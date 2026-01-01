@@ -151,14 +151,15 @@
             background: rgba(0, 0, 0, 0.2);
             backdrop-filter: blur(8px);
             border-radius: 1rem;
-            padding: 0.75rem 1rem;
+            padding: 0.5rem 0.75rem;
             color: white;
             text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
-            display: flex;
+            display: inline-flex;
             align-items: center;
-            gap: 0.5rem;
+            gap: 0.35rem;
             font-family: 'Nunito', sans-serif;
             transition: opacity 0.3s ease;
+            width: auto;
         }
 
         .weather-widget.loading {
@@ -188,14 +189,15 @@
         .weather-display {
             display: flex;
             align-items: center;
-            gap: 0.25rem;
+            gap: 0.15rem;
             font-size: 1.5rem;
             font-weight: 500;
         }
 
         .weather-icon {
-            font-size: 2rem;
+            font-size: 1.75rem;
             line-height: 1;
+            display: inline-block;
         }
     </style>
 </head>
@@ -317,7 +319,7 @@
                 <div class="date-display" id="dateDisplay">---</div>
             </div>
             <div class="weather-display">
-                <span class="weather-icon material-icons" id="weatherIcon" style="font-size: 2rem;">wb_sunny</span>
+                <span class="weather-icon" id="weatherIcon">☀</span>
                 <span id="tempDisplay">--°</span>
             </div>
         </div>
@@ -1154,17 +1156,17 @@
             }
 
             getWeatherEmoji(code) {
-                // WMO Weather interpretation codes - using Material Icons
-                if (code === 0) return 'wb_sunny'; // Clear sky
-                if (code <= 3) return 'partly_cloudy_day'; // Partly cloudy
-                if (code <= 48) return 'foggy'; // Fog
-                if (code <= 57) return 'water_drop'; // Drizzle
-                if (code <= 67) return 'rainy'; // Rain
-                if (code <= 77) return 'ac_unit'; // Snow
-                if (code <= 82) return 'rainy'; // Rain showers
-                if (code <= 86) return 'weather_snowy'; // Snow showers
-                if (code <= 99) return 'thunderstorm'; // Thunderstorm
-                return 'cloud'; // Default
+                // WMO Weather interpretation codes - using Unicode symbols
+                if (code === 0) return '☀'; // Clear sky
+                if (code <= 3) return '⛅'; // Partly cloudy
+                if (code <= 48) return '🌫'; // Fog
+                if (code <= 57) return '💧'; // Drizzle
+                if (code <= 67) return '🌧'; // Rain
+                if (code <= 77) return '❄'; // Snow
+                if (code <= 82) return '🌧'; // Rain showers
+                if (code <= 86) return '🌨'; // Snow showers
+                if (code <= 99) return '⛈'; // Thunderstorm
+                return '☁'; // Default
             }
         }
 

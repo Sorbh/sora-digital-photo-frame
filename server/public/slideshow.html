@@ -1203,20 +1203,25 @@
             window.slideshow = new PhotoFrameSlideshow();
             window.weatherWidget = new WeatherWidget();
 
-            document.addEventListener('authenticationComplete', (e) => {
+            document.addEventListener('authenticationComplete', async (e) => {
                 console.log('Authentication complete, starting slideshow for:', e.detail.account.name);
 
                 window.slideshow.hideError();
                 window.slideshow.initializeFolderSelector();
 
-                // Wait for folder selector to refresh before starting slideshow
-                setTimeout(async () => {
-                    if (window.slideshow && window.slideshow.folderSelector) {
+                // Wait for folder selector to load folders before starting slideshow
+                if (window.slideshow && window.slideshow.folderSelector) {
+                    try {
                         await window.slideshow.folderSelector.refresh();
+                        // Start slideshow only after folders are loaded
+                        await window.slideshow.startSlideshow();
+                    } catch (error) {
+                        console.error('Failed to initialize slideshow:', error);
+                        window.slideshow.showError('Failed to load folders');
                     }
-                    // Start slideshow after folders are loaded
+                } else {
                     window.slideshow.startSlideshow();
-                }, 500);
+                }
             });
 
             window.addEventListener('beforeunload', () => {

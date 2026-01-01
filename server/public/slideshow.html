@@ -141,6 +141,66 @@
         .auth-overlay.hidden {
             display: none;
         }
+
+        /* Weather and Clock Widget */
+        .weather-widget {
+            position: absolute;
+            top: 1rem;
+            left: 1rem;
+            z-index: 15;
+            background: rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(8px);
+            border-radius: 1rem;
+            padding: 0.5rem 0.75rem;
+            color: white;
+            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            font-family: 'Nunito', sans-serif;
+            transition: opacity 0.3s ease;
+            width: auto;
+        }
+
+        .weather-widget.loading {
+            opacity: 0.5;
+        }
+
+        .time-display {
+            font-size: 2rem;
+            font-weight: 600;
+            line-height: 1;
+        }
+        
+        .date-display {
+            font-size: 0.85rem;
+            font-weight: 400;
+            opacity: 0.8;
+            margin-top: 0.15rem;
+            line-height: 1;
+        }
+        
+        .time-section {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .weather-display {
+            display: flex;
+            align-items: center;
+            gap: 0.15rem;
+            font-size: 1.5rem;
+            font-weight: 500;
+        }
+
+        .weather-icon {
+            font-size: 1.75rem;
+            line-height: 1;
+            display: inline-block;
+            margin-left: -11.5rem;
+            margin-right: -8.5rem;
+        }
     </style>
 </head>
 
@@ -254,6 +314,18 @@
             </button>
         </div>
 
+        <!-- Weather and Clock Widget -->
+        <div class="weather-widget" id="weatherWidget">
+            <div class="time-section">
+                <div class="time-display" id="timeDisplay">--:--</div>
+                <div class="date-display" id="dateDisplay">---</div>
+            </div>
+            <div class="weather-display">
+                <span class="weather-icon material-icons" id="weatherIcon">wb_sunny</span>
+                <span id="tempDisplay">--°</span>
+            </div>
+        </div>
+
         <!-- Info Overlay -->
         <div class="info-overlay hidden" id="infoOverlay">
             <div class="card bg-background/90 backdrop-blur-md">
@@ -302,6 +374,11 @@
                 });
 
                 this.pinInput.addEventListener('keypress', (e) => {
+                    // Allow Enter key to submit form
+                    if (e.key === 'Enter') {
+                        return;
+                    }
+                    // Only allow numeric input
                     if (!/[0-9]/.test(e.key) && e.key !== 'Backspace' && e.key !== 'Delete' && e.key !== 'Tab') {
                         e.preventDefault();
                     }
@@ -903,24 +980,248 @@
             }
         }
 
+        // Weather and Clock Widget
+        class WeatherWidget {
+            constructor() {
+                this.timeDisplay = document.getElementById('timeDisplay');
+                this.dateDisplay = document.getElementById('dateDisplay');
+                this.weatherIcon = document.getElementById('weatherIcon');
+                this.tempDisplay = document.getElementById('tempDisplay');
+                this.widget = document.getElementById('weatherWidget');
+                
+                this.lat = null;
+                this.lon = null;
+                this.weatherData = null;
+                this.updateInterval = null;
+                this.weatherInterval = null;
+                
+                this.checkAndInit();
+            }
+
+            checkAndInit() {
+                // Check if weather widget is enabled (default: true)
+                const enabled = localStorage.getItem('weatherWidgetEnabled') !== 'false';
+                
+                if (enabled) {
+                    this.show();
+                    this.init();
+                } else {
+                    this.hide();
+                }
+                
+                // Update date display visibility
+                this.updateDateVisibility();
+                
+                // Update widget opacity
+                this.updateOpacity();
+                
+                // Listen for changes in localStorage
+                window.addEventListener('storage', (e) => {
+                    if (e.key === 'weatherWidgetEnabled') {
+                        const isEnabled = e.newValue !== 'false';
+                        if (isEnabled) {
+                            this.show();
+                            if (!this.updateInterval) this.init();
+                        } else {
+                            this.hide();
+                        }
+                    }
+                    // Update temperature display when unit changes
+                    if (e.key === 'temperatureUnit' && this.weatherData) {
+                        this.updateTemperatureDisplay();
+                    }
+                    // Update date display when toggled
+                    if (e.key === 'dateDisplayEnabled') {
+                        this.updateDateVisibility();
+                    }
+                    // Update time display when format changes
+                    if (e.key === 'timeFormat') {
+                        this.updateTime();
+                    }
+                    // Update widget opacity when changed
+                    if (e.key === 'widgetOpacity') {
+                        this.updateOpacity();
+                    }
+                });
+            }
+
+            show() {
+                if (this.widget) this.widget.style.display = 'flex';
+            }
+
+            hide() {
+                if (this.widget) this.widget.style.display = 'none';
+                this.cleanup();
+            }
+            
+            updateDateVisibility() {
+                const enabled = localStorage.getItem('dateDisplayEnabled') !== 'false';
+                if (this.dateDisplay) {
+                    this.dateDisplay.style.display = enabled ? 'block' : 'none';
+                }
+            }
+            
+            updateOpacity() {
+                const opacity = parseInt(localStorage.getItem('widgetOpacity') || '100');
+                if (this.widget) {
+                    // Apply background opacity to the widget
+                    const bgOpacity = opacity / 100;
+                    this.widget.style.background = `rgba(0, 0, 0, ${bgOpacity * 0.2})`;
+                    
+                    // Make text 20% more opaque than widget (capped at 100%)
+                    const textOpacity = Math.min(opacity + 20, 100) / 100;
+                    
+                    // Apply to all text elements
+                    if (this.timeDisplay) this.timeDisplay.style.opacity = textOpacity;
+                    if (this.dateDisplay) this.dateDisplay.style.opacity = textOpacity;
+                    if (this.weatherIcon) this.weatherIcon.style.opacity = textOpacity;
+                    if (this.tempDisplay) this.tempDisplay.style.opacity = textOpacity;
+                }
+            }
+
+            cleanup() {
+                if (this.updateInterval) {
+                    clearInterval(this.updateInterval);
+                    this.updateInterval = null;
+                }
+                if (this.weatherInterval) {
+                    clearInterval(this.weatherInterval);
+                    this.weatherInterval = null;
+                }
+            }
+
+            async init() {
+                this.updateTime();
+                this.updateInterval = setInterval(() => this.updateTime(), 1000);
+                
+                await this.getLocation();
+                await this.updateWeather();
+                
+                // Update weather every 10 minutes
+                this.weatherInterval = setInterval(() => this.updateWeather(), 10 * 60 * 1000);
+            }
+
+            updateTime() {
+                const now = new Date();
+                const format = localStorage.getItem('timeFormat') || '24';
+                
+                let timeStr;
+                if (format === '12') {
+                    let hours = now.getHours();
+                    const ampm = hours >= 12 ? 'PM' : 'AM';
+                    hours = hours % 12;
+                    hours = hours ? hours : 12; // 0 should be 12
+                    const minutes = now.getMinutes().toString().padStart(2, '0');
+                    timeStr = `${hours}:${minutes} ${ampm}`;
+                } else {
+                    const hours = now.getHours().toString().padStart(2, '0');
+                    const minutes = now.getMinutes().toString().padStart(2, '0');
+                    timeStr = `${hours}:${minutes}`;
+                }
+                
+                this.timeDisplay.textContent = timeStr;
+                
+                // Update date (e.g., "Mon, Jan 1")
+                const options = { weekday: 'short', month: 'short', day: 'numeric' };
+                const dateStr = now.toLocaleDateString('en-US', options);
+                this.dateDisplay.textContent = dateStr;
+            }
+
+            async getLocation() {
+                try {
+                    // Use ipapi.co for simple IP geolocation (no API key needed)
+                    const response = await fetch('https://ipapi.co/json/');
+                    const data = await response.json();
+                    
+                    if (data.latitude && data.longitude) {
+                        this.lat = data.latitude;
+                        this.lon = data.longitude;
+                    }
+                } catch (error) {
+                    console.error('Failed to get location:', error);
+                }
+            }
+
+            async updateWeather() {
+                if (!this.lat || !this.lon) return;
+
+                try {
+                    this.widget.classList.add('loading');
+                    
+                    // Use Open-Meteo API (free, no API key required)
+                    const response = await fetch(
+                        `https://api.open-meteo.com/v1/forecast?latitude=${this.lat}&longitude=${this.lon}&current=temperature_2m,weather_code&timezone=auto`
+                    );
+                    const data = await response.json();
+                    
+                    if (data.current) {
+                        this.weatherData = data.current;
+                        const weatherCode = data.current.weather_code;
+                        
+                        this.updateTemperatureDisplay();
+                        this.weatherIcon.textContent = this.getWeatherEmoji(weatherCode);
+                    }
+                } catch (error) {
+                    console.error('Failed to fetch weather:', error);
+                } finally {
+                    this.widget.classList.remove('loading');
+                }
+            }
+
+            updateTemperatureDisplay() {
+                if (!this.weatherData) return;
+                
+                const tempC = Math.round(this.weatherData.temperature_2m);
+                const unit = localStorage.getItem('temperatureUnit') || 'C';
+                
+                if (unit === 'F') {
+                    const tempF = Math.round((tempC * 9/5) + 32);
+                    this.tempDisplay.textContent = `${tempF}°F`;
+                } else {
+                    this.tempDisplay.textContent = `${tempC}°C`;
+                }
+            }
+
+            getWeatherEmoji(code) {
+                // WMO Weather interpretation codes - using Material Icons
+                if (code === 0) return 'wb_sunny'; // Clear sky
+                if (code <= 3) return 'partly_cloudy_day'; // Partly cloudy
+                if (code <= 48) return 'foggy'; // Fog
+                if (code <= 57) return 'water_drop'; // Drizzle
+                if (code <= 67) return 'rainy'; // Rain
+                if (code <= 77) return 'ac_unit'; // Snow
+                if (code <= 82) return 'rainy'; // Rain showers
+                if (code <= 86) return 'weather_snowy'; // Snow showers
+                if (code <= 99) return 'thunderstorm'; // Thunderstorm
+                return 'cloud'; // Default
+            }
+        }
+
         // Initialize when DOM is loaded
         document.addEventListener('DOMContentLoaded', () => {
             window.authManager = new AuthenticationManager();
             window.slideshow = new PhotoFrameSlideshow();
+            window.weatherWidget = new WeatherWidget();
 
-            document.addEventListener('authenticationComplete', (e) => {
+            document.addEventListener('authenticationComplete', async (e) => {
                 console.log('Authentication complete, starting slideshow for:', e.detail.account.name);
 
                 window.slideshow.hideError();
                 window.slideshow.initializeFolderSelector();
 
-                setTimeout(() => {
-                    if (window.slideshow && window.slideshow.folderSelector) {
-                        window.slideshow.folderSelector.refresh();
+                // Wait for folder selector to load folders before starting slideshow
+                if (window.slideshow && window.slideshow.folderSelector) {
+                    try {
+                        await window.slideshow.folderSelector.refresh();
+                        // Start slideshow only after folders are loaded
+                        await window.slideshow.startSlideshow();
+                    } catch (error) {
+                        console.error('Failed to initialize slideshow:', error);
+                        window.slideshow.showError('Failed to load folders');
                     }
-                }, 500);
-
-                window.slideshow.startSlideshow();
+                } else {
+                    window.slideshow.startSlideshow();
+                }
             });
 
             window.addEventListener('beforeunload', () => {

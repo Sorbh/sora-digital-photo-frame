@@ -1022,6 +1022,10 @@
                     if (e.key === 'dateDisplayEnabled') {
                         this.updateDateVisibility();
                     }
+                    // Update time display when format changes
+                    if (e.key === 'timeFormat') {
+                        this.updateTime();
+                    }
                 });
             }
 
@@ -1065,9 +1069,23 @@
 
             updateTime() {
                 const now = new Date();
-                const hours = now.getHours().toString().padStart(2, '0');
-                const minutes = now.getMinutes().toString().padStart(2, '0');
-                this.timeDisplay.textContent = `${hours}:${minutes}`;
+                const format = localStorage.getItem('timeFormat') || '24';
+                
+                let timeStr;
+                if (format === '12') {
+                    let hours = now.getHours();
+                    const ampm = hours >= 12 ? 'PM' : 'AM';
+                    hours = hours % 12;
+                    hours = hours ? hours : 12; // 0 should be 12
+                    const minutes = now.getMinutes().toString().padStart(2, '0');
+                    timeStr = `${hours}:${minutes} ${ampm}`;
+                } else {
+                    const hours = now.getHours().toString().padStart(2, '0');
+                    const minutes = now.getMinutes().toString().padStart(2, '0');
+                    timeStr = `${hours}:${minutes}`;
+                }
+                
+                this.timeDisplay.textContent = timeStr;
                 
                 // Update date (e.g., "Mon, Jan 1")
                 const options = { weekday: 'short', month: 'short', day: 'numeric' };

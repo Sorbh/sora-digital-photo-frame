@@ -370,6 +370,11 @@
                 });
 
                 this.pinInput.addEventListener('keypress', (e) => {
+                    // Allow Enter key to submit form
+                    if (e.key === 'Enter') {
+                        return;
+                    }
+                    // Only allow numeric input
                     if (!/[0-9]/.test(e.key) && e.key !== 'Backspace' && e.key !== 'Delete' && e.key !== 'Tab') {
                         e.preventDefault();
                     }

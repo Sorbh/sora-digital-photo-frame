@@ -1,11 +1,20 @@
 const request = require('supertest');
 const path = require('path');
 const fs = require('fs-extra');
-const app = require('../server'); // Assuming server exports the app
+const sharp = require('sharp');
+
+// Point the app at throwaway folders before it loads
+const testUploadsDir = path.join(__dirname, 'test-uploads');
+const testCacheDir = path.join(__dirname, 'test-cache');
+process.env.UPLOAD_DIR = testUploadsDir;
+process.env.CACHE_DIR = testCacheDir;
+process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
+process.env.ADMIN_PASSWORD = 'test-admin-pass';
+
+const app = require('../server');
 
 describe('Folder Controller API', () => {
   let server;
-  const testUploadsDir = path.join(__dirname, 'test-uploads');
   
   beforeAll(async () => {
     // Create test folder structure
@@ -13,21 +22,21 @@ describe('Folder Controller API', () => {
     await fs.ensureDir(path.join(testUploadsDir, 'vacation/2023'));
     await fs.ensureDir(path.join(testUploadsDir, 'family'));
     
-    // Create dummy test images (minimal valid JPEG files)
-    const minimalJpeg = Buffer.from([
-      0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46, 0x00, 0x01,
-      0x01, 0x01, 0x00, 0x48, 0x00, 0x48, 0x00, 0x00, 0xFF, 0xDB, 0x00, 0x43,
-      0x00, 0xFF, 0xD9
-    ]);
-    
-    await fs.writeFile(path.join(testUploadsDir, 'vacation/beach.jpg'), minimalJpeg);
-    await fs.writeFile(path.join(testUploadsDir, 'vacation/2023/sunset.jpg'), minimalJpeg);
-    await fs.writeFile(path.join(testUploadsDir, 'family/portrait.jpg'), minimalJpeg);
+    // Small real JPEGs, so thumbnails can be generated from them
+    const jpeg = await sharp({
+      create: { width: 32, height: 24, channels: 3, background: '#c2185b' }
+    }).jpeg().toBuffer();
+
+    await fs.writeFile(path.join(testUploadsDir, 'vacation/beach.jpg'), jpeg);
+    await fs.writeFile(path.join(testUploadsDir, 'vacation/2023/sunset.jpg'), jpeg);
+    await fs.writeFile(path.join(testUploadsDir, 'family/portrait.jpg'), jpeg);
+    await fs.writeFile(path.join(testUploadsDir, 'family/beach.jpg'), jpeg);
   });
   
   afterAll(async () => {
     // Clean up test files
     await fs.remove(testUploadsDir);
+    await fs.remove(testCacheDir);
     if (server) {
       server.close();
     }
@@ -115,7 +124,7 @@ describe('Folder Controller API', () => {
         .get('/api/folders/vacation/thumbnail')
         .expect(200);
       
-      expect(response.headers['content-type']).toBe('image/jpeg');
+      expect(response.headers['content-type']).toBe('image/webp');
       expect(response.body).toBeInstanceOf(Buffer);
     });
     
@@ -142,7 +151,7 @@ describe('Folder Controller API', () => {
         .get('/api/images/vacation%2Fbeach.jpg/thumbnail')
         .expect(200);
       
-      expect(response.headers['content-type']).toBe('image/jpeg');
+      expect(response.headers['content-type']).toBe('image/webp');
       expect(response.body).toBeInstanceOf(Buffer);
     });
     
@@ -153,6 +162,51 @@ describe('Folder Controller API', () => {
       
       expect(response.body.success).toBe(false);
       expect(response.body.code).toBe('IMAGE_NOT_FOUND');
+    });
+  });
+
+  describe('POST /api/images/move', () => {
+    const agent = request.agent(app);
+
+    beforeAll(async () => {
+      await agent.post('/api/auth/login').send({ password: 'test-admin-pass' }).expect(200);
+    });
+
+    test('should require authentication', async () => {
+      await request(app)
+        .post('/api/images/move')
+        .send({ paths: ['uploads/family/portrait.jpg'], destination: 'uploads/vacation' })
+        .expect(401);
+    });
+
+    test('should move a photo into another folder', async () => {
+      const response = await agent
+        .post('/api/images/move')
+        .send({ paths: ['uploads/family/portrait.jpg'], destination: 'uploads/vacation' })
+        .expect(200);
+
+      expect(response.body.movedCount).toBe(1);
+      expect(await fs.pathExists(path.join(testUploadsDir, 'vacation/portrait.jpg'))).toBe(true);
+      expect(await fs.pathExists(path.join(testUploadsDir, 'family/portrait.jpg'))).toBe(false);
+    });
+
+    test('should not overwrite a photo with the same name', async () => {
+      await agent
+        .post('/api/images/move')
+        .send({ paths: ['uploads/family/beach.jpg'], destination: 'uploads/vacation' })
+        .expect(200);
+
+      expect(await fs.pathExists(path.join(testUploadsDir, 'vacation/beach.jpg'))).toBe(true);
+      expect(await fs.pathExists(path.join(testUploadsDir, 'vacation/beach-1.jpg'))).toBe(true);
+    });
+
+    test('should reject destinations outside uploads', async () => {
+      await agent
+        .post('/api/images/move')
+        .send({ paths: ['uploads/vacation/beach.jpg'], destination: 'uploads/../../' })
+        .expect(404);
+
+      expect(await fs.pathExists(path.join(testUploadsDir, 'vacation/beach.jpg'))).toBe(true);
     });
   });
 });

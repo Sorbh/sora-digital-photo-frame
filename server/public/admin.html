@@ -3,13 +3,18 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Digital Photo Frame Admin</title>
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#d6336a">
+    <title>Library · Sora Frame</title>
+    <link rel="icon" href="/icons/favicon.ico" sizes="48x48">
+    <link rel="icon" href="/icons/favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+    <link rel="manifest" href="/icons/site.webmanifest">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/basecoat-css@0.3.1/dist/basecoat.cdn.min.css">
     <script src="https://cdn.jsdelivr.net/npm/basecoat-css@0.3.1/dist/js/basecoat.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/basecoat-css@0.3.1/dist/js/toast.min.js" defer></script>
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
+    <link rel="stylesheet" href="/css/sora.css">
+    <link rel="stylesheet" href="/css/tailwind.css">
 
     <!-- Theme Switcher Script -->
     <script>
@@ -51,927 +56,78 @@
         })();
     </script>
 
-    <style>
-        /* Basecoat-style body CSS with theme support */
-        body {
-
-            background: var(--background);
-            color: var(--foreground);
-            overscroll-behavior: none;
-            -webkit-font-smoothing: antialiased;
-            -moz-osx-font-smoothing: grayscale;
-        }
-
-        /* Custom admin-specific styles - minimal usage */
-        .app {
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .main-content {
-            flex: 1;
-            padding: 1rem;
-        }
-
-        /* Admin Grid - Fixed size cells like original design */
-        .admin-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, 140px);
-            gap: 1rem;
-            justify-content: start;
-        }
-
-        /* File items - using basecoat card styling */
-        .admin-grid>div {
-            width: 140px;
-            height: 140px;
-            background: var(--card);
-            border: 2px solid var(--border);
-            border-radius: 12px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            position: relative;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            text-align: center;
-        }
-
-        .admin-grid>div:hover {
-            border-color: var(--primary);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-            transform: translateY(-2px);
-        }
-
-        /* Folder styling */
-        .admin-grid>div.folder {
-            padding: 0.75rem;
-        }
-
-        .admin-grid>div.folder img {
-            width: 48px;
-            height: 48px;
-            object-fit: contain;
-            margin-bottom: 0.5rem;
-            transition: transform 0.2s ease, filter 0.2s ease;
-            /* Light theme - folder color matches foreground */
-            filter: brightness(0) saturate(100%) invert(14%) sepia(8%) saturate(928%) hue-rotate(201deg) brightness(93%) contrast(96%);
-        }
-
-        /* Dark theme - folder color matches foreground in dark mode */
-        .dark .admin-grid>div.folder img {
-            filter: brightness(0) saturate(100%) invert(98%) sepia(2%) saturate(1077%) hue-rotate(218deg) brightness(109%) contrast(94%);
-        }
-
-        .admin-grid>div.folder:hover img {
-            transform: scale(1.1);
-        }
-
-        .admin-grid>div.folder span {
-            font-size: 0.875rem;
-            font-weight: 500;
-            color: var(--foreground);
-            word-wrap: break-word;
-            line-height: 1.3;
-            max-width: 100%;
-        }
-
-        /* Image styling */
-        .admin-grid>div.image {
-            padding: 0;
-        }
-
-        /* Image container */
-        .admin-grid>div.image .admin-photo-image {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-            background: var(--muted);
-        }
-
-        .admin-grid>div.image .admin-photo-image img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            transition: transform 0.3s ease;
-        }
-
-        /* Hover overlay with controls - hidden by default */
-        .admin-grid>div.image .photo-grid-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: linear-gradient(135deg,
-                    rgba(0, 0, 0, 0.1) 0%,
-                    rgba(0, 0, 0, 0.3) 50%,
-                    rgba(0, 0, 0, 0.5) 100%);
-            opacity: 0;
-            visibility: hidden;
-            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            padding: 0.75rem;
-            z-index: 5;
-            backdrop-filter: blur(2px);
-        }
-
-        /* Show overlay on hover or when selected */
-        .admin-grid>div.image:hover .photo-grid-overlay,
-        .admin-grid>div.image.selected .photo-grid-overlay {
-            opacity: 1;
-            visibility: visible;
-        }
-
-        /* Top row with checkbox */
-        .photo-grid-overlay-top {
-            display: flex;
-            justify-content: flex-start;
-            align-items: flex-start;
-        }
-
-        /* Bottom row with action buttons */
-        .photo-grid-overlay-bottom {
-            display: flex;
-            justify-content: flex-end;
-            align-items: flex-end;
-        }
-
-        /* Action buttons container - horizontal layout */
-        .photo-grid-actions {
-            display: flex;
-            gap: 0.5rem;
-            align-items: center;
-        }
-
-        /* Action buttons styling - Enhanced with better visuals */
-        .photo-grid-actions .btn-icon {
-            width: 36px;
-            height: 36px;
-            border-radius: var(--radius-lg);
-            background: rgba(255, 255, 255, 0.15);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            color: white;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-            backdrop-filter: blur(8px);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .photo-grid-actions .btn-icon::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(255, 255, 255, 0.1);
-            opacity: 0;
-            transition: opacity 0.2s ease;
-        }
-
-        .photo-grid-actions .btn-icon:hover {
-            transform: scale(1.1);
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
-            border-color: rgba(255, 255, 255, 0.4);
-        }
-
-        .photo-grid-actions .btn-icon:hover::before {
-            opacity: 1;
-        }
-
-        .photo-grid-actions .btn-icon:active {
-            transform: scale(0.95);
-        }
-
-        .photo-grid-actions .btn-icon:focus-visible {
-            outline: 2px solid var(--ring);
-            outline-offset: 2px;
-        }
-
-        .photo-grid-actions .btn-icon .material-symbols-outlined {
-            font-size: 18px;
-            font-weight: 500;
-            z-index: 1;
-            position: relative;
-        }
-
-        /* Enhanced Delete button styling */
-        .photo-grid-actions .btn-icon[data-action="delete"] {
-            background: rgba(220, 38, 38, 0.2);
-            border-color: rgba(220, 38, 38, 0.3);
-        }
-
-        .photo-grid-actions .btn-icon[data-action="delete"]:hover {
-            background: var(--destructive);
-            color: var(--destructive-foreground);
-            border-color: var(--destructive);
-            box-shadow: 0 4px 16px rgba(220, 38, 38, 0.4);
-        }
-
-        /* Enhanced View button styling */
-        .photo-grid-actions .btn-icon[data-action="view"] {
-            background: rgba(59, 130, 246, 0.2);
-            border-color: rgba(59, 130, 246, 0.3);
-        }
-
-        .photo-grid-actions .btn-icon[data-action="view"]:hover {
-            background: var(--primary);
-            color: var(--primary-foreground);
-            border-color: var(--primary);
-            box-shadow: 0 4px 16px rgba(59, 130, 246, 0.4);
-        }
-
-        /* Checkbox container styling for photo grid overlay */
-        .photo-grid-checkbox {
-            background: rgba(0, 0, 0, 0.6);
-            border-radius: var(--radius-sm);
-            padding: 6px;
-            backdrop-filter: blur(4px);
-            transition: all var(--transition-fast);
-        }
-
-        .photo-grid-checkbox:hover {
-            background: rgba(0, 0, 0, 0.7);
-            transform: scale(1.05);
-        }
-
-        .photo-grid-checkbox .label {
-            margin: 0;
-            cursor: pointer;
-            gap: 0;
-        }
-
-        /* Screen reader only text */
-        .sr-only {
-            position: absolute;
-            width: 1px;
-            height: 1px;
-            padding: 0;
-            margin: -1px;
-            overflow: hidden;
-            clip: rect(0, 0, 0, 0);
-            white-space: nowrap;
-            border: 0;
-        }
-
-        /* Image info bar at bottom */
-        .admin-grid>div.image .photo-grid-info {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            padding: 0.5rem;
-            background: linear-gradient(to top, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0.4) 80%, transparent 100%);
-            color: white;
-            backdrop-filter: blur(2px);
-            z-index: 2;
-        }
-
-        .admin-grid>div.image .photo-grid-name {
-            font-size: 0.875rem;
-            font-weight: 500;
-            color: white;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        /* Selected state - Enhanced visual feedback */
-        .admin-grid>div.image.selected {
-            border-color: var(--primary);
-            box-shadow: 0 0 0 2px var(--primary), 0 4px 12px rgba(0, 0, 0, 0.25);
-            transform: translateY(-1px);
-        }
-
-        .admin-grid>div.image.selected::after {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: linear-gradient(135deg,
-                    rgba(var(--primary-rgb), 0.15) 0%,
-                    rgba(var(--primary-rgb), 0.05) 50%,
-                    rgba(var(--primary-rgb), 0.15) 100%);
-            border-radius: 12px;
-            pointer-events: none;
-            z-index: 1;
-        }
-
-
-        /* Responsive design */
-        @media (max-width: 768px) {
-            .admin-grid {
-                grid-template-columns: repeat(auto-fill, 110px);
-                gap: 0.5rem;
-            }
-
-            .admin-grid>div {
-                width: 110px;
-                height: 110px;
-            }
-
-            .admin-grid>div.folder img {
-                width: 36px;
-                height: 36px;
-            }
-
-            .admin-grid>div.folder span {
-                font-size: 0.75rem;
-            }
-        }
-
-        .spinner {
-            width: 16px;
-            height: 16px;
-            border: 2px solid transparent;
-            border-top: 2px solid currentColor;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-            to {
-                transform: rotate(360deg);
-            }
-        }
-
-        .hidden {
-            display: none !important;
-        }
-
-        /* Empty state styling */
-        .empty-state {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            min-height: 400px;
-            padding: 2rem;
-        }
-
-        .empty-state .upload-drop-zone:hover {
-            background-color: var(--muted);
-            opacity: 0.8;
-        }
-
-        .empty-state .upload-drop-zone:active {
-            transform: scale(0.98);
-        }
-
-        .empty-state .upload-drop-zone.dragover {
-            background-color: var(--muted);
-            border-color: var(--primary);
-            transform: scale(1.02);
-        }
-
-        /* Context Menu Items - Following Basecoat dropdown menu pattern */
-        .menu-item {
-            display: flex;
-            align-items: center;
-            padding: 0.5rem 0.75rem;
-            cursor: pointer;
-            transition: background-color 0.2s ease;
-            gap: 0.5rem;
-            font-size: 0.875rem;
-            color: var(--foreground);
-            border-radius: 4px;
-            margin: 1px;
-        }
-
-        .menu-item:hover {
-            background-color: var(--muted);
-        }
-
-        .menu-item .material-symbols-outlined {
-            font-size: 16px;
-            color: var(--muted-foreground);
-        }
-
-        .menu-item-destructive {
-            color: var(--destructive);
-        }
-
-        .menu-item-destructive:hover {
-            background-color: var(--destructive);
-            color: var(--destructive-foreground);
-        }
-
-        .menu-item-destructive:hover .material-symbols-outlined {
-            color: var(--destructive-foreground);
-        }
-
-        /* Tooltip styling - Following Basecoat design patterns */
-        [data-tooltip] {
-            position: relative;
-        }
-
-        [data-tooltip]::before {
-            content: attr(data-tooltip);
-            position: absolute;
-            bottom: calc(100% + 8px);
-            left: 50%;
-            transform: translateX(-50%);
-            background: var(--popover);
-            color: var(--popover-foreground);
-            padding: 0.5rem 0.75rem;
-            border-radius: var(--radius-md);
-            font-size: 0.875rem;
-            font-weight: 500;
-            white-space: nowrap;
-            opacity: 0;
-            visibility: hidden;
-            transition: all var(--transition-fast);
-            z-index: 1000;
-            border: 1px solid var(--border);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-        }
-
-        [data-tooltip]::after {
-            content: '';
-            position: absolute;
-            bottom: calc(100% + 2px);
-            left: 50%;
-            transform: translateX(-50%);
-            border: 4px solid transparent;
-            border-top-color: var(--popover);
-            opacity: 0;
-            visibility: hidden;
-            transition: all var(--transition-fast);
-            z-index: 1001;
-        }
-
-        [data-tooltip]:hover::before,
-        [data-tooltip]:hover::after {
-            opacity: 1;
-            visibility: visible;
-        }
-
-        /* Enhanced FAB Component with Better Badge */
-        .selection-fab {
-            position: fixed;
-            bottom: 1.5rem;
-            right: 1.5rem;
-            z-index: 150;
-            opacity: 0;
-            transform: translateY(100px) scale(0.8);
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        .selection-fab:not(.hidden) {
-            opacity: 1;
-            transform: translateY(0) scale(1);
-        }
-
-        .fab-button {
-            width: 64px;
-            height: 64px;
-            border-radius: 50%;
-            background: var(--destructive);
-            color: var(--destructive-foreground);
-            border: none;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 4px 16px -4px rgba(0, 0, 0, 0.3),
-                0 8px 32px -8px rgba(0, 0, 0, 0.2);
-            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .fab-button::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: linear-gradient(135deg,
-                    rgba(255, 255, 255, 0.2) 0%,
-                    rgba(255, 255, 255, 0.05) 50%,
-                    rgba(0, 0, 0, 0.1) 100%);
-            border-radius: 50%;
-            transition: opacity 0.2s ease;
-        }
-
-        .fab-button:hover {
-            transform: scale(1.05);
-            box-shadow: 0 6px 20px -4px rgba(0, 0, 0, 0.4),
-                0 12px 40px -8px rgba(0, 0, 0, 0.3);
-        }
-
-        .fab-button:hover::before {
-            opacity: 0.8;
-        }
-
-        .fab-button:active {
-            transform: scale(0.95);
-        }
-
-        .fab-button:focus-visible {
-            outline: 2px solid var(--ring);
-            outline-offset: 2px;
-        }
-
-        .fab-button .material-symbols-outlined {
-            font-size: 28px;
-            font-weight: 400;
-            z-index: 1;
-            position: relative;
-        }
-
-        .fab-badge {
-            position: absolute;
-            top: -6px;
-            right: -6px;
-            background: var(--primary);
-            color: var(--primary-foreground);
-            border-radius: 50%;
-            min-width: 28px;
-            height: 28px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.875rem;
-            font-weight: 700;
-            border: 3px solid var(--background);
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-            animation: pulse-in 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        .fab-badge.updated {
-            animation: bounce-badge 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-        }
-
-        @keyframes pulse-in {
-            0% {
-                transform: scale(0);
-                opacity: 0;
-            }
-
-            50% {
-                transform: scale(1.2);
-            }
-
-            100% {
-                transform: scale(1);
-                opacity: 1;
-            }
-        }
-
-        @keyframes bounce-badge {
-
-            0%,
-            100% {
-                transform: scale(1);
-            }
-
-            25% {
-                transform: scale(1.25);
-            }
-
-            50% {
-                transform: scale(0.9);
-            }
-
-            75% {
-                transform: scale(1.1);
-            }
-        }
-
-        /* Enhanced Photo Modal Dialog */
-        .photo-modal-dialog {
-            padding: 0;
-            border: none;
-            background: rgba(0, 0, 0, 0.97);
-            backdrop-filter: blur(8px);
-            width: 100vw;
-            height: 100vh;
-            max-width: 100vw;
-            max-height: 100vh;
-            margin: 0;
-            animation: modal-fade-in 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        .photo-modal-dialog::backdrop {
-            background: rgba(0, 0, 0, 0.9);
-            animation: backdrop-fade-in 0.3s ease;
-        }
-
-        @keyframes modal-fade-in {
-            from {
-                opacity: 0;
-                transform: scale(0.9);
-            }
-
-            to {
-                opacity: 1;
-                transform: scale(1);
-            }
-        }
-
-        @keyframes backdrop-fade-in {
-            from {
-                opacity: 0;
-            }
-
-            to {
-                opacity: 1;
-            }
-        }
-
-        .photo-modal-content {
-            position: relative;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            width: 100%;
-            height: 100%;
-            padding: 2rem;
-        }
-
-        /* Enhanced Close Button */
-        .photo-modal-close {
-            position: absolute;
-            top: 1.5rem;
-            right: 1.5rem;
-            background: rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 50%;
-            width: 56px;
-            height: 56px;
-            color: white;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-            z-index: 1001;
-            backdrop-filter: blur(12px);
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
-        }
-
-        .photo-modal-close::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: linear-gradient(135deg,
-                    rgba(255, 255, 255, 0.1) 0%,
-                    rgba(255, 255, 255, 0.05) 50%,
-                    rgba(0, 0, 0, 0.1) 100%);
-            border-radius: 50%;
-            opacity: 0;
-            transition: opacity 0.2s ease;
-        }
-
-        .photo-modal-close:hover {
-            background: rgba(255, 255, 255, 0.15);
-            border-color: rgba(255, 255, 255, 0.3);
-            transform: scale(1.05);
-            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
-        }
-
-        .photo-modal-close:hover::before {
-            opacity: 1;
-        }
-
-        .photo-modal-close:active {
-            transform: scale(0.95);
-        }
-
-        .photo-modal-close:focus-visible {
-            outline: 2px solid var(--ring);
-            outline-offset: 2px;
-        }
-
-        .photo-modal-close .material-symbols-outlined {
-            font-size: 28px;
-            font-weight: 400;
-            z-index: 1;
-            position: relative;
-        }
-
-        /* Enhanced Tooltip for Modal */
-        .photo-modal-close::after {
-            content: 'Close Photo (ESC)';
-            position: absolute;
-            bottom: calc(100% + 12px);
-            right: 0;
-            background: rgba(0, 0, 0, 0.9);
-            color: white;
-            padding: 0.5rem 0.75rem;
-            border-radius: var(--radius-md);
-            font-size: 0.875rem;
-            font-weight: 500;
-            white-space: nowrap;
-            opacity: 0;
-            visibility: hidden;
-            transform: translateY(8px);
-            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-            z-index: 1002;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-            backdrop-filter: blur(8px);
-        }
-
-        .photo-modal-close:hover::after {
-            opacity: 1;
-            visibility: visible;
-            transform: translateY(0);
-        }
-
-        /* Enhanced Modal Photo */
-        .modal-photo {
-            max-width: calc(100vw - 4rem);
-            max-height: calc(100vh - 8rem);
-            object-fit: contain;
-            border-radius: var(--radius-lg);
-            box-shadow: 0 12px 48px rgba(0, 0, 0, 0.5),
-                0 4px 16px rgba(0, 0, 0, 0.3);
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            cursor: zoom-in;
-            user-select: none;
-        }
-
-        .modal-photo:hover {
-            box-shadow: 0 16px 64px rgba(0, 0, 0, 0.6),
-                0 8px 24px rgba(0, 0, 0, 0.4);
-        }
-
-        .modal-photo.zoomed {
-            cursor: zoom-out;
-            transform: scale(1.5);
-        }
-
-
-        /* Navigation hints */
-        .photo-modal-hints {
-            position: absolute;
-            top: 50%;
-            left: 2rem;
-            transform: translateY(-50%);
-            background: rgba(0, 0, 0, 0.7);
-            color: rgba(255, 255, 255, 0.8);
-            padding: 0.75rem 1rem;
-            border-radius: var(--radius-lg);
-            font-size: 0.875rem;
-            opacity: 0;
-            visibility: hidden;
-            transition: all 0.3s ease;
-            backdrop-filter: blur(8px);
-            pointer-events: none;
-        }
-
-        .photo-modal-content:hover .photo-modal-hints {
-            opacity: 1;
-            visibility: visible;
-        }
-
-        .photo-modal-hints ul {
-            list-style: none;
-            margin: 0;
-            padding: 0;
-            line-height: 1.6;
-        }
-
-        .photo-modal-hints li {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            margin-bottom: 0.25rem;
-        }
-
-        .photo-modal-hints li:last-child {
-            margin-bottom: 0;
-        }
-
-        .photo-modal-hints .key {
-            background: rgba(255, 255, 255, 0.2);
-            padding: 0.125rem 0.375rem;
-            border-radius: var(--radius-sm);
-            font-family: monospace;
-            font-size: 0.75rem;
-            font-weight: 600;
-        }
-
-        /* Mobile responsiveness for photo modal */
-        @media (max-width: 768px) {
-            .photo-modal-content {
-                padding: 1rem;
-            }
-
-            .photo-modal-close {
-                top: 1rem;
-                right: 1rem;
-                width: 40px;
-                height: 40px;
-            }
-
-            .photo-modal-close .material-symbols-outlined {
-                font-size: 20px;
-            }
-
-            .modal-photo {
-                max-width: calc(100vw - 2rem);
-                max-height: calc(100vh - 6rem);
-            }
-
-            .photo-modal-info {
-                bottom: 1rem;
-                padding: 0.5rem 1rem;
-                font-size: 0.875rem;
-            }
-
-            .photo-name {
-                max-width: 80vw;
-            }
-        }
-    </style>
+    <link rel="stylesheet" href="/css/admin.css">
 </head>
 
 <body>
     <div class="app">
-        <header class="flex items-center justify-between p-4 border-b bg-card">
-            <div class="flex items-center gap-4">
-                <button id="backBtn" class="btn-icon" title="Back">
-                    <span class="material-symbols-outlined">arrow_back</span>
-                </button>
-                <h1 class="text-xl font-semibold">Photo Frame Admin</h1>
+        <header class="topbar">
+            <div class="topbar-brand">
+                <a href="/admin" class="sora-wordmark" aria-label="Sora library home">Sora</a>
+                <span class="topbar-divider"></span>
+                <span class="sora-eyebrow">Library</span>
             </div>
-            <div class="flex items-center gap-2">
-                <button id="accessAccountsBtn" class="btn-outline" title="Manage Access Accounts">
-                    <span class="material-symbols-outlined">admin_panel_settings</span>
-                    Access Accounts
+            <div class="topbar-actions">
+                <button id="accessAccountsBtn" class="tb-btn tb-desktop" title="Manage access accounts">
+                    <span class="material-symbols-outlined">key</span>
+                    <span class="tb-label">Access</span>
                 </button>
-                <button id="googlePhotosBtn" class="btn-outline" title="Sync Google Photos">
-                    <span class="material-symbols-outlined">photo_library</span>
-                    Google Photos
+                <button id="googlePhotosBtn" class="tb-btn" title="Sync Google Photos">
+                    <span class="material-symbols-outlined">add_photo_alternate</span>
+                    <span class="tb-label">Google Photos</span>
                 </button>
-                <button id="createFolderBtn" class="btn" title="Create Folder">
-                    <span class="material-symbols-outlined">create_new_folder</span>
-                    New Folder
+                <a href="/slideshow" class="tb-btn tb-desktop" title="Open the slideshow">
+                    <span class="material-symbols-outlined">slideshow</span>
+                    <span class="tb-label">Slideshow</span>
+                </a>
+                <span class="topbar-divider tb-desktop"></span>
+                <button id="settingsBtn" class="tb-btn icon tb-desktop" title="Settings">
+                    <span class="material-symbols-outlined">tune</span>
                 </button>
-                <button id="uploadBtn" class="btn" title="Upload Images">
-                    <span class="material-symbols-outlined">upload</span>
-                    Upload
-                </button>
-                <button id="settingsBtn" class="btn-icon" title="Settings">
-                    <span class="material-symbols-outlined">settings</span>
-                </button>
-                <button id="themeToggle" class="btn-icon" title="Switch to dark mode">
+                <button id="themeToggle" class="tb-btn icon" title="Switch to dark mode">
                     <span class="material-symbols-outlined" id="themeIcon">brightness_auto</span>
                 </button>
-                <button id="logoutBtn" class="btn-icon" title="Logout">
+                <button id="logoutBtn" class="tb-btn icon" title="Log out">
                     <span class="material-symbols-outlined">logout</span>
                 </button>
             </div>
         </header>
 
-        <nav aria-label="Breadcrumb" class="p-4 border-b">
-            <ol id="breadcrumbContainer" class="text-muted-foreground flex flex-wrap items-center gap-1.5 text-sm">
-                <li>
-                    <span
-                        class="breadcrumb-item text-foreground font-medium cursor-pointer hover:text-foreground transition-colors"
-                        data-path="uploads">Home</span>
-                </li>
-                <!-- Dynamic breadcrumb items with separators will be added here -->
-                <!-- Example structure for JavaScript to follow:
-                <li>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" 
-                         fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="m9 18 6-6-6-6"/>
-                    </svg>
-                </li>
-                <li>
-                    <span class="breadcrumb-item text-foreground font-medium" data-path="folder-path">Folder Name</span>
-                </li>
-                -->
-            </ol>
-        </nav>
+        <section class="library-head">
+            <div class="library-title">
+                <div class="crumb-row">
+                    <button id="backBtn" class="back-btn" title="Back" aria-label="Back" style="display: none;">
+                        <span class="material-symbols-outlined">arrow_back</span>
+                    </button>
+                    <nav aria-label="Breadcrumb">
+                        <ol id="breadcrumbContainer" class="breadcrumb flex flex-wrap items-center gap-1.5">
+                            <li>
+                                <span class="breadcrumb-item text-foreground" data-path="uploads">Home</span>
+                            </li>
+                        </ol>
+                    </nav>
+                </div>
+                <h1 id="folderTitle" class="page-title sora-display">Library</h1>
+                <p id="folderMeta" class="page-meta sora-mono">&nbsp;</p>
+            </div>
+            <div class="library-actions">
+                <button id="createFolderBtn" class="btn-outline" title="Create folder">
+                    <span class="material-symbols-outlined">create_new_folder</span>
+                    New folder
+                </button>
+                <button id="uploadBtn" class="btn mobile-hide" title="Upload images">
+                    <span class="material-symbols-outlined">upload</span>
+                    Upload
+                </button>
+            </div>
+        </section>
 
         <main class="main-content">
-            <div id="dropZone" class="drop-zone hidden">
+            <!-- Shown while files from the computer are dragged over the library -->
+            <div id="dropZone" class="drop-zone" aria-hidden="true">
                 <div class="drop-zone-content">
                     <span class="material-symbols-outlined">cloud_upload</span>
-                    <p>Drop images here to upload</p>
+                    <p>Drop to add to <strong class="drop-folder-name">Library</strong></p>
                 </div>
             </div>
 
@@ -986,6 +142,13 @@
 
             <div class="admin-grid" id="fileGrid">
                 <!-- Files and folders will be populated here -->
+            </div>
+
+            <!-- Quiet reminder in the free space below the grid -->
+            <div id="dropHint" class="drop-hint hidden" aria-hidden="true">
+                <span class="material-symbols-outlined">place_item</span>
+                <p>Drop photos here to add them to <strong class="drop-folder-name">Library</strong></p>
+                <p id="dropHintMove" class="drop-hint-sub hidden">Drag a photo onto a folder to move it there</p>
             </div>
 
             <div id="emptyState" class="empty-state hidden">
@@ -1042,7 +205,7 @@
             <button type="button" id="contextMenuTrigger" aria-haspopup="menu" style="display: none;">
                 <!-- Hidden trigger button -->
             </button>
-            <div popover id="contextMenuPopover" class="border rounded bg-background shadow-lg p-1">
+            <div popover="manual" id="contextMenuPopover" class="border rounded bg-background shadow-lg p-1">
                 <div role="menu" class="min-w-48">
                     <div role="menuitem" class="menu-item" data-action="rotate-right" data-for="image">
                         <span class="material-symbols-outlined mr-2">rotate_right</span>
@@ -1052,7 +215,7 @@
                         <span class="material-symbols-outlined mr-2">rotate_left</span>
                         Rotate Left
                     </div>
-                    <hr class="my-1">
+                    <hr class="menu-divider" data-for="image">
                     <div role="menuitem" class="menu-item menu-item-destructive" data-action="delete">
                         <span class="material-symbols-outlined mr-2">delete</span>
                         Delete
@@ -1203,12 +366,12 @@
                     <span class="material-symbols-outlined">close</span>
                 </button>
 
-                <div class="photo-modal-hints">
+                <div class="photo-modal-hints" aria-label="Keyboard shortcuts">
                     <ul>
-                        <li><span class="key">ESC</span> Close photo</li>
-                        <li><span class="key">←</span> <span class="key">→</span> Navigate images</li>
-                        <li><span class="key">Click</span> Zoom in/out</li>
-                        <li><span class="key">Drag</span> Pan zoomed photo</li>
+                        <li><span class="keys"><kbd class="key">Esc</kbd></span><span>Close photo</span></li>
+                        <li><span class="keys"><kbd class="key">←</kbd><kbd class="key">→</kbd></span><span>Previous / next</span></li>
+                        <li><span class="keys"><kbd class="key">Click</kbd></span><span>Zoom in / out</span></li>
+                        <li><span class="keys"><kbd class="key">Drag</kbd></span><span>Pan when zoomed</span></li>
                     </ul>
                 </div>
 
@@ -1219,6 +382,31 @@
         <!-- Basecoat Toast Container -->
         <div id="toaster" class="toaster fixed bottom-4 right-4 z-50" data-align="end"></div>
     </div>
+
+    <!-- Mobile tab bar -->
+    <nav class="tabbar" aria-label="Sections">
+        <a href="/admin" class="tab active" aria-current="page">
+            <span class="material-symbols-outlined">photo_library</span><span>Library</span>
+        </a>
+        <a href="/access-accounts" class="tab">
+            <span class="material-symbols-outlined">key</span><span>Access</span>
+        </a>
+        <button class="tab-fab" data-proxy="uploadBtn" aria-label="Upload photos">
+            <span class="material-symbols-outlined">add</span>
+        </button>
+        <a href="/slideshow" class="tab">
+            <span class="material-symbols-outlined">slideshow</span><span>Slideshow</span>
+        </a>
+        <button class="tab" data-proxy="settingsBtn">
+            <span class="material-symbols-outlined">tune</span><span>Settings</span>
+        </button>
+    </nav>
+    <script>
+        // Tab bar buttons forward to the (desktop) controls that own the behaviour
+        document.querySelectorAll('[data-proxy]').forEach(btn => {
+            btn.addEventListener('click', () => document.getElementById(btn.dataset.proxy)?.click());
+        });
+    </script>
 
     <script src="admin.js"></script>
     <script src="js/settings.js"></script>

@@ -1,0 +1,16 @@
+{
+  "name": "digital-photo-frame",
+  "version": "1.1.0",
+  "private": true,
+  "description": "SORA Frame - open source digital photo frame. Root wrapper that delegates to the server package.",
+  "scripts": {
+    "postinstall": "npm --prefix server install && node scripts/setup.js",
+    "start": "npm --prefix server start",
+    "dev": "npm --prefix server run dev",
+    "test": "npm --prefix server test"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "ISC"
+}

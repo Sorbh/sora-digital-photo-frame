@@ -41,11 +41,11 @@ class FolderBrowser {
                     ${this.options.showAllFoldersOption ? `
                         <button class="folder-option all-folders-btn" data-path="">
                             <div class="folder-icon">
-                                <span class="material-icons">photo_library</span>
+                                <span class="material-icons">auto_awesome_mosaic</span>
                             </div>
                             <div class="folder-info">
-                                <div class="folder-name">All Folders</div>
-                                <div class="folder-count">All images</div>
+                                <div class="folder-name">All folders</div>
+                                <div class="folder-count">Every photo in the library</div>
                             </div>
                         </button>
                     ` : ''}
@@ -122,233 +122,231 @@ class FolderBrowser {
         styles.textContent = `
             .folder-browser {
                 width: 100%;
-                max-width: 800px;
-                margin: 0 auto;
             }
 
             .folder-breadcrumb {
-                margin-bottom: 20px;
-                padding: 10px;
-                background: rgba(255, 255, 255, 0.1);
-                border-radius: 8px;
-                backdrop-filter: blur(10px);
+                margin-bottom: 16px;
             }
 
             .breadcrumb-container {
                 display: flex;
-                align-items: center;
-                gap: 8px;
                 flex-wrap: wrap;
+                align-items: center;
+                gap: 4px;
             }
 
             .breadcrumb-item {
-                display: flex;
-                align-items: center;
-                padding: 4px 8px;
-                background: rgba(255, 255, 255, 0.2);
-                border-radius: 4px;
+                padding: 6px 12px;
+                border: 0;
+                border-radius: var(--shape-sm);
+                background: transparent;
+                color: var(--ink-faint);
+                font: inherit;
+                font-size: 0.75rem;
+                font-weight: 700;
+                letter-spacing: 0.12em;
+                text-transform: uppercase;
                 cursor: pointer;
-                font-size: 14px;
-                color: #fff;
-                transition: background 0.2s;
+            }
+
+            .breadcrumb-item:last-child {
+                background: var(--blush);
+                color: var(--berry);
             }
 
             .breadcrumb-item:hover {
-                background: rgba(255, 255, 255, 0.3);
+                color: var(--berry);
             }
 
             .breadcrumb-separator {
-                color: rgba(255, 255, 255, 0.6);
-                font-size: 12px;
+                color: var(--ink-faint);
+                font-size: 0.75rem;
             }
 
             .folder-controls {
-                margin-bottom: 20px;
+                margin-bottom: 12px;
             }
 
             .folder-grid {
                 display: grid;
-                grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-                gap: 16px;
-                margin-bottom: 20px;
-            }
-
-            .folder-option {
-                background: rgba(255, 255, 255, 0.1);
-                border: 2px solid transparent;
-                border-radius: 12px;
-                padding: 16px;
-                cursor: pointer;
-                transition: all 0.3s ease;
-                backdrop-filter: blur(10px);
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                text-align: center;
-                min-height: 180px;
-            }
-
-            .folder-option:hover {
-                background: rgba(255, 255, 255, 0.2);
-                border-color: rgba(255, 255, 255, 0.3);
-                transform: translateY(-2px);
-            }
-
-            .folder-option.selected {
-                border-color: #4CAF50;
-                background: rgba(76, 175, 80, 0.2);
-            }
-
-            .folder-option.all-folders-btn {
-                background: rgba(33, 150, 243, 0.2);
-                border-color: rgba(33, 150, 243, 0.3);
-                grid-column: 1 / -1;
-                max-width: 300px;
-                margin: 0 auto 20px;
-                flex-direction: row;
-                min-height: auto;
-                padding: 12px 20px;
-            }
-
-            .folder-option.all-folders-btn:hover {
-                background: rgba(33, 150, 243, 0.3);
-            }
-
-            .folder-thumbnail {
-                width: 80px;
-                height: 80px;
-                border-radius: 8px;
-                object-fit: cover;
-                margin-bottom: 12px;
-                background: rgba(255, 255, 255, 0.1);
-            }
-
-            .folder-icon {
-                font-size: 48px;
-                color: rgba(255, 255, 255, 0.7);
-                margin-bottom: 12px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-            }
-
-            .all-folders-btn .folder-icon {
-                font-size: 24px;
-                margin-bottom: 0;
-                margin-right: 12px;
-            }
-
-            .folder-info {
-                color: #fff;
-                flex-grow: 1;
-            }
-
-            .folder-name {
-                font-size: 16px;
-                font-weight: 500;
-                margin-bottom: 4px;
-                word-break: break-word;
-            }
-
-            .folder-count {
-                font-size: 12px;
-                color: rgba(255, 255, 255, 0.7);
-            }
-
-            .folder-nav {
-                position: absolute;
-                top: 8px;
-                right: 8px;
-                background: rgba(0, 0, 0, 0.5);
-                border: none;
-                color: white;
-                width: 32px;
-                height: 32px;
-                border-radius: 50%;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                cursor: pointer;
-                font-size: 16px;
-                transition: background 0.2s;
-            }
-
-            .folder-nav:hover {
-                background: rgba(0, 0, 0, 0.7);
+                grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+                gap: 12px;
             }
 
             .folder-option {
                 position: relative;
+                display: flex;
+                align-items: center;
+                gap: 14px;
+                width: 100%;
+                padding: 12px 14px 12px 12px;
+                border: 1.5px solid var(--rule);
+                border-radius: var(--shape-md);
+                background: var(--paper-raised);
+                color: var(--foreground);
+                font: inherit;
+                text-align: left;
+                cursor: pointer;
+                box-shadow: var(--shadow-soft);
+                animation: fb-in 0.45s var(--ease-out) both;
+                transition: transform 0.25s var(--ease-out), border-color 0.2s ease, box-shadow 0.25s ease;
             }
 
-            .folder-loading {
-                text-align: center;
-                padding: 40px;
+            @keyframes fb-in {
+                from { opacity: 0; transform: translateY(8px); }
+                to { opacity: 1; transform: none; }
+            }
+
+            .folder-option:hover {
+                transform: translateY(-2px);
+                box-shadow: var(--shadow-lift);
+            }
+
+            .folder-option.selected {
+                border-color: var(--berry);
+                box-shadow: 0 0 0 4px var(--safelight-soft), var(--shadow-soft);
+            }
+
+            /* Heart badge on the folder that is playing */
+            .folder-option.selected::after {
+                content: 'favorite';
+                position: absolute;
+                top: -8px;
+                right: -6px;
+                display: grid;
+                place-items: center;
+                width: 28px;
+                height: 28px;
+                border: 3px solid var(--paper);
+                border-radius: 50%;
+                background: var(--berry-gradient);
+                color: #fff;
+                font-family: 'Material Symbols Outlined';
+                font-size: 15px;
+                font-variation-settings: 'FILL' 1;
+            }
+
+            .folder-thumbnail,
+            .folder-icon {
+                width: 58px;
+                height: 58px;
+                flex-shrink: 0;
+                border-radius: var(--shape-sm);
+            }
+
+            .folder-thumbnail {
+                object-fit: cover;
+                background: var(--paper-sunk);
+            }
+
+            .folder-icon {
+                display: grid;
+                place-items: center;
+                background: var(--honey-soft);
+                color: #b07a1c;
+            }
+
+            .folder-option:nth-child(3n + 2) .folder-icon { background: var(--teal-soft); color: #4f7f86; }
+            .folder-option:nth-child(3n) .folder-icon { background: var(--blush); color: var(--berry); }
+
+            .all-folders-btn .folder-icon {
+                background: var(--berry-gradient);
                 color: #fff;
             }
 
-            .loading-spinner {
-                width: 40px;
-                height: 40px;
-                margin: 0 auto 16px;
-                border: 3px solid rgba(255, 255, 255, 0.2);
-                border-top: 3px solid #fff;
+            .folder-icon .material-icons {
+                font-size: 26px;
+            }
+
+            .folder-info {
+                flex: 1;
+                min-width: 0;
+            }
+
+            .folder-name {
+                overflow: hidden;
+                font-weight: 700;
+                font-size: 1rem;
+                white-space: nowrap;
+                text-overflow: ellipsis;
+                text-transform: capitalize;
+            }
+
+            .folder-count {
+                margin-top: 2px;
+                font-size: 0.8125rem;
+                color: var(--muted-foreground);
+            }
+
+            .folder-nav {
+                display: grid;
+                place-items: center;
+                width: 36px;
+                height: 36px;
+                flex-shrink: 0;
+                border: 0;
                 border-radius: 50%;
-                animation: spin 1s linear infinite;
+                background: var(--blush);
+                color: var(--berry);
+                cursor: pointer;
+                transition: transform 0.2s var(--ease-out);
             }
 
-            @keyframes spin {
-                0% { transform: rotate(0deg); }
-                100% { transform: rotate(360deg); }
+            .folder-nav:hover {
+                transform: translateX(2px);
             }
 
+            .folder-nav .material-icons {
+                font-size: 18px;
+            }
+
+            .folder-loading,
             .folder-error {
+                display: grid;
+                justify-items: center;
+                gap: 10px;
+                padding: 3rem 1rem;
+                color: var(--muted-foreground);
                 text-align: center;
-                padding: 40px;
-                color: #ff6b6b;
+            }
+
+            .folder-loading.hidden,
+            .folder-error.hidden {
+                display: none;
+            }
+
+            .loading-spinner {
+                width: 28px;
+                height: 28px;
+                border: 3px solid var(--blush);
+                border-top-color: var(--berry);
+                border-radius: 50%;
+                animation: fb-spin 0.9s linear infinite;
+            }
+
+            @keyframes fb-spin {
+                to { transform: rotate(360deg); }
             }
 
             .folder-error .material-icons {
-                font-size: 48px;
-                margin-bottom: 16px;
+                font-size: 32px;
+                color: var(--destructive);
             }
 
             .retry-btn {
-                background: #ff6b6b;
-                color: white;
-                border: none;
-                padding: 8px 16px;
-                border-radius: 4px;
+                padding: 8px 18px;
+                border: 0;
+                border-radius: var(--shape-sm);
+                background: var(--berry-gradient);
+                color: #fff;
+                font: inherit;
+                font-weight: 700;
                 cursor: pointer;
-                margin-top: 16px;
             }
 
-            .retry-btn:hover {
-                background: #ff5252;
-            }
-
-            @media (max-width: 600px) {
+            @media (max-width: 640px) {
                 .folder-grid {
-                    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-                    gap: 12px;
-                }
-
-                .folder-option {
-                    padding: 12px;
-                    min-height: 140px;
-                }
-
-                .folder-thumbnail {
-                    width: 60px;
-                    height: 60px;
-                }
-
-                .folder-icon {
-                    font-size: 36px;
-                }
-
-                .folder-name {
-                    font-size: 14px;
+                    grid-template-columns: 1fr;
                 }
             }
         `;
@@ -443,11 +441,11 @@ class FolderBrowser {
         element.dataset.path = folder.path;
 
         const thumbnailHtml = folder.thumbnail 
-            ? `<img src="${folder.thumbnail}" alt="${folder.name}" class="folder-thumbnail" loading="lazy">`
+            ? `<img src="${folder.thumbnail}" alt="" class="folder-thumbnail" loading="lazy">`
             : `<div class="folder-icon"><span class="material-icons">folder</span></div>`;
 
         const navigationBtn = hasSubfolders && folder.hasSubfolders 
-            ? `<button class="folder-nav" data-path="${folder.path}" title="Browse folder">
+            ? `<button class="folder-nav" title="Browse folder">
                  <span class="material-icons">arrow_forward</span>
                </button>`
             : '';
@@ -455,11 +453,14 @@ class FolderBrowser {
         element.innerHTML = `
             ${thumbnailHtml}
             <div class="folder-info">
-                <div class="folder-name">${folder.name}</div>
-                <div class="folder-count">${folder.imageCount} images</div>
+                <div class="folder-name"></div>
+                <div class="folder-count">${folder.imageCount} ${folder.imageCount === 1 ? 'photo' : 'photos'}</div>
             </div>
             ${navigationBtn}
         `;
+        element.querySelector('.folder-name').textContent = folder.name;
+        const navBtn = element.querySelector('.folder-nav');
+        if (navBtn) navBtn.dataset.path = folder.path;
 
         return element;
     }
@@ -480,7 +481,7 @@ class FolderBrowser {
                 if (index > 0) {
                     const separator = document.createElement('span');
                     separator.className = 'breadcrumb-separator';
-                    separator.textContent = '>';
+                    separator.textContent = '›';
                     container.appendChild(separator);
                 }
 

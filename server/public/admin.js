@@ -1,3 +1,30 @@
+/**
+ * Page-wide toast via Basecoat, shared by admin.js, settings.js and googlePhotosSync.js.
+ */
+const TOAST_TITLES = { success: 'Success!', error: 'Error!', warning: 'Warning!', info: 'Info' };
+
+function showToast(message, type = 'info') {
+    const category = type in TOAST_TITLES ? type : 'info';
+    document.dispatchEvent(new CustomEvent('basecoat:toast', {
+        detail: {
+            config: { category, title: TOAST_TITLES[category], description: message, duration: 5000 }
+        }
+    }));
+}
+window.showToast = showToast;
+
+function escapeHtml(value) {
+    const div = document.createElement('div');
+    div.textContent = String(value);
+    return div.innerHTML;
+}
+
+// Drag payload for photos moved inside the library (a JSON list of admin paths)
+const PHOTO_DRAG_TYPE = 'application/x-sora-photos';
+
+const isFileDrag = (e) => Array.from(e.dataTransfer?.types || []).includes('Files');
+const isPhotoDrag = (e) => Array.from(e.dataTransfer?.types || []).includes(PHOTO_DRAG_TYPE);
+
 class PhotoFrameAdmin {
     constructor() {
         this.currentPath = this.getInitialPath();
@@ -177,12 +204,18 @@ class PhotoFrameAdmin {
         // Empty state drag and drop
         this.setupEmptyStateDragAndDrop();
 
-        // Context menu
-        document.addEventListener('click', (e) => {
-            if (!e.target.closest('#contextMenuPopover')) {
+        // Context menu. The popover is "manual" because the browser's light dismiss
+        // closes it on the mouse-up of the same right-click that opened it.
+        document.addEventListener('pointerdown', (e) => {
+            if (e.button === 0 && !e.target.closest('#contextMenuPopover, .folder-more')) {
                 this.hideContextMenu();
             }
         });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') this.hideContextMenu();
+        });
+        window.addEventListener('resize', () => this.hideContextMenu());
+        document.addEventListener('scroll', () => this.hideContextMenu(), { capture: true, passive: true });
         document.getElementById('contextMenuPopover').addEventListener('click', (e) => {
             e.stopPropagation();
             if (e.target.closest('.menu-item')) {
@@ -339,38 +372,147 @@ class PhotoFrameAdmin {
         });
     }
 
+    // Files dragged in from the computer: anywhere on the page uploads to the
+    // open folder, a folder tile uploads into that folder.
     setupMainDragAndDrop() {
-        const mainContent = document.querySelector('.main-content');
-        let dragCounter = 0;
-        
-        mainContent.addEventListener('dragenter', (e) => {
-            e.preventDefault();
-            dragCounter++;
-            document.getElementById('dropZone').classList.remove('hidden');
-        });
+        const app = document.querySelector('.app');
+        let hideTimer = null;
 
-        mainContent.addEventListener('dragover', (e) => {
-            e.preventDefault();
-        });
+        // dragleave fires for every child, so the highlight stays on while
+        // dragover keeps arriving and drops a moment after it stops
+        const keepHighlight = () => {
+            app.classList.add('file-dragging');
+            clearTimeout(hideTimer);
+            hideTimer = setTimeout(() => app.classList.remove('file-dragging'), 150);
+        };
 
-        mainContent.addEventListener('dragleave', (e) => {
-            e.preventDefault();
-            dragCounter--;
-            if (dragCounter === 0) {
-                document.getElementById('dropZone').classList.add('hidden');
+        // Drop boxes that handle files themselves (upload dialog, empty state)
+        // call preventDefault first, so they are left alone here
+        // The whole window uploads to the open folder, except while a dialog is up
+        const pageTakesDrop = () => !document.querySelector('dialog[open]');
+
+        document.addEventListener('dragover', (e) => {
+            if (!isFileDrag(e) || e.defaultPrevented) return;
+            e.preventDefault(); // never let the browser open a dropped photo
+            if (pageTakesDrop()) {
+                e.dataTransfer.dropEffect = 'copy';
+                keepHighlight();
+            } else {
+                e.dataTransfer.dropEffect = 'none';
             }
         });
 
-        mainContent.addEventListener('drop', (e) => {
+        document.addEventListener('drop', (e) => {
+            if (!isFileDrag(e) || e.defaultPrevented) return;
             e.preventDefault();
-            dragCounter = 0;
-            document.getElementById('dropZone').classList.add('hidden');
-            
-            const files = Array.from(e.dataTransfer.files).filter(file => file.type.startsWith('image/'));
-            if (files.length > 0) {
-                this.uploadFilesDirectly(files);
+            if (!pageTakesDrop()) return;
+            app.classList.remove('file-dragging');
+            this.uploadDroppedFiles(e, this.currentPath);
+        });
+
+        // The back button and breadcrumb take photos up to a parent folder
+        this.makeDropTarget(document.getElementById('backBtn'), () => this.parentPath(), { files: false });
+        const breadcrumb = document.getElementById('breadcrumbContainer');
+        breadcrumb.addEventListener('dragover', (e) => {
+            const item = e.target.closest('.breadcrumb-item');
+            if (!item || item.dataset.path === this.currentPath || !isPhotoDrag(e)) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            item.classList.add('drop-target');
+        });
+        breadcrumb.addEventListener('dragleave', (e) => {
+            e.target.closest?.('.breadcrumb-item')?.classList.remove('drop-target');
+        });
+        breadcrumb.addEventListener('drop', (e) => {
+            const item = e.target.closest('.breadcrumb-item');
+            if (!item || item.dataset.path === this.currentPath || !isPhotoDrag(e)) return;
+            e.preventDefault();
+            item.classList.remove('drop-target');
+            this.moveDroppedPhotos(e, item.dataset.path);
+        });
+    }
+
+    parentPath() {
+        const parts = this.currentPath.split('/');
+        parts.pop();
+        return parts.join('/') || 'uploads';
+    }
+
+    // Accept library photos (move) and, optionally, files from the computer (upload)
+    makeDropTarget(element, getPath, { files = true } = {}) {
+        const accepts = (e) => isPhotoDrag(e) || (files && isFileDrag(e));
+
+        element.addEventListener('dragover', (e) => {
+            if (!accepts(e)) return;
+            e.preventDefault();
+            e.stopPropagation(); // the library-wide upload highlight is not the target here
+            e.dataTransfer.dropEffect = isPhotoDrag(e) ? 'move' : 'copy';
+            element.classList.add('drop-target');
+        });
+        element.addEventListener('dragleave', (e) => {
+            if (!element.contains(e.relatedTarget)) element.classList.remove('drop-target');
+        });
+        element.addEventListener('drop', (e) => {
+            if (!accepts(e)) return;
+            e.preventDefault();
+            e.stopPropagation();
+            element.classList.remove('drop-target');
+            document.querySelector('.app').classList.remove('file-dragging');
+            if (isPhotoDrag(e)) {
+                this.moveDroppedPhotos(e, getPath());
+            } else {
+                this.uploadDroppedFiles(e, getPath());
             }
         });
+    }
+
+    uploadDroppedFiles(e, targetPath) {
+        const files = Array.from(e.dataTransfer.files).filter(file => file.type.startsWith('image/'));
+        if (files.length > 0) {
+            this.uploadFilesDirectly(files, targetPath);
+        } else {
+            this.showToast('Only image files can be uploaded', 'warning');
+        }
+    }
+
+    moveDroppedPhotos(e, destination) {
+        let paths = [];
+        try {
+            paths = JSON.parse(e.dataTransfer.getData(PHOTO_DRAG_TYPE));
+        } catch {
+            return;
+        }
+        if (Array.isArray(paths) && paths.length > 0) this.movePhotos(paths, destination);
+    }
+
+    async movePhotos(paths, destination) {
+        const folderName = destination === 'uploads' ? 'Library' : destination.split('/').pop();
+        try {
+            const response = await this.authenticatedFetch('/api/images/move', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ paths, destination })
+            });
+            if (!response) return; // Session expired
+
+            const data = await response.json();
+            if (!response.ok && response.status !== 207) {
+                this.showToast(data.message || 'Could not move photos', 'error');
+                return;
+            }
+
+            const moved = data.movedCount || 0;
+            if (moved > 0) {
+                this.showToast(`Moved ${moved} ${moved === 1 ? 'photo' : 'photos'} to ${folderName}`, 'success');
+            }
+            if (data.failedCount > 0) {
+                this.showToast(`${data.failedCount} ${data.failedCount === 1 ? 'photo' : 'photos'} could not be moved`, 'error');
+            }
+            this.loadFolderContents();
+        } catch (error) {
+            console.error('Error moving photos:', error);
+            this.showToast('Could not move photos', 'error');
+        }
     }
 
     async loadFolderContents() {
@@ -407,8 +549,17 @@ class PhotoFrameAdmin {
             index: index
         }));
         this.currentImageIndex = -1;
+
+        this.updateLibraryHeading(data);
         
-        if (data.folders.length === 0 && data.files.length === 0) {
+        // Background hint under the grid; the empty state has its own upload box
+        const isEmpty = data.folders.length === 0 && data.files.length === 0;
+        const folderName = this.currentPath === 'uploads' ? 'Library' : this.currentPath.split('/').pop();
+        document.getElementById('dropHint').classList.toggle('hidden', isEmpty);
+        document.querySelectorAll('.drop-folder-name').forEach(el => { el.textContent = folderName; });
+        document.getElementById('dropHintMove').classList.toggle('hidden', !(data.folders.length && data.files.length));
+
+        if (isEmpty) {
             emptyState.classList.remove('hidden');
             return;
         }
@@ -422,16 +573,41 @@ class PhotoFrameAdmin {
         }
         
         // Render folders
+        if (data.folders.length > 0) fileGrid.appendChild(this.createGridLabel('Folders'));
         data.folders.forEach(folder => {
             const folderElement = this.createFolderElement(folder);
             fileGrid.appendChild(folderElement);
         });
         
         // Render files
+        if (data.files.length > 0) fileGrid.appendChild(this.createGridLabel('Photos'));
         data.files.forEach(file => {
             const fileElement = this.createFileElement(file);
             fileGrid.appendChild(fileElement);
         });
+    }
+
+    updateLibraryHeading(data) {
+        const parts = this.currentPath.split('/');
+        const title = document.getElementById('folderTitle');
+        const meta = document.getElementById('folderMeta');
+
+        if (title) title.textContent = parts.length > 1 ? parts[parts.length - 1] : 'Library';
+        if (meta) {
+            const folders = data.folders.length;
+            const photos = data.files.length;
+            const counts = [];
+            if (folders) counts.push(`${folders} ${folders === 1 ? 'folder' : 'folders'}`);
+            counts.push(`${photos} ${photos === 1 ? 'photo' : 'photos'}`);
+            meta.textContent = counts.join(' · ');
+        }
+    }
+
+    createGridLabel(text) {
+        const label = document.createElement('h2');
+        label.className = 'grid-label';
+        label.textContent = text;
+        return label;
     }
 
     createFolderElement(folder) {
@@ -439,13 +615,47 @@ class PhotoFrameAdmin {
         div.className = 'file-item folder';
         div.dataset.path = folder.path;
         div.dataset.type = 'folder';
+
+        // Cover image comes from the first photo inside the folder (null when empty)
         div.innerHTML = `
-            <div class="folder-icon">
-                <img src="icons/ic_folder.svg" alt="Folder" />
+            <div class="folder-cover">
+                <img class="folder-cover-img" alt="" loading="lazy" decoding="async">
+                <div class="folder-cover-empty">
+                    <span class="material-symbols-outlined">folder_open</span>
+                </div>
             </div>
-            <div class="folder-name">${folder.name}</div>
+            <div class="folder-meta">
+                <div class="folder-name"></div>
+                <button type="button" class="folder-more" aria-label="Folder options" aria-haspopup="menu">
+                    <span class="material-symbols-outlined">more_vert</span>
+                </button>
+                <span class="folder-kind material-symbols-outlined" aria-hidden="true">chevron_right</span>
+            </div>
         `;
+        div.querySelector('.folder-name').textContent = folder.name;
+        const cover = div.querySelector('.folder-cover-img');
+        if (folder.thumbnail) {
+            cover.addEventListener('error', () => div.classList.add('no-cover'));
+            cover.src = folder.thumbnail;
+        } else {
+            div.classList.add('no-cover');
+        }
+
+        // The next photos fill the prints behind the cover; tinted paper when there are none
+        const coverBox = div.querySelector('.folder-cover');
+        (folder.prints || []).slice(0, 2).forEach((url, i) => {
+            coverBox.style.setProperty(`--print-${i + 1}`, `url("${url.replace(/["\\]/g, "")}")`);
+        });
         
+        // Drop photos from the grid (move) or the computer (upload) onto the folder
+        this.makeDropTarget(div, () => folder.path);
+
+        // Options button: same menu as right-click, reachable by mouse, touch and keyboard
+        div.querySelector('.folder-more').addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.showContextMenu(e, {...folder, type: 'folder'});
+        });
+
         div.addEventListener('click', () => this.navigateTo(folder.path));
         div.addEventListener('contextmenu', (e) => this.showContextMenu(e, {...folder, type: 'folder'}));
         
@@ -459,13 +669,13 @@ class PhotoFrameAdmin {
         div.dataset.type = 'image';
         div.innerHTML = `
             <div class="admin-photo-image">
-                <img src="${file.url}" alt="${file.name}" loading="lazy">
+                <img src="${file.thumbnail || file.url}" alt="" loading="lazy" decoding="async">
             </div>
             <div class="photo-grid-overlay">
                 <div class="photo-grid-overlay-top">
                     <div class="photo-grid-checkbox">
                         <label class="label">
-                            <input type="checkbox" class="input" data-path="${file.path}" aria-label="Select Photo">
+                            <input type="checkbox" class="input" aria-label="Select Photo">
                             <span class="sr-only">Select Photo</span>
                         </label>
                     </div>
@@ -482,9 +692,13 @@ class PhotoFrameAdmin {
                 </div>
             </div>
             <div class="photo-grid-info">
-                <div class="photo-grid-name">${file.name}</div>
+                <div class="photo-grid-name"></div>
             </div>
         `;
+        // File names come from uploads, so set them as text rather than HTML
+        div.querySelector('img').alt = file.name;
+        div.querySelector('.photo-grid-name').textContent = file.name;
+        div.querySelector('input[type="checkbox"]').dataset.path = file.path;
         
         // Handle checkbox selection
         const checkbox = div.querySelector('input[type="checkbox"]');
@@ -507,6 +721,24 @@ class PhotoFrameAdmin {
             });
         });
         
+        // Drag onto a folder to move it; a selected photo brings the whole selection along
+        div.draggable = true;
+        div.querySelector('img').draggable = false;
+        div.addEventListener('dragstart', (e) => {
+            this.cancelLongPress();
+            div.classList.remove('selecting');
+            const paths = this.selectedItems.has(file.path) ? [...this.selectedItems] : [file.path];
+            e.dataTransfer.setData(PHOTO_DRAG_TYPE, JSON.stringify(paths));
+            e.dataTransfer.effectAllowed = 'move';
+            document.querySelector('.app').classList.add('photo-dragging');
+            paths.forEach(p => document.querySelector(`.file-item[data-path="${CSS.escape(p)}"]`)?.classList.add('dragging'));
+        });
+        div.addEventListener('dragend', () => {
+            document.querySelector('.app').classList.remove('photo-dragging');
+            document.querySelectorAll('.file-item.dragging').forEach(el => el.classList.remove('dragging'));
+            document.querySelectorAll('.drop-target').forEach(el => el.classList.remove('drop-target'));
+        });
+
         // Add long press for mobile
         div.addEventListener('mousedown', (e) => this.handlePointerDown(e, file, div));
         div.addEventListener('touchstart', (e) => this.handlePointerDown(e, file, div), { passive: false });
@@ -701,7 +933,7 @@ class PhotoFrameAdmin {
             filesList.innerHTML = this.selectedFiles.map(file => 
                 `<div class="flex items-center gap-2">
                     <span class="material-symbols-outlined text-sm">image</span>
-                    <span class="flex-1">${file.name}</span>
+                    <span class="flex-1">${escapeHtml(file.name)}</span>
                     <span class="text-xs">${this.formatFileSize(file.size)}</span>
                 </div>`
             ).join('');
@@ -778,27 +1010,30 @@ class PhotoFrameAdmin {
         document.getElementById('uploadProgress').classList.add('hidden');
     }
 
-    async uploadFilesDirectly(files) {
+    async uploadFilesDirectly(files, targetPath = this.currentPath) {
         if (files.length === 0) return;
         
+        // path goes first so multer sees it before the files arrive
         const formData = new FormData();
+        formData.append('path', targetPath);
         files.forEach(file => {
             formData.append('images', file);
         });
-        formData.append('path', this.currentPath);
-        
-        this.showToast(`Uploading ${files.length} file(s) to ${this.currentPath}...`, 'info');
+
+        const folderName = targetPath === 'uploads' ? 'Library' : targetPath.split('/').pop();
+        this.showToast(`Uploading ${files.length} ${files.length === 1 ? 'photo' : 'photos'} to ${folderName}…`, 'info');
         
         try {
-            const response = await fetch('/api/upload', {
+            const response = await this.authenticatedFetch('/api/upload', {
                 method: 'POST',
                 body: formData
             });
+            if (!response) return; // Session expired
             
             const data = await response.json();
             
             if (response.ok) {
-                this.showToast(`${data.files.length} file(s) uploaded successfully to ${this.currentPath}`, 'success');
+                this.showToast(`${data.files.length} ${data.files.length === 1 ? 'photo' : 'photos'} added to ${folderName}`, 'success');
                 this.loadFolderContents();
             } else {
                 this.showToast(data.message || 'Upload failed', 'error');
@@ -820,25 +1055,37 @@ class PhotoFrameAdmin {
         // Show/hide menu items based on item type
         const rotateItems = popover.querySelectorAll('[data-for="image"]');
         rotateItems.forEach(rotateItem => {
-            rotateItem.style.display = item.type === 'image' ? 'flex' : 'none';
+            rotateItem.style.display = item.type === 'image' ? '' : 'none';
         });
         
-        // Position the popover at the right-click location
+        // Position at the right-click location, or under the options button
+        const anchor = event.type === 'click' && event.currentTarget instanceof Element
+            ? event.currentTarget.getBoundingClientRect()
+            : null;
+        const x = anchor ? anchor.right : event.clientX;
+        const y = anchor ? anchor.bottom + 4 : event.clientY;
         popover.style.position = 'fixed';
-        popover.style.left = event.clientX + 'px';
-        popover.style.top = event.clientY + 'px';
+        popover.style.left = (anchor ? x - popover.offsetWidth : x) + 'px';
+        popover.style.top = y + 'px';
         
-        // Show the popover
-        popover.showPopover();
+        // Show the popover (re-opening moves it to the new spot)
+        if (!popover.matches(':popover-open')) popover.showPopover();
         
         // Adjust position if menu goes off screen
         setTimeout(() => {
             const rect = popover.getBoundingClientRect();
+            if (anchor) {
+                popover.style.left = Math.max(8, x - rect.width) + 'px';
+                if (rect.bottom > window.innerHeight) {
+                    popover.style.top = (anchor.top - rect.height - 4) + 'px';
+                }
+                return;
+            }
             if (rect.right > window.innerWidth) {
-                popover.style.left = (event.clientX - rect.width) + 'px';
+                popover.style.left = (x - rect.width) + 'px';
             }
             if (rect.bottom > window.innerHeight) {
-                popover.style.top = (event.clientY - rect.height) + 'px';
+                popover.style.top = (y - rect.height) + 'px';
             }
         }, 0);
     }
@@ -950,7 +1197,7 @@ class PhotoFrameAdmin {
 
     async refreshImageInGrid(item) {
         // Find the image element in the grid and refresh it with cache busting
-        const imageElement = document.querySelector(`[data-path="${item.path}"] img`);
+        const imageElement = document.querySelector(`[data-path="${CSS.escape(item.path)}"] img`);
         if (imageElement) {
             // Add cache-busting timestamp to force browser to reload the image
             const timestamp = Date.now();
@@ -1011,37 +1258,7 @@ class PhotoFrameAdmin {
     }
 
     showToast(message, type = 'info') {
-        // Map our existing types to Basecoat categories
-        const categoryMap = {
-            'info': 'info',
-            'success': 'success',
-            'error': 'error',
-            'warning': 'warning'
-        };
-        
-        const category = categoryMap[type] || 'info';
-        
-        // Determine title based on type
-        const titleMap = {
-            'success': 'Success!',
-            'error': 'Error!',
-            'warning': 'Warning!',
-            'info': 'Info'
-        };
-        
-        const title = titleMap[type] || 'Notification';
-        
-        // Dispatch Basecoat toast event
-        document.dispatchEvent(new CustomEvent('basecoat:toast', {
-            detail: {
-                config: {
-                    category: category,
-                    title: title,
-                    description: message,
-                    duration: 5000
-                }
-            }
-        }));
+        showToast(message, type);
     }
 
     showPhotoModal(imageUrl, imageName) {
@@ -1197,7 +1414,8 @@ class PhotoFrameAdmin {
             }
         }, this.longPressDelay);
         
-        e.preventDefault();
+        // Mouse presses must stay default so the tile can be dragged
+        if (e.type === 'touchstart') e.preventDefault();
     }
 
     handlePointerUp(_e, _file, element) {
@@ -1454,7 +1672,7 @@ class PhotoFrameAdmin {
             filesList.innerHTML = this.emptyStateSelectedFiles.map(file => 
                 `<div class="flex items-center gap-2">
                     <span class="material-symbols-outlined text-sm">image</span>
-                    <span class="flex-1">${file.name}</span>
+                    <span class="flex-1">${escapeHtml(file.name)}</span>
                     <span class="text-xs">${this.formatFileSize(file.size)}</span>
                 </div>`
             ).join('');

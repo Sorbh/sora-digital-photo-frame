@@ -2,76 +2,178 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Digital Photo Frame - Select Folder</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#d6336a">
+    <title>Choose folder · Sora Frame</title>
+    <link rel="icon" href="/icons/favicon.ico" sizes="48x48">
+    <link rel="icon" href="/icons/favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+    <link rel="manifest" href="/icons/site.webmanifest">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Nunito:ital,wght@0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/basecoat-css@0.3.1/dist/basecoat.cdn.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/basecoat-css@0.3.1/dist/js/all.min.js" defer></script>
-    <link rel="stylesheet" href="css/folder-selection-extensions.css">
-    
-    <!-- Theme Switcher Script -->
+    <link rel="stylesheet" href="/css/sora.css">
+
+    <!-- Theme: follow the admin's saved choice (system / dark / light) -->
     <script>
     (() => {
       try {
         const stored = localStorage.getItem('themeMode');
-        if (stored ? stored === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches) {
-          document.documentElement.classList.add('dark');
-        }
+        const dark = stored === 'dark' || ((!stored || stored === 'system') && matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.classList.toggle('dark', dark);
       } catch (_) {}
-      
-      document.addEventListener('basecoat:theme', (e) => {
-        const mode = e.detail?.mode || (document.documentElement.classList.contains('dark') ? 'light' : 'dark');
-        if (mode === 'dark') {
-          document.documentElement.classList.add('dark');
-        } else {
-          document.documentElement.classList.remove('dark');
-        }
-        localStorage.setItem('themeMode', mode);
-      });
     })();
     </script>
+    <style>
+        body {
+            margin: 0;
+            min-height: 100vh;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .main-content {
+            padding: 0 clamp(1rem, 3vw, 2.5rem) 4rem;
+        }
+
+        .browser-head {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 1rem;
+            flex-wrap: wrap;
+            margin: 0 0 1rem;
+        }
+
+        .browser-title {
+            margin: 0;
+            font-family: var(--font-display);
+            font-variation-settings: 'SOFT' 100;
+            font-size: 1.75rem;
+            font-weight: 500;
+            letter-spacing: -0.02em;
+        }
+
+        .browser-subtitle {
+            margin: 0;
+            color: var(--muted-foreground);
+            font-size: 0.9375rem;
+        }
+
+        .notification {
+            position: fixed;
+            left: 50%;
+            bottom: 1.5rem;
+            z-index: 100;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 18px;
+            border-radius: var(--shape-sm);
+            background: var(--ink);
+            color: var(--paper);
+            font-weight: 600;
+            box-shadow: var(--shadow-lift);
+            transform: translate(-50%, 0);
+            animation: note-in 0.35s var(--ease-out) both;
+        }
+
+        .notification .material-symbols-outlined {
+            color: var(--berry);
+            font-variation-settings: 'FILL' 1;
+        }
+
+        .notification.leaving {
+            animation: note-out 0.3s ease both;
+        }
+
+        @keyframes note-in {
+            from { opacity: 0; transform: translate(-50%, 12px); }
+        }
+
+        @keyframes note-out {
+            to { opacity: 0; transform: translate(-50%, 12px); }
+        }
+
+        @media (max-width: 640px) {
+            .main-content {
+                padding: 0 0.75rem 2rem;
+            }
+
+            .notification {
+                bottom: calc(96px + env(safe-area-inset-bottom));
+            }
+        }
+    </style>
 </head>
 <body>
-    <header class="header">
-        <div class="header-left">
-            <button class="btn-icon back-btn" onclick="goBack()">
-                <span class="material-symbols-outlined">arrow_back</span>
-            </button>
-            <h1 class="title">Select Folder</h1>
+    <header class="topbar">
+        <div class="topbar-brand">
+            <a href="/slideshow" class="sora-wordmark" aria-label="Back to the slideshow">Sora</a>
+            <span class="topbar-divider"></span>
+            <span class="sora-eyebrow">Now playing</span>
         </div>
-        <div class="header-right">
-            <a href="/slideshow" class="btn slideshow-btn">
-                <span class="material-symbols-outlined">slideshow</span>
-                <span>Start Slideshow</span>
+        <div class="topbar-actions">
+            <a href="/admin" class="tb-btn tb-desktop" title="Manage the library">
+                <span class="material-symbols-outlined">photo_library</span>
+                <span class="tb-label">Library</span>
             </a>
         </div>
     </header>
 
+    <section class="library-head">
+        <div class="library-title">
+            <div class="crumb-row">
+                <button class="back-btn" onclick="goBack()" title="Back" aria-label="Back">
+                    <span class="material-symbols-outlined">arrow_back</span>
+                </button>
+                <p class="sora-eyebrow" style="margin: 0;">Slideshow source</p>
+            </div>
+            <h1 class="page-title sora-display no-transform">What should <em>play?</em></h1>
+            <p class="page-meta">
+                <span class="material-symbols-outlined" style="font-size:16px;font-variation-settings:'FILL' 1">favorite</span>
+                <span id="currentSelection">All folders</span>
+            </p>
+        </div>
+        <div class="library-actions">
+            <a href="/slideshow" class="btn mobile-hide">
+                <span class="material-symbols-outlined">play_arrow</span>
+                Start slideshow
+            </a>
+        </div>
+    </section>
+
     <main class="main-content">
-        <div class="current-selection">
-            <div class="selection-header">
-                <span class="material-symbols-outlined">check_circle</span>
-                <div class="selection-title">Current Selection</div>
-            </div>
-            <div class="selection-info" id="currentSelection">
-                All Folders - All images will be shown
-            </div>
+        <div class="browser-head">
+            <h2 class="browser-title">Choose a folder</h2>
+            <p class="browser-subtitle">Only photos from the chosen folder will play.</p>
         </div>
 
-        <div class="folder-browser-container">
-            <div class="browser-header">
-                <h2 class="browser-title">Choose a Folder</h2>
-                <p class="browser-subtitle">Select a folder to display only images from that folder in the slideshow</p>
-            </div>
-            
-            <div id="folderBrowser">
-                <!-- Folder browser will be initialized here -->
-            </div>
+        <div id="folderBrowser">
+            <!-- Folder browser will be initialized here -->
         </div>
     </main>
+
+    <!-- Mobile tab bar -->
+    <nav class="tabbar" aria-label="Sections">
+        <a href="/admin" class="tab">
+            <span class="material-symbols-outlined">photo_library</span><span>Library</span>
+        </a>
+        <a href="/access-accounts" class="tab">
+            <span class="material-symbols-outlined">key</span><span>Access</span>
+        </a>
+        <a href="/slideshow" class="tab-fab" aria-label="Start slideshow">
+            <span class="material-symbols-outlined">play_arrow</span>
+        </a>
+        <a href="/folder-selection" class="tab active" aria-current="page">
+            <span class="material-symbols-outlined">folder_special</span><span>Folders</span>
+        </a>
+        <a href="/slideshow" class="tab">
+            <span class="material-symbols-outlined">slideshow</span><span>Slideshow</span>
+        </a>
+    </nav>
 
     <!-- Load required scripts -->
     <script src="/js/folderService.js"></script>
@@ -103,7 +205,7 @@
             updateCurrentSelection();
             
             // Show success feedback
-            showNotification(`Selected: ${folderName}`, 'success');
+            showNotification(`Now playing ${folderName}`);
         }
 
         function onFolderChanged(folderPath, folderName) {
@@ -117,9 +219,9 @@
             const selectionElement = document.getElementById('currentSelection');
             
             if (selection) {
-                selectionElement.textContent = `${selection.name} - Images from this folder will be shown`;
+                selectionElement.textContent = `Playing ${selection.name}`;
             } else {
-                selectionElement.textContent = 'All Folders - All images will be shown';
+                selectionElement.textContent = 'Playing all folders';
             }
         }
 
@@ -132,51 +234,18 @@
             }
         }
 
-        function showNotification(message, type = 'info') {
-            // Create notification element
+        function showNotification(message) {
             const notification = document.createElement('div');
-            notification.style.cssText = `
-                position: fixed;
-                top: 20px;
-                right: 20px;
-                background: ${type === 'success' ? '#4CAF50' : '#2196F3'};
-                color: white;
-                padding: 12px 20px;
-                border-radius: 8px;
-                z-index: 10000;
-                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-                animation: slideIn 0.3s ease;
-            `;
-            notification.textContent = message;
-            
-            // Add animation keyframes if not already added
-            if (!document.getElementById('notification-styles')) {
-                const style = document.createElement('style');
-                style.id = 'notification-styles';
-                style.textContent = `
-                    @keyframes slideIn {
-                        from { transform: translateX(100%); opacity: 0; }
-                        to { transform: translateX(0); opacity: 1; }
-                    }
-                    @keyframes slideOut {
-                        from { transform: translateX(0); opacity: 1; }
-                        to { transform: translateX(100%); opacity: 0; }
-                    }
-                `;
-                document.head.appendChild(style);
-            }
-            
+            notification.className = 'notification';
+            notification.setAttribute('role', 'status');
+            notification.innerHTML = '<span class="material-symbols-outlined">favorite</span><span></span>';
+            notification.lastChild.textContent = message;
             document.body.appendChild(notification);
-            
-            // Remove notification after 3 seconds
+
             setTimeout(() => {
-                notification.style.animation = 'slideOut 0.3s ease';
-                setTimeout(() => {
-                    if (notification.parentNode) {
-                        notification.parentNode.removeChild(notification);
-                    }
-                }, 300);
-            }, 3000);
+                notification.classList.add('leaving');
+                setTimeout(() => notification.remove(), 300);
+            }, 2600);
         }
 
         // Handle browser navigation

@@ -4,242 +4,87 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Digital Photo Frame - Login</title>
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/basecoat-css@0.3.1/dist/basecoat.cdn.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/basecoat-css@0.3.1/dist/js/all.min.js" defer></script>
-    
-    <!-- Theme Switcher Script -->
+    <title>Sign in · Sora Frame</title>
+    <link rel="icon" href="/icons/favicon.ico" sizes="48x48">
+    <link rel="icon" href="/icons/favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+    <link rel="manifest" href="/icons/site.webmanifest">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="/css/sora.css">
+
+    <!-- Theme: follow the admin's saved choice, else the system -->
     <script>
     (() => {
       try {
         const stored = localStorage.getItem('themeMode');
-        if (stored ? stored === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches) {
-          document.documentElement.classList.add('dark');
-        }
+        const dark = stored === 'dark' || ((!stored || stored === 'system') && matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.classList.toggle('dark', dark);
       } catch (_) {}
-      
-      document.addEventListener('basecoat:theme', (e) => {
-        const mode = e.detail?.mode || (document.documentElement.classList.contains('dark') ? 'light' : 'dark');
-        if (mode === 'dark') {
-          document.documentElement.classList.add('dark');
-        } else {
-          document.documentElement.classList.remove('dark');
-        }
-        localStorage.setItem('themeMode', mode);
-      });
     })();
     </script>
-    <style>
-        /* Basecoat-style body CSS with theme support */
-        body {
-            background: var(--background);
-            color: var(--foreground);
-            overscroll-behavior: none;
-            -webkit-font-smoothing: antialiased;
-            -moz-osx-font-smoothing: grayscale;
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .spinner {
-            width: 16px;
-            height: 16px;
-            border: 2px solid transparent;
-            border-top: 2px solid currentColor;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            display: none;
-        }
-
-        @keyframes spin {
-            to {
-                transform: rotate(360deg);
-            }
-        }
-    </style>
+    <link rel="stylesheet" href="/css/login.css">
 </head>
 
 <body>
-    <!-- ✅ Following style guide: Use Tailwind only when absolutely necessary for layout -->
-    <div class="w-full max-w-md">
-        <!-- ✅ Following style guide: Basecoat card component with proper structure -->
-        <div class="card justify-center">
-            <!-- ✅ Following style guide: Card header pattern -->
-            <header class="flex flex-col items-center justify-center">
-                <div class="btn-lg-icon-outline">📷</div>
-                <h2>Digital Photo Frame</h2>
-
-            </header>
-
-            <!-- ✅ Following style guide: Card main content section -->
-            <section>
-                <!-- ✅ Following style guide: Recommended form pattern -->
-
-                <form class="form grid gap-6" id="loginForm">
-                    <p class="text-muted-foreground">Enter password to access admin panel</p>
-                    <div class="grid gap-2">
-                        <label for="passwordInput" class="label">Password</label>
-                        <input type="password" name="password" class="input" placeholder="Enter admin password" required
-                            autocomplete="current-password" id="passwordInput">
-                        <p class="text-muted-foreground text-sm">Enter your admin password to access the control panel.
-                        </p>
-                    </div>
-
-                    <button type="submit" class="btn" id="loginBtn">
-                        <span class="btn-text">Login</span>
-                        <div class="spinner" id="spinner"></div>
-                    </button>
-
-                    <!-- ✅ Following style guide: Error alert pattern -->
-                    <div id="errorMessage" class="alert-destructive" style="display: none;">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
-                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <circle cx="12" cy="12" r="10" />
-                            <line x1="12" x2="12" y1="8" y2="12" />
-                            <line x1="12" x2="12.01" y1="16" y2="16" />
-                        </svg>
-                        <h2>Login Failed</h2>
-                        <section id="errorText"></section>
-                    </div>
-
-                    <!-- ✅ Following style guide: Success alert pattern -->
-                    <div id="successMessage" class="alert" style="display: none;">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
-                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <circle cx="12" cy="12" r="10" />
-                            <path d="m9 12 2 2 4-4" />
-                        </svg>
-                        <h2>Success!</h2>
-                        <section id="successText"></section>
-                    </div>
-                </form>
-            </section>
-
-            <!-- ✅ Following style guide: Card footer pattern -->
-            <footer>
-                <a href="/slideshow" class="btn-link">
-                    <span>🎬</span>
-                    View Slideshow (No login required)
-                </a>
-            </footer>
+    <aside class="hero" aria-hidden="true">
+        <div class="hero-top">
+            <span class="sora-wordmark">Sora</span>
+            <span class="days-pill"><span class="material-icons">favorite</span>Photo frame</span>
         </div>
-    </div>
-</body>
 
-<script>
-    class LoginManager {
-        constructor() {
-            this.form = document.getElementById('loginForm');
-            this.passwordInput = document.getElementById('passwordInput');
-            this.loginBtn = document.getElementById('loginBtn');
-            this.spinner = document.getElementById('spinner');
-            this.btnText = document.querySelector('.btn-text');
-            this.errorMessage = document.getElementById('errorMessage');
-            this.successMessage = document.getElementById('successMessage');
+        <div class="album">
+            <div class="polaroid one"><div class="pic"></div><span class="dot"></span></div>
+            <div class="polaroid two"><div class="pic"></div><span class="dot"></span></div>
+            <span class="script">our little moments</span>
+        </div>
 
-            this.setupEventListeners();
-            this.checkUrlParams();
-        }
+        <div class="hero-copy">
+            <h1>Every photo, <em>on the wall</em></h1>
+            <p>Curate the library your frames play from: folders, uploads and Google Photos imports.</p>
+        </div>
+        <div class="clouds"></div>
+    </aside>
 
-        setupEventListeners() {
-            this.form.addEventListener('submit', (e) => this.handleLogin(e));
-            this.passwordInput.addEventListener('input', () => this.clearMessages());
-        }
+    <main class="sign-in">
+        <div class="sign-in-inner">
+            <span class="sora-eyebrow">Library admin</span>
+            <h2>Sign in</h2>
+            <p class="lede">Enter the admin password to manage your photos.</p>
 
-        checkUrlParams() {
-            const urlParams = new URLSearchParams(window.location.search);
-            const error = urlParams.get('error');
-            const expired = urlParams.get('expired');
+            <form id="loginForm">
+                <div class="field">
+                    <label for="passwordInput">Password</label>
+                    <input type="password" name="password" placeholder="Admin password" required
+                        autocomplete="current-password" id="passwordInput" autofocus>
+                </div>
 
-            if (error === 'invalid') {
-                this.showError('Invalid password. Please try again.');
-            } else if (expired === 'true') {
-                this.showError('Your session has expired. Please login again.');
-            }
-        }
+                <button type="submit" class="submit" id="loginBtn">
+                    <span class="btn-text">Sign in</span>
+                    <span class="material-icons">arrow_forward</span>
+                    <div class="spinner" id="spinner"></div>
+                </button>
 
-        async handleLogin(e) {
-            e.preventDefault();
+                <div id="errorMessage" class="notice error" role="alert" style="display: none;">
+                    <span class="material-icons">error</span>
+                    <h3>Login failed</h3>
+                    <section id="errorText"></section>
+                </div>
 
-            const password = this.passwordInput.value.trim();
-            if (!password) {
-                this.showError('Please enter a password');
-                return;
-            }
+                <div id="successMessage" class="notice success" role="status" style="display: none;">
+                    <span class="material-icons">check_circle</span>
+                    <h3>Welcome back</h3>
+                    <section id="successText"></section>
+                </div>
+            </form>
 
-            this.setLoading(true);
-            this.clearMessages();
+            <div class="sign-in-foot">
+                <a href="/slideshow"><span class="material-icons">slideshow</span>Open the slideshow</a>
+            </div>
+        </div>
+    </main>
 
-            try {
-                const response = await fetch('/api/auth/login', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ password })
-                });
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    this.showSuccess('Login successful! Redirecting...');
-                    setTimeout(() => {
-                        window.location.href = '/admin';
-                    }, 1000);
-                } else {
-                    this.showError(data.message || 'Login failed');
-                }
-            } catch (error) {
-                console.error('Login error:', error);
-                this.showError('Connection error. Please try again.');
-            } finally {
-                this.setLoading(false);
-            }
-        }
-
-        setLoading(loading) {
-            this.loginBtn.disabled = loading;
-            if (loading) {
-                this.btnText.textContent = 'Logging in...';
-                this.spinner.style.display = 'inline-block';
-            } else {
-                this.btnText.textContent = 'Login';
-                this.spinner.style.display = 'none';
-            }
-        }
-
-        showError(message) {
-            const errorText = document.getElementById('errorText');
-            if (errorText) {
-                errorText.textContent = message;
-            }
-            this.errorMessage.style.display = 'grid';
-            this.successMessage.style.display = 'none';
-        }
-
-        showSuccess(message) {
-            const successText = document.getElementById('successText');
-            if (successText) {
-                successText.textContent = message;
-            }
-            this.successMessage.style.display = 'grid';
-            this.errorMessage.style.display = 'none';
-        }
-
-        clearMessages() {
-            this.errorMessage.style.display = 'none';
-            this.successMessage.style.display = 'none';
-        }
-    }
-
-    // Initialize login manager when DOM is loaded
-    document.addEventListener('DOMContentLoaded', () => {
-        new LoginManager();
-    });
-</script>
+<script src="/js/login.js"></script>
 </body>
 
 </html>

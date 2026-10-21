@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 128 128">
+  <defs>
+    <!-- Berry &amp; Honey: same values as the berry gradient and honey tokens in css/sora.css -->
+    <linearGradient id="berry" x1="0" y1="0" x2="128" y2="128" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#e0395f"/>
+      <stop offset="0.55" stop-color="#c42b6e"/>
+      <stop offset="1" stop-color="#a8217c"/>
+    </linearGradient>
+    <radialGradient id="honey" cx="20" cy="14" r="70" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f6dfae"/>
+      <stop offset="0.3" stop-color="#e9b95e"/>
+      <stop offset="0.7" stop-color="#e9b95e" stop-opacity="0"/>
+    </radialGradient>
+    <g id="mark" fill-rule="evenodd">
+      <!-- outer frame, inner edge chamfered at the top right -->
+      <path d="M19 2h90a17 17 0 0 1 17 17v90a17 17 0 0 1-17 17H19A17 17 0 0 1 2 109V19A17 17 0 0 1 19 2Z
+               M18 11.5a6.5 6.5 0 0 0-6.5 6.5v92a6.5 6.5 0 0 0 6.5 6.5h92a6.5 6.5 0 0 0 6.5-6.5V44.5a5 5 0 0 0-1.5-3.6L90.6 13a5 5 0 0 0-3.6-1.5Z"/>
+      <!-- inner photo, notched at the top left -->
+      <path d="M22.5 30.5A8 8 0 0 0 30.5 22.5H90a16 16 0 0 1 16 16V100a6 6 0 0 1-6 6H28.5a6 6 0 0 1-6-6Z
+               M35 32a3 3 0 0 0-3 3v58.5a3 3 0 0 0 3 3h58.5a3 3 0 0 0 3-3V40a8 8 0 0 0-8-8Z"/>
+    </g>
+  </defs>
+  <use xlink:href="#mark" href="#mark" fill="url(#berry)"/>
+  <!-- honey glint catching the top-left corner -->
+  <use xlink:href="#mark" href="#mark" fill="url(#honey)"/>
+</svg>

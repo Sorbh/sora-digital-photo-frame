@@ -1,0 +1,1021 @@
+body {
+    overscroll-behavior: none;
+}
+
+.app {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.hidden {
+    display: none !important;
+}
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+.spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid transparent;
+    border-top: 2px solid currentColor;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ---------- Grid ------------------------------------------------- */
+
+.main-content {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    padding: 0 clamp(1rem, 3vw, 2.5rem) 4rem;
+}
+
+.admin-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: clamp(0.75rem, 1.6vw, 1.25rem);
+}
+
+.grid-label {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 1rem 0 0.25rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--berry);
+}
+
+.grid-label:first-child {
+    margin-top: 0;
+}
+
+.grid-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--rule);
+}
+
+.file-item {
+    position: relative;
+    cursor: pointer;
+    animation: tile-in 0.5s var(--ease-out) both;
+}
+
+@keyframes tile-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: none; }
+}
+
+/* Folders: a cover photo on a little stack of prints */
+.file-item.folder {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 10px 10px 12px;
+    border: 1px solid var(--rule);
+    border-radius: var(--shape-md);
+    background: var(--paper-raised);
+    box-shadow: var(--shadow-soft);
+    transition: transform 0.3s var(--ease-out), box-shadow 0.3s ease, border-color 0.3s ease;
+}
+
+.file-item.folder:hover {
+    transform: translateY(-6px);
+    border-color: color-mix(in oklab, var(--foreground) 18%, var(--rule));
+    box-shadow: var(--shadow-lift);
+}
+
+.folder-cover {
+    position: relative;
+    aspect-ratio: 4 / 3;
+    isolation: isolate;
+}
+
+.folder-cover::before,
+.folder-cover::after {
+    content: '';
+    position: absolute;
+    inset: 4px;
+    z-index: -1;
+    border-radius: var(--shape-sm);
+    background: var(--paper-sunk) center / cover no-repeat;
+    border: 1px solid var(--rule);
+    transition: transform 0.45s var(--ease-out), background-color 0.3s ease, border-color 0.3s ease;
+}
+
+.folder-cover::before { transform: rotate(-3deg); background-image: var(--print-1, none); }
+.folder-cover::after { transform: rotate(2.5deg); background-image: var(--print-2, none); }
+
+/* Hover fans the prints out from under the cover */
+.file-item.folder:hover .folder-cover::before {
+    transform: rotate(-10deg) translate(-10px, 2px);
+    background-color: var(--honey-soft);
+    border-color: color-mix(in oklab, var(--honey) 45%, transparent);
+}
+
+.file-item.folder:hover .folder-cover::after {
+    transform: rotate(9deg) translate(10px, -2px);
+    background-color: var(--blush);
+    border-color: color-mix(in oklab, var(--berry) 30%, transparent);
+}
+
+.folder-cover-img,
+.folder-cover-empty {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border-radius: var(--shape-sm);
+    transition: transform 0.45s var(--ease-out), box-shadow 0.3s ease;
+}
+
+.file-item.folder:hover :is(.folder-cover-img, .folder-cover-empty) {
+    transform: rotate(-1.5deg) scale(1.03);
+    box-shadow: 0 10px 20px -10px rgb(60 10 30 / 0.45);
+}
+
+.folder-cover-img {
+    object-fit: cover;
+    background: var(--paper-sunk);
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.1);
+}
+
+.folder-cover-empty {
+    display: none;
+    place-items: center;
+    background: var(--paper-sunk);
+    color: var(--muted-foreground);
+}
+
+.folder-cover-empty .material-symbols-outlined {
+    font-size: 34px;
+    font-variation-settings: 'FILL' 0, 'wght' 250, 'GRAD' 0, 'opsz' 40;
+}
+
+.file-item.folder.no-cover .folder-cover-img { display: none; }
+.file-item.folder.no-cover .folder-cover-empty { display: grid; }
+
+.folder-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 0 2px 0 4px;
+}
+
+.file-item.folder .folder-name {
+    overflow: hidden;
+    font-weight: 600;
+    font-size: 0.95rem;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    text-transform: capitalize;
+}
+
+.folder-kind {
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: var(--blush);
+    color: var(--berry);
+    font-size: 18px;
+    transition: transform 0.25s var(--ease-out), background-color 0.25s ease, color 0.25s ease;
+}
+
+.folder-more {
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    margin-left: auto;
+    flex-shrink: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--muted-foreground);
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.2s ease, background-color 0.15s ease, color 0.15s ease;
+}
+
+.folder-more .material-symbols-outlined { font-size: 20px; }
+.folder-more:hover { background: var(--muted); color: var(--foreground); }
+.folder-more:focus-visible { outline: 2px solid var(--safelight); outline-offset: 1px; }
+
+.file-item.folder:hover .folder-more,
+.file-item.folder:focus-within .folder-more { opacity: 1; }
+
+/* No hover on touch screens: keep the button visible */
+@media (hover: none) {
+    .folder-more { opacity: 1; }
+}
+
+.file-item.folder:hover .folder-kind {
+    transform: translateX(4px);
+    background: var(--berry);
+    color: #fff;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .file-item.folder,
+    .folder-cover::before,
+    .folder-cover::after,
+    .folder-cover-img,
+    .folder-cover-empty { transition: none; }
+}
+
+/* Empty covers rotate through the blush / honey / teal chips */
+.file-item.folder:nth-of-type(3n + 1) .folder-cover-empty { background: var(--blush); color: var(--berry); }
+.file-item.folder:nth-of-type(3n + 2) .folder-cover-empty { background: var(--honey-soft); color: #b07a1c; }
+.file-item.folder:nth-of-type(3n + 3) .folder-cover-empty { background: var(--teal-soft); color: #4f7f86; }
+.dark .file-item.folder:nth-of-type(3n + 2) .folder-cover-empty { color: var(--honey); }
+.dark .file-item.folder:nth-of-type(3n + 3) .folder-cover-empty { color: var(--teal); }
+
+/* Photos */
+.file-item.image {
+    aspect-ratio: 1;
+    overflow: hidden;
+    border-radius: var(--shape-md);
+    background: var(--paper-sunk);
+    transition: transform 0.3s var(--ease-out), box-shadow 0.3s ease;
+}
+
+.file-item.image:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lift);
+}
+
+.admin-photo-image {
+    position: absolute;
+    inset: 0;
+}
+
+.admin-photo-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.6s var(--ease-out);
+}
+
+.file-item.image:hover .admin-photo-image img {
+    transform: scale(1.04);
+}
+
+.photo-grid-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 12px;
+    background: linear-gradient(to bottom, rgb(0 0 0 / 0.35), transparent 35%, transparent 55%, rgb(0 0 0 / 0.55));
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.file-item.image:hover .photo-grid-overlay,
+.file-item.image:focus-within .photo-grid-overlay,
+.file-item.image.selected .photo-grid-overlay {
+    opacity: 1;
+}
+
+.photo-grid-overlay-bottom {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.photo-grid-actions {
+    display: flex;
+    gap: 6px;
+}
+
+.photo-grid-actions .btn-icon {
+    display: inline-grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: rgb(255 255 255 / 0.18);
+    color: #fff;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    box-shadow: none;
+}
+
+.photo-grid-actions .btn-icon:hover {
+    background: rgb(255 255 255 / 0.95);
+    color: #14120f;
+}
+
+.photo-grid-actions .btn-icon[data-action="delete"]:hover {
+    background: var(--destructive);
+    color: #fff;
+}
+
+.photo-grid-actions .btn-icon .material-symbols-outlined {
+    font-size: 18px;
+    line-height: 1;
+}
+
+.photo-grid-overlay-top {
+    display: flex;
+}
+
+.photo-grid-checkbox .label {
+    display: flex;
+    margin: 0;
+    cursor: pointer;
+}
+
+.photo-grid-checkbox input[type="checkbox"] {
+    appearance: none;
+    -webkit-appearance: none;
+    display: block;
+    flex: none;
+    width: 24px;
+    height: 24px;
+    margin: 0;
+    border: 1.5px solid rgb(255 255 255 / 0.9);
+    border-radius: 50%;
+    background: rgb(0 0 0 / 0.25) none center / 14px no-repeat;
+    box-shadow: none;
+    cursor: pointer;
+}
+
+.photo-grid-checkbox input[type="checkbox"]::before,
+.photo-grid-checkbox input[type="checkbox"]::after {
+    content: none;
+}
+
+.photo-grid-checkbox input[type="checkbox"]:checked {
+    border-color: #fff;
+    background-color: var(--safelight);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E");
+}
+
+.photo-grid-info {
+    position: absolute;
+    left: 0;
+    right: 90px;
+    bottom: 0;
+    z-index: 6;
+    padding: 12px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.file-item.image:hover .photo-grid-info {
+    opacity: 1;
+}
+
+.photo-grid-name {
+    overflow: hidden;
+    font-family: var(--font-sans);
+    font-weight: 600;
+    font-size: 0.6875rem;
+    color: rgb(255 255 255 / 0.9);
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.file-item.image.selected {
+    box-shadow: 0 0 0 3px var(--background), 0 0 0 5px var(--safelight);
+}
+
+.file-item.image.selected .admin-photo-image img {
+    transform: none;
+    filter: saturate(0.85) brightness(0.92);
+}
+
+/* Google Photos import tile */
+.file-item.google-photos-import {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    min-height: 100%;
+    aspect-ratio: 1;
+    padding: 1rem;
+    border: 1.5px dashed color-mix(in oklab, var(--foreground) 22%, transparent);
+    border-radius: var(--shape-md);
+    color: var(--muted-foreground);
+    font-size: 0.875rem;
+    font-weight: 550;
+    text-align: center;
+    transition: border-color 0.2s ease, color 0.2s ease, background-color 0.2s ease;
+}
+
+.file-item.google-photos-import:hover {
+    border-color: var(--safelight);
+    background: var(--safelight-soft);
+    color: var(--foreground);
+}
+
+.file-item.google-photos-import .material-icons {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: var(--paper-sunk);
+    font-size: 24px;
+}
+
+/* ---------- Empty state ----------------------------------------- */
+
+.empty-state {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 420px;
+    padding: 2rem 0;
+}
+
+.empty-state h3 {
+    font-family: var(--font-display);
+    font-size: 2.25rem !important;
+    font-weight: 400 !important;
+}
+
+.upload-drop-zone {
+    border-color: color-mix(in oklab, var(--foreground) 18%, transparent) !important;
+    border-radius: var(--shape-md)!important;
+    background: var(--paper-raised);
+    transition: border-color 0.2s ease, background-color 0.2s ease, transform 0.2s var(--ease-out) !important;
+}
+
+.upload-drop-zone:hover,
+.upload-drop-zone.dragover {
+    border-color: var(--safelight) !important;
+    background: var(--safelight-soft) !important;
+}
+
+.upload-drop-zone .material-symbols-outlined {
+    color: var(--safelight);
+}
+
+.empty-state .upload-drop-zone:active {
+    transform: scale(0.98);
+}
+
+/* ---------- Context menu ---------------------------------------- */
+
+#contextMenuPopover {
+    border-color: var(--rule) !important;
+    border-radius: var(--shape-xs)!important;
+    background: var(--popover) !important;
+    box-shadow: var(--shadow-lift) !important;
+    padding: 6px !important;
+}
+
+.menu-divider {
+    margin: 4px 0;
+    border: 0;
+    border-top: 1px solid var(--rule);
+}
+
+.menu-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.55rem 0.75rem;
+    border-radius: var(--shape-xs);
+    font-size: 0.875rem;
+    color: var(--foreground);
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+.menu-item:hover {
+    background-color: var(--muted);
+}
+
+.menu-item .material-symbols-outlined {
+    font-size: 18px;
+    color: var(--muted-foreground);
+}
+
+.menu-item-destructive,
+.menu-item-destructive .material-symbols-outlined {
+    color: var(--destructive);
+}
+
+.menu-item-destructive:hover {
+    background-color: color-mix(in oklab, var(--destructive) 12%, transparent);
+}
+
+/* ---------- Tooltips -------------------------------------------- */
+
+[data-tooltip] {
+    position: relative;
+}
+
+[data-tooltip]::before {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    z-index: 1000;
+    padding: 0.4rem 0.6rem;
+    border-radius: var(--shape-xs);
+    background: var(--ink);
+    color: var(--paper);
+    font-size: 0.75rem;
+    font-weight: 550;
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    transform: translate(-50%, 4px);
+    transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+[data-tooltip]:hover::before {
+    opacity: 1;
+    visibility: visible;
+    transform: translate(-50%, 0);
+}
+
+/* ---------- Selection FAB --------------------------------------- */
+
+.selection-fab {
+    position: fixed;
+    right: 1.5rem;
+    bottom: 1.5rem;
+    z-index: 150;
+    opacity: 0;
+    transform: translateY(100px) scale(0.8);
+    transition: opacity 0.3s ease, transform 0.4s var(--ease-out);
+}
+
+.selection-fab:not(.hidden) {
+    opacity: 1;
+    transform: none;
+}
+
+.fab-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 60px;
+    height: 60px;
+    border: 0;
+    border-radius: 50%;
+    background: var(--destructive);
+    color: #fff;
+    box-shadow: 0 16px 36px -14px var(--destructive);
+    cursor: pointer;
+    transition: transform 0.2s var(--ease-out);
+}
+
+.fab-button:hover { transform: scale(1.06); }
+.fab-button:active { transform: scale(0.95); }
+
+.fab-button .material-symbols-outlined {
+    font-size: 26px;
+}
+
+.fab-badge {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 26px;
+    height: 26px;
+    padding: 0 6px;
+    border: 3px solid var(--background);
+    border-radius: 999px;
+    background: var(--ink);
+    color: var(--paper);
+    font-family: var(--font-sans);
+    font-weight: 600;
+    font-size: 0.75rem;
+    font-weight: 500;
+    animation: pulse-in 0.4s var(--ease-out);
+}
+
+.fab-badge.updated {
+    animation: bounce-badge 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+@keyframes pulse-in {
+    0% { transform: scale(0); opacity: 0; }
+    50% { transform: scale(1.2); }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes bounce-badge {
+    0%, 100% { transform: scale(1); }
+    25% { transform: scale(1.25); }
+    50% { transform: scale(0.9); }
+    75% { transform: scale(1.1); }
+}
+
+/* ---------- Google Photos modal (plain div, not <dialog>) -------- */
+
+.modal {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    display: grid;
+    place-items: center;
+    padding: 1rem;
+    background: rgb(15 14 12 / 0.55);
+    backdrop-filter: blur(6px);
+}
+
+.modal-content {
+    width: 100%;
+    max-width: 32rem;
+    max-height: calc(100vh - 2rem);
+    overflow: auto;
+    padding: 1.75rem;
+    border-radius: var(--shape-lg);
+    box-shadow: var(--shadow-lift);
+}
+
+.session-state {
+    display: grid;
+    justify-items: center;
+    gap: 1rem;
+    padding: 1.5rem 0;
+    text-align: center;
+}
+
+.session-icon .material-symbols-outlined {
+    font-size: 40px;
+    color: var(--safelight);
+}
+
+.session-icon.error .material-symbols-outlined {
+    color: var(--destructive);
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+/* ---------- Photo viewer ---------------------------------------- */
+
+.photo-modal-dialog {
+    width: 100vw;
+    height: 100vh;
+    max-width: 100vw;
+    max-height: 100vh;
+    margin: 0;
+    padding: 0;
+    border: none;
+    background: rgb(11 10 9 / 0.97);
+    animation: modal-fade-in 0.3s var(--ease-out);
+}
+
+.photo-modal-dialog::backdrop {
+    background: rgb(0 0 0 / 0.9);
+}
+
+@keyframes modal-fade-in {
+    from { opacity: 0; transform: scale(0.97); }
+    to { opacity: 1; transform: none; }
+}
+
+.photo-modal-content {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    padding: 2rem;
+}
+
+.photo-modal-close {
+    position: absolute;
+    top: 1.5rem;
+    right: 1.5rem;
+    z-index: 1001;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    border: 1px solid rgb(255 255 255 / 0.14);
+    border-radius: 50%;
+    background: rgb(255 255 255 / 0.08);
+    color: #fff;
+    cursor: pointer;
+    transition: background-color 0.2s ease, transform 0.2s var(--ease-out);
+}
+
+.photo-modal-close:hover {
+    background: rgb(255 255 255 / 0.16);
+    transform: rotate(90deg);
+}
+
+.photo-modal-close .material-symbols-outlined {
+    font-size: 24px;
+}
+
+.modal-photo {
+    max-width: calc(100vw - 4rem);
+    max-height: calc(100vh - 8rem);
+    object-fit: contain;
+    border-radius: var(--shape-xs);
+    box-shadow: 0 30px 80px rgb(0 0 0 / 0.6);
+    transition: transform 0.3s var(--ease-out);
+    cursor: zoom-in;
+    user-select: none;
+}
+
+.modal-photo.zoomed {
+    cursor: zoom-out;
+    transform: scale(1.5);
+}
+
+.photo-modal-hints {
+    position: absolute;
+    left: 1.5rem;
+    bottom: 1.5rem;
+    z-index: 1001;
+    padding: 14px 18px 14px 14px;
+    border: 1px solid rgb(255 255 255 / 0.1);
+    border-radius: var(--shape-md);
+    background: rgb(20 12 16 / 0.62);
+    backdrop-filter: blur(12px) saturate(1.2);
+    -webkit-backdrop-filter: blur(12px) saturate(1.2);
+    box-shadow: 0 12px 32px -12px rgb(0 0 0 / 0.6);
+    color: rgb(255 255 255 / 0.82);
+    font-size: 0.8125rem;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(6px);
+    transition: opacity 0.25s ease, transform 0.25s var(--ease-out), visibility 0.25s;
+    pointer-events: none;
+}
+
+.photo-modal-content:hover .photo-modal-hints {
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+}
+
+/* Keys in one column, labels lined up in the next */
+.photo-modal-hints ul {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 10px 14px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.photo-modal-hints li {
+    display: contents;
+}
+
+.photo-modal-hints .keys {
+    display: flex;
+    gap: 4px;
+}
+
+.photo-modal-hints li > span:last-child {
+    align-self: center;
+    white-space: nowrap;
+}
+
+.photo-modal-hints .key {
+    display: inline-grid;
+    place-items: center;
+    min-width: 26px;
+    height: 24px;
+    padding: 0 7px;
+    border: 1px solid rgb(255 255 255 / 0.18);
+    border-bottom-width: 2px;
+    border-radius: var(--shape-xs);
+    background: rgb(255 255 255 / 0.08);
+    color: #fff;
+    font-family: var(--font-sans);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    line-height: 1;
+}
+
+/* ---------- Small screens --------------------------------------- */
+
+@media (max-width: 640px) {
+    .admin-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .photo-modal-content {
+        padding: 1rem;
+    }
+
+    .photo-modal-close {
+        top: 1rem;
+        right: 1rem;
+        width: 40px;
+        height: 40px;
+    }
+
+    .modal-photo {
+        max-width: calc(100vw - 2rem);
+        max-height: calc(100vh - 6rem);
+    }
+
+    .photo-modal-hints {
+        display: none;
+    }
+
+    .admin-grid {
+        gap: 0.75rem;
+    }
+
+    .main-content {
+        padding: 0 0.75rem 2rem;
+    }
+
+    .selection-fab {
+        right: 1rem;
+        bottom: calc(96px + env(safe-area-inset-bottom));
+    }
+
+    .file-item.folder .folder-name {
+        font-size: 0.875rem;
+    }
+}
+
+/* ---------- Drag and drop -------------------------------------- */
+
+/* Soft watermark in the free space under the grid. The whole window is the
+   drop target; this just says so where there is room to say it. */
+.drop-hint {
+    display: grid;
+    place-content: center;
+    justify-items: center;
+    gap: 8px;
+    flex: 1;
+    min-height: 240px;
+    margin-top: 1.5rem;
+    padding: 2rem 1rem;
+    background: radial-gradient(ellipse 50% 60% at 50% 50%, color-mix(in oklab, var(--berry) 7%, transparent), transparent 75%);
+    color: color-mix(in oklab, var(--muted-foreground) 55%, transparent);
+    text-align: center;
+    pointer-events: none;
+    transition: color 0.25s ease;
+}
+
+.drop-hint .material-symbols-outlined {
+    font-size: 64px;
+    font-variation-settings: 'FILL' 0, 'wght' 150, 'GRAD' 0, 'opsz' 48;
+    opacity: 0.6;
+}
+
+.drop-hint p {
+    margin: 0;
+    font-size: 0.95rem;
+}
+
+.drop-hint strong {
+    font-weight: 650;
+}
+
+.drop-hint .drop-hint-sub {
+    font-size: 0.8125rem;
+    opacity: 0.8;
+}
+
+.app.file-dragging .drop-hint {
+    color: var(--berry);
+}
+
+/* Whole-window highlight while files from the computer are over the page */
+.drop-zone {
+    position: fixed;
+    inset: 10px;
+    z-index: 60;
+    border: 2px dashed color-mix(in oklab, var(--berry) 45%, transparent);
+    border-radius: var(--shape-lg);
+    background: color-mix(in oklab, var(--berry) 5%, transparent);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none; /* folder tiles underneath still take drops */
+    transition: opacity 0.2s ease, visibility 0.2s;
+}
+
+.drop-zone-content {
+    position: fixed;
+    left: 50%;
+    bottom: 2rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 20px;
+    border-radius: var(--shape-sm);
+    background: var(--berry-gradient);
+    box-shadow: 0 16px 36px -14px var(--berry);
+    color: #fff;
+    font-size: 0.9375rem;
+    transform: translate(-50%, 8px);
+    transition: transform 0.25s var(--ease-out);
+}
+
+.drop-zone-content p { margin: 0; }
+.drop-zone-content .material-symbols-outlined { font-size: 22px; }
+
+.app.file-dragging .drop-zone {
+    opacity: 1;
+    visibility: visible;
+}
+
+.app.file-dragging .drop-zone-content {
+    transform: translate(-50%, 0);
+}
+
+/* Photo being dragged (and the rest of its selection) */
+/* filter/scale rather than opacity/transform, which the tile-in animation holds */
+.file-item.image.dragging {
+    filter: opacity(0.4) saturate(0.6);
+    scale: 0.96;
+    transition: filter 0.2s ease, scale 0.2s var(--ease-out);
+}
+
+/* Folders invite a drop while a photo is in flight */
+.app.photo-dragging .file-item.folder:not(.drop-target) {
+    border-style: dashed;
+    border-color: color-mix(in oklab, var(--berry) 35%, transparent);
+}
+
+.file-item.folder.drop-target {
+    transform: translateY(-6px) scale(1.03);
+    border-style: solid;
+    border-color: var(--berry);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--berry) 22%, transparent), var(--shadow-lift);
+}
+
+.file-item.folder.drop-target .folder-cover::before {
+    transform: rotate(-10deg) translate(-10px, 2px);
+    background-color: var(--honey-soft);
+}
+
+.file-item.folder.drop-target .folder-cover::after {
+    transform: rotate(9deg) translate(10px, -2px);
+    background-color: var(--blush);
+}
+
+.file-item.folder.drop-target .folder-kind {
+    background: var(--berry);
+    color: #fff;
+}
+
+/* Parents in the breadcrumb and the back button take photos too */
+.breadcrumb-item.drop-target {
+    margin: -3px -6px;
+    padding: 3px 6px;
+    border-radius: var(--shape-xs);
+    background: rgb(255 255 255 / 0.25);
+    color: #fff !important;
+}
+
+.back-btn.drop-target {
+    background: rgb(255 255 255 / 0.4);
+    transform: scale(1.12);
+}
+
+/* Touch screens cannot drag files in */
+@media (hover: none) {
+    .drop-hint { display: none; }
+}

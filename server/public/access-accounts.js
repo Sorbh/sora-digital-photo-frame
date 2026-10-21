@@ -110,6 +110,14 @@ class AccessAccountsManager {
 
     renderAccounts() {
         document.getElementById('loadingState').classList.add('hidden');
+
+        const meta = document.getElementById('accountsMetaText');
+        if (meta) {
+            const count = this.accounts.length;
+            meta.textContent = count === 0
+                ? 'No accounts yet'
+                : `${count} ${count === 1 ? 'account' : 'accounts'} with their own PIN`;
+        }
         
         if (this.accounts.length === 0) {
             this.showEmptyState();
@@ -126,58 +134,70 @@ class AccessAccountsManager {
         this.bindAccountActions();
     }
 
+    escapeHtml(value) {
+        const div = document.createElement('div');
+        div.textContent = String(value);
+        return div.innerHTML;
+    }
+
     renderAccountCard(account) {
-        const folderTags = account.assignedFolders.length > 0 
-            ? account.assignedFolders.map(folder => 
+        const esc = (value) => this.escapeHtml(value);
+        const folderTags = account.assignedFolders.length > 0
+            ? account.assignedFolders.map(folder =>
                 `<span class="folder-tag">
-                    <span class="material-icons">folder</span>
-                    ${folder}
+                    <span class="material-symbols-outlined">folder</span>
+                    ${esc(folder)}
                 </span>`).join('')
             : '<span class="folder-tag no-folders-tag">No folders assigned</span>';
 
-        const lastAccessed = account.lastAccessed 
-            ? new Date(account.lastAccessed).toLocaleDateString()
+        const lastAccessed = account.lastAccessed
+            ? new Date(account.lastAccessed).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
             : 'Never';
+        const folderCount = account.assignedFolders.length;
 
         return `
-            <div class="card account-card" data-account-id="${account.id}">
-                <header class="flex items-start justify-between">
-                    <div>
-                        <h3 class="text-lg font-semibold">${account.name}</h3>
-                        <div class="grid gap-1 mt-2 text-sm text-muted-foreground">
-                            <div class="flex items-center gap-2">
-                                <span class="material-symbols-outlined text-base">key</span>
-                                PIN: ${account.pin}
-                            </div>
-                            <div class="flex items-center gap-2">
-                                <span class="material-symbols-outlined text-base">folder</span>
-                                ${account.assignedFolders.length} folders
-                            </div>
-                            <div class="flex items-center gap-2">
-                                <span class="material-symbols-outlined text-base">access_time</span>
-                                Last used: ${lastAccessed}
-                            </div>
-                        </div>
+            <article class="account-card" data-account-id="${esc(account.id)}">
+                <div class="account-top">
+                    <div class="account-avatar" aria-hidden="true">${esc(account.name.trim().charAt(0).toUpperCase() || '?')}</div>
+                    <div class="account-heading">
+                        <h3 class="account-name">${esc(account.name)}</h3>
+                        <button class="pin-reveal" data-pin="${esc(account.pin)}" title="Show PIN" aria-label="Show PIN">
+                            <span class="material-symbols-outlined">key</span>
+                            <span class="pin-value">${'•'.repeat(String(account.pin).length)}</span>
+                        </button>
                     </div>
                     <div class="account-actions">
-                        <button class="btn-icon edit-account" title="Edit Account" data-account-id="${account.id}">
+                        <button class="tb-btn icon edit-account" title="Edit account" data-account-id="${esc(account.id)}">
                             <span class="material-symbols-outlined">edit</span>
                         </button>
-                        <button class="btn-icon delete-account" title="Delete Account" data-account-id="${account.id}">
+                        <button class="tb-btn icon delete-account" data-danger title="Delete account" data-account-id="${esc(account.id)}">
                             <span class="material-symbols-outlined">delete</span>
                         </button>
                     </div>
-                </header>
-                <section class="mt-4">
-                    <div class="flex flex-wrap gap-1">
-                        ${folderTags}
-                    </div>
-                </section>
-            </div>
+                </div>
+                <dl class="account-stats">
+                    <div><dt>Folders</dt><dd>${folderCount === 0 ? 'None' : folderCount}</dd></div>
+                    <div><dt>Last used</dt><dd>${esc(lastAccessed)}</dd></div>
+                </dl>
+                <div class="folder-tags">
+                    ${folderTags}
+                </div>
+            </article>
         `;
     }
 
     bindAccountActions() {
+        // PINs stay masked until asked for
+        document.querySelectorAll('.pin-reveal').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const value = btn.querySelector('.pin-value');
+                const shown = btn.classList.toggle('revealed');
+                value.textContent = shown ? btn.dataset.pin : '•'.repeat(btn.dataset.pin.length);
+                btn.title = shown ? 'Hide PIN' : 'Show PIN';
+                btn.setAttribute('aria-label', btn.title);
+            });
+        });
+
         // Edit account buttons
         document.querySelectorAll('.edit-account').forEach(btn => {
             btn.addEventListener('click', (e) => {
@@ -234,19 +254,20 @@ class AccessAccountsManager {
         loadingElement.classList.add('hidden');
         gridElement.classList.remove('hidden');
         
+        const esc = (value) => this.escapeHtml(value);
         gridElement.innerHTML = this.folders.map(folder => {
             const isSelected = selectedFolders.includes(folder.name);
             return `
-                <div class="folder-item ${isSelected ? 'selected' : ''}" data-folder="${folder.name}">
+                <div class="folder-item ${isSelected ? 'selected' : ''}" data-folder="${esc(folder.name)}">
                     <label class="label flex items-center gap-3 cursor-pointer">
                         <input type="checkbox" 
                                class="input"
-                               id="folder-${folder.name}" 
-                               value="${folder.name}" 
+                               id="folder-${esc(folder.name)}" 
+                               value="${esc(folder.name)}" 
                                ${isSelected ? 'checked' : ''}>
                         <div class="flex items-center gap-2 flex-1">
                             <span class="material-symbols-outlined">folder</span>
-                            <span class="font-medium">${folder.name}</span>
+                            <span class="font-medium">${esc(folder.name)}</span>
                             <span class="text-sm text-muted-foreground ml-auto">${folder.imageCount}</span>
                         </div>
                     </label>
@@ -443,8 +464,10 @@ class AccessAccountsManager {
             <span class="material-icons">
                 ${type === 'error' ? 'error' : type === 'success' ? 'check_circle' : 'info'}
             </span>
-            <span class="toast-message">${message}</span>
+            <span class="toast-message"></span>
         `;
+        // Messages can include server text, so never parse them as HTML
+        toast.querySelector('.toast-message').textContent = message;
         
         container.appendChild(toast);
         

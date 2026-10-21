@@ -1,83 +1,53 @@
 const path = require('path');
+const { UPLOADS_DIR } = require('../config/paths');
 const fs = require('fs-extra');
-const sharp = require('sharp');
+const thumbnails = require('../services/thumbnailService');
 const imageController = require('./imageController');
+const { resolveAdminPath, toAdminPath } = require('../utils/safePath');
 
 class FolderController {
   constructor() {
-    this.uploadsDir = path.join(__dirname, '..', 'uploads');
-    this.thumbnailCache = new Map();
-    this.thumbnailCacheExpiry = 3600000; // 1 hour
+    this.uploadsDir = UPLOADS_DIR;
   }
 
-  // Generate folder thumbnail from first image
+  // Cover URL for a folder (first image, searching subfolders), or null when empty.
+  // The ?v= token changes when the cover image changes, so browsers can cache it.
   async generateFolderThumbnail(folderPath) {
     try {
-      const fullPath = path.isAbsolute(folderPath) ? folderPath : path.join(this.uploadsDir, folderPath);
-      const relativePath = path.relative(this.uploadsDir, fullPath);
-      
-      // Check cache first
-      const cacheKey = relativePath;
-      const cached = this.thumbnailCache.get(cacheKey);
-      if (cached && (Date.now() - cached.timestamp) < this.thumbnailCacheExpiry) {
-        return cached.thumbnail;
-      }
-      
-      // Find first image in folder (including subfolders)
-      const firstImage = await this.findFirstImage(fullPath);
-      if (!firstImage) {
-        return null;
-      }
-      
-      // Generate thumbnail
-      const thumbnailBuffer = await sharp(firstImage)
-        .resize(200, 200, { fit: 'cover' })
-        .jpeg({ quality: 80 })
-        .toBuffer();
-      
-      const thumbnailBase64 = `data:image/jpeg;base64,${thumbnailBuffer.toString('base64')}`;
-      
-      // Cache the result
-      this.thumbnailCache.set(cacheKey, {
-        thumbnail: thumbnailBase64,
-        timestamp: Date.now()
-      });
-      
-      return thumbnailBase64;
+      const fullPath = thumbnails.resolveInUploads(folderPath);
+      if (!fullPath) return null;
+
+      const firstImage = await thumbnails.findFirstImage(fullPath);
+      if (!firstImage) return null;
+
+      const stat = await fs.stat(firstImage);
+      const version = `${path.basename(firstImage)}:${Math.round(stat.mtimeMs)}`;
+      const encoded = path.relative(this.uploadsDir, fullPath).split(path.sep).map(encodeURIComponent).join('/');
+      return `/api/folders/${encoded}/thumbnail?v=${encodeURIComponent(version)}`;
     } catch (error) {
       console.error('Error generating folder thumbnail:', error);
       return null;
     }
   }
-  
-  // Find first image in folder recursively
-  async findFirstImage(dir) {
+
+  // Thumbnail URLs for the 2nd and 3rd photos, shown on the prints stacked behind the cover
+  async generateFolderPrints(folderPath) {
     try {
-      const items = await fs.readdir(dir, { withFileTypes: true });
-      
-      // First check for images in current directory
-      for (const item of items) {
-        if (item.isFile() && /\.(jpg|jpeg|png|gif|webp)$/i.test(item.name)) {
-          return path.join(dir, item.name);
-        }
-      }
-      
-      // If no images found, check subdirectories
-      for (const item of items) {
-        if (item.isDirectory()) {
-          const subImage = await this.findFirstImage(path.join(dir, item.name));
-          if (subImage) {
-            return subImage;
-          }
-        }
-      }
-      
-      return null;
+      const fullPath = thumbnails.resolveInUploads(folderPath);
+      if (!fullPath) return [];
+
+      const images = (await thumbnails.findImages(fullPath, 3)).slice(1);
+      return await Promise.all(images.map(async image => {
+        const stat = await fs.stat(image);
+        const relativePath = path.relative(this.uploadsDir, image);
+        return `/api/images/${encodeURIComponent(relativePath)}/thumbnail?v=${Math.round(stat.mtimeMs)}`;
+      }));
     } catch (error) {
-      return null;
+      console.error('Error generating folder prints:', error);
+      return [];
     }
   }
-  
+
   // Count images in folder recursively
   async countImagesInFolder(dir) {
     try {
@@ -87,6 +57,7 @@ class FolderController {
       for (const item of items) {
         const fullPath = path.join(dir, item.name);
         if (item.isDirectory()) {
+          if (item.name.startsWith('.')) continue;
           count += await this.countImagesInFolder(fullPath);
         } else if (item.isFile() && /\.(jpg|jpeg|png|gif|webp)$/i.test(item.name)) {
           count++;
@@ -103,9 +74,9 @@ class FolderController {
   async getFolderStructure(req, res) {
     try {
       const folderPath = req.params.folderPath || '';
-      const fullPath = folderPath ? path.join(this.uploadsDir, folderPath) : this.uploadsDir;
-      
-      if (!await fs.pathExists(fullPath)) {
+      const fullPath = thumbnails.resolveInUploads(folderPath);
+
+      if (!fullPath || !await fs.pathExists(fullPath)) {
         return res.status(404).json({ 
           success: false,
           error: `Folder not found: ${folderPath}`,
@@ -123,12 +94,15 @@ class FolderController {
       
       if (hasAccessRestrictions) {
         allowedFolders = req.session.accessAccount.assignedFolders;
-        console.log('🔒 Folder Access Control - User assigned folders:', allowedFolders);
       }
+
+      // Folder details (counts, covers) are gathered in parallel after filtering
+      const folderJobs = [];
       
       // Process folders
       for (const item of items) {
         if (item.isDirectory()) {
+          if (item.name.startsWith('.')) continue;
           const itemPath = path.join(fullPath, item.name);
           const relativePath = folderPath ? path.join(folderPath, item.name) : item.name;
           
@@ -146,30 +120,25 @@ class FolderController {
             });
             
             if (!folderAllowed) {
-              console.log('❌ Folder Access Control - Access denied to folder:', relativePath);
               continue; // Skip this folder
             }
-            
-            console.log('✅ Folder Access Control - Access granted to folder:', relativePath);
           }
-          
-          // Check if folder has subfolders
-          const subItems = await fs.readdir(itemPath, { withFileTypes: true });
-          const hasSubfolders = subItems.some(subItem => subItem.isDirectory());
-          
-          // Count images in this folder
-          const imageCount = await this.countImagesInFolder(itemPath);
-          
-          // Generate thumbnail
-          const thumbnail = await this.generateFolderThumbnail(relativePath);
-          
-          folders.push({
-            name: item.name,
-            path: relativePath,
-            thumbnail: thumbnail,
-            imageCount: imageCount,
-            hasSubfolders: hasSubfolders
-          });
+
+          folderJobs.push((async () => {
+            const [subItems, imageCount, thumbnail] = await Promise.all([
+              fs.readdir(itemPath, { withFileTypes: true }),
+              this.countImagesInFolder(itemPath),
+              this.generateFolderThumbnail(relativePath)
+            ]);
+
+            return {
+              name: item.name,
+              path: relativePath,
+              thumbnail: thumbnail,
+              imageCount: imageCount,
+              hasSubfolders: subItems.some(subItem => subItem.isDirectory() && !subItem.name.startsWith('.'))
+            };
+          })());
         } else if (item.isFile() && /\.(jpg|jpeg|png|gif|webp)$/i.test(item.name)) {
           const relativePath = folderPath ? path.join(folderPath, item.name) : item.name;
           const imageFolder = path.dirname(relativePath);
@@ -184,7 +153,6 @@ class FolderController {
               return false;
             });
             if (!imageAllowed) {
-              console.log('❌ Image Access Control - Access denied to image:', relativePath);
               continue; // Skip this image
             }
           }
@@ -197,6 +165,8 @@ class FolderController {
         }
       }
       
+      folders = await Promise.all(folderJobs);
+
       // Generate breadcrumb
       const breadcrumb = [];
       if (folderPath) {
@@ -248,26 +218,25 @@ class FolderController {
   // Get folder thumbnail endpoint
   async getFolderThumbnail(req, res) {
     try {
-      const folderPath = req.params.folderPath;
-      const thumbnail = await this.generateFolderThumbnail(folderPath);
-      
-      if (!thumbnail) {
+      const fullPath = thumbnails.resolveInUploads(req.params.folderPath);
+      if (!fullPath) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid folder path',
+          code: 'INVALID_PATH'
+        });
+      }
+
+      const firstImage = await thumbnails.findFirstImage(fullPath);
+      if (!firstImage) {
         return res.status(404).json({
           success: false,
           error: 'No thumbnail available for folder',
           code: 'THUMBNAIL_NOT_FOUND'
         });
       }
-      
-      // Extract base64 data and send as image
-      const base64Data = thumbnail.replace(/^data:image\/jpeg;base64,/, '');
-      const buffer = Buffer.from(base64Data, 'base64');
-      
-      res.set({
-        'Content-Type': 'image/jpeg',
-        'Cache-Control': 'public, max-age=3600'
-      });
-      res.send(buffer);
+
+      thumbnails.send(res, await thumbnails.getThumbnail(firstImage), { versioned: Boolean(req.query.v) });
     } catch (error) {
       console.error('Error serving folder thumbnail:', error);
       res.status(500).json({
@@ -277,38 +246,54 @@ class FolderController {
       });
     }
   }
-  
-  // Get folder contents (existing method)
+
+  // Get folder contents for the admin library
   async getFolderContents(req, res) {
     try {
       const folderPath = req.query.path || 'uploads';
-      const fullPath = path.join(__dirname, '..', folderPath);
-      
-      if (!await fs.pathExists(fullPath)) {
+      const fullPath = resolveAdminPath(folderPath, { allowRoot: true });
+
+      if (!fullPath || !await fs.pathExists(fullPath)) {
         return res.status(404).json({ message: 'Folder not found' });
       }
-      
+
       const items = await fs.readdir(fullPath, { withFileTypes: true });
-      const folders = [];
-      const files = [];
-      
+      const folderJobs = [];
+      const fileJobs = [];
+
       for (const item of items) {
+        if (item.name.startsWith('.')) continue;
+
         if (item.isDirectory()) {
-          folders.push({
+          const folderRelative = path.relative(this.uploadsDir, path.join(fullPath, item.name));
+          folderJobs.push(Promise.all([
+            this.generateFolderThumbnail(folderRelative),
+            this.generateFolderPrints(folderRelative)
+          ]).then(([thumbnail, prints]) => ({
             name: item.name,
             type: 'folder',
-            path: path.join(folderPath, item.name)
-          });
-        } else if (item.isFile() && /\.(jpg|jpeg|png|gif|webp)$/i.test(item.name)) {
-          files.push({
+            path: path.join(folderPath, item.name),
+            thumbnail, // null for empty folders, so the grid skips the request
+            prints
+          })));
+        } else if (item.isFile() && thumbnails.IMAGE_PATTERN.test(item.name)) {
+          const imageFullPath = path.join(fullPath, item.name);
+          const relativePath = path.relative(this.uploadsDir, imageFullPath);
+          const urlPath = relativePath.split(path.sep).map(encodeURIComponent).join('/');
+
+          fileJobs.push(fs.stat(imageFullPath).then(stat => ({
             name: item.name,
             type: 'image',
             path: path.join(folderPath, item.name),
-            url: `/uploads/${path.relative(this.uploadsDir, path.join(fullPath, item.name))}`
-          });
+            url: `/uploads/${urlPath}`,
+            // Grid tiles use the small cached version; ?v= busts it after a rotate
+            thumbnail: `/api/images/${encodeURIComponent(relativePath)}/thumbnail?v=${Math.round(stat.mtimeMs)}`
+          })));
         }
       }
-      
+
+      const [folders, files] = await Promise.all([Promise.all(folderJobs), Promise.all(fileJobs)]);
+
       res.json({
         currentPath: folderPath,
         folders: folders.sort((a, b) => a.name.localeCompare(b.name)),
@@ -324,14 +309,24 @@ class FolderController {
   async createFolder(req, res) {
     try {
       const { name, path: parentPath } = req.body;
-      const fullPath = path.join(__dirname, '..', parentPath || 'uploads', name);
-      
+
+      // A single, visible folder name: no separators, no "." / ".." or hidden names
+      if (typeof name !== 'string' || !name.trim() || /[\\/]/.test(name) || name.trim().startsWith('.')) {
+        return res.status(400).json({ message: 'Invalid folder name' });
+      }
+
+      const parentDir = resolveAdminPath(parentPath || 'uploads', { allowRoot: true });
+      if (!parentDir) {
+        return res.status(400).json({ message: 'Invalid parent folder' });
+      }
+
+      const fullPath = path.join(parentDir, name.trim());
       if (await fs.pathExists(fullPath)) {
         return res.status(400).json({ message: 'Folder already exists' });
       }
-      
+
       await fs.ensureDir(fullPath);
-      res.json({ message: 'Folder created successfully', path: fullPath });
+      res.json({ message: 'Folder created successfully', path: toAdminPath(fullPath) });
     } catch (error) {
       console.error('Error creating folder:', error);
       res.status(500).json({ message: 'Server error' });
@@ -341,18 +336,18 @@ class FolderController {
   // Delete folder
   async deleteFolder(req, res) {
     try {
-      const folderPath = req.query.path;
-      const fullPath = path.join(__dirname, '..', folderPath);
-      
-      if (!await fs.pathExists(fullPath)) {
+      // Never the uploads root itself, only folders inside it
+      const fullPath = resolveAdminPath(req.query.path);
+
+      if (!fullPath || !await fs.pathExists(fullPath)) {
         return res.status(404).json({ message: 'Folder not found' });
       }
-      
+
       await fs.remove(fullPath);
-      
+
       // Clear image cache after folder deletion as it might contain images
       imageController.clearImageCache();
-      
+
       res.json({ message: 'Folder deleted successfully' });
     } catch (error) {
       console.error('Error deleting folder:', error);

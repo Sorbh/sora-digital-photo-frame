@@ -1,0 +1,13 @@
+/*
+ * Utilities used by the admin pages, compiled ahead of time instead of by the
+ * Tailwind browser runtime. Rebuild after changing classes: npm run build:css
+ */
+@import "tailwindcss" source(none);
+
+@source "../public/admin.html";
+@source "../public/admin.js";
+@source "../public/access-accounts.html";
+@source "../public/access-accounts.js";
+@source "../public/js/settings.js";
+@source "../public/js/googlePhotosSync.js";
+@source "../public/js/folderBrowser.js";

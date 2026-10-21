@@ -156,61 +156,73 @@ class FolderSelector {
         styles.textContent = `
             .folder-selector {
                 position: relative;
-                display: inline-block;
+                display: inline-flex;
             }
 
             .folder-selector-btn {
-                background: rgba(255, 255, 255, 0.2);
-                border: none;
-                color: white;
-                padding: 8px 12px;
-                border-radius: 20px;
-                cursor: pointer;
-                display: flex;
+                display: inline-flex;
                 align-items: center;
                 gap: 8px;
-                font-size: 14px;
-                transition: all 0.3s ease;
-                backdrop-filter: blur(10px);
-                min-width: 120px;
-                max-width: 200px;
+                height: 44px;
+                padding: 0 12px 0 14px;
+                border: 0;
+                border-radius: var(--shape-sm);
+                background: transparent;
+                color: #fff4ef;
+                font: 550 0.875rem/1 var(--font-sans, sans-serif);
+                letter-spacing: 0.01em;
+                cursor: pointer;
+                transition: background-color 0.18s ease;
             }
 
-            .folder-selector-btn:hover {
-                background: rgba(255, 255, 255, 0.3);
+            .folder-selector-btn:hover,
+            .open .folder-selector-btn {
+                background: rgba(255, 255, 255, 0.09);
+            }
+
+            .folder-selector-btn .material-icons {
+                font-size: 20px;
             }
 
             .selected-folder-name {
-                flex: 1;
-                text-align: left;
-                white-space: nowrap;
+                max-width: 11rem;
                 overflow: hidden;
                 text-overflow: ellipsis;
+                white-space: nowrap;
             }
 
             .dropdown-arrow {
-                font-size: 18px;
-                transition: transform 0.3s ease;
+                opacity: 0.6;
+                transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
             }
 
-            .folder-selector.open .dropdown-arrow {
+            .open .dropdown-arrow {
                 transform: rotate(180deg);
             }
 
             .folder-dropdown {
                 position: absolute;
-                top: 100%;
-                right: 0;
-                width: 280px;
-                max-height: 400px;
-                background: rgba(0, 0, 0, 0.9);
-                border: 1px solid rgba(255, 255, 255, 0.2);
-                border-radius: 12px;
-                backdrop-filter: blur(20px);
-                z-index: 1000;
-                margin-top: 8px;
-                overflow: hidden;
-                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+                bottom: calc(100% + 18px);
+                left: 50%;
+                width: 21rem;
+                max-width: calc(100vw - 2rem);
+                padding: 6px;
+                transform: translateX(-50%);
+                transform-origin: 50% 100%;
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                border-radius: var(--shape-lg);
+                background: rgba(22, 20, 17, 0.86);
+                backdrop-filter: blur(28px) saturate(1.4);
+                -webkit-backdrop-filter: blur(28px) saturate(1.4);
+                box-shadow: 0 30px 60px -20px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(0, 0, 0, 0.3);
+                color: #fff4ef;
+                z-index: 40;
+                animation: folder-pop 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+            }
+
+            @keyframes folder-pop {
+                from { opacity: 0; transform: translateX(-50%) translateY(8px) scale(0.97); }
+                to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
             }
 
             .folder-dropdown.hidden {
@@ -221,136 +233,139 @@ class FolderSelector {
                 display: flex;
                 align-items: center;
                 justify-content: space-between;
-                padding: 12px 16px;
-                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-                color: white;
-                font-weight: 500;
+                padding: 10px 10px 8px 14px;
+                font: 500 0.6875rem/1 var(--font-sans, sans-serif);
+                letter-spacing: 0.14em;
+                text-transform: uppercase;
+                color: rgba(255, 244, 239, 0.55);
             }
 
             .close-dropdown {
-                background: none;
-                border: none;
-                color: rgba(255, 255, 255, 0.7);
+                display: grid;
+                place-items: center;
+                width: 28px;
+                height: 28px;
+                border: 0;
+                border-radius: 50%;
+                background: transparent;
+                color: inherit;
                 cursor: pointer;
-                padding: 4px;
-                border-radius: 4px;
-                transition: color 0.2s;
             }
 
             .close-dropdown:hover {
-                color: white;
-                background: rgba(255, 255, 255, 0.1);
+                background: rgba(255, 255, 255, 0.08);
+                color: #fff4ef;
+            }
+
+            .close-dropdown .material-icons {
+                font-size: 18px;
             }
 
             .folder-options {
-                max-height: 300px;
+                max-height: min(56vh, 30rem);
                 overflow-y: auto;
-            }
-
-            .folder-options::-webkit-scrollbar {
-                width: 6px;
-            }
-
-            .folder-options::-webkit-scrollbar-track {
-                background: rgba(255, 255, 255, 0.1);
-            }
-
-            .folder-options::-webkit-scrollbar-thumb {
-                background: rgba(255, 255, 255, 0.3);
-                border-radius: 3px;
+                overscroll-behavior: contain;
             }
 
             .folder-option {
-                display: block;
                 cursor: pointer;
-                transition: background 0.2s;
-                color: white;
             }
-            
+
             .folder-option-content {
                 display: flex;
                 align-items: center;
-                gap: 8px;
-                padding: 12px 16px;
-                transition: background 0.2s;
-            }
-            
-            .expand-btn {
-                background: none;
-                border: none;
-                color: rgba(255, 255, 255, 0.7);
-                cursor: pointer;
-                padding: 2px;
-                border-radius: 4px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                width: 24px;
-                height: 24px;
-                transition: all 0.2s;
-                flex-shrink: 0;
-            }
-            
-            .expand-btn:hover {
-                background: rgba(255, 255, 255, 0.1);
-                color: white;
-            }
-            
-            .expand-btn .material-icons {
-                font-size: 18px;
-            }
-            
-            .folder-spacer {
-                width: 24px;
-                height: 24px;
-                flex-shrink: 0;
+                gap: 12px;
+                padding: 7px 10px 7px 8px;
+                border-radius: var(--shape-sm);
+                transition: background-color 0.15s ease;
             }
 
             .folder-option:hover .folder-option-content {
-                background: rgba(255, 255, 255, 0.1);
+                background: rgba(255, 255, 255, 0.06);
             }
 
             .folder-option.selected .folder-option-content {
-                background: rgba(76, 175, 80, 0.2);
-                border-left: 3px solid #4CAF50;
+                background: rgba(255, 92, 141, 0.16);
+                box-shadow: inset 0 0 0 1px rgba(255, 92, 141, 0.35);
             }
 
-            .folder-option.all-folders .folder-option-content {
-                background: rgba(33, 150, 243, 0.1);
+            .folder-option.all-folders {
+                margin-bottom: 4px;
+                padding-bottom: 4px;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.06);
             }
 
-            .folder-option.all-folders:hover .folder-option-content {
-                background: rgba(33, 150, 243, 0.2);
-            }
-
-            .folder-option .folder-icon {
-                font-size: 20px;
-                color: rgba(255, 255, 255, 0.7);
+            .folder-spacer {
+                width: 0;
                 flex-shrink: 0;
             }
 
+            .expand-btn {
+                display: grid;
+                place-items: center;
+                width: 22px;
+                height: 22px;
+                flex-shrink: 0;
+                margin-right: -6px;
+                border: 0;
+                border-radius: var(--shape-xs);
+                background: transparent;
+                color: rgba(255, 244, 239, 0.6);
+                cursor: pointer;
+            }
+
+            .expand-btn:hover {
+                background: rgba(255, 255, 255, 0.1);
+                color: #fff4ef;
+            }
+
+            .expand-btn .material-icons {
+                font-size: 18px;
+            }
+
+            .folder-option .folder-icon,
+            .folder-option .folder-thumb {
+                width: 44px;
+                height: 44px;
+                flex-shrink: 0;
+                border-radius: var(--shape-xs);
+            }
+
+            .folder-option .folder-icon {
+                display: grid;
+                place-items: center;
+                background: rgba(255, 255, 255, 0.06);
+                color: rgba(255, 244, 239, 0.7);
+                font-size: 22px;
+            }
+
             .folder-option.all-folders .folder-icon {
-                color: #2196F3;
+                background: linear-gradient(135deg, rgba(255, 92, 141, 0.9), rgba(196, 43, 110, 0.75));
+                color: #fff;
+            }
+
+            .folder-option .folder-thumb {
+                object-fit: cover;
+                box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);
             }
 
             .folder-details {
-                flex: 1;
+                display: grid;
+                gap: 3px;
                 min-width: 0;
-                margin-left: 4px;
             }
 
-            .folder-name {
-                font-size: 14px;
-                font-weight: 500;
-                white-space: nowrap;
+            .folder-option .folder-name {
                 overflow: hidden;
+                font: 500 0.95rem/1.2 var(--font-sans, sans-serif);
+                white-space: nowrap;
                 text-overflow: ellipsis;
             }
 
             .folder-count {
-                font-size: 12px;
-                color: rgba(255, 255, 255, 0.6);
-                margin-top: 2px;
+                font: 400 0.6875rem/1 var(--font-sans, sans-serif);
+                letter-spacing: 0.04em;
+                color: rgba(255, 244, 239, 0.5);
             }
 
             .folder-loading {
@@ -359,100 +374,60 @@ class FolderSelector {
                 justify-content: center;
                 gap: 12px;
                 padding: 20px;
-                color: rgba(255, 255, 255, 0.7);
+                font-size: 0.875rem;
+                color: rgba(255, 244, 239, 0.6);
             }
 
             .loading-spinner {
                 width: 16px;
                 height: 16px;
-                border: 2px solid rgba(255, 255, 255, 0.2);
-                border-top: 2px solid #fff;
+                border: 2px solid rgba(255, 255, 255, 0.15);
+                border-top-color: #ff5c8d;
                 border-radius: 50%;
-                animation: spin 1s linear infinite;
+                animation: folder-spin 0.9s linear infinite;
             }
 
-            @keyframes spin {
-                0% { transform: rotate(0deg); }
-                100% { transform: rotate(360deg); }
+            @keyframes folder-spin {
+                to { transform: rotate(360deg); }
             }
 
             .folder-error {
                 display: flex;
                 flex-direction: column;
                 align-items: center;
-                gap: 8px;
+                gap: 10px;
                 padding: 20px;
-                color: #ff6b6b;
+                font-size: 0.875rem;
+                color: #ffb3c8;
                 text-align: center;
             }
-            
+
             .folder-error.hidden {
                 display: none;
             }
 
-            .folder-error .material-icons {
-                font-size: 24px;
-            }
-
             .retry-btn {
-                background: #ff6b6b;
-                color: white;
-                border: none;
-                padding: 6px 12px;
-                border-radius: 4px;
+                padding: 7px 14px;
+                border: 0;
+                border-radius: var(--shape-sm);
+                background: #ff5c8d;
+                color: #fff;
+                font: 600 0.8rem/1 var(--font-sans, sans-serif);
                 cursor: pointer;
-                font-size: 12px;
             }
 
-            .retry-btn:hover {
-                background: #ff5252;
-            }
-
-            /* Nested folder visual enhancements */
-            .folder-option[data-level="1"] .folder-option-content {
-                background: rgba(255, 255, 255, 0.02);
-            }
-            
-            .folder-option[data-level="2"] .folder-option-content {
-                background: rgba(255, 255, 255, 0.04);
-            }
-            
-            .folder-option[data-level="3"] .folder-option-content {
-                background: rgba(255, 255, 255, 0.06);
-            }
-            
-            .folder-option:hover[data-level="1"] .folder-option-content {
-                background: rgba(255, 255, 255, 0.12);
-            }
-            
-            .folder-option:hover[data-level="2"] .folder-option-content {
-                background: rgba(255, 255, 255, 0.14);
-            }
-            
-            .folder-option:hover[data-level="3"] .folder-option-content {
-                background: rgba(255, 255, 255, 0.16);
-            }
-
+            /* Phones: icon-only so the dock fits the screen */
             @media (max-width: 600px) {
-                .folder-dropdown {
-                    width: 250px;
-                    right: -50px;
+                .folder-selector-btn {
+                    width: 40px;
+                    height: 40px;
+                    padding: 0;
+                    justify-content: center;
                 }
 
-                .folder-selector-btn {
-                    min-width: 100px;
-                    max-width: 150px;
-                    font-size: 12px;
-                    padding: 6px 10px;
-                }
-                
-                .folder-option-content {
-                    padding: 10px 12px;
-                }
-                
-                .expand-btn {
-                    width: 20px;
-                    height: 20px;
+                .selected-folder-name,
+                .dropdown-arrow {
+                    display: none;
                 }
             }
         `;
@@ -551,13 +526,16 @@ class FolderSelector {
                         </button>` : 
                         `<div class="folder-spacer"></div>`
                     }
-                    <span class="material-icons folder-icon">folder</span>
+                    ${folder.thumbnail
+                        ? `<img class="folder-thumb" src="${folder.thumbnail}" alt="">`
+                        : `<span class="material-icons folder-icon">folder</span>`}
                     <div class="folder-details">
-                        <div class="folder-name">${folder.name}</div>
+                        <div class="folder-name"></div>
                         ${this.options.showFolderCount ? `<div class="folder-count">${folder.imageCount} images</div>` : ''}
                     </div>
                 </div>
             `;
+            element.querySelector('.folder-name').textContent = folder.name;
 
             container.appendChild(element);
             

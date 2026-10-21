@@ -19,14 +19,16 @@ router.get('/images/:imageId/thumbnail', imageController.getImageThumbnail.bind(
 
 // Public folder routes for slideshow
 router.get('/folders', folderController.getFolderStructure.bind(folderController));
-router.get('/folders/:folderPath(*)', folderController.getFolderStructure.bind(folderController));
+// Thumbnail route must come first: the (*) catch-all below would swallow it
 router.get('/folders/:folderPath(*)/thumbnail', folderController.getFolderThumbnail.bind(folderController));
+router.get('/folders/:folderPath(*)', folderController.getFolderStructure.bind(folderController));
 
 // Protected routes (authentication required)
 router.post('/upload', requireAuth, upload.array('images'), imageController.uploadImages.bind(imageController));
 router.delete('/images', requireAuth, imageController.deleteImage.bind(imageController));
 router.delete('/images/batch', requireAuth, imageController.batchDeleteImages.bind(imageController));
 router.post('/images/rotate', requireAuth, imageController.rotateImage.bind(imageController));
+router.post('/images/move', requireAuth, imageController.moveImages.bind(imageController));
 
 // Folder management routes (protected)
 router.get('/admin/folders', requireAuth, folderController.getFolderContents.bind(folderController));

@@ -15,7 +15,7 @@ class ViewController {
   // Serve slideshow page
   serveSlideshow(req, res) {
     const slideshowPath = path.join(__dirname, '..', 'public', 'slideshow.html');
-    const defaultInterval = process.env.DEFAULT_SLIDESHOW_INTERVAL || 15000;
+    const defaultInterval = parseInt(process.env.DEFAULT_SLIDESHOW_INTERVAL, 10) || 15000;
     
     // Read the HTML file
     fs.readFile(slideshowPath, 'utf8', (err, data) => {
@@ -24,11 +24,8 @@ class ViewController {
         return res.status(500).send('Error loading slideshow');
       }
       
-      // Replace the hardcoded interval with the environment variable
-      const modifiedData = data.replace(
-        /this\.interval = 15000;.*$/m,
-        `this.interval = ${defaultInterval}; // From DEFAULT_SLIDESHOW_INTERVAL`
-      );
+      // Hand the configured interval to slideshow.js via <html data-interval>
+      const modifiedData = data.replace('data-interval="15000"', `data-interval="${defaultInterval}"`);
       
       res.setHeader('Content-Type', 'text/html');
       res.send(modifiedData);

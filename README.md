@@ -24,6 +24,21 @@ Turn any device with a web browser into a smart, open-source digital photo frame
 - **Always On**: Wake Lock support prevents the display device from sleeping during a slideshow.
 - **Responsive Design**: Optimized for all screen sizes and orientations.
 
+## Quick Start
+
+Requires Node.js 18+.
+
+```bash
+git clone https://github.com/sorbh/digital-photo-frame.git
+cd digital-photo-frame
+npm install        # installs the server and creates server/.env
+npm start
+```
+
+Set `ADMIN_PASSWORD` in `server/.env`, then open `http://localhost:3000` for the slideshow and `http://localhost:3000/admin` to manage photos.
+
+Prefer Docker? `ADMIN_PASSWORD=yourpassword docker compose up -d` - see [DOCKER.md](DOCKER.md).
+
 ## How It Works
 
 ### Managing Photos

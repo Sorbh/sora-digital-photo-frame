@@ -1,10 +1,13 @@
 const path = require('path');
+const { UPLOADS_DIR } = require('../config/paths');
 const fs = require('fs-extra');
 const sharp = require('sharp');
+const thumbnails = require('../services/thumbnailService');
+const { resolveAdminPath, toAdminPath } = require('../utils/safePath');
 
 class ImageController {
   constructor() {
-    this.uploadsDir = path.join(__dirname, '..', 'uploads');
+    this.uploadsDir = UPLOADS_DIR;
     // Track recently shown images to prevent repeats
     this.recentlyShown = new Set();
     this.maxRecentCount = parseInt(process.env.MAX_RECENT_IMAGES) || 10; // Number of recent images to avoid
@@ -27,6 +30,7 @@ class ImageController {
     for (const item of items) {
       const fullPath = path.join(dir, item.name);
       if (item.isDirectory()) {
+        if (item.name.startsWith('.')) continue;
         const subImages = await this.getAllImages(fullPath, false); // Don't use cache for recursion
         images.push(...subImages);
       } else if (item.isFile() && /\.(jpg|jpeg|png|gif|webp)$/i.test(item.name)) {
@@ -68,26 +72,14 @@ class ImageController {
       // Apply access account folder restrictions if user is PIN authenticated (not admin)
       if (req.session && req.session.accessAccount && req.session.accessAccount.assignedFolders && req.session.accessAccount.assignedFolders.length > 0 && !req.session.authenticated) {
         const assignedFolders = req.session.accessAccount.assignedFolders;
-        console.log('🔒 Access Control - User assigned folders:', assignedFolders);
-        console.log('📁 Access Control - Total images before access filter:', allImages.length);
-        
+
         availableImages = allImages.filter(img => {
           const imgFolder = path.dirname(img.relativePath);
-          const hasAccess = assignedFolders.some(allowedFolder => {
-            // Check if image folder matches allowed folder exactly
-            if (imgFolder === allowedFolder) return true;
-            // Check if image folder is a child of an allowed folder
-            if (imgFolder.startsWith(allowedFolder + path.sep)) return true;
-            return false;
-          });
-          if (hasAccess) {
-            console.log('✅ Access Control - Access granted to:', img.relativePath, 'in folder:', imgFolder);
-          }
-          return hasAccess;
+          // Allowed if the image is in an assigned folder or one of its subfolders
+          return assignedFolders.some(allowedFolder =>
+            imgFolder === allowedFolder || imgFolder.startsWith(allowedFolder + path.sep));
         });
-        
-        console.log('📁 Access Control - Images after access filter:', availableImages.length);
-        
+
         if (availableImages.length === 0) {
           console.log('❌ Access Control - No accessible images found for assigned folders:', assignedFolders);
           return res.status(403).json({ 
@@ -101,20 +93,12 @@ class ImageController {
       // Apply folder filter if specified
       if (folderFilter) {
         const decodedFolder = decodeURIComponent(folderFilter);
-        console.log('🔍 API Filter - Requested folder:', decodedFolder);
-        console.log('📁 API Filter - Total images before filter:', availableImages.length);
-        
+
         availableImages = availableImages.filter(img => {
           const imgFolder = path.dirname(img.relativePath);
-          const match = imgFolder === decodedFolder || imgFolder.startsWith(decodedFolder + path.sep);
-          if (match) {
-            console.log('✅ API Filter - Match found:', img.relativePath, 'in folder:', imgFolder);
-          }
-          return match;
+          return imgFolder === decodedFolder || imgFolder.startsWith(decodedFolder + path.sep);
         });
-        
-        console.log('📁 API Filter - Images after filter:', availableImages.length);
-        
+
         if (availableImages.length === 0) {
           console.log('❌ API Filter - No images found in folder:', decodedFolder);
           return res.status(404).json({ 
@@ -143,8 +127,6 @@ class ImageController {
       const randomIndex = Math.floor(Math.random() * availableImages.length);
       const randomImage = availableImages[randomIndex];
       
-      console.log('🎲 API Filter - Selected image:', randomImage.relativePath, 'from folder:', path.dirname(randomImage.relativePath));
-      
       // Add to recently shown list
       this.recentlyShown.add(randomImage.id);
       
@@ -157,8 +139,6 @@ class ImageController {
       
       const relativePath = `/uploads/${randomImage.relativePath}`;
       const fullUrl = `${req.protocol}://${req.get('host')}${relativePath}`;
-      
-      console.log(`Selected image: ${randomImage.id}, Recently shown count: ${this.recentlyShown.size}/${availableImages.length}, Folder filter: ${folderFilter || 'none'}`);
       
       res.json({
         success: true,
@@ -185,31 +165,21 @@ class ImageController {
     }
   }
 
-  // Get image thumbnail
+  // Get image thumbnail (generated once, then served from the disk cache)
   async getImageThumbnail(req, res) {
     try {
-      const imageId = decodeURIComponent(req.params.imageId);
-      const imagePath = path.join(this.uploadsDir, imageId);
-      
-      if (!await fs.pathExists(imagePath)) {
+      // Express already decoded the param; a second decode would mangle names containing '%'
+      const imagePath = thumbnails.resolveInUploads(req.params.imageId);
+
+      if (!imagePath || !thumbnails.IMAGE_PATTERN.test(imagePath) || !await fs.pathExists(imagePath)) {
         return res.status(404).json({
           success: false,
           error: 'Image not found',
           code: 'IMAGE_NOT_FOUND'
         });
       }
-      
-      // Generate thumbnail
-      const thumbnailBuffer = await sharp(imagePath)
-        .resize(200, 200, { fit: 'cover' })
-        .jpeg({ quality: 80 })
-        .toBuffer();
-      
-      res.set({
-        'Content-Type': 'image/jpeg',
-        'Cache-Control': 'public, max-age=3600'
-      });
-      res.send(thumbnailBuffer);
+
+      thumbnails.send(res, await thumbnails.getThumbnail(imagePath), { versioned: Boolean(req.query.v) });
     } catch (error) {
       console.error('Error generating image thumbnail:', error);
       res.status(500).json({
@@ -230,16 +200,17 @@ class ImageController {
   // Upload images
   async uploadImages(req, res) {
     try {
-      console.log('Upload request body:', req.body);
-      console.log('Upload files:', req.files?.map(f => f.path));
-      
       const uploadedFiles = req.files;
-      const targetPath = req.body.path || 'uploads';
+      const targetDir = resolveAdminPath(req.body.path || 'uploads', { allowRoot: true });
       const processedFiles = [];
-      
+
+      if (!targetDir) {
+        await Promise.all(uploadedFiles.map(file => fs.remove(file.path)));
+        return res.status(400).json({ message: 'Invalid upload folder' });
+      }
+
       for (const file of uploadedFiles) {
         // If the target path is different from where multer uploaded it, move the file
-        const targetDir = path.join(__dirname, '..', targetPath);
         const targetFilePath = path.join(targetDir, file.filename);
         
         // Ensure target directory exists
@@ -265,7 +236,7 @@ class ImageController {
         processedFiles.push({
           filename: file.filename,
           originalname: file.originalname,
-          path: targetFilePath,
+          path: toAdminPath(targetFilePath),
           size: file.size
         });
       }
@@ -286,14 +257,14 @@ class ImageController {
   // Delete image
   async deleteImage(req, res) {
     try {
-      const imagePath = req.query.path;
-      const fullPath = path.join(__dirname, '..', imagePath);
-      
-      if (!await fs.pathExists(fullPath)) {
+      const fullPath = resolveAdminPath(req.query.path);
+
+      if (!fullPath || !await fs.pathExists(fullPath)) {
         return res.status(404).json({ message: 'Image not found' });
       }
-      
+
       await fs.remove(fullPath);
+      await thumbnails.remove(fullPath);
       
       // Clear cache after deletion to update available images
       this.clearImageCache();
@@ -301,6 +272,63 @@ class ImageController {
       res.json({ message: 'Image deleted successfully' });
     } catch (error) {
       console.error('Error deleting image:', error);
+      res.status(500).json({ message: 'Server error' });
+    }
+  }
+
+  // Move images into another folder (drag a photo onto a folder in the admin grid)
+  async moveImages(req, res) {
+    try {
+      const { paths, destination } = req.body;
+
+      if (!Array.isArray(paths) || paths.length === 0) {
+        return res.status(400).json({ message: 'Invalid paths provided' });
+      }
+
+      const destDir = resolveAdminPath(destination || 'uploads', { allowRoot: true });
+      if (!destDir || !(await fs.stat(destDir).catch(() => null))?.isDirectory()) {
+        return res.status(404).json({ message: 'Destination folder not found' });
+      }
+
+      const results = { movedCount: 0, failedCount: 0, errors: [] };
+
+      for (const imagePath of paths) {
+        const fullPath = resolveAdminPath(imagePath);
+
+        if (!fullPath || !thumbnails.IMAGE_PATTERN.test(fullPath) || !await fs.pathExists(fullPath)) {
+          results.failedCount++;
+          results.errors.push(`Image not found: ${imagePath}`);
+          continue;
+        }
+        if (path.dirname(fullPath) === destDir) continue; // already there
+
+        try {
+          // Never overwrite a photo that already has this name in the destination
+          const ext = path.extname(fullPath);
+          const base = path.basename(fullPath, ext);
+          let target = path.join(destDir, base + ext);
+          for (let n = 1; await fs.pathExists(target); n++) {
+            target = path.join(destDir, `${base}-${n}${ext}`);
+          }
+
+          await fs.move(fullPath, target);
+          await thumbnails.remove(fullPath);
+          results.movedCount++;
+        } catch (error) {
+          console.error(`Error moving image ${imagePath}:`, error);
+          results.failedCount++;
+          results.errors.push(`Failed to move: ${imagePath}`);
+        }
+      }
+
+      this.clearImageCache();
+
+      res.status(results.failedCount > 0 ? 207 : 200).json({
+        message: `Moved ${results.movedCount} image(s)`,
+        ...results
+      });
+    } catch (error) {
+      console.error('Error moving images:', error);
       res.status(500).json({ message: 'Server error' });
     }
   }
@@ -322,10 +350,11 @@ class ImageController {
       
       for (const imagePath of paths) {
         try {
-          const fullPath = path.join(__dirname, '..', imagePath);
-          
-          if (await fs.pathExists(fullPath)) {
+          const fullPath = resolveAdminPath(imagePath);
+
+          if (fullPath && await fs.pathExists(fullPath)) {
             await fs.remove(fullPath);
+            await thumbnails.remove(fullPath);
             results.deletedCount++;
           } else {
             results.failedCount++;
@@ -362,9 +391,9 @@ class ImageController {
   async rotateImage(req, res) {
     try {
       const { path: imagePath, angle = 90 } = req.body;
-      const fullPath = path.join(__dirname, '..', imagePath);
-      
-      if (!await fs.pathExists(fullPath)) {
+      const fullPath = resolveAdminPath(imagePath);
+
+      if (!fullPath || !await fs.pathExists(fullPath)) {
         return res.status(404).json({ message: 'Image not found' });
       }
       

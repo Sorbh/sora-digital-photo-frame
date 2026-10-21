@@ -3,136 +3,74 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Access Accounts - Digital Photo Frame Admin</title>
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#d6336a">
+    <title>Access · Sora Frame</title>
+    <link rel="icon" href="/icons/favicon.ico" sizes="48x48">
+    <link rel="icon" href="/icons/favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+    <link rel="manifest" href="/icons/site.webmanifest">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/basecoat-css@0.3.1/dist/basecoat.cdn.min.css">
     <script src="https://cdn.jsdelivr.net/npm/basecoat-css@0.3.1/dist/js/all.min.js" defer></script>
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
-    
-    <!-- Theme Switcher Script -->
+    <link rel="stylesheet" href="/css/sora.css">
+    <link rel="stylesheet" href="/css/tailwind.css">
+
+    <!-- Theme: follow the admin's saved choice (system / dark / light) -->
     <script>
     (() => {
       try {
         const stored = localStorage.getItem('themeMode');
-        if (stored ? stored === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches) {
-          document.documentElement.classList.add('dark');
-        }
+        const dark = stored === 'dark' || ((!stored || stored === 'system') && matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.classList.toggle('dark', dark);
       } catch (_) {}
-      
-      document.addEventListener('basecoat:theme', (e) => {
-        const mode = e.detail?.mode || (document.documentElement.classList.contains('dark') ? 'light' : 'dark');
-        if (mode === 'dark') {
-          document.documentElement.classList.add('dark');
-        } else {
-          document.documentElement.classList.remove('dark');
-        }
-        localStorage.setItem('themeMode', mode);
-      });
     })();
     </script>
-    <style>
-        /* Basecoat-style body CSS with theme support */
-        body {
-            background: var(--background);
-            color: var(--foreground);
-            overscroll-behavior: none;
-            -webkit-font-smoothing: antialiased;
-            -moz-osx-font-smoothing: grayscale;
-        }
-
-        /* Custom styles for access accounts */
-        .app {
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .main-content {
-            flex: 1;
-            padding: 1rem;
-        }
-
-        .accounts-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            gap: 1rem;
-        }
-
-        .account-card {
-            position: relative;
-        }
-
-        .account-actions {
-            position: absolute;
-            top: 1rem;
-            right: 1rem;
-            display: flex;
-            gap: 0.5rem;
-        }
-
-        .folder-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-            gap: 0.75rem;
-            margin-top: 1rem;
-        }
-
-        .folder-item {
-            padding: 0.75rem;
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .folder-item:hover {
-            border-color: var(--primary);
-            background: var(--muted);
-        }
-
-        .folder-item.selected {
-            border-color: var(--primary);
-            background: var(--primary);
-            color: var(--primary-foreground);
-        }
-
-        .loading-state,
-        .empty-state {
-            text-align: center;
-            padding: 3rem 1rem;
-        }
-
-        .loading-state .material-symbols-outlined,
-        .empty-state .material-symbols-outlined {
-            font-size: 3rem;
-            margin-bottom: 1rem;
-            opacity: 0.6;
-        }
-    </style>
+    <link rel="stylesheet" href="/css/access-accounts.css">
 </head>
 
 <body>
     <div class="app">
-        <header class="flex items-center justify-between p-4 border-b bg-card">
-            <div class="flex items-center gap-4">
-                <button id="backBtn" class="btn-icon" title="Back to Admin">
-                    <span class="material-symbols-outlined">arrow_back</span>
-                </button>
-                <h1 class="text-xl font-semibold">Access Accounts</h1>
+        <header class="topbar">
+            <div class="topbar-brand">
+                <a href="/admin" class="sora-wordmark" aria-label="Sora library home">Sora</a>
+                <span class="topbar-divider"></span>
+                <span class="sora-eyebrow">Access</span>
             </div>
-            <div class="flex items-center gap-2">
-                <button id="createAccountBtn" class="btn" title="Create Account">
-                    <span class="material-symbols-outlined">person_add</span>
-                    New Account
-                </button>
+            <div class="topbar-actions">
+                <a href="/admin" class="tb-btn tb-desktop" title="Back to the library">
+                    <span class="material-symbols-outlined">photo_library</span>
+                    <span class="tb-label">Library</span>
+                </a>
+                <a href="/slideshow" class="tb-btn tb-desktop" title="Open the slideshow">
+                    <span class="material-symbols-outlined">slideshow</span>
+                    <span class="tb-label">Slideshow</span>
+                </a>
             </div>
         </header>
+
+        <section class="library-head">
+            <div class="library-title">
+                <div class="crumb-row">
+                    <button id="backBtn" class="back-btn" title="Back to library" aria-label="Back to library">
+                        <span class="material-symbols-outlined">arrow_back</span>
+                    </button>
+                    <p class="sora-eyebrow" style="margin: 0;">Frames &amp; PINs</p>
+                </div>
+                <h1 class="page-title sora-display no-transform">Who can <em>visit</em></h1>
+                <p id="accountsMeta" class="page-meta sora-mono"><span class="material-symbols-outlined" style="font-size:16px;font-variation-settings:'FILL' 1">favorite</span><span id="accountsMetaText">Loading accounts</span></p>
+            </div>
+            <div class="library-actions">
+                <button id="createAccountBtn" class="btn mobile-hide" title="Create account">
+                    <span class="material-symbols-outlined">person_add</span>
+                    New account
+                </button>
+            </div>
+        </section>
 
         <main class="main-content">
             <div id="loadingState" class="loading-state">
                 <span class="material-symbols-outlined">hourglass_empty</span>
-                <p>Loading accounts...</p>
+                <p>Loading accounts</p>
             </div>
 
             <div id="accountsList" class="accounts-grid hidden">
@@ -140,9 +78,9 @@
             </div>
 
             <div id="emptyState" class="empty-state hidden">
-                <span class="material-symbols-outlined">group</span>
-                <h3 class="text-lg font-medium mb-2">No access accounts yet</h3>
-                <p class="text-muted-foreground">Create an account to get started</p>
+                <span class="material-symbols-outlined">key</span>
+                <h3>No one has a key yet</h3>
+                <p>Create an account to give a frame or a family member their own PIN.</p>
             </div>
         </main>
 
@@ -230,6 +168,29 @@
         <div id="toastContainer" class="toast-container"></div>
     </div>
 
+    <!-- Mobile tab bar -->
+    <nav class="tabbar" aria-label="Sections">
+        <a href="/admin" class="tab">
+            <span class="material-symbols-outlined">photo_library</span><span>Library</span>
+        </a>
+        <a href="/access-accounts" class="tab active" aria-current="page">
+            <span class="material-symbols-outlined">key</span><span>Access</span>
+        </a>
+        <button class="tab-fab" data-proxy="createAccountBtn" aria-label="New account">
+            <span class="material-symbols-outlined">person_add</span>
+        </button>
+        <a href="/slideshow" class="tab">
+            <span class="material-symbols-outlined">slideshow</span><span>Slideshow</span>
+        </a>
+        <a href="/folder-selection" class="tab">
+            <span class="material-symbols-outlined">folder_special</span><span>Folders</span>
+        </a>
+    </nav>
+    <script>
+        document.querySelectorAll('[data-proxy]').forEach(btn => {
+            btn.addEventListener('click', () => document.getElementById(btn.dataset.proxy)?.click());
+        });
+    </script>
     <script src="access-accounts.js"></script>
 </body>
 

@@ -1,13 +1,13 @@
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs-extra');
+const { resolveAdminPath, UPLOADS_DIR } = require('../utils/safePath');
 
 // Multer configuration for file uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const uploadPath = req.body.path || 'uploads';
-    const fullPath = path.join(__dirname, '..', uploadPath);
-    console.log('Upload destination:', uploadPath, 'Full path:', fullPath);
+    // Invalid targets land in the uploads root; the controller rejects and removes them
+    const fullPath = resolveAdminPath(req.body.path || 'uploads', { allowRoot: true }) || UPLOADS_DIR;
     fs.ensureDirSync(fullPath);
     cb(null, fullPath);
   },

@@ -316,33 +316,7 @@ class SettingsManager {
     }
 
     showToast(message, type = 'info') {
-        const categoryMap = {
-            'info': 'info',
-            'success': 'success',
-            'error': 'error',
-            'warning': 'warning'
-        };
-
-        const category = categoryMap[type] || 'info';
-        const titleMap = {
-            'success': 'Success!',
-            'error': 'Error!',
-            'warning': 'Warning!',
-            'info': 'Info'
-        };
-
-        const title = titleMap[type] || 'Notification';
-
-        document.dispatchEvent(new CustomEvent('basecoat:toast', {
-            detail: {
-                config: {
-                    category: category,
-                    title: title,
-                    description: message,
-                    duration: 5000
-                }
-            }
-        }));
+        window.showToast(message, type);
     }
 }
 

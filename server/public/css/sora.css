@@ -1,0 +1,753 @@
+/* ==========================================================================
+   SORA Frame - design system
+   "Berry & Honey": a warm, romantic family-album palette. Raspberry-to-berry
+   gradient for hero surfaces, honey and blush accents, soft white cards.
+   Fraunces for display, Figtree for interface, Allura as a script accent
+   (use <em> inside .sora-display). Load after basecoat so these tokens win.
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT@0,9..144,300..700,100;1,9..144,300..700,100&family=Figtree:ital,wght@0,400..800;1,400..800&family=Allura&family=IBM+Plex+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,200..600,0..1,-25..0&display=block');
+
+/* ---------- Tokens ---------------------------------------------------- */
+
+html:root {
+    --font-display: 'Fraunces', 'Iowan Old Style', Georgia, serif;
+    --font-sans: 'Figtree', 'Avenir Next', 'Segoe UI', sans-serif;
+    --font-script: 'Allura', 'Snell Roundhand', cursive;
+    --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+    /* Palette */
+    --berry: #d6336a;
+    --berry-deep: #a8217c;
+    --berry-gradient: linear-gradient(135deg, #e0395f 0%, #c42b6e 55%, #a8217c 100%);
+    --honey: #e9b95e;
+    --honey-soft: #f6dfae;
+    --blush: #f9dde5;
+    --teal: #8fb9bf;
+    --teal-soft: #dcecee;
+
+    /* Surfaces (light: cream album pages) */
+    --paper: #fbf4e8;
+    --paper-raised: #ffffff;
+    --paper-sunk: #f4e7d2;
+    --ink: #2d1b26;
+    --ink-soft: #5b4452;
+    --ink-faint: #917a87;
+    --rule: #efe0c9;
+    /* --safelight is the historical name of the accent token: now berry */
+    --safelight: var(--berry);
+    --safelight-soft: color-mix(in oklab, var(--berry) 12%, transparent);
+
+    /* Basecoat / shadcn token mapping */
+    --background: var(--paper);
+    --foreground: var(--ink);
+    --card: var(--paper-raised);
+    --card-foreground: var(--ink);
+    --popover: var(--paper-raised);
+    --popover-foreground: var(--ink);
+    --primary: var(--berry);
+    --primary-foreground: #fff;
+    --secondary: var(--paper-sunk);
+    --secondary-foreground: var(--ink);
+    --muted: var(--paper-sunk);
+    --muted-foreground: var(--ink-faint);
+    --accent: var(--blush);
+    --accent-foreground: var(--ink);
+    --destructive: #c4262e;
+    --destructive-foreground: #fff8f5;
+    --border: var(--rule);
+    --input: #e6d4b8;
+    --ring: var(--berry);
+    /* Material 3 shape scale, kept on the subtle side */
+    --shape-xs: 4px;   /* menus, tooltips, snackbars, text fields */
+    --shape-sm: 8px;   /* buttons, chips, nested media */
+    --shape-md: 12px;  /* cards and tiles */
+    --shape-lg: 16px;  /* dialogs, sheets, banners, toolbars */
+    --radius: 0.75rem; /* Basecoat derives its own radii from this */
+
+    --shadow-soft: 0 1px 2px rgb(120 40 70 / 0.05), 0 10px 28px -14px rgb(120 40 70 / 0.22);
+    --shadow-lift: 0 2px 6px rgb(120 40 70 / 0.08), 0 26px 48px -20px rgb(120 40 70 / 0.38);
+    --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+    --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+
+    /* Sora frame mark (icons/sora-mark.svg) used by the wordmark and hero watermarks */
+    --sora-mark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Cg fill-rule='evenodd'%3E%3Cpath d='M19 2h90a17 17 0 0 1 17 17v90a17 17 0 0 1-17 17H19A17 17 0 0 1 2 109V19A17 17 0 0 1 19 2Z M18 11.5a6.5 6.5 0 0 0-6.5 6.5v92a6.5 6.5 0 0 0 6.5 6.5h92a6.5 6.5 0 0 0 6.5-6.5V44.5a5 5 0 0 0-1.5-3.6L90.6 13a5 5 0 0 0-3.6-1.5Z'/%3E%3Cpath d='M22.5 30.5A8 8 0 0 0 30.5 22.5H90a16 16 0 0 1 16 16V100a6 6 0 0 1-6 6H28.5a6 6 0 0 1-6-6Z M35 32a3 3 0 0 0-3 3v58.5a3 3 0 0 0 3 3h58.5a3 3 0 0 0 3-3V40a8 8 0 0 0-8-8Z'/%3E%3C/g%3E%3C/svg%3E");
+
+    color-scheme: light;
+}
+
+/* Night album (dark): aubergine with glowing berry */
+html.dark:root {
+    --berry: #ff5c8d;
+    --berry-deep: #d23a8f;
+    --honey: #f2c46d;
+    --honey-soft: #4a3a24;
+    --blush: #45222f;
+    --teal-soft: #213538;
+
+    --paper: #1a1117;
+    --paper-raised: #251820;
+    --paper-sunk: #31212b;
+    --ink: #fbefe8;
+    --ink-soft: #dcc6cf;
+    --ink-faint: #a48c99;
+    --rule: #3a2732;
+
+    --input: #4a3340;
+    --destructive: #ff6b6b;
+    --destructive-foreground: #1a0d0b;
+    --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.4), 0 12px 30px -14px rgb(0 0 0 / 0.7);
+    --shadow-lift: 0 2px 6px rgb(0 0 0 / 0.45), 0 28px 54px -20px rgb(0 0 0 / 0.85);
+
+    color-scheme: dark;
+}
+
+/* ---------- Base ------------------------------------------------------ */
+
+html {
+    font-family: var(--font-sans);
+    font-feature-settings: 'ss01', 'cv11';
+    text-rendering: optimizeLegibility;
+}
+
+body {
+    font-family: var(--font-sans);
+    background: var(--background);
+    color: var(--foreground);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+::selection {
+    background: var(--safelight);
+    color: #fff;
+}
+
+:focus-visible {
+    outline: 2px solid var(--safelight);
+    outline-offset: 2px;
+}
+
+/* Material Symbols - also serves legacy `.material-icons` markup so newer
+   icon names (partly_cloudy_day, rainy, foggy...) render as glyphs. */
+.material-symbols-outlined,
+.material-icons {
+    font-family: 'Material Symbols Outlined';
+    font-weight: normal;
+    font-style: normal;
+    font-size: 1.25em;
+    line-height: 1;
+    letter-spacing: normal;
+    text-transform: none;
+    display: inline-block;
+    white-space: nowrap;
+    word-wrap: normal;
+    direction: ltr;
+    -webkit-font-feature-settings: 'liga';
+    font-feature-settings: 'liga';
+    -webkit-font-smoothing: antialiased;
+    font-variation-settings: 'FILL' 0, 'wght' 350, 'GRAD' 0, 'opsz' 24;
+    user-select: none;
+}
+
+/* ---------- Typography helpers --------------------------------------- */
+
+.sora-display {
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-variation-settings: 'SOFT' 100, 'opsz' 96;
+    letter-spacing: -0.025em;
+    line-height: 1.02;
+}
+
+/* Script accent words: <h1 class="sora-display">Welcome <em>home</em></h1> */
+.sora-display em,
+.sora-script {
+    font-family: var(--font-script);
+    font-style: normal;
+    font-weight: 400;
+    font-size: 1.18em;
+    letter-spacing: 0;
+    line-height: 0.8;
+}
+
+.sora-eyebrow {
+    font-family: var(--font-sans);
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--berry);
+}
+
+.sora-mono {
+    font-family: var(--font-sans);
+    font-feature-settings: 'tnum';
+}
+
+/* Wordmark: "Sora" in heavy Figtree with the berry frame mark and its honey glint */
+.sora-wordmark {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3em;
+    font-family: var(--font-sans);
+    font-weight: 800;
+    font-size: 1.5rem;
+    line-height: 1;
+    letter-spacing: -0.03em;
+    color: var(--foreground);
+    text-decoration: none;
+}
+
+.sora-wordmark::before {
+    content: '';
+    width: 1em;
+    height: 1em;
+    flex-shrink: 0;
+    /* sheen (parked off to the right), honey glint, berry body */
+    background:
+        linear-gradient(115deg, transparent 44%, rgb(255 255 255 / 0.85) 50%, transparent 56%) 100% 0 / 250% 100% no-repeat,
+        radial-gradient(circle at 16% 11%, var(--honey-soft) 0, var(--honey) 0.18em, transparent 0.55em),
+        var(--berry-gradient);
+    -webkit-mask: var(--sora-mark) center / contain no-repeat;
+    mask: var(--sora-mark) center / contain no-repeat;
+    transition: transform 0.4s var(--ease-out), background-position 1s var(--ease-out);
+}
+
+/* Light catches the frame: the sheen sweeps across as the mark lifts */
+.sora-wordmark:hover::before {
+    background-position: 0 0, 0 0, 0 0;
+    transform: translateY(-1px) scale(1.08);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .sora-wordmark::before { transition: none; }
+}
+
+.sora-wordmark::after {
+    content: none;
+}
+
+/* Hero surfaces use the berry gradient with a soft glow */
+.sora-berry {
+    background: var(--berry-gradient);
+    color: #fff;
+}
+
+/* Film grain overlay - add as an empty element */
+.sora-grain {
+    position: fixed;
+    inset: -50%;
+    pointer-events: none;
+    z-index: 1;
+    opacity: 0.035;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    animation: sora-grain 1.2s steps(4) infinite;
+}
+
+@keyframes sora-grain {
+    0% { transform: translate(0, 0); }
+    25% { transform: translate(-3%, 2%); }
+    50% { transform: translate(2%, -3%); }
+    75% { transform: translate(-2%, -1%); }
+    100% { transform: translate(0, 0); }
+}
+
+/* ---------- Basecoat component polish -------------------------------- */
+
+.btn, .btn-outline, .btn-ghost, .btn-secondary, .btn-destructive,
+.btn-icon, .btn-sm-icon-ghost, .btn-link {
+    font-family: var(--font-sans);
+    font-weight: 650;
+    letter-spacing: 0.005em;
+    transition: background-color 0.18s ease, color 0.18s ease, border-color 0.18s ease,
+        box-shadow 0.18s ease, transform 0.18s var(--ease-out);
+}
+
+.btn:active:not(:disabled), .btn-outline:active:not(:disabled),
+.btn-icon:active:not(:disabled), .btn-destructive:active:not(:disabled) {
+    transform: translateY(1px) scale(0.985);
+}
+
+.btn, .btn-primary {
+    border-radius: var(--shape-sm);
+    background: var(--berry-gradient);
+    color: #fff;
+    box-shadow: 0 1px 0 rgb(255 255 255 / 0.18) inset, 0 8px 20px -10px var(--berry);
+}
+
+.btn:hover:not(:disabled), .btn-primary:hover:not(:disabled) {
+    filter: brightness(1.06) saturate(1.05);
+}
+
+.btn-outline, .btn-secondary, .btn-ghost, .btn-destructive {
+    border-radius: var(--shape-sm);
+}
+
+.btn-outline {
+    background: var(--paper-raised);
+    border-color: var(--rule);
+}
+
+.btn-outline:hover {
+    background: var(--paper-sunk);
+}
+
+.input, input.input, textarea.textarea, select.select {
+    font-family: var(--font-sans);
+    background: var(--paper-raised);
+    transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.input:focus, .input:focus-visible {
+    border-color: var(--safelight);
+    box-shadow: 0 0 0 3px var(--safelight-soft);
+    outline: none;
+}
+
+.card {
+    border-color: var(--rule);
+    border-radius: var(--shape-md);
+    box-shadow: var(--shadow-soft);
+}
+
+/* Dialog titles get the display face */
+.dialog > article > header h2,
+dialog > article > header h2,
+.card > header h2,
+.light-title {
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-variation-settings: 'SOFT' 100;
+    font-size: 1.6rem;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+}
+
+dialog::backdrop {
+    background: rgb(45 15 32 / 0.5);
+    backdrop-filter: blur(6px);
+}
+
+.dialog > article, dialog.dialog > article {
+    border-color: var(--rule);
+    border-radius: var(--shape-lg);
+    box-shadow: var(--shadow-lift);
+}
+
+/* ---------- App shell (admin pages) -------------------------------- */
+
+.topbar {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    height: 64px;
+    padding: 0 clamp(1rem, 3vw, 2.5rem);
+    border-bottom: 1px solid var(--rule);
+    background: color-mix(in oklab, var(--background) 82%, transparent);
+    backdrop-filter: blur(16px) saturate(1.4);
+    -webkit-backdrop-filter: blur(16px) saturate(1.4);
+}
+
+.topbar-brand {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.topbar-brand .sora-wordmark {
+    font-size: 1.6rem;
+}
+
+.topbar-divider {
+    width: 1px;
+    height: 20px;
+    background: var(--rule);
+}
+
+.topbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.tb-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 36px;
+    padding: 0 12px;
+    border: 0;
+    border-radius: var(--shape-sm);
+    background: transparent;
+    color: var(--ink-soft);
+    font-size: 0.875rem;
+    font-weight: 550;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background-color 0.18s ease, color 0.18s ease;
+}
+
+.tb-btn:hover {
+    background: var(--paper-sunk);
+    color: var(--foreground);
+}
+
+.tb-btn.icon {
+    width: 36px;
+    padding: 0;
+    justify-content: center;
+}
+
+.tb-btn .material-symbols-outlined {
+    font-size: 20px;
+}
+
+/* ---------- Library heading: a berry hero card ------------------ */
+
+.library-head {
+    position: relative;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+    overflow: hidden;
+    margin: clamp(1rem, 2.5vw, 1.75rem) clamp(1rem, 3vw, 2.5rem) 1.75rem;
+    padding: clamp(1.5rem, 3.5vw, 2.75rem) clamp(1.5rem, 3.5vw, 2.75rem) clamp(2rem, 4vw, 3rem);
+    border-radius: var(--shape-lg);
+    background:
+        radial-gradient(45% 70% at 92% 0%, rgb(255 200 120 / 0.38), transparent 70%),
+        var(--berry-gradient);
+    color: #fff;
+    isolation: isolate;
+    box-shadow: 0 30px 60px -36px var(--berry-deep);
+}
+
+/* Blossom watermark */
+.library-head::before {
+    content: '';
+    position: absolute;
+    right: -3rem;
+    top: -4rem;
+    z-index: -1;
+    width: 16rem;
+    height: 16rem;
+    background: rgb(255 255 255 / 0.1);
+    -webkit-mask: var(--sora-mark) center / contain no-repeat;
+    mask: var(--sora-mark) center / contain no-repeat;
+    transform: rotate(20deg);
+}
+
+/* Soft clouds along the bottom edge */
+.library-head::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -1px;
+    z-index: -1;
+    height: 34px;
+    opacity: 0.16;
+    background:
+        radial-gradient(circle at 8% 100%, #fff 26px, transparent 27px),
+        radial-gradient(circle at 22% 120%, #fff 34px, transparent 35px),
+        radial-gradient(circle at 40% 110%, #fff 24px, transparent 25px),
+        radial-gradient(circle at 62% 125%, #fff 38px, transparent 39px),
+        radial-gradient(circle at 84% 110%, #fff 28px, transparent 29px),
+        radial-gradient(circle at 97% 120%, #fff 30px, transparent 31px);
+}
+
+.library-head .sora-eyebrow {
+    color: rgb(255 255 255 / 0.8);
+}
+
+.breadcrumb {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-family: var(--font-sans);
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: rgb(255 255 255 / 0.72);
+}
+
+.library-head .breadcrumb .text-foreground,
+.library-head .breadcrumb .text-muted-foreground {
+    color: inherit !important;
+}
+
+.library-head .breadcrumb li:last-child .breadcrumb-item {
+    color: #fff;
+}
+
+.breadcrumb .breadcrumb-item {
+    font-weight: 700 !important;
+}
+
+.breadcrumb .breadcrumb-item.cursor-pointer:hover {
+    color: #ffd98f !important;
+}
+
+.breadcrumb svg {
+    width: 12px;
+    height: 12px;
+    opacity: 0.6;
+}
+
+/* Back button sits with the breadcrumb, so the title keeps a clean left edge */
+.crumb-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 32px;
+    margin: 0 0 10px;
+}
+
+.back-btn {
+    display: grid;
+    place-items: center;
+    /* admin.js shows it as display:flex, so centre for flex as well */
+    justify-content: center;
+    align-items: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    flex-shrink: 0;
+    border: 1px solid rgb(255 255 255 / 0.35);
+    border-radius: 50%;
+    background: rgb(255 255 255 / 0.14);
+    color: #fff;
+    cursor: pointer;
+    transition: background-color 0.18s ease, transform 0.18s var(--ease-out);
+}
+
+.back-btn .material-symbols-outlined {
+    font-size: 18px;
+    line-height: 1;
+}
+
+.back-btn:hover {
+    background: rgb(255 255 255 / 0.26);
+    transform: translateX(-2px);
+}
+
+.page-title {
+    margin: 0;
+    font-size: clamp(2.25rem, 5vw, 3.75rem);
+    text-transform: capitalize;
+    overflow-wrap: anywhere;
+    color: #fff;
+}
+
+/* Stats live in a white pill, like a counter badge */
+.page-meta {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin: 14px 0 0;
+    padding: 6px 14px;
+    border-radius: var(--shape-sm);
+    background: #fff;
+    color: #c42b6e;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    box-shadow: 0 10px 24px -12px rgb(70 8 40 / 0.6);
+}
+
+.page-meta:empty,
+.page-meta.is-blank {
+    visibility: hidden;
+}
+
+.library-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.library-actions .btn,
+.library-actions .btn-outline {
+    height: 44px;
+    padding: 0 20px;
+    border-radius: var(--shape-sm);
+}
+
+.library-head .btn-outline {
+    border: 1px solid rgb(255 255 255 / 0.45);
+    background: rgb(255 255 255 / 0.12);
+    color: #fff;
+}
+
+.library-head .btn-outline:hover {
+    background: rgb(255 255 255 / 0.24);
+}
+
+.library-head .btn {
+    background: #fff;
+    color: #c42b6e;
+    box-shadow: 0 14px 28px -14px rgb(70 8 40 / 0.7);
+}
+
+.library-head .btn:hover {
+    background: #fff4f7;
+}
+
+/* ---------- Mobile tab bar ----------------------------------------- */
+
+.tabbar {
+    display: none;
+}
+
+@media (max-width: 900px) {
+    .tb-btn .tb-label {
+        display: none;
+    }
+
+    .tb-btn:not(.icon) {
+        width: 36px;
+        padding: 0;
+        justify-content: center;
+    }
+}
+
+@media (max-width: 640px) {
+    .topbar {
+        height: 58px;
+    }
+
+    .topbar .tb-desktop,
+    .topbar-brand .sora-eyebrow,
+    .topbar-brand .topbar-divider {
+        display: none;
+    }
+
+    .library-head {
+        margin: 0.75rem 0.75rem 1.25rem;
+        padding: 1.5rem 1.25rem 1.75rem;
+        border-radius: var(--shape-lg);
+        gap: 1.25rem;
+    }
+
+    .library-head::before {
+        width: 11rem;
+        height: 11rem;
+        right: -3rem;
+        top: -3rem;
+    }
+
+    .library-actions {
+        width: 100%;
+    }
+
+    .library-actions > * {
+        flex: 1;
+        justify-content: center;
+    }
+
+    /* Upload moves to the tab bar's centre button */
+    .library-actions .mobile-hide {
+        display: none;
+    }
+
+    body:has(.tabbar) {
+        padding-bottom: calc(96px + env(safe-area-inset-bottom));
+    }
+
+    .tabbar {
+        position: fixed;
+        left: 12px;
+        right: 12px;
+        bottom: calc(12px + env(safe-area-inset-bottom));
+        z-index: 60;
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        align-items: center;
+        height: 66px;
+        padding: 0 6px;
+        border: 1px solid var(--rule);
+        border-radius: var(--shape-lg);
+        background: color-mix(in oklab, var(--paper-raised) 90%, transparent);
+        backdrop-filter: blur(18px) saturate(1.4);
+        -webkit-backdrop-filter: blur(18px) saturate(1.4);
+        box-shadow: 0 20px 40px -18px rgb(90 20 50 / 0.35);
+    }
+
+    .tab {
+        display: grid;
+        justify-items: center;
+        gap: 2px;
+        padding: 6px 0;
+        border: 0;
+        background: none;
+        color: var(--ink-faint);
+        font: inherit;
+        font-size: 0.6875rem;
+        font-weight: 650;
+        text-decoration: none;
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    .tab .material-symbols-outlined {
+        font-size: 24px;
+    }
+
+    .tab.active {
+        color: var(--berry);
+    }
+
+    .tab.active .material-symbols-outlined {
+        font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    }
+
+    .tab-fab {
+        justify-self: center;
+        display: grid;
+        place-items: center;
+        width: 60px;
+        height: 60px;
+        margin-top: -34px;
+        border: 5px solid var(--paper);
+        border-radius: 50%;
+        background: var(--berry-gradient);
+        color: #fff;
+        box-shadow: 0 14px 28px -10px var(--berry);
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+        transition: transform 0.18s var(--ease-out);
+    }
+
+    .tab-fab:active {
+        transform: scale(0.94);
+    }
+
+    .tab-fab .material-symbols-outlined {
+        font-size: 28px;
+        font-variation-settings: 'FILL' 0, 'wght' 500, 'GRAD' 0, 'opsz' 24;
+    }
+}
+
+.page-title.no-transform {
+    text-transform: none;
+}
+
+/* Scrollbars */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in oklab, var(--foreground) 22%, transparent) transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}

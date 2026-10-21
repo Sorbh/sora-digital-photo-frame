@@ -99,13 +99,13 @@ class GooglePhotosSync {
       console.log('Setting authenticated state'); // Debug log
       googlePhotosBtn.title = `Connected to Google Photos (${this.userInfo.email})`;
       googlePhotosBtn.classList.add('authenticated');
-      googlePhotosBtn.innerHTML = '<span class="material-symbols-outlined">check_circle</span> Connected to Google Photos';
+      googlePhotosBtn.innerHTML = '<span class="material-symbols-outlined">check_circle</span><span class="tb-label">Google Photos</span>';
     } else if (!this.justAuthenticated) {
       // Only set to unauthenticated if we haven't just authenticated
       console.log('Setting unauthenticated state'); // Debug log
       googlePhotosBtn.title = 'Connect to Google Photos';
       googlePhotosBtn.classList.remove('authenticated');
-      googlePhotosBtn.innerHTML = '<span class="material-symbols-outlined">photo_library</span> Connect Google Photos';
+      googlePhotosBtn.innerHTML = '<span class="material-symbols-outlined">add_photo_alternate</span><span class="tb-label">Google Photos</span>';
     } else {
       console.log('Preserving button state - just authenticated'); // Debug log
     }
@@ -129,7 +129,7 @@ class GooglePhotosSync {
       const googlePhotosBtn = document.getElementById('googlePhotosBtn');
       if (googlePhotosBtn) {
         googlePhotosBtn.disabled = true;
-        googlePhotosBtn.innerHTML = '<span class="material-symbols-outlined">hourglass_empty</span> Connecting...';
+        googlePhotosBtn.innerHTML = '<span class="material-symbols-outlined">hourglass_empty</span><span class="tb-label">Connecting</span>';
         console.log('🔧 [DEBUG] Button set to loading state');
       }
 

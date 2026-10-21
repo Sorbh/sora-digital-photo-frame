@@ -1,0 +1,331 @@
+body {
+    overscroll-behavior: none;
+}
+
+.app {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.hidden {
+    display: none !important;
+}
+
+.main-content {
+    flex: 1;
+    padding: 0 clamp(1rem, 3vw, 2.5rem) 4rem;
+}
+
+/* ---------- Account passes --------------------------------------- */
+
+.accounts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+    gap: clamp(0.75rem, 1.6vw, 1.25rem);
+}
+
+.account-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    overflow: hidden;
+    padding: 22px;
+    border: 1px solid var(--rule);
+    border-radius: var(--shape-md);
+    background: var(--paper-raised);
+    box-shadow: var(--shadow-soft);
+    animation: tile-in 0.5s var(--ease-out) both;
+    transition: transform 0.3s var(--ease-out), box-shadow 0.3s ease;
+}
+
+.account-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lift);
+}
+
+/* Ticket notch: these are passes to the frame */
+.account-card::before,
+.account-card::after {
+    content: '';
+    position: absolute;
+    top: 96px;
+    width: 18px;
+    height: 18px;
+    border: 1px solid var(--rule);
+    border-radius: 50%;
+    background: var(--background);
+}
+
+.account-card::before { left: -10px; }
+.account-card::after { right: -10px; }
+
+@keyframes tile-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: none; }
+}
+
+.account-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 66px;
+    padding-bottom: 18px;
+    border-bottom: 1px dashed var(--rule);
+}
+
+.account-avatar {
+    display: grid;
+    place-items: center;
+    width: 46px;
+    height: 46px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: var(--blush);
+    color: var(--berry);
+    font-family: var(--font-display);
+    font-size: 1.4rem;
+    font-weight: 600;
+}
+
+.account-card:nth-child(3n + 2) .account-avatar { background: var(--honey-soft); color: #b07a1c; }
+.account-card:nth-child(3n + 3) .account-avatar { background: var(--teal-soft); color: #4f7f86; }
+.dark .account-card:nth-child(3n + 2) .account-avatar { color: var(--honey); }
+.dark .account-card:nth-child(3n + 3) .account-avatar { color: var(--teal); }
+
+.account-heading {
+    flex: 1;
+    min-width: 0;
+}
+
+.account-name {
+    margin: 0;
+    overflow: hidden;
+    font-family: var(--font-display);
+    font-size: 1.45rem;
+    font-weight: 500;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.account-actions {
+    display: flex;
+    gap: 2px;
+    margin: -6px -8px 0 0;
+}
+
+.account-actions .tb-btn[data-danger]:hover {
+    background: color-mix(in oklab, var(--destructive) 12%, transparent);
+    color: var(--destructive);
+}
+
+.pin-reveal {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 4px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--muted-foreground);
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    letter-spacing: 0.2em;
+    cursor: pointer;
+}
+
+.pin-reveal:hover {
+    color: var(--foreground);
+}
+
+.pin-reveal .material-symbols-outlined {
+    font-size: 16px;
+}
+
+.account-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin: 0;
+}
+
+.account-stats dt {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+}
+
+.account-stats dd {
+    margin: 4px 0 0;
+    font-weight: 600;
+}
+
+.folder-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.folder-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px 4px 8px;
+    border-radius: var(--shape-sm);
+    background: var(--blush);
+    color: var(--ink);
+    font-size: 0.8125rem;
+    font-weight: 600;
+}
+
+.folder-tag .material-symbols-outlined {
+    font-size: 15px;
+    color: var(--berry);
+}
+
+.folder-tag.no-folders-tag {
+    background: transparent;
+    border: 1px dashed var(--rule);
+    color: var(--muted-foreground);
+}
+
+/* ---------- States ----------------------------------------------- */
+
+.loading-state,
+.empty-state {
+    display: grid;
+    justify-items: center;
+    gap: 6px;
+    padding: 4rem 1rem;
+    text-align: center;
+    color: var(--muted-foreground);
+}
+
+.loading-state .material-symbols-outlined,
+.empty-state .material-symbols-outlined {
+    font-size: 2.5rem;
+    color: var(--safelight);
+    font-variation-settings: 'FILL' 0, 'wght' 250, 'GRAD' 0, 'opsz' 40;
+}
+
+.empty-state h3 {
+    margin: 0.5rem 0 0;
+    font-family: var(--font-display);
+    font-size: 2rem;
+    font-weight: 400;
+    color: var(--foreground);
+}
+
+/* ---------- Account modal ---------------------------------------- */
+
+#accountModal > article {
+    max-width: 36rem;
+}
+
+#accountModal .card {
+    box-shadow: none;
+    background: var(--paper);
+}
+
+#accountModal .card h3 {
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+}
+
+#accountPin {
+    font-family: var(--font-mono);
+    letter-spacing: 0.3em;
+}
+
+.input.error {
+    border-color: var(--destructive);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--destructive) 15%, transparent);
+}
+
+.error-message {
+    font-size: 0.8125rem;
+    color: var(--destructive);
+}
+
+.folder-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 8px;
+}
+
+.folder-item {
+    padding: 10px 12px;
+    border: 1px solid var(--rule);
+    border-radius: var(--shape-sm);
+    background: var(--paper-raised);
+    cursor: pointer;
+    transition: border-color 0.18s ease, background-color 0.18s ease;
+}
+
+.folder-item:hover {
+    border-color: color-mix(in oklab, var(--foreground) 25%, var(--rule));
+}
+
+.folder-item.selected {
+    border-color: var(--safelight);
+    background: var(--safelight-soft);
+}
+
+.folder-item input[type="checkbox"]:checked {
+    border-color: var(--safelight);
+    background-color: var(--safelight);
+}
+
+/* ---------- Toasts ----------------------------------------------- */
+
+.toast-container {
+    position: fixed;
+    right: 1.5rem;
+    bottom: 1.5rem;
+    z-index: 100;
+    display: grid;
+    gap: 8px;
+}
+
+.toast {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    border-radius: var(--shape-xs);
+    background: var(--ink);
+    color: var(--paper);
+    font-size: 0.875rem;
+    box-shadow: var(--shadow-lift);
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity 0.3s ease, transform 0.3s var(--ease-out);
+}
+
+.toast.show {
+    opacity: 1;
+    transform: none;
+}
+
+.toast .material-icons {
+    font-size: 18px;
+}
+
+.toast-success .material-icons { color: #7fcf98; }
+
+@media (max-width: 640px) {
+    .main-content { padding: 0 0.75rem 2rem; }
+    .accounts-grid { grid-template-columns: 1fr; }
+    .toast-container { left: 1rem; right: 1rem; bottom: calc(96px + env(safe-area-inset-bottom)); }
+    #accountModal > article { max-height: calc(100dvh - 2rem); }
+}
+.toast-error .material-icons { color: #f6a189; }

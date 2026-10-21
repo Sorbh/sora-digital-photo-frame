@@ -1,83 +1,118 @@
 <div align="center">
-<img width="1022" height="256" alt="sora_github_banner" src="https://github.com/user-attachments/assets/dc1dd451-e360-4245-a062-32e667db05bb" />
-   
-### Open Source Digital Photo Frame
 
-[Website](https://sora-frame.vercel.app/)  |  [Quick Start](https://docs-sora-frame.vercel.app/quickstart/)  |  [Docs](https://docs-sora-frame.vercel.app/)  |  [API References](https://docs-sora-frame.vercel.app/api-reference/introduction)
+<img src=".github/readme/banner.jpg" alt="Sora Frame — turn any screen into a living photo frame" width="100%">
+
+<br>
+
+**A self-hosted digital photo frame that runs in any browser.**<br>
+Put an old tablet, laptop or smart TV on the shelf and fill it with your photos.
+
+[Website](https://sora-frame.vercel.app/) · [Quick start](https://docs-sora-frame.vercel.app/quickstart/) · [Docs](https://docs-sora-frame.vercel.app/) · [API](https://docs-sora-frame.vercel.app/api-reference/introduction)
+
+![Node 18+](https://img.shields.io/badge/node-18%2B-d6336a?style=flat-square)
+![Docker](https://img.shields.io/badge/docker-ready-a61e6e?style=flat-square)
+![License ISC](https://img.shields.io/badge/license-ISC-f6c56b?style=flat-square)
+
+<br>
+
+<img src=".github/readme/slideshow.webp" alt="Sora slideshow cross-fading between photos with the clock and weather widget" width="100%">
 
 </div>
 
-
-# SORA Frame
-Turn any device with a web browser into a smart, open-source digital photo frame. Manage your photos remotely and enjoy a beautiful, full-screen slideshow on any tablet, laptop, or smart TV.
-
-<img width="1885" alt="slideshow-preview" src="https://github.com/user-attachments/assets/4740a698-08f5-4b7c-bb2e-603ca0ebf012" />
-
-## Features
-
-- **Run Anywhere**: Works on any device with a modern web browser.
-- **Beautiful Slideshow**: A clean, full-screen photo display with smooth fade transitions, auto-advance, and random image display.
-- **Remote Management**: A Finder-like admin panel to upload, organize, and delete photos and folders from any device on your network. Supports drag-and-drop.
-- **Targeted Slideshows**: An interactive folder selector to display photos from specific folders, including nested ones. Your last selected folder is even remembered across sessions.
-- **Modern UI**: Clean and responsive interface following Material Design 3 principles.
-- **Keyboard-Friendly**: Full keyboard navigation and shortcuts for both the slideshow and admin panel.
-- **Always On**: Wake Lock support prevents the display device from sleeping during a slideshow.
-- **Responsive Design**: Optimized for all screen sizes and orientations.
-
-## Quick Start
-
-Requires Node.js 18+.
+## Quick start
 
 ```bash
-git clone https://github.com/sorbh/digital-photo-frame.git
-cd digital-photo-frame
-npm install        # installs the server and creates server/.env
+git clone https://github.com/Sorbh/sora-digital-photo-frame.git
+cd sora-digital-photo-frame
+npm install   # installs the server and creates server/.env
 npm start
 ```
 
-Set `ADMIN_PASSWORD` in `server/.env`, then open `http://localhost:3000` for the slideshow and `http://localhost:3000/admin` to manage photos.
+Set `ADMIN_PASSWORD` in `server/.env`, then open:
 
-Prefer Docker? `ADMIN_PASSWORD=yourpassword docker compose up -d` - see [DOCKER.md](DOCKER.md).
+| | |
+|---|---|
+| **Slideshow** | `http://localhost:3000` |
+| **Library** (admin) | `http://localhost:3000/admin` |
 
-## How It Works
+Prefer Docker? `ADMIN_PASSWORD=yourpassword docker compose up -d` — see [DOCKER.md](DOCKER.md).
 
-### Managing Photos
+## What it does
 
-Access the admin panel by navigating to `http://your-server-ip:3000/admin` and logging in with your password.
+**🖼 The frame**
+- Full-screen slideshow with soft cross-fades and a large clock, date and weather widget.
+- Pick what plays: everything, or a single folder (nested folders included).
+- Keeps the screen awake, including on iPads and phones.
+- Install it to the home screen like an app.
 
-From there, you can:
-- **Upload Photos**: Drag and drop images directly into the current folder or use the upload button.
-- **Organize**: Create and delete nested folders to organize your library.
-- **Supported formats**: JPEG, PNG, WebP, GIF.
+**📁 The library**
+- Upload by dropping photos anywhere on the page, or with the Upload button.
+- Folders show covers from their own photos; nest them as deep as you like.
+- Drag a photo onto a folder, a breadcrumb or the back button to move it.
+- Select several photos and delete them in one go; right-click for more options.
+- Optional Google Photos import.
 
-### Viewing the Slideshow
+**🔑 Sharing**
+- Give each frame or family member their own PIN.
+- Limit each PIN to the folders it may show.
 
-On the slideshow screen, you can:
-- **Filter by Folder**: Click the folder icon to open the folder selector. You can view all photos or select a specific folder, including nested ones. The slideshow updates instantly.
-- **Control Playback**: Use keyboard shortcuts to play/pause, advance to the next image, and more.
+## A closer look
 
-#### Slideshow Keyboard Shortcuts
-- `Space` or `K`: Play/pause slideshow
-- `Right Arrow` or `N`: Next image
-- `F`: Toggle fullscreen mode
-- `I`: Show/hide image information
+<table>
+  <tr>
+    <td width="50%"><img src=".github/readme/library.jpg" alt="Library with folder covers"><br><sub><b>Library</b> — folders with photo covers</sub></td>
+    <td width="50%"><img src=".github/readme/folder.jpg" alt="Inside a folder"><br><sub><b>Folders</b> — drop to upload, drag to move</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src=".github/readme/folders.jpg" alt="Choosing what the slideshow plays"><br><sub><b>Now playing</b> — choose a folder for the frame</sub></td>
+    <td width="50%"><img src=".github/readme/access.jpg" alt="Access accounts with PINs"><br><sub><b>Access</b> — a PIN per frame or person</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src=".github/readme/slideshow.jpg" alt="Slideshow controls"><br><sub><b>Slideshow</b> — controls appear on hover</sub></td>
+    <td width="50%"><img src=".github/readme/login.jpg" alt="Sign-in page"><br><sub><b>Sign in</b> — admin password</sub></td>
+  </tr>
+</table>
 
-## License
+<img src=".github/readme/mobile.jpg" alt="Sora on a phone: library, folder and slideshow" width="100%">
 
-This project is licensed under the ISC License - see the [LICENSE](LICENSE) file for details.
+## Keyboard shortcuts
+
+| Key | Slideshow |
+|---|---|
+| `Space` / `K` | Play or pause |
+| `→` / `N` | Next photo |
+| `F` | Fullscreen |
+| `I` | Photo info |
+| `Esc` | Leave fullscreen |
+
+## Configuration
+
+Settings live in `server/.env` (created on first `npm install`).
+
+| Variable | Default | What it does |
+|---|---|---|
+| `ADMIN_PASSWORD` | — | Password for the library. **Change it.** |
+| `PORT` | `3000` | Port the server listens on |
+| `UPLOAD_DIR` | `uploads` | Where photos are stored |
+| `DEFAULT_SLIDESHOW_INTERVAL` | `15000` | Time per photo, in ms |
+| `MAX_FILE_SIZE` | `10485760` | Upload limit, in bytes (10 MB) |
+| `ENABLE_GOOGLE_PHOTOS` | `false` | Turn on Google Photos import |
+
+Supported formats: JPEG, PNG, WebP and GIF.
+
+## Development
+
+```bash
+npm run dev   # server with auto-reload
+npm test      # API tests
+```
+
+Node.js + Express on the server, plain HTML, CSS and JavaScript in the browser. Photos are plain files in folders — no database.
 
 ## Support
 
-- **Issues**: [GitHub Issues](https://github.com/sorbh/digital-photo-frame/issues)
-- **Documentation**: See the `/documentation` directory for technical specifications
-- **Discussions**: [GitHub Discussions](https://github.com/sorbh/digital-photo-frame/discussions)
+[Report an issue](https://github.com/Sorbh/sora-digital-photo-frame/issues) · [Discussions](https://github.com/Sorbh/sora-digital-photo-frame/discussions)
 
----
+Licensed under ISC.
 
-**Transform any device into a beautiful digital photo frame!** 📸✨
-
----
-
-<p align="center">
-Built with ❤️ by Claude Code - Monitored & Prompted by Saurabh K. Sharma
-</p>
+<p align="center"><sub>Built with ❤️ by Claude Code — monitored &amp; prompted by Saurabh K. Sharma</sub></p>

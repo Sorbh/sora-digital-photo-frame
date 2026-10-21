@@ -434,6 +434,52 @@ body.chrome-visible .controls,
     background: rgba(255, 255, 255, 0.12);
 }
 
+/* ---------- Photo caption: where and when ---------------------- */
+
+.photo-caption {
+    position: absolute;
+    right: clamp(1.5rem, 4vw, 3.5rem);
+    bottom: clamp(1.75rem, 5vh, 3.5rem);
+    z-index: 3;
+    max-width: min(26rem, 38vw);
+    text-align: right;
+    color: #f4efe6;
+    text-shadow: 0 2px 24px rgba(0, 0, 0, 0.55);
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(6px);
+    transition: opacity 0.6s ease, transform 0.8s var(--ease-out);
+}
+
+.photo-caption.is-visible {
+    opacity: var(--widget-text, 1);
+    transform: none;
+}
+
+.caption-place {
+    font-family: var(--font-display);
+    font-size: clamp(1.25rem, 2.2vw, 1.85rem);
+    font-style: italic;
+    font-weight: 400;
+    line-height: 1.1;
+    letter-spacing: -0.01em;
+}
+
+.caption-date {
+    margin-top: 6px;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: rgba(244, 239, 230, 0.72);
+}
+
+/* The info card and note pages take the corner while they are up */
+.slideshow-container:has(.info-overlay:not(.hidden)) .photo-caption,
+body.note-showing .photo-caption {
+    opacity: 0;
+}
+
 /* ---------- Info placard ---------------------------------------- */
 
 .info-overlay {
@@ -813,6 +859,19 @@ body.chrome-visible .controls,
 
     .weather-widget {
         bottom: 5.5rem;
+    }
+
+    .photo-caption {
+        top: 1.25rem;
+        bottom: auto;
+        left: 1.25rem;
+        right: 1.25rem;
+        max-width: none;
+        text-align: left;
+    }
+
+    body.is-paused .photo-caption {
+        top: 3.75rem;
     }
 }
 

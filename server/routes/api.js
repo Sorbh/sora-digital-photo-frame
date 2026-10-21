@@ -17,6 +17,7 @@ router.get('/health', (req, res) => {
 // Public routes (no authentication required)
 router.get('/random-image', imageController.getRandomImage.bind(imageController));
 router.get('/images/random', imageController.getRandomImage.bind(imageController)); // New endpoint for consistency
+router.get('/images/next', imageController.getRandomImage.bind(imageController)); // follows the folder's play order
 router.get('/images/:imageId/thumbnail', imageController.getImageThumbnail.bind(imageController));
 
 // Public folder routes for slideshow
@@ -36,6 +37,7 @@ router.post('/images/move', requireAuth, imageController.moveImages.bind(imageCo
 router.get('/admin/folders', requireAuth, folderController.getFolderContents.bind(folderController));
 router.post('/admin/folders', requireAuth, folderController.createFolder.bind(folderController));
 router.delete('/admin/folders', requireAuth, folderController.deleteFolder.bind(folderController));
+router.put('/admin/folders/order', requireAuth, folderController.setPlayOrder.bind(folderController));
 
 // Access account management routes (admin only)
 router.get('/access-accounts', requireAuth, accessAccountController.getAllAccounts.bind(accessAccountController));

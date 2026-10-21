@@ -116,6 +116,17 @@
                 <p id="folderMeta" class="page-meta sora-mono">&nbsp;</p>
             </div>
             <div class="library-actions">
+                <label class="play-order" title="How this folder plays on the frame">
+                    <span class="material-symbols-outlined" id="playOrderIcon" aria-hidden="true">shuffle</span>
+                    <span class="sr-only">Play order</span>
+                    <select id="playOrderSelect">
+                        <option value="shuffle">Shuffle</option>
+                        <option value="newest">Newest first</option>
+                        <option value="oldest">Oldest first</option>
+                        <option value="custom">My order</option>
+                    </select>
+                    <span class="material-symbols-outlined play-order-caret" aria-hidden="true">expand_more</span>
+                </label>
                 <button id="createFolderBtn" class="btn-outline" title="Create folder">
                     <span class="material-symbols-outlined">create_new_folder</span>
                     New folder
@@ -231,6 +242,14 @@
                     <div role="menuitem" class="menu-item" data-action="edit-snap" data-for="snap">
                         <span class="material-symbols-outlined mr-2">edit</span>
                         Edit snap
+                    </div>
+                    <div role="menuitem" class="menu-item" data-action="move-earlier" data-for="image snap">
+                        <span class="material-symbols-outlined mr-2">arrow_back</span>
+                        Move earlier
+                    </div>
+                    <div role="menuitem" class="menu-item" data-action="move-later" data-for="image snap">
+                        <span class="material-symbols-outlined mr-2">arrow_forward</span>
+                        Move later
                     </div>
                     <hr class="menu-divider" data-for="image snap">
                     <div role="menuitem" class="menu-item menu-item-destructive" data-action="delete">

@@ -226,6 +226,16 @@ class AuthenticationManager {
     }
 }
 
+const LAST_SHOWN_KEY = 'photoframe_last_shown';
+
+// "12 March 2019" in the frame's language. Camera times carry no zone and
+// a date-time without one is read as local time, so the day never shifts.
+function formatTakenAt(takenAt) {
+    const date = takenAt ? new Date(takenAt) : null;
+    if (!date || isNaN(date)) return '';
+    return date.toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' });
+}
+
 class PhotoFrameSlideshow {
     constructor() {
         this.currentSlide = 0;
@@ -274,6 +284,9 @@ class PhotoFrameSlideshow {
         this.nextBtn = document.getElementById('nextBtn');
         this.filename = document.getElementById('filename');
         this.folder = document.getElementById('folder');
+        this.caption = document.getElementById('photoCaption');
+        this.captionPlace = document.getElementById('captionPlace');
+        this.captionDate = document.getElementById('captionDate');
         this.noteLayer = document.getElementById('noteLayer');
 
         this.errorState.classList.add('hidden');
@@ -354,14 +367,17 @@ class PhotoFrameSlideshow {
         });
     }
 
+    // The next picture for the chosen folder. Ordered folders continue from
+    // the last one shown, even after the frame restarts.
     async fetchRandomImage() {
         try {
             const selectedFolderPath = this.folderStorage.getCurrentFolderPath();
-            const url = selectedFolderPath
-                ? `/api/images/random?folder=${encodeURIComponent(selectedFolderPath)}`
-                : '/api/images/random';
+            const params = new URLSearchParams();
+            if (selectedFolderPath) params.set('folder', selectedFolderPath);
+            const last = this.lastShown();
+            if (last && last.folder === (selectedFolderPath || '')) params.set('after', last.id);
 
-            const response = await fetch(url);
+            const response = await fetch(`/api/images/next?${params}`);
             if (!response.ok) throw new Error('Failed to fetch image');
             const data = await response.json();
 
@@ -369,10 +385,19 @@ class PhotoFrameSlideshow {
                 throw new Error(data.error || 'Failed to fetch image');
             }
 
+            localStorage.setItem(LAST_SHOWN_KEY, JSON.stringify({ folder: selectedFolderPath || '', id: data.image.id }));
             return data.image;
         } catch (error) {
             console.error('Error fetching random image:', error);
             this.showError(`Failed to load image: ${error.message}`);
+            return null;
+        }
+    }
+
+    lastShown() {
+        try {
+            return JSON.parse(localStorage.getItem(LAST_SHOWN_KEY));
+        } catch {
             return null;
         }
     }
@@ -436,6 +461,7 @@ class PhotoFrameSlideshow {
     }
 
     updateInfo() {
+        this.updateCaption();
         if (this.currentImageData) {
             this.filename.textContent = this.currentImageData.filename;
             this.folder.textContent = this.currentImageData.folder || 'Library';
@@ -447,6 +473,28 @@ class PhotoFrameSlideshow {
                 }, 3000);
             }
         }
+    }
+
+    // Where and when the photo was taken, under the photo (Settings can hide it)
+    updateCaption() {
+        if (!this.caption) return;
+        const data = this.currentImageData;
+        const info = data?.type === 'image' ? data.info : null;
+        const date = formatTakenAt(info?.takenAt);
+        const place = info?.place || '';
+        const enabled = localStorage.getItem('photoDetailsEnabled') !== 'false';
+
+        this.caption.classList.remove('is-visible');
+        clearTimeout(this.captionTimer);
+        if (!enabled || !(date || place)) return;
+
+        // Fade the old words out before the new ones come in
+        this.captionTimer = setTimeout(() => {
+            this.captionPlace.textContent = place || date;
+            this.captionDate.textContent = place ? date : '';
+            this.captionDate.hidden = !place || !date;
+            this.caption.classList.add('is-visible');
+        }, 600);
     }
 
     async nextImage() {

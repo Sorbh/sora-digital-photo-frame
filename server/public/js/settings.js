@@ -53,6 +53,21 @@ class SettingsManager {
                             </label>
                         </div>
 
+                        <!-- Photo details -->
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <span class="material-symbols-outlined text-2xl">location_on</span>
+                                <div>
+                                    <div class="font-medium">Where and when</div>
+                                    <div class="text-sm text-muted-foreground">Show the place and date a photo was taken</div>
+                                </div>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" id="photoDetailsToggle" checked>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+
                         <!-- Time Format -->
                         <div class="flex items-center justify-between">
                             <div class="flex items-center gap-3">
@@ -216,6 +231,12 @@ class SettingsManager {
             this.showToast(`Date display ${enabled ? 'enabled' : 'disabled'}`, 'success');
         });
 
+        document.getElementById('photoDetailsToggle').addEventListener('change', (e) => {
+            const enabled = e.target.checked;
+            localStorage.setItem('photoDetailsEnabled', enabled.toString());
+            this.showToast(`Place and date ${enabled ? 'shown' : 'hidden'} on photos`, 'success');
+        });
+
         // Time format buttons
         document.getElementById('time12HrBtn').addEventListener('click', () => {
             this.setTimeFormat('12');
@@ -265,6 +286,8 @@ class SettingsManager {
         // Date display
         const dateEnabled = localStorage.getItem('dateDisplayEnabled') !== 'false';
         document.getElementById('dateDisplayToggle').checked = dateEnabled;
+
+        document.getElementById('photoDetailsToggle').checked = localStorage.getItem('photoDetailsEnabled') !== 'false';
 
         // Time format
         this.updateTimeFormatButtons();

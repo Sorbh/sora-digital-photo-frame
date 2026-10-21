@@ -472,8 +472,14 @@ class FolderSelector {
      * Load folders from API
      */
     async loadFolders() {
-        if (this.isLoading) return;
-        
+        // Calls made while a load is running share it; resolves true when the list loaded
+        if (!this.loadingFolders) {
+            this.loadingFolders = this.fetchFolders().finally(() => { this.loadingFolders = null; });
+        }
+        return this.loadingFolders;
+    }
+
+    async fetchFolders() {
         this.showLoading(true);
         this.hideError();
         
@@ -482,9 +488,11 @@ class FolderSelector {
             this.folders = data.folders || [];
             this.renderFolders();
             this.updateSelectedState();
+            return true;
         } catch (error) {
             console.error('Error loading folders:', error);
             this.showError(error.message);
+            return false;
         } finally {
             this.showLoading(false);
         }
@@ -749,7 +757,11 @@ class FolderSelector {
         const searchInFolders = (folders) => {
             for (const folder of folders) {
                 if (folder.path === folderPath) return true;
-                if (folder.subfolders && searchInFolders(folder.subfolders)) return true;
+                if (!folderPath.startsWith(`${folder.path}/`)) continue;
+                // Subfolders load on demand: a path under an unopened folder is taken on trust
+                const subfolders = folder.subfolders || this.loadedSubfolders.get(folder.path);
+                if (!subfolders) return true;
+                if (searchInFolders(subfolders)) return true;
             }
             return false;
         };
@@ -770,10 +782,10 @@ class FolderSelector {
         
         try {
             // Load folders (this already calls updateSelectedState)
-            await this.loadFolders();
+            const loaded = await this.loadFolders();
             
-            // After loading, verify the selection is still valid
-            if (currentSelection && currentSelection.path) {
+            // After loading, verify the selection is still valid (not when the list failed to load)
+            if (loaded && currentSelection && currentSelection.path) {
                 const folderExists = this.findFolderInList(currentSelection.path);
                 if (!folderExists) {
                     // Selected folder no longer exists, reset to "All Folders"

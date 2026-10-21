@@ -1050,3 +1050,99 @@ body {
 @media (hover: none) {
     .drop-hint { display: none; }
 }
+
+/* ---------- Play order ------------------------------------------ */
+
+/* A pill in the folder header, holding a native select so phones get their own picker */
+.play-order {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 44px;
+    padding: 0 12px 0 16px;
+    border: 1px solid rgb(255 255 255 / 0.45);
+    border-radius: var(--shape-sm);
+    background: rgb(255 255 255 / 0.12);
+    color: #fff;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.18s ease;
+}
+
+.play-order:hover,
+.play-order:focus-within {
+    background: rgb(255 255 255 / 0.24);
+}
+
+.play-order:focus-within {
+    outline: 2px solid #fff;
+    outline-offset: 2px;
+}
+
+.play-order .material-symbols-outlined {
+    font-size: 20px;
+}
+
+.play-order select {
+    appearance: none;
+    border: 0;
+    outline: 0;
+    padding-right: 18px;
+    margin-right: -18px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+}
+
+.play-order select option {
+    color: var(--foreground);
+    background: var(--background);
+}
+
+.play-order-caret {
+    pointer-events: none;
+    opacity: 0.8;
+}
+
+/* Dragging a photo onto another one puts it before or after: a berry bar marks the spot */
+.file-item.image::after {
+    content: "";
+    position: absolute;
+    top: 6%;
+    bottom: 6%;
+    z-index: 8;
+    width: 4px;
+    border-radius: 4px;
+    background: var(--berry);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--berry) 22%, transparent);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.12s ease;
+}
+
+.file-item.image.drop-before::after {
+    left: calc(clamp(0.75rem, 1.6vw, 1.25rem) / -2 - 2px);
+    opacity: 1;
+}
+
+.file-item.image.drop-after::after {
+    right: calc(clamp(0.75rem, 1.6vw, 1.25rem) / -2 - 2px);
+    opacity: 1;
+}
+
+/* In "My order" tiles show they can be picked up */
+.admin-grid.custom-order .file-item.image {
+    cursor: grab;
+}
+
+@media (max-width: 640px) {
+    .library-actions {
+        flex-wrap: wrap;
+    }
+
+    .library-actions > .play-order {
+        flex-basis: 100%;
+    }
+}

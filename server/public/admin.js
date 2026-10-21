@@ -148,6 +148,7 @@ class PhotoFrameAdmin {
         // Create folder
         document.getElementById('createFolderBtn').addEventListener('click', () => this.showCreateFolderModal());
         document.getElementById('createSnapBtn').addEventListener('click', () => this.createSnap());
+        document.getElementById('playOrderSelect').addEventListener('change', (e) => this.setPlayOrder(e.target.value));
         document.getElementById('confirmCreateBtn').addEventListener('click', () => this.createFolder());
         document.getElementById('cancelCreateBtn').addEventListener('click', () => this.hideCreateFolderModal());
         document.getElementById('closeCreateFolderModal').addEventListener('click', () => this.hideCreateFolderModal());
@@ -553,6 +554,9 @@ class PhotoFrameAdmin {
         this.currentImageIndex = -1;
 
         this.updateLibraryHeading(data);
+        this.playOrder = data.order || 'shuffle';
+        this.fileNames = data.files.map(file => file.name);
+        this.showPlayOrder();
         
         // Background hint under the grid; the empty state has its own upload box
         const isEmpty = data.folders.length === 0 && data.files.length === 0;
@@ -742,11 +746,15 @@ class PhotoFrameAdmin {
             div.classList.remove('selecting');
             const paths = this.selectedItems.has(file.path) ? [...this.selectedItems] : [file.path];
             e.dataTransfer.setData(PHOTO_DRAG_TYPE, JSON.stringify(paths));
+            this.draggingPaths = paths;
             e.dataTransfer.effectAllowed = 'move';
             document.querySelector('.app').classList.add('photo-dragging');
             paths.forEach(p => document.querySelector(`.file-item[data-path="${CSS.escape(p)}"]`)?.classList.add('dragging'));
         });
+        this.makeReorderTarget(div, file);
         div.addEventListener('dragend', () => {
+            this.draggingPaths = null;
+            this.clearReorderMarks();
             document.querySelector('.app').classList.remove('photo-dragging');
             document.querySelectorAll('.file-item.dragging').forEach(el => el.classList.remove('dragging'));
             document.querySelectorAll('.drop-target').forEach(el => el.classList.remove('drop-target'));
@@ -1158,7 +1166,131 @@ class PhotoFrameAdmin {
             case 'edit-snap':
                 this.openSnap(targetItem);
                 break;
+            case 'move-earlier':
+            case 'move-later':
+                this.nudge(targetItem, action === 'move-earlier' ? -1 : 1);
+                break;
         }
+    }
+
+    // ---------- Play order -----------------------------------------------
+
+    showPlayOrder() {
+        const icons = { shuffle: 'shuffle', newest: 'arrow_downward', oldest: 'arrow_upward', custom: 'drag_indicator' };
+        document.getElementById('playOrderSelect').value = this.playOrder;
+        document.getElementById('playOrderIcon').textContent = icons[this.playOrder] || 'shuffle';
+        document.getElementById('fileGrid').classList.toggle('custom-order', this.playOrder === 'custom');
+    }
+
+    async setPlayOrder(order, sequence) {
+        const previous = this.playOrder;
+        this.playOrder = order;
+        this.showPlayOrder();
+        try {
+            const body = sequence ? { order, sequence } : { order };
+            const response = await this.authenticatedFetch(`/api/admin/folders/order?path=${encodeURIComponent(this.currentPath)}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            if (!response) return false;
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error || 'Could not save the play order');
+
+            if (sequence) {
+                if (previous !== 'custom') this.showToast('Playing in your order. Drag photos to rearrange.', 'success');
+                return true;
+            }
+            const messages = {
+                shuffle: 'Photos will play shuffled',
+                newest: 'Newest photos will play first',
+                oldest: 'Oldest photos will play first',
+                custom: 'Playing in your order. Drag photos to rearrange.'
+            };
+            this.showToast(messages[order], 'success');
+            this.loadFolderContents(); // the grid follows the play order
+            return true;
+        } catch (error) {
+            this.playOrder = previous;
+            this.showPlayOrder();
+            this.showToast(error.message, 'error');
+            return false;
+        }
+    }
+
+    // A photo tile takes other photos from this folder dropped before or after it
+    makeReorderTarget(div, file) {
+        const sideOf = (e) => {
+            const rect = div.getBoundingClientRect();
+            return e.clientX < rect.left + rect.width / 2 ? 'before' : 'after';
+        };
+        const accepts = (e) => isPhotoDrag(e) && this.draggingPaths && !this.draggingPaths.includes(file.path);
+
+        div.addEventListener('dragover', (e) => {
+            if (!accepts(e)) return;
+            e.preventDefault();
+            e.stopPropagation(); // not an upload or a folder move
+            e.dataTransfer.dropEffect = 'move';
+            const side = sideOf(e);
+            if (!div.classList.contains(`drop-${side}`)) {
+                this.clearReorderMarks();
+                div.classList.add(`drop-${side}`);
+            }
+        });
+        div.addEventListener('dragleave', (e) => {
+            if (!div.contains(e.relatedTarget)) div.classList.remove('drop-before', 'drop-after');
+        });
+        div.addEventListener('drop', (e) => {
+            if (!accepts(e)) return;
+            e.preventDefault();
+            e.stopPropagation();
+            const moving = this.draggingPaths.map(p => p.split('/').pop());
+            this.clearReorderMarks();
+            this.reorder(moving, file.name, sideOf(e));
+        });
+    }
+
+    clearReorderMarks() {
+        document.querySelectorAll('.drop-before, .drop-after').forEach(el => el.classList.remove('drop-before', 'drop-after'));
+    }
+
+    // Put the moving files (kept in their current order) before or after a file
+    async reorder(moving, targetName, side) {
+        const keep = this.fileNames.filter(name => !moving.includes(name));
+        const ordered = this.fileNames.filter(name => moving.includes(name));
+        const at = keep.indexOf(targetName) + (side === 'after' ? 1 : 0);
+        const sequence = [...keep.slice(0, at), ...ordered, ...keep.slice(at)];
+        if (sequence.join('/') === this.fileNames.join('/') && this.playOrder === 'custom') return;
+
+        // Rearrange the tiles straight away, then save
+        const previous = this.fileNames;
+        this.fileNames = sequence;
+        this.arrangeTiles();
+        if (!await this.setPlayOrder('custom', sequence)) {
+            this.fileNames = previous;
+            this.arrangeTiles();
+        }
+    }
+
+    // Menu alternative to dragging (touch screens): swap with the neighbour
+    nudge(item, step) {
+        const index = this.fileNames.indexOf(item.name);
+        const neighbour = this.fileNames[index + step];
+        if (index < 0 || !neighbour) {
+            this.showToast(step < 0 ? 'Already first' : 'Already last', 'info');
+            return;
+        }
+        this.reorder([item.name], neighbour, step < 0 ? 'before' : 'after');
+    }
+
+    arrangeTiles() {
+        const grid = document.getElementById('fileGrid');
+        const tiles = new Map([...grid.querySelectorAll('.file-item.image')].map(el => [el.dataset.path.split('/').pop(), el]));
+        this.fileNames.forEach(name => tiles.get(name) && grid.appendChild(tiles.get(name)));
+        this.availableImages = this.availableImages
+            .slice()
+            .sort((a, b) => this.fileNames.indexOf(a.name) - this.fileNames.indexOf(b.name))
+            .map((file, index) => ({ ...file, index }));
     }
 
     createSnap(photoPath = null) {

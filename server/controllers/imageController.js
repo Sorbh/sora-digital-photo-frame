@@ -4,6 +4,8 @@ const fs = require('fs-extra');
 const sharp = require('sharp');
 const thumbnails = require('../services/thumbnailService');
 const snaps = require('../services/snapService');
+const playOrder = require('../services/playOrderService');
+const photoInfo = require('../services/photoInfoService');
 const { resolveAdminPath, toAdminPath } = require('../utils/safePath');
 
 class ImageController {
@@ -111,34 +113,15 @@ class ImageController {
         }
       }
       
-      // If we have enough images, filter out recently shown ones
-      if (availableImages.length > this.maxRecentCount) {
-        const filteredByRecent = availableImages.filter(img => !this.recentlyShown.has(img.id));
-        
-        // If all images have been shown recently, reset the recently shown list
-        if (filteredByRecent.length === 0) {
-          console.log('All images in folder shown recently, resetting recent list');
-          this.recentlyShown.clear();
-          // Keep availableImages as is (with folder filter applied)
-        } else {
-          availableImages = filteredByRecent;
-        }
-      }
-      
-      // Select random image from available pool
-      const randomIndex = Math.floor(Math.random() * availableImages.length);
-      const randomImage = availableImages[randomIndex];
-      
-      // Add to recently shown list
-      this.recentlyShown.add(randomImage.id);
-      
-      // Limit the size of recently shown set
-      if (this.recentlyShown.size > this.maxRecentCount) {
-        // Convert to array, remove oldest entries, convert back to Set
-        const recentArray = Array.from(this.recentlyShown);
-        this.recentlyShown = new Set(recentArray.slice(-this.maxRecentCount));
-      }
-      
+      // The folder being played decides the order: shuffle, by date, or the
+      // order set in the library. Ordered play is stateless: the frame sends
+      // the last photo it showed (?after=) and gets the one after it.
+      const baseDir = folderFilter ? resolveAdminPath(path.join('uploads', decodeURIComponent(folderFilter))) : this.uploadsDir;
+      const { order } = baseDir ? await playOrder.read(baseDir) : { order: 'shuffle' };
+      const randomImage = order === 'shuffle'
+        ? this.pickShuffled(availableImages)
+        : this.pickNext(await playOrder.sort(baseDir, availableImages, order), req.query.after);
+
       // A snap is drawn by the frame itself, from its page data
       if (randomImage.type === 'snap') {
         const snap = await snaps.forFrame(randomImage.path, req.session);
@@ -149,12 +132,14 @@ class ImageController {
             type: 'snap',
             filename: snap.title || path.basename(randomImage.path),
             folder: path.dirname(randomImage.relativePath),
+            order,
             snap
           }
         });
       }
 
       const relativePath = `/uploads/${randomImage.relativePath}`;
+      const info = await this.describe(randomImage);
       const fullUrl = `${req.protocol}://${req.get('host')}${relativePath}`;
       
       res.json({
@@ -167,6 +152,8 @@ class ImageController {
           folder: path.dirname(randomImage.relativePath),
           url: fullUrl,
           thumbnail: `${req.protocol}://${req.get('host')}/api/images/${encodeURIComponent(randomImage.id)}/thumbnail`,
+          order,
+          info,
           metadata: {
             size: null, // Would need fs.stat to get actual size
             dimensions: {
@@ -180,6 +167,41 @@ class ImageController {
     } catch (error) {
       console.error('Error getting random image:', error);
       res.status(500).json({ message: 'Server error' });
+    }
+  }
+
+  // Random, never repeating the last few photos (until the folder runs out)
+  pickShuffled(images) {
+    let pool = images;
+    if (images.length > this.maxRecentCount) {
+      pool = images.filter(img => !this.recentlyShown.has(img.id));
+      if (pool.length === 0) {
+        this.recentlyShown.clear();
+        pool = images;
+      }
+    }
+
+    const picked = pool[Math.floor(Math.random() * pool.length)];
+    this.recentlyShown.add(picked.id);
+    if (this.recentlyShown.size > this.maxRecentCount) {
+      this.recentlyShown = new Set(Array.from(this.recentlyShown).slice(-this.maxRecentCount));
+    }
+    return picked;
+  }
+
+  // The photo after `afterId` in an ordered list, wrapping round; the first if unknown
+  pickNext(ordered, afterId) {
+    const index = afterId ? ordered.findIndex(img => img.id === afterId) : -1;
+    return ordered[(index + 1) % ordered.length];
+  }
+
+  // When and where the photo was taken, for the frame's caption
+  async describe(image) {
+    try {
+      const { takenAt, lat, lon } = await photoInfo.get(image.path, image.relativePath);
+      return { takenAt, place: await photoInfo.placeName(lat, lon) };
+    } catch {
+      return { takenAt: null, place: null };
     }
   }
 

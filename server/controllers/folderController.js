@@ -3,6 +3,7 @@ const { UPLOADS_DIR } = require('../config/paths');
 const fs = require('fs-extra');
 const thumbnails = require('../services/thumbnailService');
 const snaps = require('../services/snapService');
+const playOrder = require('../services/playOrderService');
 const imageController = require('./imageController');
 const { resolveAdminPath, toAdminPath } = require('../utils/safePath');
 
@@ -305,16 +306,58 @@ class FolderController {
         }
       }
 
-      const [folders, files] = await Promise.all([Promise.all(folderJobs), Promise.all(fileJobs)]);
+      const [folders, files, { order }] = await Promise.all([
+        Promise.all(folderJobs), Promise.all(fileJobs), playOrder.read(fullPath)
+      ]);
+
+      // Photos are listed in the order the frame plays them (by name for shuffle)
+      const entries = files.filter(Boolean).map(file => {
+        const filePath = path.join(fullPath, file.name);
+        return { file, path: filePath, relativePath: path.relative(this.uploadsDir, filePath) };
+      });
+      const sorted = await playOrder.sort(fullPath, entries, order);
 
       res.json({
         currentPath: folderPath,
+        order,
         folders: folders.sort((a, b) => a.name.localeCompare(b.name)),
-        files: files.filter(Boolean).sort((a, b) => a.name.localeCompare(b.name))
+        files: sorted.map(entry => entry.file)
       });
     } catch (error) {
       console.error('Error reading folder:', error);
       res.status(500).json({ message: 'Server error' });
+    }
+  }
+
+  // How a folder plays on the frame: { order, sequence? } where sequence is
+  // the folder's file names in the order set by dragging
+  async setPlayOrder(req, res) {
+    try {
+      const fullPath = resolveAdminPath(req.query.path || 'uploads', { allowRoot: true });
+      if (!fullPath || !(await fs.stat(fullPath).catch(() => null))?.isDirectory()) {
+        return res.status(404).json({ success: false, error: 'Folder not found' });
+      }
+
+      const { order, sequence } = req.body || {};
+      if (!playOrder.ORDERS.includes(order)) {
+        return res.status(400).json({ success: false, error: 'Unknown play order' });
+      }
+
+      const settings = { order };
+      if (sequence !== undefined) {
+        if (!Array.isArray(sequence) || sequence.some(name => typeof name !== 'string')) {
+          return res.status(400).json({ success: false, error: 'Sequence must be a list of file names' });
+        }
+        // Only names of files in this folder, once each
+        const present = new Set((await fs.readdir(fullPath)).filter(name => !name.startsWith('.')));
+        settings.sequence = [...new Set(sequence)].filter(name => present.has(name));
+      }
+
+      const saved = await playOrder.write(fullPath, settings);
+      res.json({ success: true, order: saved.order });
+    } catch (error) {
+      console.error('Error saving play order:', error);
+      res.status(500).json({ success: false, error: 'Failed to save play order' });
     }
   }
 

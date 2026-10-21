@@ -93,20 +93,11 @@ class NoteService {
    * frame, and with photos limited to the folders its PIN may see.
    */
   async active(session = {}, now = new Date()) {
-    const account = session.accessAccount;
-    const restrictFolders = account && !session.authenticated && account.assignedFolders?.length > 0
-      ? account.assignedFolders
-      : null;
-
     const notes = (await this.load()).filter(note =>
-      this.status(note, now) === 'active' && this.isForAccount(note, account));
+      this.status(note, now) === 'active' && this.isForAccount(note, session.accessAccount));
 
     return Promise.all(notes.map(async note => {
-      const photos = [];
-      for (const photo of note.photos || []) {
-        if (restrictFolders && !this.inFolders(photo, restrictFolders)) continue;
-        if (await this.photoExists(photo)) photos.push(photo);
-      }
+      const photos = await this.visiblePhotos(note.photos, session);
 
       return {
         id: note.id,
@@ -167,12 +158,6 @@ class NoteService {
    */
   async validate(input = {}) {
     const errors = {};
-    const text = (field, { required = false } = {}) => {
-      const value = typeof input[field] === 'string' ? input[field].trim() : '';
-      if (required && !value) errors[field] = 'Required';
-      else if (value.length > LIMITS[field]) errors[field] = `At most ${LIMITS[field]} characters`;
-      return value;
-    };
     const date = (field) => {
       if (input[field] === null || input[field] === undefined || input[field] === '') return null;
       const value = new Date(input[field]);
@@ -193,12 +178,7 @@ class NoteService {
     };
 
     const note = {
-      title: text('title', { required: true }),
-      message: text('message'),
-      signoff: text('signoff'),
-      eyebrow: text('eyebrow'),
-      theme: THEMES.includes(input.theme) ? input.theme : 'paper',
-      layout: Object.hasOwn(LAYOUTS, input.layout) ? input.layout : 'auto',
+      ...await this.validatePage(input, errors),
       eventAt: date('eventAt'),
       startsAt: date('startsAt') || new Date().toISOString(),
       endsAt: date('endsAt'),
@@ -209,24 +189,6 @@ class NoteService {
 
     if (note.endsAt && note.endsAt <= note.startsAt) errors.endsAt = 'Must be after the start';
 
-    // Photos: up to 4 existing images inside uploads/ ("uploads/" prefix optional)
-    const photos = Array.isArray(input.photos) ? input.photos : [];
-    if (photos.length > LIMITS.photos) errors.photos = `At most ${LIMITS.photos} photos`;
-    note.photos = [];
-    for (const raw of photos.slice(0, LIMITS.photos)) {
-      const photo = typeof raw === 'string' ? path.normalize(raw.replace(/^\/?uploads\//, '')) : '';
-      if (!await this.photoExists(photo)) {
-        errors.photos = 'One of the photos could not be found';
-        continue;
-      }
-      if (!note.photos.includes(photo)) note.photos.push(photo);
-    }
-
-    const needed = LAYOUTS[note.layout];
-    if (needed > note.photos.length && !errors.photos) {
-      errors.layout = `This layout needs ${needed} photo${needed === 1 ? '' : 's'}`;
-    }
-
     const audience = input.audience || {};
     const accountIds = Array.isArray(audience.accountIds)
       ? [...new Set(audience.accountIds.filter(id => typeof id === 'string'))].slice(0, LIMITS.accountIds)
@@ -235,6 +197,64 @@ class NoteService {
     if (!note.audience.all && accountIds.length === 0) errors.audience = 'Pick at least one frame';
 
     return Object.keys(errors).length ? { errors } : { note };
+  }
+
+  /**
+   * The page itself: words, theme, layout and photos. Shared with snaps,
+   * which use the same pages without a schedule. Adds to errors in place.
+   */
+  async validatePage(input, errors) {
+    const text = (field, { required = false } = {}) => {
+      const value = typeof input[field] === 'string' ? input[field].trim() : '';
+      if (required && !value) errors[field] = 'Required';
+      else if (value.length > LIMITS[field]) errors[field] = `At most ${LIMITS[field]} characters`;
+      return value;
+    };
+
+    const page = {
+      title: text('title', { required: true }),
+      message: text('message'),
+      signoff: text('signoff'),
+      eyebrow: text('eyebrow'),
+      theme: THEMES.includes(input.theme) ? input.theme : 'paper',
+      layout: Object.hasOwn(LAYOUTS, input.layout) ? input.layout : 'auto',
+      photos: []
+    };
+
+    // Photos: up to 4 existing images inside uploads/ ("uploads/" prefix optional)
+    const photos = Array.isArray(input.photos) ? input.photos : [];
+    if (photos.length > LIMITS.photos) errors.photos = `At most ${LIMITS.photos} photos`;
+    for (const raw of photos.slice(0, LIMITS.photos)) {
+      const photo = typeof raw === 'string' ? path.normalize(raw.replace(/^\/?uploads\//, '')) : '';
+      if (!await this.photoExists(photo)) {
+        errors.photos = 'One of the photos could not be found';
+        continue;
+      }
+      if (!page.photos.includes(photo)) page.photos.push(photo);
+    }
+
+    const needed = LAYOUTS[page.layout];
+    if (needed > page.photos.length && !errors.photos) {
+      errors.layout = `This layout needs ${needed} photo${needed === 1 ? '' : 's'}`;
+    }
+    return page;
+  }
+
+  /**
+   * The photos a frame may show: the ones that still exist and, for a PIN
+   * limited to some folders, sit inside them.
+   */
+  async visiblePhotos(photos = [], session = {}) {
+    const account = session.accessAccount;
+    const restrictFolders = account && !session.authenticated && account.assignedFolders?.length > 0
+      ? account.assignedFolders
+      : null;
+    const visible = [];
+    for (const photo of photos) {
+      if (restrictFolders && !this.inFolders(photo, restrictFolders)) continue;
+      if (await this.photoExists(photo)) visible.push(photo);
+    }
+    return visible;
   }
 }
 

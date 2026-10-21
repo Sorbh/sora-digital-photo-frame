@@ -17,6 +17,11 @@ class ViewController {
     res.sendFile(path.join(__dirname, '..', 'public', 'notes.html'));
   }
 
+  // Serve the snap editor
+  serveSnap(req, res) {
+    res.sendFile(path.join(__dirname, '..', 'public', 'snap.html'));
+  }
+
   // Serve slideshow page
   serveSlideshow(req, res) {
     const slideshowPath = path.join(__dirname, '..', 'public', 'slideshow.html');

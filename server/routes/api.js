@@ -5,6 +5,7 @@ const folderController = require('../controllers/folderController');
 const accessAccountController = require('../controllers/accessAccountController');
 const googlePhotosController = require('../controllers/googlePhotosController');
 const noteController = require('../controllers/noteController');
+const snapController = require('../controllers/snapController');
 const upload = require('../middleware/upload');
 const { requireAuth } = require('../middleware/auth');
 
@@ -48,6 +49,12 @@ router.post('/notes', requireAuth, noteController.create.bind(noteController));
 router.get('/notes/active', noteController.active.bind(noteController));
 router.put('/notes/:id', requireAuth, noteController.update.bind(noteController));
 router.delete('/notes/:id', requireAuth, noteController.remove.bind(noteController));
+
+// Snaps: memory-book pages saved in a folder and played like photos
+// (moved and deleted with the photo endpoints)
+router.get('/snaps', requireAuth, snapController.get.bind(snapController));
+router.post('/snaps', requireAuth, snapController.create.bind(snapController));
+router.put('/snaps', requireAuth, snapController.update.bind(snapController));
 
 // Feature flags
 router.get('/features', requireAuth, (req, res) => {

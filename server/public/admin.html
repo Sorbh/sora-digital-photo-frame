@@ -56,6 +56,7 @@
         })();
     </script>
 
+    <link rel="stylesheet" href="/css/notePage.css">
     <link rel="stylesheet" href="/css/admin.css">
 </head>
 
@@ -118,6 +119,10 @@
                 <button id="createFolderBtn" class="btn-outline" title="Create folder">
                     <span class="material-symbols-outlined">create_new_folder</span>
                     New folder
+                </button>
+                <button id="createSnapBtn" class="btn-outline" title="Make a memory-book page for this folder">
+                    <span class="material-symbols-outlined">auto_stories</span>
+                    New snap
                 </button>
                 <button id="uploadBtn" class="btn mobile-hide" title="Upload images">
                     <span class="material-symbols-outlined">upload</span>
@@ -219,7 +224,15 @@
                         <span class="material-symbols-outlined mr-2">rotate_left</span>
                         Rotate Left
                     </div>
-                    <hr class="menu-divider" data-for="image">
+                    <div role="menuitem" class="menu-item" data-action="create-snap" data-for="image">
+                        <span class="material-symbols-outlined mr-2">auto_stories</span>
+                        Create snap
+                    </div>
+                    <div role="menuitem" class="menu-item" data-action="edit-snap" data-for="snap">
+                        <span class="material-symbols-outlined mr-2">edit</span>
+                        Edit snap
+                    </div>
+                    <hr class="menu-divider" data-for="image snap">
                     <div role="menuitem" class="menu-item menu-item-destructive" data-action="delete">
                         <span class="material-symbols-outlined mr-2">delete</span>
                         Delete
@@ -412,6 +425,7 @@
         });
     </script>
 
+    <script src="js/notePage.js"></script>
     <script src="admin.js"></script>
     <script src="js/settings.js"></script>
     <script src="js/googlePhotosSync.js"></script>

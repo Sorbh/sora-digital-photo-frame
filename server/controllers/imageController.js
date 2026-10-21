@@ -3,6 +3,7 @@ const { UPLOADS_DIR } = require('../config/paths');
 const fs = require('fs-extra');
 const sharp = require('sharp');
 const thumbnails = require('../services/thumbnailService');
+const snaps = require('../services/snapService');
 const { resolveAdminPath, toAdminPath } = require('../utils/safePath');
 
 class ImageController {
@@ -33,8 +34,9 @@ class ImageController {
         if (item.name.startsWith('.')) continue;
         const subImages = await this.getAllImages(fullPath, false); // Don't use cache for recursion
         images.push(...subImages);
-      } else if (item.isFile() && /\.(jpg|jpeg|png|gif|webp)$/i.test(item.name)) {
+      } else if (item.isFile() && (thumbnails.IMAGE_PATTERN.test(item.name) || snaps.isSnap(item.name))) {
         const imageData = {
+          type: snaps.isSnap(item.name) ? 'snap' : 'image',
           path: fullPath,
           relativePath: path.relative(this.uploadsDir, fullPath),
           folder: path.basename(path.dirname(fullPath)),
@@ -137,6 +139,21 @@ class ImageController {
         this.recentlyShown = new Set(recentArray.slice(-this.maxRecentCount));
       }
       
+      // A snap is drawn by the frame itself, from its page data
+      if (randomImage.type === 'snap') {
+        const snap = await snaps.forFrame(randomImage.path, req.session);
+        return res.json({
+          success: true,
+          image: {
+            id: randomImage.id,
+            type: 'snap',
+            filename: snap.title || path.basename(randomImage.path),
+            folder: path.dirname(randomImage.relativePath),
+            snap
+          }
+        });
+      }
+
       const relativePath = `/uploads/${randomImage.relativePath}`;
       const fullUrl = `${req.protocol}://${req.get('host')}${relativePath}`;
       
@@ -144,6 +161,7 @@ class ImageController {
         success: true,
         image: {
           id: randomImage.id,
+          type: 'image',
           filename: path.basename(randomImage.path),
           path: relativePath,
           folder: path.dirname(randomImage.relativePath),
@@ -295,7 +313,8 @@ class ImageController {
       for (const imagePath of paths) {
         const fullPath = resolveAdminPath(imagePath);
 
-        if (!fullPath || !thumbnails.IMAGE_PATTERN.test(fullPath) || !await fs.pathExists(fullPath)) {
+        const isSnap = Boolean(fullPath) && snaps.isSnap(fullPath);
+        if (!fullPath || !(isSnap || thumbnails.IMAGE_PATTERN.test(fullPath)) || !await fs.pathExists(fullPath)) {
           results.failedCount++;
           results.errors.push(`Image not found: ${imagePath}`);
           continue;
@@ -304,7 +323,7 @@ class ImageController {
 
         try {
           // Never overwrite a photo that already has this name in the destination
-          const ext = path.extname(fullPath);
+          const ext = isSnap ? snaps.SNAP_EXT : path.extname(fullPath);
           const base = path.basename(fullPath, ext);
           let target = path.join(destDir, base + ext);
           for (let n = 1; await fs.pathExists(target); n++) {
@@ -313,6 +332,9 @@ class ImageController {
 
           await fs.move(fullPath, target);
           await thumbnails.remove(fullPath);
+          if (!isSnap) {
+            await snaps.photoMoved(path.relative(this.uploadsDir, fullPath), path.relative(this.uploadsDir, target));
+          }
           results.movedCount++;
         } catch (error) {
           console.error(`Error moving image ${imagePath}:`, error);

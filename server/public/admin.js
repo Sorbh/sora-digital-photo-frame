@@ -147,6 +147,7 @@ class PhotoFrameAdmin {
 
         // Create folder
         document.getElementById('createFolderBtn').addEventListener('click', () => this.showCreateFolderModal());
+        document.getElementById('createSnapBtn').addEventListener('click', () => this.createSnap());
         document.getElementById('confirmCreateBtn').addEventListener('click', () => this.createFolder());
         document.getElementById('cancelCreateBtn').addEventListener('click', () => this.hideCreateFolderModal());
         document.getElementById('closeCreateFolderModal').addEventListener('click', () => this.hideCreateFolderModal());
@@ -544,7 +545,8 @@ class PhotoFrameAdmin {
         fileGrid.innerHTML = '';
         
         // Update available images for navigation
-        this.availableImages = data.files.map((file, index) => ({
+        // Snaps open in their own editor, so the photo viewer steps over them
+        this.availableImages = data.files.filter(file => file.type !== 'snap').map((file, index) => ({
             ...file,
             index: index
         }));
@@ -595,10 +597,12 @@ class PhotoFrameAdmin {
         if (title) title.textContent = parts.length > 1 ? parts[parts.length - 1] : 'Library';
         if (meta) {
             const folders = data.folders.length;
-            const photos = data.files.length;
+            const snaps = data.files.filter(file => file.type === 'snap').length;
+            const photos = data.files.length - snaps;
             const counts = [];
             if (folders) counts.push(`${folders} ${folders === 1 ? 'folder' : 'folders'}`);
             counts.push(`${photos} ${photos === 1 ? 'photo' : 'photos'}`);
+            if (snaps) counts.push(`${snaps} ${snaps === 1 ? 'snap' : 'snaps'}`);
             meta.textContent = counts.join(' · ');
         }
     }
@@ -662,11 +666,18 @@ class PhotoFrameAdmin {
         return div;
     }
 
+    // A snap is a memory-book page saved in the folder; it opens in the snap editor
+    openSnap(file) {
+        window.location.href = `/snap?path=${encodeURIComponent(file.path)}`;
+    }
+
     createFileElement(file) {
+        const isSnap = file.type === 'snap';
+        const type = isSnap ? 'snap' : 'image';
         const div = document.createElement('div');
-        div.className = 'file-item image';
+        div.className = isSnap ? 'file-item image snap' : 'file-item image';
         div.dataset.path = file.path;
-        div.dataset.type = 'image';
+        div.dataset.type = type;
         div.innerHTML = `
             <div class="admin-photo-image">
                 <img src="${file.thumbnail || file.url}" alt="" loading="lazy" decoding="async">
@@ -698,6 +709,7 @@ class PhotoFrameAdmin {
         // File names come from uploads, so set them as text rather than HTML
         div.querySelector('img').alt = file.name;
         div.querySelector('.photo-grid-name').textContent = file.name;
+        if (isSnap) this.dressSnapTile(div, file);
         div.querySelector('input[type="checkbox"]').dataset.path = file.path;
         
         // Handle checkbox selection
@@ -714,9 +726,10 @@ class PhotoFrameAdmin {
                 e.stopPropagation(); // Prevent cell selection
                 const action = button.getAttribute('data-action');
                 if (action === 'view') {
-                    this.showPhotoModal(file.url, file.name);
+                    if (isSnap) this.openSnap(file);
+                    else this.showPhotoModal(file.url, file.name);
                 } else if (action === 'delete') {
-                    this.deleteItem({...file, type: 'image'});
+                    this.deleteItem({...file, type});
                 }
             });
         });
@@ -745,7 +758,7 @@ class PhotoFrameAdmin {
         div.addEventListener('mouseup', (e) => this.handlePointerUp(e, file, div));
         div.addEventListener('touchend', (e) => this.handlePointerUp(e, file, div));
         div.addEventListener('mouseleave', () => this.cancelLongPress());
-        div.addEventListener('contextmenu', (e) => this.showContextMenu(e, {...file, type: 'image'}));
+        div.addEventListener('contextmenu', (e) => this.showContextMenu(e, {...file, type}));
         
         // Regular click handler for photo modal
         div.addEventListener('click', (e) => {
@@ -753,11 +766,35 @@ class PhotoFrameAdmin {
             if (e.target.closest('.photo-grid-checkbox') || e.target.closest('.btn-icon')) return;
             if (!this.longPressTriggered) {
                 e.preventDefault();
-                this.showPhotoModal(file.url, file.name);
+                if (isSnap) this.openSnap(file);
+                else this.showPhotoModal(file.url, file.name);
             }
         });
         
         return div;
+    }
+
+    // Draw the snap's page in place of a thumbnail, as the frame will show it
+    dressSnapTile(div, file) {
+        const snap = file.snap || {};
+        const stage = document.createElement('div');
+        stage.className = 'note-stage snap-tile-stage';
+        stage.appendChild(NotePage.render({ ...snap, photos: (snap.photoUrls || []).map(p => p.thumbnail) }, { fill: true }));
+        div.querySelector('.admin-photo-image').replaceChildren(stage);
+
+        const badge = document.createElement('span');
+        badge.className = 'snap-badge';
+        badge.innerHTML = '<span class="material-symbols-outlined">auto_stories</span>Snap';
+        div.appendChild(badge);
+
+        div.querySelector('.photo-grid-name').textContent = snap.title || file.name;
+        const view = div.querySelector('[data-action="view"]');
+        view.dataset.tooltip = 'Edit Snap';
+        view.setAttribute('aria-label', 'Edit Snap');
+        view.querySelector('.material-symbols-outlined').textContent = 'edit';
+        const del = div.querySelector('[data-action="delete"]');
+        del.dataset.tooltip = 'Delete Snap';
+        del.setAttribute('aria-label', 'Delete Snap');
     }
 
     createGooglePhotosImportElement() {
@@ -1052,10 +1089,9 @@ class PhotoFrameAdmin {
         this.contextMenuTarget = item;
         const popover = document.getElementById('contextMenuPopover');
         
-        // Show/hide menu items based on item type
-        const rotateItems = popover.querySelectorAll('[data-for="image"]');
-        rotateItems.forEach(rotateItem => {
-            rotateItem.style.display = item.type === 'image' ? '' : 'none';
+        // Show/hide menu items based on item type (data-for lists the types)
+        popover.querySelectorAll('[data-for]').forEach(menuItem => {
+            menuItem.style.display = menuItem.dataset.for.split(' ').includes(item.type) ? '' : 'none';
         });
         
         // Position at the right-click location, or under the options button
@@ -1116,7 +1152,19 @@ class PhotoFrameAdmin {
             case 'rotate-left':
                 await this.rotateImage(targetItem, -90);
                 break;
+            case 'create-snap':
+                this.createSnap(targetItem.path);
+                break;
+            case 'edit-snap':
+                this.openSnap(targetItem);
+                break;
         }
+    }
+
+    createSnap(photoPath = null) {
+        const params = new URLSearchParams({ folder: this.currentPath });
+        if (photoPath) params.set('photo', photoPath);
+        window.location.href = `/snap?${params}`;
     }
 
     async deleteItem(item) {
@@ -1144,7 +1192,7 @@ class PhotoFrameAdmin {
             console.log('Delete response:', data);
             
             if (response.ok) {
-                this.showToast(`${item.type === 'folder' ? 'Folder' : 'Image'} deleted successfully`, 'success');
+                this.showToast(`${{ folder: 'Folder', snap: 'Snap' }[item.type] || 'Image'} deleted successfully`, 'success');
                 this.loadFolderContents();
             } else {
                 this.showToast(data.message || 'Delete failed', 'error');
@@ -1554,13 +1602,14 @@ class PhotoFrameAdmin {
 
     // Enhanced confirmation dialog for single item deletion
     async showDeleteConfirmation(itemName, itemType = 'image') {
+        const itemLabel = { folder: 'Folder', snap: 'Snap' }[itemType] || 'Photo';
         return new Promise((resolve) => {
             // Create a custom confirmation dialog
             const dialogHtml = `
                 <dialog id="deleteConfirmModal" class="dialog" aria-labelledby="delete-confirm-title">
                     <article>
                         <header>
-                            <h2 id="delete-confirm-title">Delete ${itemType === 'folder' ? 'Folder' : 'Photo'}</h2>
+                            <h2 id="delete-confirm-title">Delete ${itemLabel}</h2>
                         </header>
                         <section>
                             <p>Are you sure you want to delete <strong>"${itemName}"</strong>?</p>
@@ -1570,7 +1619,7 @@ class PhotoFrameAdmin {
                             <button id="cancelSingleDeleteBtn" class="btn-outline">Cancel</button>
                             <button id="confirmSingleDeleteBtn" class="btn-destructive">
                                 <span class="material-symbols-outlined">delete</span>
-                                Delete ${itemType === 'folder' ? 'Folder' : 'Photo'}
+                                Delete ${itemLabel}
                             </button>
                         </footer>
                     </article>

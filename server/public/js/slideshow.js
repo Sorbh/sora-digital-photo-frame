@@ -460,19 +460,30 @@ class PhotoFrameSlideshow {
         }
 
         const imageData = await this.fetchRandomImage();
-        if (imageData) {
-            const loaded = await this.loadImage(imageData);
-            if (loaded) {
-                this.showImage();
-            }
-        }
+        if (imageData) await this.present(imageData);
 
         if (this.isPlaying) {
             this.scheduleNext();
         }
     }
 
-    async showNote(note) {
+    // Show the next picture: a photo, or a snap (a saved page) drawn on the note layer
+    async present(imageData) {
+        if (imageData.type !== 'snap') {
+            if (!await this.loadImage(imageData)) return false;
+            this.showImage();
+            return true;
+        }
+        if (!await this.showNote(imageData.snap, { scheduled: false })) return false;
+        this.currentImageData = imageData;
+        this.noteScheduler?.photoShown();
+        this.updateInfo();
+        this.loadingState.classList.add('hidden');
+        this.hideError();
+        return true;
+    }
+
+    async showNote(note, { scheduled = true } = {}) {
         if (!this.noteLayer || !window.NotePage) return false;
         try {
             const page = NotePage.render(note);
@@ -484,7 +495,7 @@ class PhotoFrameSlideshow {
             void this.noteLayer.offsetWidth; // restart the entrance animation
             this.noteLayer.classList.add('is-visible');
             document.body.classList.add('note-showing');
-            this.noteScheduler.markShown(note);
+            if (scheduled) this.noteScheduler.markShown(note);
             return true;
         } catch (error) {
             console.error('Could not show note:', error);
@@ -677,9 +688,8 @@ class PhotoFrameSlideshow {
 
         const imageData = await this.fetchRandomImage();
         if (imageData) {
-            const loaded = await this.loadImage(imageData);
+            const loaded = await this.present(imageData);
             if (loaded) {
-                this.showImage();
                 this.scheduleNext();
             } else {
                 this.showError('Failed to load image from selected folder');
@@ -715,9 +725,8 @@ class PhotoFrameSlideshow {
 
         const imageData = await this.fetchRandomImage();
         if (imageData) {
-            const loaded = await this.loadImage(imageData);
+            const loaded = await this.present(imageData);
             if (loaded) {
-                this.showImage();
                 this.scheduleNext();
             } else {
                 this.showError('Failed to load first image');

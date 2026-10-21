@@ -2,6 +2,7 @@ const path = require('path');
 const { UPLOADS_DIR } = require('../config/paths');
 const fs = require('fs-extra');
 const thumbnails = require('../services/thumbnailService');
+const snaps = require('../services/snapService');
 const imageController = require('./imageController');
 const { resolveAdminPath, toAdminPath } = require('../utils/safePath');
 
@@ -59,7 +60,7 @@ class FolderController {
         if (item.isDirectory()) {
           if (item.name.startsWith('.')) continue;
           count += await this.countImagesInFolder(fullPath);
-        } else if (item.isFile() && /\.(jpg|jpeg|png|gif|webp)$/i.test(item.name)) {
+        } else if (item.isFile() && (thumbnails.IMAGE_PATTERN.test(item.name) || snaps.isSnap(item.name))) {
           count++;
         }
       }
@@ -289,6 +290,18 @@ class FolderController {
             // Grid tiles use the small cached version; ?v= busts it after a rotate
             thumbnail: `/api/images/${encodeURIComponent(relativePath)}/thumbnail?v=${Math.round(stat.mtimeMs)}`
           })));
+        } else if (item.isFile() && snaps.isSnap(item.name)) {
+          // Snaps carry their page, so the grid can draw them like the frame does
+          const snapPath = path.join(fullPath, item.name);
+          fileJobs.push(snaps.load(snapPath).then(snap => ({
+            name: item.name,
+            type: 'snap',
+            path: path.join(folderPath, item.name),
+            snap
+          })).catch(error => {
+            console.error('Skipping unreadable snap:', snapPath, error.message);
+            return null;
+          }));
         }
       }
 
@@ -297,7 +310,7 @@ class FolderController {
       res.json({
         currentPath: folderPath,
         folders: folders.sort((a, b) => a.name.localeCompare(b.name)),
-        files: files.sort((a, b) => a.name.localeCompare(b.name))
+        files: files.filter(Boolean).sort((a, b) => a.name.localeCompare(b.name))
       });
     } catch (error) {
       console.error('Error reading folder:', error);

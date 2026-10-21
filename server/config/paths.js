@@ -9,4 +9,7 @@ const UPLOADS_DIR = path.resolve(SERVER_DIR, process.env.UPLOAD_DIR || 'uploads'
 // Generated, disposable files (thumbnails). Safe to delete at any time.
 const CACHE_DIR = path.resolve(SERVER_DIR, process.env.CACHE_DIR || 'cache');
 
-module.exports = { SERVER_DIR, UPLOADS_DIR, CACHE_DIR };
+// Small JSON stores (notes). DATA_DIR lets tests use a throwaway folder.
+const DATA_DIR = path.resolve(SERVER_DIR, process.env.DATA_DIR || 'data');
+
+module.exports = { SERVER_DIR, UPLOADS_DIR, CACHE_DIR, DATA_DIR };

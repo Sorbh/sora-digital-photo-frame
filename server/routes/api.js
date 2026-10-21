@@ -4,6 +4,7 @@ const imageController = require('../controllers/imageController');
 const folderController = require('../controllers/folderController');
 const accessAccountController = require('../controllers/accessAccountController');
 const googlePhotosController = require('../controllers/googlePhotosController');
+const noteController = require('../controllers/noteController');
 const upload = require('../middleware/upload');
 const { requireAuth } = require('../middleware/auth');
 
@@ -40,6 +41,13 @@ router.get('/access-accounts', requireAuth, accessAccountController.getAllAccoun
 router.post('/access-accounts', requireAuth, accessAccountController.createAccount.bind(accessAccountController));
 router.put('/access-accounts/:id', requireAuth, accessAccountController.updateAccount.bind(accessAccountController));
 router.delete('/access-accounts/:id', requireAuth, accessAccountController.deleteAccount.bind(accessAccountController));
+
+// Notes shown in the slideshow (admin manages, frames read their active ones)
+router.get('/notes', requireAuth, noteController.list.bind(noteController));
+router.post('/notes', requireAuth, noteController.create.bind(noteController));
+router.get('/notes/active', noteController.active.bind(noteController));
+router.put('/notes/:id', requireAuth, noteController.update.bind(noteController));
+router.delete('/notes/:id', requireAuth, noteController.remove.bind(noteController));
 
 // Feature flags
 router.get('/features', requireAuth, (req, res) => {

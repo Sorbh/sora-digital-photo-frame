@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#d6336a">
+    <title>Notes · Sora Frame</title>
+    <link rel="icon" href="/icons/favicon.ico" sizes="48x48">
+    <link rel="icon" href="/icons/favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+    <link rel="manifest" href="/icons/site.webmanifest">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/basecoat-css@0.3.1/dist/basecoat.cdn.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/basecoat-css@0.3.1/dist/js/all.min.js" defer></script>
+    <link rel="stylesheet" href="/css/sora.css">
+    <link rel="stylesheet" href="/css/tailwind.css">
+
+    <!-- Theme: follow the admin's saved choice (system / dark / light) -->
+    <script>
+    (() => {
+      try {
+        const stored = localStorage.getItem('themeMode');
+        const dark = stored === 'dark' || ((!stored || stored === 'system') && matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.classList.toggle('dark', dark);
+      } catch (_) {}
+    })();
+    </script>
+    <link rel="stylesheet" href="/css/access-accounts.css">
+    <link rel="stylesheet" href="/css/notePage.css">
+    <link rel="stylesheet" href="/css/notes.css">
+</head>
+
+<body>
+    <div class="app">
+        <header class="topbar">
+            <div class="topbar-brand">
+                <a href="/admin" class="sora-wordmark" aria-label="Sora library home">Sora</a>
+                <span class="topbar-divider"></span>
+                <span class="sora-eyebrow">Notes</span>
+            </div>
+            <div class="topbar-actions">
+                <a href="/admin" class="tb-btn tb-desktop" title="Back to the library">
+                    <span class="material-symbols-outlined">photo_library</span>
+                    <span class="tb-label">Library</span>
+                </a>
+                <a href="/access-accounts" class="tb-btn tb-desktop" title="Manage access accounts">
+                    <span class="material-symbols-outlined">key</span>
+                    <span class="tb-label">Access</span>
+                </a>
+                <a href="/slideshow" class="tb-btn tb-desktop" title="Open the slideshow">
+                    <span class="material-symbols-outlined">slideshow</span>
+                    <span class="tb-label">Slideshow</span>
+                </a>
+            </div>
+        </header>
+
+        <section class="library-head">
+            <div class="library-title">
+                <div class="crumb-row">
+                    <a href="/admin" class="back-btn" title="Back to library" aria-label="Back to library">
+                        <span class="material-symbols-outlined">arrow_back</span>
+                    </a>
+                    <p class="sora-eyebrow" style="margin: 0;">On the frame</p>
+                </div>
+                <h1 class="page-title sora-display no-transform">Little <em>love notes</em></h1>
+                <p class="page-meta sora-mono"><span class="material-symbols-outlined" style="font-size:16px;font-variation-settings:'FILL' 1">favorite</span><span id="notesMetaText">Loading notes</span></p>
+            </div>
+            <div class="library-actions">
+                <button id="createNoteBtn" class="btn mobile-hide" title="New note">
+                    <span class="material-symbols-outlined">edit_note</span>
+                    New note
+                </button>
+            </div>
+        </section>
+
+        <main class="main-content">
+            <div id="loadingState" class="loading-state">
+                <span class="material-symbols-outlined">hourglass_empty</span>
+                <p>Loading notes</p>
+            </div>
+
+            <div id="notesList" class="notes-list hidden"></div>
+
+            <div id="emptyState" class="notes-empty hidden">
+                <div class="notes-empty-art note-stage" id="emptyPreview" aria-hidden="true"></div>
+                <div>
+                    <h3>Slip a note into the slideshow</h3>
+                    <p>Remind someone about a visit, a call or an outing. Every few minutes the frame shows your note as a page from a photo album, then goes back to the photos.</p>
+                    <button class="btn" data-proxy="createNoteBtn">
+                        <span class="material-symbols-outlined">edit_note</span>
+                        Write the first note
+                    </button>
+                </div>
+            </div>
+        </main>
+
+        <!-- Note editor -->
+        <dialog id="noteModal" class="dialog note-dialog" aria-labelledby="noteModalTitle">
+            <article>
+                <header>
+                    <h2 id="noteModalTitle">New note</h2>
+                    <button type="button" id="closeNoteModal" class="btn-sm-icon-ghost absolute top-4 right-4" aria-label="Close">
+                        <span class="material-symbols-outlined">close</span>
+                    </button>
+                </header>
+                <section class="note-editor">
+                    <form id="noteForm" class="note-form" novalidate>
+                        <label class="nf-field">
+                            <span class="nf-label">Headline <span class="nf-count" data-count-for="title"></span></span>
+                            <input class="input" type="text" name="title" maxlength="60" required placeholder="Ambika is visiting you" autocomplete="off">
+                            <span class="nf-error" data-error-for="title"></span>
+                        </label>
+
+                        <label class="nf-field">
+                            <span class="nf-label">Message <span class="nf-count" data-count-for="message"></span></span>
+                            <textarea class="textarea" name="message" maxlength="160" rows="2" placeholder="She's bringing the kids and your favourite cake."></textarea>
+                            <span class="nf-error" data-error-for="message"></span>
+                        </label>
+
+                        <label class="nf-field">
+                            <span class="nf-label">Sign-off</span>
+                            <input class="input" type="text" name="signoff" maxlength="40" placeholder="Love, Ambika" autocomplete="off">
+                        </label>
+
+                        <div class="nf-field">
+                            <span class="nf-label">Photos <span class="nf-hint">up to 4</span></span>
+                            <div class="nf-photos" id="photoTiles"></div>
+                            <span class="nf-error" data-error-for="photos"></span>
+                        </div>
+
+                        <div class="nf-field">
+                            <span class="nf-label">Layout <span class="nf-hint" id="layoutHint"></span></span>
+                            <div class="nf-layouts" id="layoutPicker" role="radiogroup" aria-label="Layout"></div>
+                            <span class="nf-error" data-error-for="layout"></span>
+                        </div>
+
+                        <div class="nf-row">
+                            <label class="nf-field">
+                                <span class="nf-label">Event <span class="nf-hint">optional</span></span>
+                                <input class="input" type="datetime-local" name="eventAt">
+                            </label>
+                            <label class="nf-field" id="eyebrowField">
+                                <span class="nf-label">Date line</span>
+                                <input class="input" type="text" name="eyebrow" maxlength="40" placeholder="This weekend" autocomplete="off">
+                            </label>
+                        </div>
+
+                        <div class="nf-row">
+                            <label class="nf-field">
+                                <span class="nf-label">Show from</span>
+                                <input class="input" type="datetime-local" name="startsAt">
+                            </label>
+                            <label class="nf-field">
+                                <span class="nf-label">Until <span class="nf-hint" id="endsHint">optional</span></span>
+                                <input class="input" type="datetime-local" name="endsAt">
+                                <span class="nf-error" data-error-for="endsAt"></span>
+                            </label>
+                        </div>
+
+                        <div class="nf-row nf-inline">
+                            <span class="nf-label">Show every</span>
+                            <select class="select" name="everyMinutes">
+                                <option value="1">1 min</option>
+                                <option value="2">2 min</option>
+                                <option value="5" selected>5 min</option>
+                                <option value="10">10 min</option>
+                                <option value="15">15 min</option>
+                                <option value="30">30 min</option>
+                                <option value="60">1 hour</option>
+                            </select>
+                            <span class="nf-label">for</span>
+                            <select class="select" name="showForSeconds">
+                                <option value="10">10 sec</option>
+                                <option value="15">15 sec</option>
+                                <option value="20" selected>20 sec</option>
+                                <option value="30">30 sec</option>
+                                <option value="45">45 sec</option>
+                                <option value="60">1 min</option>
+                            </select>
+                        </div>
+
+                        <div class="nf-row nf-inline">
+                            <span class="nf-label">Theme</span>
+                            <div class="nf-swatches" role="radiogroup" aria-label="Theme">
+                                <label class="swatch swatch-paper" title="Paper"><input type="radio" name="theme" value="paper" checked><span></span></label>
+                                <label class="swatch swatch-berry" title="Berry"><input type="radio" name="theme" value="berry"><span></span></label>
+                                <label class="swatch swatch-ink" title="Ink"><input type="radio" name="theme" value="ink"><span></span></label>
+                            </div>
+                        </div>
+
+                        <div class="nf-field">
+                            <span class="nf-label">Show on</span>
+                            <div class="nf-chips" id="audienceChips"></div>
+                            <span class="nf-error" data-error-for="audience"></span>
+                        </div>
+                    </form>
+
+                    <aside class="note-preview-pane">
+                        <span class="nf-label">Preview</span>
+                        <div class="note-stage note-preview" id="notePreview"></div>
+                        <div class="preview-orient" role="group" aria-label="Preview shape">
+                            <button type="button" class="active" data-orient="landscape" title="Landscape screen"><span class="material-symbols-outlined">crop_landscape</span></button>
+                            <button type="button" data-orient="portrait" title="Portrait screen"><span class="material-symbols-outlined">crop_portrait</span></button>
+                        </div>
+                    </aside>
+                </section>
+                <footer>
+                    <button type="button" id="cancelNoteBtn" class="btn-outline">Cancel</button>
+                    <button type="submit" id="saveNoteBtn" class="btn" form="noteForm">
+                        <span class="material-symbols-outlined">check</span>
+                        Save note
+                    </button>
+                </footer>
+            </article>
+        </dialog>
+
+        <!-- Photo picker -->
+        <dialog id="photoPicker" class="dialog photo-picker" aria-labelledby="photoPickerTitle">
+            <article>
+                <header>
+                    <h2 id="photoPickerTitle">Choose photos</h2>
+                    <nav class="picker-crumbs" id="pickerCrumbs" aria-label="Folder"></nav>
+                </header>
+                <section>
+                    <div class="picker-grid" id="pickerGrid"></div>
+                </section>
+                <footer>
+                    <span class="picker-count" id="pickerCount"></span>
+                    <button type="button" id="pickerCancel" class="btn-outline">Cancel</button>
+                    <button type="button" id="pickerDone" class="btn">Use photos</button>
+                </footer>
+            </article>
+        </dialog>
+
+        <!-- Delete confirmation -->
+        <dialog id="deleteModal" class="dialog" aria-labelledby="deleteTitle">
+            <article>
+                <header>
+                    <h2 id="deleteTitle">Delete note</h2>
+                </header>
+                <section>
+                    <p>Delete <strong id="deleteNoteName"></strong>? It will stop showing on every frame.</p>
+                </section>
+                <footer>
+                    <button type="button" id="cancelDeleteBtn" class="btn-outline">Cancel</button>
+                    <button type="button" id="confirmDeleteBtn" class="btn-destructive">
+                        <span class="material-symbols-outlined">delete</span>
+                        Delete
+                    </button>
+                </footer>
+            </article>
+        </dialog>
+
+        <div id="toastContainer" class="toast-container"></div>
+    </div>
+
+    <!-- Mobile tab bar -->
+    <nav class="tabbar" aria-label="Sections">
+        <a href="/admin" class="tab">
+            <span class="material-symbols-outlined">photo_library</span><span>Library</span>
+        </a>
+        <a href="/access-accounts" class="tab">
+            <span class="material-symbols-outlined">key</span><span>Access</span>
+        </a>
+        <button class="tab-fab" data-proxy="createNoteBtn" aria-label="New note">
+            <span class="material-symbols-outlined">edit_note</span>
+        </button>
+        <a href="/slideshow" class="tab">
+            <span class="material-symbols-outlined">slideshow</span><span>Slideshow</span>
+        </a>
+        <a href="/folder-selection" class="tab">
+            <span class="material-symbols-outlined">folder_special</span><span>Folders</span>
+        </a>
+    </nav>
+    <script>
+        document.querySelectorAll('[data-proxy]').forEach(btn => {
+            btn.addEventListener('click', () => document.getElementById(btn.dataset.proxy)?.click());
+        });
+    </script>
+    <script src="/js/notePage.js"></script>
+    <script src="/js/notes.js"></script>
+</body>
+
+</html>

@@ -12,6 +12,11 @@ class ViewController {
     res.sendFile(path.join(__dirname, '..', 'public', 'access-accounts.html'));
   }
 
+  // Serve notes page
+  serveNotes(req, res) {
+    res.sendFile(path.join(__dirname, '..', 'public', 'notes.html'));
+  }
+
   // Serve slideshow page
   serveSlideshow(req, res) {
     const slideshowPath = path.join(__dirname, '..', 'public', 'slideshow.html');

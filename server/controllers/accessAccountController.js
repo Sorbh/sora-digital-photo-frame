@@ -1,9 +1,10 @@
 const fs = require('fs').promises;
 const path = require('path');
+const { DATA_DIR } = require('../config/paths');
 
 class AccessAccountController {
     constructor() {
-        this.dataPath = path.join(__dirname, '../data');
+        this.dataPath = DATA_DIR;
         this.accountsFile = path.join(this.dataPath, 'access-accounts.json');
         this.initializeDataDirectory();
         

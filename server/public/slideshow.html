@@ -20,6 +20,7 @@
     <link rel="stylesheet" href="/css/sora.css">
 
     <link rel="stylesheet" href="/css/slideshow.css">
+    <link rel="stylesheet" href="/css/notePage.css">
 </head>
 
 <body>
@@ -99,6 +100,9 @@
             <img id="image2" alt="">
         </div>
 
+        <!-- Note pages (Notes) fade in over the photos every few minutes -->
+        <div class="note-stage note-layer" id="noteLayer" aria-live="polite"></div>
+
         <div class="stage-scrim" aria-hidden="true"></div>
 
         <!-- Loading State -->
@@ -177,6 +181,8 @@
     <script src="/js/folderSelector.js"></script>
     <script src="/js/keepAwake.js"></script>
 
+    <script src="/js/notePage.js"></script>
+    <script src="/js/noteScheduler.js"></script>
     <script src="/js/slideshow.js"></script>
 </body>
 

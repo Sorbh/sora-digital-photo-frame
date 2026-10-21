@@ -239,6 +239,9 @@ class PhotoFrameSlideshow {
         this.folderSelector = null;
         this.folderStorage = new FolderStorage();
         this.leavingTimers = [null, null];
+        this.currentDuration = this.interval;
+        this.noteScheduler = window.NoteScheduler ? new NoteScheduler() : null;
+        this.noteHideTimer = null;
 
         // Ken Burns drift spans the slide plus its crossfade
         document.documentElement.style.setProperty('--slide-duration', `${this.interval + 2000}ms`);
@@ -271,6 +274,7 @@ class PhotoFrameSlideshow {
         this.nextBtn = document.getElementById('nextBtn');
         this.filename = document.getElementById('filename');
         this.folder = document.getElementById('folder');
+        this.noteLayer = document.getElementById('noteLayer');
 
         this.errorState.classList.add('hidden');
         this.images.forEach(img => img.removeAttribute('src'));
@@ -424,6 +428,8 @@ class PhotoFrameSlideshow {
         nextSlideEl.classList.add('active');
 
         this.currentSlide = (this.currentSlide + 1) % 2;
+        this.hideNote();
+        this.noteScheduler?.photoShown();
         this.updateInfo();
         this.loadingState.classList.add('hidden');
         this.hideError();
@@ -445,6 +451,14 @@ class PhotoFrameSlideshow {
 
     async nextImage() {
         this.resetProgress();
+
+        // Every few minutes a note takes the place of the next photo
+        const note = this.noteScheduler?.nextDue();
+        if (note && await this.showNote(note)) {
+            if (this.isPlaying) this.scheduleNext(note.showForSeconds * 1000);
+            return;
+        }
+
         const imageData = await this.fetchRandomImage();
         if (imageData) {
             const loaded = await this.loadImage(imageData);
@@ -458,16 +472,45 @@ class PhotoFrameSlideshow {
         }
     }
 
-    scheduleNext() {
-        this.clearTimers();
-        this.timer = setTimeout(() => this.nextImage(), this.interval);
-        this.startProgress();
+    async showNote(note) {
+        if (!this.noteLayer || !window.NotePage) return false;
+        try {
+            const page = NotePage.render(note);
+            clearTimeout(this.noteHideTimer);
+            this.noteLayer.classList.remove('is-visible');
+            this.noteLayer.replaceChildren(page);
+            await NotePage.whenLoaded(page);
+
+            void this.noteLayer.offsetWidth; // restart the entrance animation
+            this.noteLayer.classList.add('is-visible');
+            document.body.classList.add('note-showing');
+            this.noteScheduler.markShown(note);
+            return true;
+        } catch (error) {
+            console.error('Could not show note:', error);
+            return false;
+        }
     }
 
-    startProgress() {
+    hideNote() {
+        if (!this.noteLayer?.classList.contains('is-visible')) return;
+        this.noteLayer.classList.remove('is-visible');
+        document.body.classList.remove('note-showing');
+        clearTimeout(this.noteHideTimer);
+        this.noteHideTimer = setTimeout(() => this.noteLayer.replaceChildren(), 1500);
+    }
+
+    scheduleNext(duration = this.interval) {
+        this.clearTimers();
+        this.currentDuration = duration;
+        this.timer = setTimeout(() => this.nextImage(), duration);
+        this.startProgress(duration);
+    }
+
+    startProgress(duration = this.currentDuration) {
         this.progressBar.style.width = '0%';
         let progress = 0;
-        const increment = 100 / (this.interval / 100);
+        const increment = 100 / (duration / 100);
 
         this.progressTimer = setInterval(() => {
             progress += increment;
@@ -549,8 +592,8 @@ class PhotoFrameSlideshow {
         this.playPauseBtn.title = this.isPlaying ? 'Pause (Space)' : 'Play (Space)';
 
         if (this.isPlaying) {
-            // Resume slideshow
-            this.scheduleNext();
+            // Resume slideshow (a note keeps its own, longer duration)
+            this.scheduleNext(this.currentDuration);
         } else {
             // Pause slideshow
             this.clearTimers();
@@ -662,10 +705,13 @@ class PhotoFrameSlideshow {
         if (this.wakeLock) {
             this.wakeLock.disable();
         }
+
+        this.noteScheduler?.stop();
     }
 
     async startSlideshow() {
         this.hideError();
+        this.noteScheduler?.start();
 
         const imageData = await this.fetchRandomImage();
         if (imageData) {

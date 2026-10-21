@@ -178,6 +178,7 @@ commands/
 CLAUDE.md
 commands
 server/data/access-accounts.json
+server/data/notes.json
 
 # Generated thumbnails
 server/cache/

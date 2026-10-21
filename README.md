@@ -52,6 +52,11 @@ Prefer Docker? `ADMIN_PASSWORD=yourpassword docker compose up -d` — see [DOCKE
 - Select several photos and delete them in one go; right-click for more options.
 - Optional Google Photos import.
 
+**💌 Notes**
+- Slip a note into the slideshow: "Ambika is visiting you", with up to four photos.
+- It shows every few minutes between two dates, with an optional countdown to the event.
+- Pick a memory-book layout, a theme, and which frames or PINs see it.
+
 **🔑 Sharing**
 - Give each frame or family member their own PIN.
 - Limit each PIN to the folders it may show.
@@ -71,7 +76,13 @@ Prefer Docker? `ADMIN_PASSWORD=yourpassword docker compose up -d` — see [DOCKE
     <td width="50%"><img src=".github/readme/slideshow.jpg" alt="Slideshow controls"><br><sub><b>Slideshow</b> — controls appear on hover</sub></td>
     <td width="50%"><img src=".github/readme/login.jpg" alt="Sign-in page"><br><sub><b>Sign in</b> — admin password</sub></td>
   </tr>
+  <tr>
+    <td width="50%"><img src=".github/readme/notes.jpg" alt="Notes list"><br><sub><b>Notes</b> — scheduled love notes and reminders</sub></td>
+    <td width="50%"><img src=".github/readme/note-frame.jpg" alt="A note on the frame"><br><sub><b>On the frame</b> — a note between photos</sub></td>
+  </tr>
 </table>
+
+<img src=".github/readme/notes-layouts.jpg" alt="Eight note layouts: cover, quote, remember, stack, collage, spine, gallery and auto" width="100%">
 
 <img src=".github/readme/mobile.jpg" alt="Sora on a phone: library, folder and slideshow" width="100%">
 

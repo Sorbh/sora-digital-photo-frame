@@ -1,0 +1,561 @@
+/* Note pages: a memory-book spread shown on the frame and in the admin preview.
+   Everything is sized in container units, so the page scales with its stage. */
+
+.note-stage {
+    container-type: size;
+    position: relative;
+    overflow: hidden;
+}
+
+.note-page {
+    --np-bg: #f4ecdf;
+    --np-ink: #2a1d22;
+    --np-soft: #5b4452;
+    --np-accent: #d6336a;
+    --np-rule: rgba(45, 27, 38, 0.14);
+    --np-gutter: rgba(70, 35, 25, 0.1);
+    --np-gap: 1.5cqmin;
+
+    position: absolute;
+    inset: 0;
+    display: grid;
+    grid-template-columns: 40% 1fr;
+    overflow: hidden;
+    background:
+        radial-gradient(120% 90% at 18% 8%, #fffaf2 0%, transparent 60%),
+        radial-gradient(90% 80% at 100% 100%, #efe3d1 0%, transparent 70%),
+        var(--np-bg);
+    color: var(--np-ink);
+    font-family: var(--font-sans, 'Figtree', sans-serif);
+}
+
+/* The spine between the two "pages" */
+.note-page:not(.layout-cover)::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 40%;
+    width: 5cqw;
+    transform: translateX(-50%);
+    background: linear-gradient(90deg, transparent, var(--np-gutter) 50%, transparent);
+    pointer-events: none;
+}
+
+.note-page.theme-berry {
+    --np-bg: #c42b6e;
+    --np-ink: #fff;
+    --np-soft: rgba(255, 255, 255, 0.84);
+    --np-accent: #ffd98f;
+    --np-rule: rgba(255, 255, 255, 0.28);
+    --np-gutter: rgba(60, 0, 30, 0.22);
+    background:
+        radial-gradient(60% 50% at 85% 8%, rgba(255, 196, 120, 0.32), transparent 70%),
+        radial-gradient(55% 45% at 5% 100%, rgba(255, 255, 255, 0.14), transparent 70%),
+        linear-gradient(135deg, #e0395f 0%, #c42b6e 55%, #a8217c 100%);
+}
+
+.note-page.theme-ink {
+    --np-bg: #1c1218;
+    --np-ink: #fbf4e8;
+    --np-soft: rgba(251, 244, 232, 0.74);
+    --np-accent: #ff8fb1;
+    --np-rule: rgba(251, 244, 232, 0.16);
+    --np-gutter: rgba(0, 0, 0, 0.35);
+    background:
+        radial-gradient(70% 60% at 15% 10%, rgba(214, 51, 106, 0.18), transparent 70%),
+        radial-gradient(60% 60% at 100% 100%, rgba(255, 217, 143, 0.08), transparent 70%),
+        var(--np-bg);
+}
+
+/* ---------- Text column ------------------------------------------ */
+
+.np-text {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 0;
+    padding: 9cqh 4cqw 12cqh 6cqw;
+}
+
+.np-text > * {
+    margin: 0;
+    overflow-wrap: anywhere;
+}
+
+.np-eyebrow {
+    margin-bottom: 3.6cqh;
+    font-family: var(--font-mono, monospace);
+    font-size: 2.1cqh;
+    font-weight: 500;
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    color: var(--np-accent);
+}
+
+.np-title {
+    font-family: var(--font-display, Georgia, serif);
+    font-variation-settings: 'SOFT' 50, 'opsz' 144;
+    font-size: 9.6cqh;
+    font-weight: 500;
+    line-height: 0.98;
+    letter-spacing: -0.03em;
+    text-wrap: balance;
+}
+
+.note-page.is-long .np-title {
+    font-size: 7.4cqh;
+    line-height: 1.02;
+}
+
+.np-message {
+    max-width: 30ch;
+    margin-top: 4cqh;
+    font-family: var(--font-display, Georgia, serif);
+    font-variation-settings: 'opsz' 24;
+    font-size: 3.7cqh;
+    line-height: 1.32;
+    color: var(--np-soft);
+    text-wrap: pretty;
+}
+
+.np-signoff {
+    margin-top: 3.2cqh;
+    font-family: var(--font-script, cursive);
+    font-size: 8cqh;
+    line-height: 1;
+    color: var(--np-accent);
+    transform: rotate(-4deg);
+    transform-origin: left center;
+}
+
+.np-foot {
+    position: absolute;
+    left: 6cqw;
+    right: 4cqw;
+    bottom: 6cqh;
+    padding-top: 2cqh;
+    border-top: 1px solid var(--np-rule);
+    font-family: var(--font-mono, monospace);
+    font-size: 1.5cqh;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--np-soft);
+    opacity: 0.75;
+}
+
+/* ---------- Photos ----------------------------------------------- */
+
+.np-photos {
+    display: grid;
+    gap: var(--np-gap);
+    min-width: 0;
+    min-height: 0;
+    padding: 4.5cqh 3.5cqw 4.5cqh 2.5cqw;
+}
+
+.np-photos figure {
+    min-width: 0;
+    min-height: 0;
+    margin: 0;
+    overflow: hidden;
+    border-radius: 1.1cqmin;
+    background: color-mix(in oklab, var(--np-ink) 8%, transparent);
+    box-shadow: 0 1.2cqh 3cqh -1.6cqh rgba(50, 20, 30, 0.45);
+}
+
+.np-photos img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.layout-mosaic .np-photos {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 3fr 2fr;
+}
+
+.layout-mosaic .np-photos figure:first-child,
+.layout-mosaic[data-count="2"] .np-photos figure {
+    grid-column: 1 / -1;
+}
+
+.layout-mosaic[data-count="2"] .np-photos {
+    grid-template-rows: 3fr 2fr;
+}
+
+.layout-grid .np-photos {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+}
+
+/* ---------- Cover: words only, like the front of a photo book ---- */
+
+.note-page.layout-cover {
+    grid-template-columns: 1fr;
+}
+
+.layout-cover::after {
+    content: '';
+    position: absolute;
+    inset: 3.2cqmin;
+    border: 1px solid var(--np-rule);
+    pointer-events: none;
+}
+
+.layout-cover .np-text {
+    align-items: center;
+    padding: 10cqh 14cqw 14cqh;
+    text-align: center;
+}
+
+.layout-cover .np-title {
+    font-size: 13cqh;
+}
+
+.layout-cover.is-long .np-title {
+    font-size: 10cqh;
+}
+
+.layout-cover .np-message {
+    max-width: 38ch;
+    font-size: 4.2cqh;
+}
+
+.layout-cover .np-signoff {
+    transform-origin: center;
+}
+
+.layout-cover .np-foot {
+    left: 50%;
+    right: auto;
+    width: 30cqw;
+    transform: translateX(-50%);
+    text-align: center;
+}
+
+/* ---------- Book layouts (picked by the admin) -------------------
+   Two facing pages (.np-left / .np-right) or one cover (.np-book), each a
+   flex column of text, photos, rows and columns. Sized in cqmin so the
+   same rules work on landscape and portrait screens. */
+
+.note-page.theme-paper,
+.note-page:not(.theme-berry):not(.theme-ink) {
+    --np-cloth: #b4c2c6;
+    --np-face: linear-gradient(170deg, #fffdf8 0%, #f6efe3 100%);
+}
+
+.note-page.theme-berry {
+    --np-cloth: #5a1233;
+    --np-face: linear-gradient(135deg, #e0395f 0%, #c42b6e 55%, #a8217c 100%);
+}
+
+.note-page.theme-ink {
+    --np-cloth: #0b0709;
+    --np-face: radial-gradient(90% 60% at 20% 0%, rgba(214, 51, 106, 0.2), transparent 70%), #1c1218;
+}
+
+.note-page.tpl {
+    grid-template-columns: 1fr 1fr;
+}
+
+.note-page.tpl::before {
+    left: 50%;
+}
+
+.np-sheet {
+    display: flex;
+    flex-direction: column;
+    gap: 1.6cqmin;
+    min-width: 0;
+    min-height: 0;
+    padding: 6cqmin 4.5cqmin 6cqmin 6.5cqmin;
+}
+
+.np-right {
+    padding: 6cqmin 6.5cqmin 6cqmin 4.5cqmin;
+}
+
+.np-row,
+.np-col {
+    display: flex;
+    flex: 1 1 0;
+    gap: 1.6cqmin;
+    min-width: 0;
+    min-height: 0;
+}
+
+.np-col {
+    flex-direction: column;
+    justify-content: center;
+}
+
+.tpl :is(.np-eyebrow, .np-title, .np-message, .np-signoff, .np-foot) {
+    flex: none;
+    margin: 0;
+    overflow-wrap: anywhere;
+}
+
+.tpl .np-eyebrow { font-size: 1.7cqmin; }
+.tpl .np-title { font-size: 6.6cqmin; }
+.tpl.is-long .np-title { font-size: 5.2cqmin; }
+.tpl .np-message { max-width: 34ch; margin: 0; font-size: 2.6cqmin; }
+.tpl .np-signoff { margin: 0.4cqmin 0 0; font-size: 5.2cqmin; }
+
+.tpl .np-foot {
+    position: static;
+    margin-top: auto;
+    padding-top: 1.2cqmin;
+    font-size: 1.2cqmin;
+}
+
+.tpl figure {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 0;
+    margin: 0;
+    overflow: hidden;
+    border-radius: 0.5cqmin;
+    background: color-mix(in oklab, var(--np-ink) 8%, transparent);
+    box-shadow: 0 0.8cqmin 2cqmin -1.2cqmin rgba(50, 20, 30, 0.45);
+}
+
+.tpl figure img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* Missing photo (admin picker only): a soft dashed placeholder */
+.note-page figure.is-empty {
+    border: 1px dashed color-mix(in oklab, var(--np-ink) 30%, transparent);
+    background:
+        repeating-linear-gradient(135deg, transparent 0 6px, color-mix(in oklab, var(--np-ink) 6%, transparent) 6px 7px),
+        color-mix(in oklab, var(--np-ink) 5%, transparent);
+    box-shadow: none;
+}
+
+/* Full-bleed page: the photo runs into the spine and off the edge */
+.bleed-right .np-right,
+.bleed-left .np-left {
+    padding: 0;
+}
+
+.bleed-right .np-right figure,
+.bleed-left .np-left figure {
+    border-radius: 0;
+    box-shadow: none;
+}
+
+.note-page.bleed-right::before,
+.note-page.bleed-left::before {
+    z-index: 1;
+}
+
+/* Quote: the message is the hero of the left page */
+.tpl-quote .np-left .np-message {
+    max-width: none;
+    font-size: 4.4cqmin;
+    font-variation-settings: 'SOFT' 100, 'opsz' 72;
+    line-height: 1.12;
+    letter-spacing: -0.015em;
+    color: var(--np-ink);
+}
+
+.tpl-quote .np-left .np-message::before { content: '\201C'; }
+.tpl-quote .np-left .np-message::after { content: '\201D'; }
+
+.tpl-quote .np-right .np-eyebrow {
+    margin-top: -0.6cqmin;
+}
+
+/* Remember: text tucked beside a small photo at the foot of the page */
+.tpl-remember .np-left > .np-row {
+    flex-grow: 0.9;
+}
+
+.tpl-remember .np-left .np-col {
+    justify-content: flex-end;
+}
+
+/* Collage: the top row (headline + big photo) is the larger one */
+.tpl-collage .np-left > .np-row:first-child {
+    flex-grow: 1.5;
+}
+
+.tpl-collage .np-left .np-col {
+    flex: 1.1 1 0;
+    justify-content: flex-start;
+}
+
+.tpl-collage .np-left .np-title { font-size: 5cqmin; }
+.tpl-collage.is-long .np-left .np-title { font-size: 4.2cqmin; }
+
+/* Stack and spine: a narrow column of photos beside the words */
+.tpl-stack .np-right .np-col:last-child,
+.tpl-spine .np-right .np-col:last-child {
+    flex-grow: 0.85;
+}
+
+/* Narrow text columns: larger words so the column doesn't look empty */
+:is(.tpl-stack, .tpl-spine, .tpl-gallery) .np-right .np-message {
+    font-size: 3.1cqmin;
+    line-height: 1.3;
+}
+
+/* Spine: the headline runs up the edge of the left page */
+.has-vertical .np-left .np-title {
+    max-height: 100%;
+    overflow: hidden;
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    font-family: var(--font-sans, sans-serif);
+    font-variation-settings: normal;
+    font-size: 3.6cqmin;
+    font-weight: 800;
+    line-height: 1.05;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+/* Gallery: a column of photos beside the words */
+.tpl-gallery .np-right .np-col:first-child {
+    flex-grow: 0.75;
+}
+
+/* Cover: a single book lying on cloth */
+.note-page.tpl-cover {
+    grid-template-columns: 1fr;
+    place-items: center;
+    background:
+        radial-gradient(70% 70% at 50% 40%, rgba(255, 255, 255, 0.12), transparent 70%),
+        var(--np-cloth);
+}
+
+.note-page.tpl-cover::before {
+    display: none;
+}
+
+.np-book {
+    width: min(40cqw, 70cqh);
+    height: 88cqh;
+    align-items: center;
+    padding: 5cqmin 4cqmin;
+    border-radius: 0.4cqmin 1cqmin 1cqmin 0.4cqmin;
+    background: var(--np-face);
+    text-align: center;
+    box-shadow:
+        inset 1.2cqmin 0 1.4cqmin -1cqmin rgba(0, 0, 0, 0.18),
+        0 2cqmin 5cqmin -1cqmin rgba(20, 10, 15, 0.55);
+}
+
+.np-book figure {
+    align-self: stretch;
+}
+
+.np-book .np-title {
+    font-size: 5.4cqmin;
+}
+
+.tpl-cover.is-long .np-book .np-title {
+    font-size: 4.4cqmin;
+}
+
+.np-book .np-message {
+    max-width: 30ch;
+    font-size: 2.2cqmin;
+    font-style: italic;
+}
+
+.np-book .np-signoff {
+    transform-origin: center;
+}
+
+/* ---------- Portrait screens: text above, photos below ----------- */
+
+@container (aspect-ratio < 1) {
+    .note-page:not(.layout-cover) {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto minmax(0, 1fr);
+    }
+
+    .note-page:not(.layout-cover)::before { display: none; }
+
+    .note-page:not(.layout-cover) .np-text {
+        padding: 7cqh 8cqw 2cqh;
+    }
+
+    .note-page:not(.layout-cover) .np-foot { display: none; }
+
+    .note-page:not(.layout-cover) .np-photos {
+        padding: 2cqh 8cqw 6cqh;
+    }
+
+    .np-eyebrow { font-size: 2.8cqw; margin-bottom: 2.4cqh; }
+    .np-title, .layout-cover .np-title { font-size: 10cqw; }
+    .note-page.is-long .np-title { font-size: 8cqw; }
+    .np-message, .layout-cover .np-message { font-size: 4.4cqw; margin-top: 2cqh; }
+    .np-signoff { font-size: 9cqw; margin-top: 2cqh; }
+    .np-foot { font-size: 2cqw; }
+    .layout-cover .np-text { padding: 10cqh 10cqw; }
+    .layout-cover .np-foot { width: 50cqw; }
+
+    .note-page.tpl:not(.tpl-cover) {
+        grid-template-columns: 1fr;
+        grid-template-rows: 1fr 1fr;
+    }
+
+    .note-page.tpl::before { display: none; }
+
+    .np-sheet,
+    .np-right { padding: 5cqmin 6cqmin; }
+    .np-left { padding-bottom: 1.6cqmin; }
+    .np-right { padding-top: 1.6cqmin; }
+    .bleed-right .np-right,
+    .bleed-left .np-left { padding: 0; }
+
+    .np-book { width: 80cqw; height: 80cqh; }
+}
+
+/* ---------- Entrance (frame only: the stage adds .is-visible) ---- */
+
+.note-stage.is-visible .np-text > * {
+    animation: np-rise 1s var(--ease-out, ease-out) both;
+}
+
+.note-stage.is-visible .np-text > :nth-child(2) { animation-delay: 0.12s; }
+.note-stage.is-visible .np-text > :nth-child(3) { animation-delay: 0.24s; }
+.note-stage.is-visible .np-text > :nth-child(4) { animation-delay: 0.42s; }
+.note-stage.is-visible .np-text > :nth-child(5) { animation-delay: 0.5s; }
+
+.note-stage.is-visible .note-page figure {
+    animation: np-settle 1.2s var(--ease-out, ease-out) both;
+    animation-delay: calc(0.2s + var(--i, 0) * 0.14s);
+}
+
+.note-stage.is-visible .tpl :is(.np-eyebrow, .np-title, .np-message, .np-signoff, .np-foot) {
+    animation: np-rise 1s var(--ease-out, ease-out) both;
+    animation-delay: calc(0.1s + var(--t, 0) * 0.12s);
+}
+
+@keyframes np-rise {
+    from { opacity: 0; translate: 0 2.5cqh; }
+    to { opacity: 1; translate: 0 0; }
+}
+
+@keyframes np-settle {
+    from { opacity: 0; scale: 1.04; }
+    to { opacity: 1; scale: 1; }
+}
+
+/* np-signoff already uses transform, so its rise uses translate (above) */
+
+@media (prefers-reduced-motion: reduce) {
+    .note-stage.is-visible .np-text > *,
+    .note-stage.is-visible .note-page figure {
+        animation: none;
+    }
+}

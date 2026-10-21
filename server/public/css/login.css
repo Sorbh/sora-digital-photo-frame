@@ -9,7 +9,7 @@ body {
     overscroll-behavior: none;
 }
 
-/* ---------- Hero panel: berry gradient, floating album ---------- */
+/* ---------- Hero panel: berry gradient, old devices as frames ---------- */
 
 .hero {
     position: relative;
@@ -54,80 +54,39 @@ body {
     font-variation-settings: 'FILL' 1;
 }
 
-/* Two tilted portrait cards, like a couple's album cover */
-.album {
+/* An old tablet and phone reused as frames on a shelf, softly lit */
+.shelf {
     position: relative;
     align-self: center;
-    width: min(100%, 30rem);
-    height: clamp(15rem, 34vh, 21rem);
+    width: min(100%, 36rem);
+    margin: 0;
 }
 
-.polaroid {
+.shelf::before {
+    content: "";
     position: absolute;
-    width: 46%;
-    aspect-ratio: 4 / 5;
-    padding: 8px;
-    border-radius: var(--shape-lg);
-    background: #fff;
-    box-shadow: 0 30px 60px -24px rgba(70, 8, 40, 0.65);
-    animation: float 7s var(--ease-in-out) infinite alternate;
-}
-
-.polaroid .pic {
-    width: 100%;
-    height: 100%;
-    border-radius: var(--shape-sm);
-    background: var(--tone);
-}
-
-.polaroid .dot {
-    position: absolute;
-    width: 34px;
-    height: 34px;
-    border: 4px solid #fff;
+    inset: 8% 12% 18%;
+    z-index: -1;
     border-radius: 50%;
-    box-shadow: 0 6px 14px -6px rgba(70, 8, 40, 0.5);
+    background: radial-gradient(closest-side, rgba(255, 214, 150, 0.45), transparent);
+    filter: blur(24px);
 }
 
-.polaroid.one {
-    left: 6%;
-    top: 14%;
-    --tone: radial-gradient(circle at 50% 38%, #f8d9b8 0 17%, transparent 18%), radial-gradient(ellipse at 50% 92%, #f2c7a5 0 34%, transparent 35%), linear-gradient(170deg, #f6dfae, #e9b95e);
-    transform: rotate(-8deg);
+.shelf img {
+    display: block;
+    width: 100%;
+    height: auto;
+    filter: drop-shadow(0 28px 36px rgba(70, 8, 40, 0.45));
+    animation: settle 1.1s var(--ease-out) both;
 }
 
-.polaroid.one .dot { left: -12px; top: -10px; background: #f6dfae; }
-
-.polaroid.two {
-    right: 6%;
-    top: 0;
-    --tone: radial-gradient(circle at 50% 38%, #f3c9b5 0 17%, transparent 18%), radial-gradient(ellipse at 50% 92%, #ea9fb4 0 34%, transparent 35%), linear-gradient(200deg, #9cc4c9, #4f7f86);
-    transform: rotate(7deg);
-    animation-delay: -3.5s;
-}
-
-.polaroid.two .dot { right: -12px; top: -12px; background: #ff7aa2; }
-
-.album .script {
-    position: absolute;
-    left: 50%;
-    bottom: -0.25rem;
-    z-index: 3;
-    transform: translateX(-50%) rotate(-6deg);
-    font-family: var(--font-script);
-    font-size: clamp(2.25rem, 4vw, 3rem);
-    white-space: nowrap;
-    text-shadow: 0 4px 18px rgba(70, 8, 40, 0.45);
-}
-
-@keyframes float {
-    from { translate: 0 0; }
-    to { translate: 0 -10px; }
+@keyframes settle {
+    from { opacity: 0; transform: translateY(14px); }
+    to { opacity: 1; transform: none; }
 }
 
 .hero h1 {
     margin: 0;
-    max-width: 13ch;
     font-family: var(--font-display);
     font-variation-settings: 'SOFT' 100, 'opsz' 144;
     font-size: clamp(2.5rem, 4.8vw, 4.25rem);
@@ -143,6 +102,8 @@ body {
     font-size: 1.2em;
     letter-spacing: 0;
     color: #ffd98f;
+    display: block;
+    white-space: nowrap;
 }
 
 .hero p {
@@ -310,11 +271,8 @@ body {
 @media (max-width: 860px) {
     body { grid-template-columns: 1fr; align-content: start; }
     .hero { gap: 1.5rem; padding-bottom: 4.5rem; }
-    .album { margin-top: 0.5rem; }
+    .shelf { width: min(100%, 24rem); }
     .hero-copy p { display: none; }
-    .album { height: 13rem; width: min(100%, 20rem); }
-    .polaroid { border-radius: var(--shape-md); padding: 6px; }
-    .polaroid .pic { border-radius: var(--shape-xs); }
     .hero h1 { font-size: 2.25rem; max-width: none; text-align: center; }
     .clouds {
         display: block;

@@ -127,6 +127,7 @@ Thumbs.db
 # Project-specific files
 uploads/
 !uploads/.gitkeep
+server/data/
 temp/
 logs/
 *.log

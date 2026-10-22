@@ -55,13 +55,16 @@ const requireAuth = (req, res, next) => {
   }
 
   // For HTML requests, redirect to login
-  return res.redirect('/login');
+  return res.redirect(`/login?next=${encodeURIComponent(req.originalUrl)}`);
 };
+
+// A path on this site to return to after signing in, or null
+const safeNext = (value) => (typeof value === 'string' && /^\/(?![\/\\])/.test(value) ? value : null);
 
 // Check if user is NOT authenticated (for login page)
 const requireGuest = (req, res, next) => {
   if (req.session && req.session.authenticated) {
-    return res.redirect('/admin');
+    return res.redirect(safeNext(req.query.next) || '/admin');
   }
   next();
 };

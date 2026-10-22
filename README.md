@@ -60,6 +60,8 @@ Prefer Docker? `ADMIN_PASSWORD=yourpassword docker compose up -d` — see [DOCKE
 **🔑 Sharing**
 - Give each frame or family member their own PIN.
 - Limit each PIN to the folders it may show.
+- Pair a frame by scanning the QR code on its screen with your phone. It stays signed in, and you can unpair it from Access.
+- Frames with no keyboard can sign in from the address: `http://<server>:3000/slideshow?pin=123456`.
 
 ## A closer look
 

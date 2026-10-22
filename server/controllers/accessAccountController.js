@@ -114,6 +114,26 @@ class AccessAccountController {
         return 'acc_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
     }
 
+    // A new account with a PIN nobody has yet (used when a frame is paired by QR code)
+    async addAccountWithRandomPin({ name, assignedFolders = [] }) {
+        const accounts = await this.loadAccounts();
+        let pin;
+        do {
+            pin = String(require('crypto').randomInt(100000, 1000000));
+        } while (accounts.some(account => account.pin === pin));
+        const account = {
+            id: this.generateAccountId(),
+            name,
+            pin,
+            assignedFolders,
+            createdAt: new Date().toISOString(),
+            lastAccessed: null
+        };
+        accounts.push(account);
+        await this.saveAccounts(accounts);
+        return account;
+    }
+
     async getAllAccounts(req, res) {
         try {
             const accounts = await this.loadAccounts();
@@ -246,6 +266,8 @@ class AccessAccountController {
 
             accounts.splice(accountIndex, 1);
             await this.saveAccounts(accounts);
+            // Frames paired to this account stop working with it
+            await require('../services/pairingService').removeDevices(device => device.accountId === id);
 
             res.json({
                 success: true,
@@ -358,6 +380,12 @@ class AccessAccountController {
 
     async clearSession(req, res) {
         try {
+            // A frame signing out in the admin's browser keeps the admin signed in
+            if (req.session.authenticated) {
+                delete req.session.accessAccount;
+                return res.json({ success: true, message: 'Session cleared' });
+            }
+
             req.session.destroy((err) => {
                 if (err) {
                     console.error('Error destroying session:', err);

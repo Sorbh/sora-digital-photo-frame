@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#d6336a">
+    <title>Pair a frame · Sora Frame</title>
+    <link rel="icon" href="/icons/favicon.ico" sizes="48x48">
+    <link rel="icon" href="/icons/favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+    <link rel="manifest" href="/icons/site.webmanifest">
+    <link rel="stylesheet" href="/css/sora.css">
+
+    <!-- Theme: follow the admin's saved choice, else the system -->
+    <script>
+    (() => {
+      try {
+        const stored = localStorage.getItem('themeMode');
+        const dark = stored === 'dark' || ((!stored || stored === 'system') && matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.classList.toggle('dark', dark);
+      } catch (_) {}
+    })();
+    </script>
+    <link rel="stylesheet" href="/css/pair.css">
+</head>
+
+<body>
+    <header class="pair-top">
+        <a href="/admin" class="sora-wordmark" aria-label="Sora library home">Sora</a>
+        <span class="sora-eyebrow">Pair a frame</span>
+    </header>
+
+    <main class="pair-main">
+        <!-- Checking the code -->
+        <section class="pair-state" id="stateLoading">
+            <div class="pair-spinner" aria-hidden="true"></div>
+            <p class="pair-note">Checking the code</p>
+        </section>
+
+        <!-- The code is gone: expired, used, or mistyped -->
+        <section class="pair-state hidden" id="stateExpired">
+            <span class="material-icons pair-big-icon">timer_off</span>
+            <h1 class="sora-display">This code has <em>expired</em></h1>
+            <p class="pair-note">The frame shows a fresh code every ten minutes. Scan the one on its screen now.</p>
+            <a class="pair-link" href="/access-accounts"><span class="material-icons">key</span>Go to Access</a>
+        </section>
+
+        <!-- Approve -->
+        <form class="pair-state hidden" id="pairForm" novalidate>
+            <p class="sora-eyebrow">New frame</p>
+            <h1 class="sora-display">Show photos on <em>this frame</em></h1>
+
+            <div class="code-check">
+                <span class="code-check-label">Code on the frame</span>
+                <span class="code-check-code" id="codeShown">······</span>
+                <span class="code-check-hint"><span class="material-icons">visibility</span>Check it matches the frame's screen</span>
+            </div>
+
+            <label class="field">
+                <span class="field-label">Frame name</span>
+                <input type="text" id="frameName" maxlength="60" placeholder="Kitchen frame" autocomplete="off" required>
+            </label>
+
+            <fieldset class="field">
+                <legend class="field-label">Which photos</legend>
+                <div class="choice-list" id="accountList"></div>
+
+                <div class="new-account hidden" id="newAccount">
+                    <p class="pair-note">Pick the folders this frame plays. Leave all unticked to play every folder.</p>
+                    <div class="folder-list" id="folderList"></div>
+                </div>
+            </fieldset>
+
+            <p class="pair-error hidden" id="pairError" role="alert"></p>
+
+            <button type="submit" class="pair-submit" id="pairButton">
+                <span class="material-icons">link</span>
+                <span>Pair this frame</span>
+            </button>
+        </form>
+
+        <!-- Done -->
+        <section class="pair-state hidden" id="stateDone">
+            <span class="material-icons pair-big-icon is-done">check_circle</span>
+            <h1 class="sora-display"><span id="doneName">The frame</span> is <em>paired</em></h1>
+            <p class="pair-note">It starts the slideshow in a moment and stays signed in. You can remove it any time from Access.</p>
+            <a class="pair-link" href="/access-accounts"><span class="material-icons">key</span>Go to Access</a>
+        </section>
+    </main>
+
+<script src="/js/pair.js"></script>
+</body>
+
+</html>

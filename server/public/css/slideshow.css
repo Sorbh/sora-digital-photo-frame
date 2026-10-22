@@ -593,21 +593,138 @@ body.note-showing .photo-caption {
 }
 
 .auth-panel {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: auto auto;
+    grid-template-areas:
+        "intro intro"
+        "pin pair";
     align-items: center;
+    align-content: center;
     justify-content: center;
+    gap: 2.25rem clamp(3rem, 8vw, 7rem);
     padding: 2rem 0;
+}
+
+.auth-intro {
+    grid-area: intro;
     text-align: center;
 }
 
-.auth-panel > * {
+.auth-pin {
+    grid-area: pin;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.auth-intro > *,
+.auth-pin,
+.auth-pair {
     animation: rise-in 0.9s var(--ease-out) both;
 }
 
-.auth-panel > :nth-child(2) { animation-delay: 0.06s; }
-.auth-panel > :nth-child(3) { animation-delay: 0.12s; }
-.auth-panel > :nth-child(4) { animation-delay: 0.18s; }
+.auth-intro > :nth-child(2) { animation-delay: 0.06s; }
+.auth-intro > :nth-child(3) { animation-delay: 0.12s; }
+.auth-pin { animation-delay: 0.18s; }
+.auth-pair { animation-delay: 0.26s; }
+
+/* Pair by QR code: for frames with no keyboard or touch */
+.auth-pair {
+    grid-area: pair;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.25rem;
+    width: min(100%, 290px);
+    padding: 1.5rem 1.5rem 1.25rem;
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    border-radius: var(--shape-lg, 28px);
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    text-align: center;
+}
+
+.pair-qr {
+    display: grid;
+    place-items: center;
+    width: 212px;
+    aspect-ratio: 1;
+    padding: 12px;
+    border-radius: var(--shape-md, 18px);
+    background: #fff;
+    box-shadow: 0 18px 40px -18px rgba(40, 0, 20, 0.55);
+    transition: opacity 0.3s ease, filter 0.3s ease;
+}
+
+.pair-qr svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+.pair-qr:empty::before {
+    content: '';
+    width: 36px;
+    height: 36px;
+    border: 3px solid rgba(42, 16, 32, 0.15);
+    border-top-color: #d6336a;
+    border-radius: 50%;
+    animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.auth-pair.is-approved .pair-qr {
+    opacity: 0.35;
+    filter: blur(2px);
+}
+
+.pair-text {
+    display: grid;
+    gap: 6px;
+}
+
+.pair-text p {
+    margin: 0;
+}
+
+.pair-lede {
+    font-size: 0.975rem;
+    line-height: 1.4;
+    color: #fff4ef;
+}
+
+.pair-code-label {
+    margin-top: 6px !important;
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.pair-code-label span {
+    color: #fff4ef;
+    word-break: break-all;
+}
+
+.pair-code {
+    font-family: var(--font-mono);
+    font-size: 1.6rem;
+    font-weight: 500;
+    letter-spacing: 0.22em;
+    color: #ffd98f;
+}
+
+.pair-status {
+    min-height: 1.2em;
+    font-size: 0.8125rem;
+    color: rgba(255, 255, 255, 0.82);
+}
+
+.auth-pair.is-error .pair-status {
+    color: #ffd98f;
+}
 
 @keyframes rise-in {
     from { opacity: 0; transform: translateY(14px); }
@@ -625,7 +742,7 @@ body.note-showing .photo-caption {
 }
 
 .auth-sub {
-    margin: 0 0 2.25rem;
+    margin: 0;
     font-size: 1rem;
     color: rgba(255, 255, 255, 0.82);
 }
@@ -876,6 +993,16 @@ body.note-showing .photo-caption {
 }
 
 @media (max-height: 720px) {
+    .auth-panel {
+        row-gap: 1.5rem;
+        padding: 0.5rem 0;
+    }
+
+    .auth-title {
+        margin: 6px 0;
+        font-size: clamp(2.75rem, 7vw, 4rem);
+    }
+
     .keypad {
         grid-template-columns: repeat(3, 60px);
         gap: 10px 20px;
@@ -887,7 +1014,93 @@ body.note-showing .photo-caption {
         font-size: 1.65rem;
     }
 
+    .pair-qr {
+        width: 176px;
+    }
+}
+
+/* Small frames: one column that scales to the width, with the QR card
+   above the keypad so it's quick to find when setting a frame up */
+@media (max-width: 760px) {
+    .auth-overlay {
+        padding: 1rem;
+    }
+
+    .auth-panel {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-areas:
+            "intro"
+            "pair"
+            "pin";
+        justify-items: center;
+        gap: 1.5rem;
+        padding: 1rem 0 1.5rem;
+    }
+
+    .auth-pin {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .auth-pair {
+        flex-direction: row;
+        gap: 1rem;
+        width: 100%;
+        max-width: 380px;
+        padding: 0.875rem;
+        text-align: left;
+        animation-delay: 0s;
+    }
+
+    .pair-qr {
+        flex: none;
+        width: clamp(104px, 34vw, 132px);
+        padding: 6px;
+    }
+
+    .pair-text {
+        min-width: 0;
+    }
+
+    .pair-lede {
+        font-size: 0.9375rem;
+    }
+
+    .pair-code {
+        font-size: 1.2rem;
+    }
+
+    #pairUrl {
+        display: block;
+        white-space: nowrap;
+    }
+
+    .auth-title {
+        margin: 8px 0 6px;
+        font-size: clamp(2.5rem, 13vw, 3.5rem);
+    }
+
     .auth-sub {
-        margin-bottom: 1.5rem;
+        font-size: 0.9375rem;
+    }
+
+    .pin-cells {
+        gap: clamp(5px, 2vw, 10px);
+    }
+
+    .pin-cell {
+        width: clamp(34px, 11vw, 46px);
+        height: clamp(44px, 14vw, 58px);
+    }
+
+    .keypad {
+        grid-template-columns: repeat(3, clamp(54px, 17vw, 68px));
+        gap: 10px clamp(14px, 6vw, 22px);
+    }
+
+    .key {
+        width: clamp(54px, 17vw, 68px);
+        height: clamp(54px, 17vw, 68px);
+        font-size: 1.6rem;
     }
 }

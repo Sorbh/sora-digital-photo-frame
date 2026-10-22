@@ -1,3 +1,6 @@
+const DEVICE_TOKEN_KEY = 'photoframe_device_token';
+const RENEW_MS = 6 * 60 * 60 * 1000; // sessions last a day; paired frames sign in again well before
+
 class AuthenticationManager {
     constructor() {
         this.isAuthenticated = false;
@@ -8,13 +11,149 @@ class AuthenticationManager {
         this.authErrorAlert = document.getElementById('authErrorAlert');
         this.authErrorMessage = document.getElementById('authErrorMessage');
         this.authLoading = document.getElementById('authLoading');
+        this.pairCard = document.getElementById('pairCard');
+        this.pairQr = document.getElementById('pairQr');
+        this.pairCode = document.getElementById('pairCode');
+        this.pairUrl = document.getElementById('pairUrl');
+        this.pairStatus = document.getElementById('pairStatus');
 
         this.init();
     }
 
     init() {
         this.bindEvents();
+        // Frames with no keyboard can open /slideshow?pin=123456 and sign in by themselves
+        const urlPin = new URLSearchParams(location.search).get('pin');
+        const deviceToken = localStorage.getItem(DEVICE_TOKEN_KEY);
+        if (urlPin) {
+            this.signInFromUrl(urlPin.trim());
+        } else if (deviceToken) {
+            this.signInAsDevice(deviceToken);
+        } else {
+            this.checkExistingSession();
+        }
+    }
+
+    // Keep a frame that is left running signed in to its account
+    keepSignedIn(signIn) {
+        clearInterval(this.renewTimer);
+        this.renewTimer = setInterval(() => signIn().catch(() => {}), RENEW_MS);
+    }
+
+    // A frame paired by QR code signs in with the token it was given
+    async signInAsDevice(token) {
+        try {
+            const data = await this.requestDevice(token);
+            if (data.success) {
+                this.handleAuthSuccess(data.account);
+                this.keepSignedIn(() => this.requestDevice(token));
+                return;
+            }
+            if (data.code === 'DEVICE_UNKNOWN') localStorage.removeItem(DEVICE_TOKEN_KEY);
+        } catch (error) {
+            console.error('Signing in as a paired frame failed:', error);
+        }
         this.checkExistingSession();
+    }
+
+    async requestDevice(token) {
+        const response = await fetch('/api/auth/device', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token })
+        });
+        return response.json();
+    }
+
+    // Show a QR code an admin can scan to sign this frame in, and wait for them
+    async startPairing() {
+        if (!this.pairCard || this.pairing) return;
+        this.pairing = { starting: true };
+        this.pairCard.classList.remove('is-approved', 'is-error');
+        this.pairStatus.textContent = '';
+        try {
+            const response = await fetch('/api/pair/start', { method: 'POST' });
+            const data = await response.json();
+            if (!this.pairing) return; // signed in meanwhile
+            if (!data.success) throw new Error(data.error || 'Could not get a code');
+
+            this.pairing = { code: data.code, secret: data.secret, expiresAt: data.expiresAt };
+            this.pairQr.innerHTML = data.qr; // an SVG drawn by our server
+            this.pairCode.textContent = `${data.code.slice(0, 3)}-${data.code.slice(3)}`;
+            this.pairUrl.textContent = `${new URL(data.url).host}/pair`;
+            this.pairTimer = setTimeout(() => this.checkPairing(), 2000);
+        } catch (error) {
+            console.error('Pairing could not start:', error);
+            this.pairing = null;
+            this.pairQr.innerHTML = '';
+            this.pairCode.textContent = '······';
+            this.pairCard.classList.add('is-error');
+            this.pairStatus.textContent = 'No code right now. Trying again in a minute.';
+            this.pairTimer = setTimeout(() => this.startPairing(), 60 * 1000);
+        }
+    }
+
+    async checkPairing() {
+        const pairing = this.pairing;
+        if (!pairing?.code) return;
+        if (Date.now() > pairing.expiresAt) return this.restartPairing();
+
+        let data;
+        try {
+            const query = new URLSearchParams({ code: pairing.code, secret: pairing.secret });
+            data = await (await fetch(`/api/pair/status?${query}`)).json();
+        } catch (error) {
+            data = null; // offline for a moment: keep waiting
+        }
+        if (this.pairing !== pairing) return;
+
+        if (data?.status === 'approved') {
+            localStorage.setItem(DEVICE_TOKEN_KEY, data.token);
+            this.pairCard.classList.add('is-approved');
+            this.pairStatus.textContent = `Paired as ${data.device.name}`;
+            this.keepSignedIn(() => this.requestDevice(data.token));
+            setTimeout(() => this.handleAuthSuccess(data.account), 700);
+        } else if (data?.status === 'expired') {
+            this.restartPairing();
+        } else {
+            this.pairTimer = setTimeout(() => this.checkPairing(), data ? 2000 : 5000);
+        }
+    }
+
+    restartPairing() {
+        this.stopPairing();
+        this.startPairing();
+    }
+
+    stopPairing() {
+        clearTimeout(this.pairTimer);
+        this.pairing = null;
+    }
+
+    async signInFromUrl(pin) {
+        try {
+            const data = await this.requestPin(pin);
+            if (!data.success) {
+                this.showAuthOverlay();
+                this.handleAuthError(data.error, data.code);
+                return;
+            }
+            this.handleAuthSuccess(data.account);
+            this.keepSignedIn(() => this.requestPin(pin));
+        } catch (error) {
+            console.error('Sign-in from the address failed:', error);
+            this.showAuthOverlay();
+            this.showError('Connection error. Please try again.');
+        }
+    }
+
+    async requestPin(pin) {
+        const response = await fetch('/api/auth/pin', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ pin })
+        });
+        return response.json();
     }
 
     bindEvents() {
@@ -108,13 +247,7 @@ class AuthenticationManager {
         this.setLoading(true);
 
         try {
-            const response = await fetch('/api/auth/pin', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ pin })
-            });
-
-            const data = await response.json();
+            const data = await this.requestPin(pin);
 
             if (data.success) {
                 this.handleAuthSuccess(data.account);
@@ -168,6 +301,8 @@ class AuthenticationManager {
         } finally {
             this.isAuthenticated = false;
             this.userAccount = null;
+            clearInterval(this.renewTimer);
+            localStorage.removeItem(DEVICE_TOKEN_KEY); // signing out unpairs this browser
             sessionStorage.removeItem('authenticated');
             sessionStorage.removeItem('accountName');
             this.showAuthOverlay();
@@ -182,10 +317,12 @@ class AuthenticationManager {
     showAuthOverlay() {
         this.authOverlay.classList.remove('hidden');
         setTimeout(() => this.focusPin(), 100);
+        this.startPairing();
     }
 
     hideAuthOverlay() {
         this.authOverlay.classList.add('hidden');
+        this.stopPairing();
     }
 
     setLoading(loading) {

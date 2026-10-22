@@ -166,6 +166,51 @@ body {
     font-weight: 600;
 }
 
+/* Frames paired by QR code */
+.paired-frames {
+    display: grid;
+    gap: 6px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border, var(--paper-sunk));
+}
+
+.paired-label {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+}
+
+.paired-frame {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.paired-frame > .material-symbols-outlined {
+    font-size: 20px;
+    color: var(--berry);
+}
+
+.paired-text {
+    display: grid;
+    flex: 1;
+    min-width: 0;
+}
+
+.paired-name {
+    overflow: hidden;
+    font-weight: 600;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.paired-seen {
+    font-size: 0.75rem;
+    color: var(--muted-foreground);
+}
+
 .folder-tags {
     display: flex;
     flex-wrap: wrap;

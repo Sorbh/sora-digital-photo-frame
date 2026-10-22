@@ -1,6 +1,7 @@
 class AccessAccountsManager {
     constructor() {
         this.accounts = [];
+        this.devices = []; // frames paired by QR code
         this.folders = [];
         this.currentEditingAccount = null;
         this.init();
@@ -59,11 +60,15 @@ class AccessAccountsManager {
     async loadAccounts() {
         try {
             this.showLoading();
-            const response = await fetch('/api/access-accounts');
+            const [response, devices] = await Promise.all([
+                fetch('/api/access-accounts'),
+                fetch('/api/admin/devices').then(r => r.json()).catch(() => ({}))
+            ]);
             const data = await response.json();
             
             if (response.ok) {
                 this.accounts = data.accounts || [];
+                this.devices = devices.devices || [];
                 this.renderAccounts();
             } else {
                 this.showToast('Failed to load accounts', 'error');
@@ -182,11 +187,56 @@ class AccessAccountsManager {
                 <div class="folder-tags">
                     ${folderTags}
                 </div>
+                ${this.renderDevices(account)}
             </article>
         `;
     }
 
+    // Frames paired to this account by scanning their QR code
+    renderDevices(account) {
+        const esc = (value) => this.escapeHtml(value);
+        const devices = this.devices.filter(device => device.accountId === account.id);
+        if (devices.length === 0) return '';
+        const seen = (device) => device.lastSeen
+            ? `Seen ${new Date(device.lastSeen).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`
+            : 'Paired, not seen yet';
+        return `
+            <div class="paired-frames">
+                <span class="paired-label">Paired frames</span>
+                ${devices.map(device => `
+                    <div class="paired-frame">
+                        <span class="material-symbols-outlined">tv</span>
+                        <span class="paired-text">
+                            <span class="paired-name">${esc(device.name)}</span>
+                            <span class="paired-seen">${esc(seen(device))}</span>
+                        </span>
+                        <button class="tb-btn icon remove-device" data-danger title="Remove ${esc(device.name)}" aria-label="Remove ${esc(device.name)}" data-device-id="${esc(device.id)}" data-device-name="${esc(device.name)}">
+                            <span class="material-symbols-outlined">link_off</span>
+                        </button>
+                    </div>`).join('')}
+            </div>
+        `;
+    }
+
+    async removeDevice(id, name) {
+        if (!confirm(`Remove ${name}? It goes back to its sign-in screen and needs pairing again.`)) return;
+        try {
+            const response = await fetch(`/api/admin/devices/${encodeURIComponent(id)}`, { method: 'DELETE' });
+            if (!response.ok) throw new Error('Remove failed');
+            this.devices = this.devices.filter(device => device.id !== id);
+            this.renderAccounts();
+            this.showToast(`${name} removed`, 'success');
+        } catch (error) {
+            console.error('Error removing frame:', error);
+            this.showToast('Could not remove the frame', 'error');
+        }
+    }
+
     bindAccountActions() {
+        document.querySelectorAll('.remove-device').forEach(btn => {
+            btn.addEventListener('click', () => this.removeDevice(btn.dataset.deviceId, btn.dataset.deviceName));
+        });
+
         // PINs stay masked until asked for
         document.querySelectorAll('.pin-reveal').forEach(btn => {
             btn.addEventListener('click', () => {

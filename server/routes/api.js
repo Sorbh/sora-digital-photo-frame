@@ -6,6 +6,7 @@ const accessAccountController = require('../controllers/accessAccountController'
 const googlePhotosController = require('../controllers/googlePhotosController');
 const noteController = require('../controllers/noteController');
 const snapController = require('../controllers/snapController');
+const pairingController = require('../controllers/pairingController');
 const upload = require('../middleware/upload');
 const { requireAuth } = require('../middleware/auth');
 
@@ -69,6 +70,15 @@ router.get('/features', requireAuth, (req, res) => {
 router.post('/auth/pin', accessAccountController.authenticateWithPin.bind(accessAccountController));
 router.get('/auth/session', accessAccountController.getSession.bind(accessAccountController));
 router.delete('/auth/session', accessAccountController.clearSession.bind(accessAccountController));
+
+// Pairing a frame by QR code: the frame starts and waits, an admin approves
+router.post('/pair/start', pairingController.start.bind(pairingController));
+router.get('/pair/status', pairingController.status.bind(pairingController));
+router.post('/auth/device', pairingController.signIn.bind(pairingController));
+router.get('/admin/pair/:code', requireAuth, pairingController.show.bind(pairingController));
+router.post('/admin/pair/:code/approve', requireAuth, pairingController.approve.bind(pairingController));
+router.get('/admin/devices', requireAuth, pairingController.listDevices.bind(pairingController));
+router.delete('/admin/devices/:id', requireAuth, pairingController.removeDevice.bind(pairingController));
 
 // Google Photos routes (admin only) - conditionally enabled
 if (process.env.ENABLE_GOOGLE_PHOTOS === 'true') {

@@ -34,9 +34,13 @@
         </header>
 
         <main class="auth-panel">
-            <p class="sora-eyebrow">Private gallery</p>
-            <h1 class="auth-title sora-display">Welcome <em>home</em></h1>
-            <p class="auth-sub">Enter your PIN to start the slideshow.</p>
+            <header class="auth-intro">
+                <p class="sora-eyebrow">Private gallery</p>
+                <h1 class="auth-title sora-display">Welcome <em>home</em></h1>
+                <p class="auth-sub">Enter your PIN, or scan the code to set up this frame.</p>
+            </header>
+
+            <section class="auth-pin">
 
             <form id="pinForm" novalidate>
                 <div class="pin-field">
@@ -79,6 +83,18 @@
                     </button>
                 </div>
             </form>
+            </section>
+
+            <aside class="auth-pair" id="pairCard" aria-labelledby="pairTitle">
+                <div class="pair-qr" id="pairQr" role="img" aria-label="QR code to set up this frame"></div>
+                <div class="pair-text">
+                    <p class="sora-eyebrow" id="pairTitle">No keyboard?</p>
+                    <p class="pair-lede">Scan with your phone to set up this frame.</p>
+                    <p class="pair-code-label">Or open <span id="pairUrl">/pair</span> and check the code</p>
+                    <p class="pair-code" id="pairCode" aria-live="polite">······</p>
+                    <p class="pair-status" id="pairStatus" aria-live="polite"></p>
+                </div>
+            </aside>
         </main>
 
         <footer class="auth-foot">

@@ -46,9 +46,11 @@ RUN npm ci --only=production --omit=dev && \
 
 # Copy application code from builder stage
 COPY --from=builder --chown=photoframe:nodejs /app/*.js ./
+COPY --from=builder --chown=photoframe:nodejs /app/config ./config
 COPY --from=builder --chown=photoframe:nodejs /app/controllers ./controllers
 COPY --from=builder --chown=photoframe:nodejs /app/middleware ./middleware
 COPY --from=builder --chown=photoframe:nodejs /app/routes ./routes
+COPY --from=builder --chown=photoframe:nodejs /app/services ./services
 COPY --from=builder --chown=photoframe:nodejs /app/utils ./utils
 COPY --from=builder --chown=photoframe:nodejs /app/public ./public
 
@@ -64,7 +66,7 @@ EXPOSE 3000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD node -e "require('http').request({port:process.env.PORT||3000,path:'/api/health'}, (res) => process.exit(res.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1)).end()"
+    CMD node -e "require('http').request({port:process.env.PORT||3000,path:'/api/health'}, (res) => process.exit(res.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1)).end()"
 
 # Use dumb-init for proper signal handling
 ENTRYPOINT ["dumb-init", "--"]

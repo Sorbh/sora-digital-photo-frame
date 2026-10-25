@@ -135,8 +135,14 @@ const getAuthStatus = (req, res) => {
   });
 };
 
+// Someone allowed to watch the slideshow: the admin, a PIN account or a paired frame
+const sessionRequireViewer = (req, res, next) => {
+  if (req.session && (req.session.authenticated || req.session.accessAccount)) return next();
+  return res.status(401).json({ message: 'Authentication required', code: 'AUTH_REQUIRED' });
+};
+
 // A hosted setup can swap in its own sign-in, e.g. Google accounts.
-// provider: { requireAuth(req, res, next), requireGuest(req, res, next) }, both optional.
+// provider: { requireAuth, requireGuest, requireViewer } middleware, all optional.
 let provider = {};
 
 const setAuthProvider = (next) => {
@@ -145,10 +151,12 @@ const setAuthProvider = (next) => {
 
 const requireAuth = (req, res, next) => (provider.requireAuth || sessionRequireAuth)(req, res, next);
 const requireGuest = (req, res, next) => (provider.requireGuest || sessionRequireGuest)(req, res, next);
+const requireViewer = (req, res, next) => (provider.requireViewer || sessionRequireViewer)(req, res, next);
 
 module.exports = {
   requireAuth,
   requireGuest,
+  requireViewer,
   setAuthProvider,
   login,
   logout,

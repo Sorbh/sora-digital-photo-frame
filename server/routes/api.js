@@ -7,8 +7,9 @@ const googlePhotosController = require('../controllers/googlePhotosController');
 const noteController = require('../controllers/noteController');
 const snapController = require('../controllers/snapController');
 const pairingController = require('../controllers/pairingController');
+const frameKeyController = require('../controllers/frameKeyController');
 const upload = require('../middleware/upload');
-const { requireAuth } = require('../middleware/auth');
+const { requireAuth, requireViewer } = require('../middleware/auth');
 const { keepTenant } = require('../context');
 
 // Health check endpoint
@@ -71,6 +72,9 @@ router.get('/features', requireAuth, (req, res) => {
 router.post('/auth/pin', accessAccountController.authenticateWithPin.bind(accessAccountController));
 router.get('/auth/session', accessAccountController.getSession.bind(accessAccountController));
 router.delete('/auth/session', accessAccountController.clearSession.bind(accessAccountController));
+
+// Keys for frames that decrypt photos themselves (remote encrypted storage only)
+router.get('/frame/keys', requireViewer, frameKeyController.get.bind(frameKeyController));
 
 // Pairing a frame by QR code: the frame starts and waits, an admin approves
 router.post('/pair/start', pairingController.start.bind(pairingController));

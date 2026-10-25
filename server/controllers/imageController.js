@@ -150,6 +150,8 @@ class ImageController {
       const relativePath = getLibrary().photoUrl(toAdminPath(randomImage.path));
       const info = await this.describe(randomImage);
       const fullUrl = `${req.protocol}://${req.get('host')}${relativePath}`;
+      // Remote encrypted storage: the frame may fetch the stored bytes and decrypt them itself
+      const rawUrl = getLibrary().rawUrl?.(toAdminPath(randomImage.path)) || null;
       
       res.json({
         success: true,
@@ -160,6 +162,7 @@ class ImageController {
           path: relativePath,
           folder: path.dirname(randomImage.relativePath),
           url: fullUrl,
+          ...(rawUrl && { rawUrl, mimeType: `image/${this.formatFor(randomImage.path)}` }),
           thumbnail: `${req.protocol}://${req.get('host')}/api/images/${encodeURIComponent(randomImage.id)}/thumbnail`,
           order,
           info,

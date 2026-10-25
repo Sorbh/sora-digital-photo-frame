@@ -40,8 +40,15 @@ class EncryptedPhotoLibrary extends PhotoLibrary {
   // The app serves decrypted photos at the same /uploads URLs
   photoUrl(adminPath) { return this.inner.photoUrl(adminPath); }
 
-  // Where the stored (encrypted) bytes can be fetched, for browser-side decryption
-  rawUrl(adminPath) { return this.inner.rawUrl ? this.inner.rawUrl(adminPath) : null; }
+  // Where the stored (encrypted) bytes can be fetched, for browser-side decryption.
+  // Only remote storage offers this; local disk is always decrypted on the server,
+  // so its key never leaves the server.
+  rawUrl(adminPath) { return this.browserDecryption ? this.inner.rawUrl(adminPath) : null; }
+
+  get browserDecryption() { return typeof this.inner.rawUrl === 'function'; }
+
+  // Key for a frame decrypting rawUrl files (the provider limits it to the current tenant)
+  getKey(id) { return this.keys.getKey(id); }
 
   movePhoto(adminPath, toFolderAdminPath) { return this.inner.movePhoto(adminPath, toFolderAdminPath); }
   deletePhoto(adminPath) { return this.inner.deletePhoto(adminPath); }

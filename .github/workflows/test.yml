@@ -12,9 +12,6 @@ jobs:
     defaults:
       run:
         working-directory: server
-    env:
-      # No reverse-geocoding calls to OpenStreetMap from CI
-      PHOTO_PLACES: 'off'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

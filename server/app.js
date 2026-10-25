@@ -7,6 +7,10 @@ const session = require('express-session');
 const logger = require('./middleware/logger');
 const errorHandler = require('./middleware/errorHandler');
 const webpFallback = require('./middleware/webpFallback');
+const media = require('./middleware/media');
+const EncryptedPhotoLibrary = require('./library/EncryptedPhotoLibrary');
+const EncryptedDataStore = require('./store/EncryptedDataStore');
+const { keysFromEnv } = require('./crypto/keys');
 const routes = require('./routes');
 const { UPLOADS_DIR } = require('./config/paths');
 const LocalPhotoLibrary = require('./library/LocalPhotoLibrary');
@@ -28,19 +32,26 @@ const { setAuthProvider } = require('./middleware/auth');
  *   resolveTenant async function(req) -> { id, plan } or null (default: one 'default' tenant)
  *   auth          { requireAuth, requireGuest } middleware (default: admin password session)
  *   quota         { canAdd(bytes) -> { ok, message } } for the current tenant (default: unlimited)
+ *   keys          key provider ({ currentKey, getKey }, see crypto/keys.js) to encrypt photos
+ *                 and data at rest (default: PHOTO_ENCRYPTION_KEY, or no encryption)
  *   beforeRoutes  function(app) run after core middleware, before core routes,
  *                 e.g. to mount extra sign-in routes
  */
-function createApp({ sessionStore, beforeRoutes, library, dataStore, resolveTenant, auth, quota } = {}) {
+function createApp({ sessionStore, beforeRoutes, library, dataStore, resolveTenant, auth, quota, keys = keysFromEnv() } = {}) {
   const sessionSecret = process.env.SESSION_SECRET;
   if (!sessionSecret) {
     throw new Error('SESSION_SECRET environment variable not set');
   }
 
   const app = express();
-  const photoLibrary = library || new LocalPhotoLibrary();
+  let photoLibrary = library || new LocalPhotoLibrary();
+  let store = dataStore || new LocalDataStore();
+  if (keys) {
+    photoLibrary = new EncryptedPhotoLibrary(photoLibrary, keys);
+    store = new EncryptedDataStore(store, keys);
+  }
   setLibrary(photoLibrary);
-  setDataStore(dataStore || new LocalDataStore());
+  setDataStore(store);
   setAuthProvider(auth);
   setQuota(quota);
 
@@ -71,6 +82,9 @@ function createApp({ sessionStore, beforeRoutes, library, dataStore, resolveTena
   // Static files
   if (photoLibrary.staticDir) {
     app.use('/uploads', webpFallback(photoLibrary.staticDir), express.static(photoLibrary.staticDir));
+  } else {
+    // Encrypted or remote storage: serve through the library (decrypts on the server)
+    app.use('/uploads', media());
   }
   app.use('/js', express.static(path.join(__dirname, 'public/js')));
   app.use('/admin', express.static(path.join(__dirname, 'public')));

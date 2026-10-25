@@ -6,6 +6,7 @@ const sharp = require('sharp');
 const { UPLOADS_DIR, CACHE_DIR: CACHE_ROOT } = require('../config/paths');
 const { toAdminPath } = require('../utils/safePath');
 const { getLibrary } = require('../library');
+const { jpegCopy, acceptsWebp } = require('../middleware/webpFallback');
 const { currentTenant, DEFAULT_TENANT } = require('../context');
 
 const CACHE_DIR = path.join(CACHE_ROOT, 'thumbs');
@@ -131,8 +132,15 @@ class ThumbnailService {
     res.set('Cache-Control', versioned
       ? 'public, max-age=604800, immutable'
       : 'public, max-age=300, stale-while-revalidate=86400');
-    res.type('image/webp');
-    res.sendFile(thumbPath);
+    res.vary('Accept');
+    if (acceptsWebp(res.req)) {
+      res.type('image/webp');
+      return res.sendFile(thumbPath);
+    }
+    // Old frames without WebP get a JPEG copy
+    return jpegCopy(thumbPath)
+      .then(copy => res.type('jpeg').sendFile(copy))
+      .catch(() => res.status(500).json({ message: 'Server error' }));
   }
 }
 

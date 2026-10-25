@@ -6,6 +6,7 @@ const session = require('express-session');
 
 const logger = require('./middleware/logger');
 const errorHandler = require('./middleware/errorHandler');
+const webpFallback = require('./middleware/webpFallback');
 const routes = require('./routes');
 const { UPLOADS_DIR } = require('./config/paths');
 const LocalPhotoLibrary = require('./library/LocalPhotoLibrary');
@@ -68,7 +69,9 @@ function createApp({ sessionStore, beforeRoutes, library, dataStore, resolveTena
   app.use(tenantMiddleware(resolveTenant));
 
   // Static files
-  if (photoLibrary.staticDir) app.use('/uploads', express.static(photoLibrary.staticDir));
+  if (photoLibrary.staticDir) {
+    app.use('/uploads', webpFallback(photoLibrary.staticDir), express.static(photoLibrary.staticDir));
+  }
   app.use('/js', express.static(path.join(__dirname, 'public/js')));
   app.use('/admin', express.static(path.join(__dirname, 'public')));
   // Serve CSS and JS files from root for access-accounts page

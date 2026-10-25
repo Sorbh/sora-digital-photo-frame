@@ -6,6 +6,7 @@ const sharp = require('sharp');
 const { UPLOADS_DIR, CACHE_DIR: CACHE_ROOT } = require('../config/paths');
 const { toAdminPath } = require('../utils/safePath');
 const { getLibrary } = require('../library');
+const { currentTenant, DEFAULT_TENANT } = require('../context');
 
 const CACHE_DIR = path.join(CACHE_ROOT, 'thumbs');
 const IMAGE_PATTERN = /\.(jpg|jpeg|png|gif|webp)$/i;
@@ -37,8 +38,11 @@ class ThumbnailService {
   }
 
   cachePathFor(sourcePath) {
+    // Tenants share admin paths ("uploads/Family/..."), so their thumbnails must not
+    const { id } = currentTenant();
+    const scope = id === DEFAULT_TENANT.id ? '' : `${id}/`;
     const key = crypto.createHash('sha1')
-      .update(`${path.relative(UPLOADS_DIR, sourcePath)}:${THUMB_SIZE}`)
+      .update(`${scope}${path.relative(UPLOADS_DIR, sourcePath)}:${THUMB_SIZE}`)
       .digest('hex');
     return path.join(CACHE_DIR, `${key}.webp`);
   }

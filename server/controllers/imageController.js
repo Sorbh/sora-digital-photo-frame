@@ -1,6 +1,8 @@
 const path = require('path');
 const { UPLOADS_DIR } = require('../config/paths');
 const { getLibrary } = require('../library');
+const { currentTenant } = require('../context');
+const { assertCanAdd } = require('../services/quotaService');
 const sharp = require('sharp');
 const thumbnails = require('../services/thumbnailService');
 const snaps = require('../services/snapService');
@@ -12,12 +14,27 @@ class ImageController {
   constructor() {
     this.uploadsDir = UPLOADS_DIR;
     // Track recently shown images to prevent repeats
-    this.recentlyShown = new Set();
+    // Per-tenant state (recently shown, image list cache); see the accessors below
+    this.states = new Map();
     this.maxRecentCount = parseInt(process.env.MAX_RECENT_IMAGES) || 10; // Number of recent images to avoid
-    this.imageCache = null;
-    this.cacheTimestamp = null;
     this.cacheExpiry = parseInt(process.env.IMAGE_CACHE_EXPIRY) || 60000; // Cache for 1 minute
   }
+
+  // Each tenant gets its own anti-repeat history and image list cache
+  state() {
+    const { id } = currentTenant();
+    if (!this.states.has(id)) {
+      this.states.set(id, { recentlyShown: new Set(), imageCache: null, cacheTimestamp: null });
+    }
+    return this.states.get(id);
+  }
+
+  get recentlyShown() { return this.state().recentlyShown; }
+  set recentlyShown(value) { this.state().recentlyShown = value; }
+  get imageCache() { return this.state().imageCache; }
+  set imageCache(value) { this.state().imageCache = value; }
+  get cacheTimestamp() { return this.state().cacheTimestamp; }
+  set cacheTimestamp(value) { this.state().cacheTimestamp = value; }
 
   // Get all images recursively with caching
   async getAllImages(useCache = true) {
@@ -231,10 +248,10 @@ class ImageController {
 
   // Upload images
   async uploadImages(req, res) {
+    const processedFiles = [];
     try {
       const uploadedFiles = req.files;
       const targetDir = resolveAdminPath(req.body.path || 'uploads', { allowRoot: true });
-      const processedFiles = [];
 
       if (!targetDir) {
         return res.status(400).json({ message: 'Invalid upload folder' });
@@ -252,6 +269,7 @@ class ImageController {
           )
           .jpeg({ quality: parseInt(process.env.IMAGE_QUALITY) || 85 })
           .toBuffer();
+        await assertCanAdd(buffer.length);
         const added = await getLibrary().addPhoto(toAdminPath(targetDir), {
           buffer, originalName: filename, contentType: file.mimetype
         });
@@ -266,6 +284,11 @@ class ImageController {
         files: processedFiles
       });
     } catch (error) {
+      if (error.code === 'QUOTA_EXCEEDED') {
+        // Photos before the one that hit the limit are kept
+        this.clearImageCache();
+        return res.status(413).json({ message: error.message, code: error.code, files: processedFiles });
+      }
       console.error('Error uploading images:', error);
       res.status(500).json({ message: 'Server error' });
     }

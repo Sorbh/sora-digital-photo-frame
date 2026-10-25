@@ -9,6 +9,7 @@ const snapController = require('../controllers/snapController');
 const pairingController = require('../controllers/pairingController');
 const upload = require('../middleware/upload');
 const { requireAuth } = require('../middleware/auth');
+const { keepTenant } = require('../context');
 
 // Health check endpoint
 router.get('/health', (req, res) => {
@@ -28,7 +29,7 @@ router.get('/folders/:folderPath(*)/thumbnail', folderController.getFolderThumbn
 router.get('/folders/:folderPath(*)', folderController.getFolderStructure.bind(folderController));
 
 // Protected routes (authentication required)
-router.post('/upload', requireAuth, upload.array('images'), imageController.uploadImages.bind(imageController));
+router.post('/upload', requireAuth, upload.array('images'), keepTenant, imageController.uploadImages.bind(imageController));
 router.delete('/images', requireAuth, imageController.deleteImage.bind(imageController));
 router.delete('/images/batch', requireAuth, imageController.batchDeleteImages.bind(imageController));
 router.post('/images/rotate', requireAuth, imageController.rotateImage.bind(imageController));

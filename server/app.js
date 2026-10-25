@@ -12,6 +12,9 @@ const LocalPhotoLibrary = require('./library/LocalPhotoLibrary');
 const { setLibrary } = require('./library');
 const LocalDataStore = require('./store/LocalDataStore');
 const { setDataStore } = require('./store');
+const { tenantMiddleware } = require('./context');
+const { setQuota } = require('./services/quotaService');
+const { setAuthProvider } = require('./middleware/auth');
 
 /**
  * Build the photo frame app. The self-hosted server calls this with no
@@ -21,10 +24,13 @@ const { setDataStore } = require('./store');
  *   sessionStore  express-session store (default: in-memory)
  *   library       photo storage implementation (default: local uploads folder)
  *   dataStore     JSON document storage (default: local data, cache and folder files)
+ *   resolveTenant async function(req) -> { id, plan } or null (default: one 'default' tenant)
+ *   auth          { requireAuth, requireGuest } middleware (default: admin password session)
+ *   quota         { canAdd(bytes) -> { ok, message } } for the current tenant (default: unlimited)
  *   beforeRoutes  function(app) run after core middleware, before core routes,
  *                 e.g. to mount extra sign-in routes
  */
-function createApp({ sessionStore, beforeRoutes, library, dataStore } = {}) {
+function createApp({ sessionStore, beforeRoutes, library, dataStore, resolveTenant, auth, quota } = {}) {
   const sessionSecret = process.env.SESSION_SECRET;
   if (!sessionSecret) {
     throw new Error('SESSION_SECRET environment variable not set');
@@ -34,6 +40,8 @@ function createApp({ sessionStore, beforeRoutes, library, dataStore } = {}) {
   const photoLibrary = library || new LocalPhotoLibrary();
   setLibrary(photoLibrary);
   setDataStore(dataStore || new LocalDataStore());
+  setAuthProvider(auth);
+  setQuota(quota);
 
   // Trust proxy if running behind reverse proxy
   app.set('trust proxy', 1);
@@ -57,6 +65,7 @@ function createApp({ sessionStore, beforeRoutes, library, dataStore } = {}) {
   }));
 
   app.use(logger);
+  app.use(tenantMiddleware(resolveTenant));
 
   // Static files
   if (photoLibrary.staticDir) app.use('/uploads', express.static(photoLibrary.staticDir));

@@ -1,7 +1,7 @@
 const bcrypt = require('bcryptjs');
 
-// Check if user is authenticated
-const requireAuth = (req, res, next) => {
+// Check if user is authenticated (default: the admin password session)
+const sessionRequireAuth = (req, res, next) => {
   console.log('🔐 Auth Check:', {
     sessionId: req.sessionID,
     hasSession: !!req.session,
@@ -62,7 +62,7 @@ const requireAuth = (req, res, next) => {
 const safeNext = (value) => (typeof value === 'string' && /^\/(?![\/\\])/.test(value) ? value : null);
 
 // Check if user is NOT authenticated (for login page)
-const requireGuest = (req, res, next) => {
+const sessionRequireGuest = (req, res, next) => {
   if (req.session && req.session.authenticated) {
     return res.redirect(safeNext(req.query.next) || '/admin');
   }
@@ -135,9 +135,21 @@ const getAuthStatus = (req, res) => {
   });
 };
 
+// A hosted setup can swap in its own sign-in, e.g. Google accounts.
+// provider: { requireAuth(req, res, next), requireGuest(req, res, next) }, both optional.
+let provider = {};
+
+const setAuthProvider = (next) => {
+  provider = next || {};
+};
+
+const requireAuth = (req, res, next) => (provider.requireAuth || sessionRequireAuth)(req, res, next);
+const requireGuest = (req, res, next) => (provider.requireGuest || sessionRequireGuest)(req, res, next);
+
 module.exports = {
   requireAuth,
   requireGuest,
+  setAuthProvider,
   login,
   logout,
   getAuthStatus

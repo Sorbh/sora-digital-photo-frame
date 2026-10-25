@@ -1,10 +1,5 @@
-const path = require('path');
 const crypto = require('crypto');
-const fs = require('fs-extra');
-
-const { DATA_DIR } = require('../config/paths');
-
-const DEVICES_FILE = path.join(DATA_DIR, 'devices.json');
+const { getDataStore } = require('../store');
 const PAIRING_TTL_MS = 10 * 60 * 1000;
 const MAX_PENDING = 50;
 const SEEN_WRITE_GAP_MS = 60 * 60 * 1000;
@@ -79,9 +74,7 @@ class PairingService {
       pairedAt: new Date().toISOString(),
       lastSeen: null
     };
-    const devices = await this.loadDevices();
-    devices.push(device);
-    await this.saveDevices(devices);
+    await getDataStore().update('devices', [], devices => [...devices, device]);
     pairing.approved = { token, device };
     return device;
   }
@@ -100,20 +93,16 @@ class PairingService {
 
   // The frame just showed up, so Access can say when it was last seen
   async markSeen(id) {
-    const devices = await this.loadDevices();
-    const device = devices.find(d => d.id === id);
-    if (!device) return;
-    device.lastSeen = new Date().toISOString();
-    await this.saveDevices(devices);
+    await getDataStore().update('devices', [], devices => devices.map(device =>
+      device.id === id ? { ...device, lastSeen: new Date().toISOString() } : device));
   }
 
   async loadDevices() {
-    return fs.readJson(DEVICES_FILE).catch(() => []);
+    return getDataStore().get('devices', []).catch(() => []);
   }
 
   async saveDevices(devices) {
-    await fs.ensureDir(DATA_DIR);
-    await fs.writeJson(DEVICES_FILE, devices, { spaces: 2 });
+    await getDataStore().set('devices', devices);
   }
 
   // The paired device for a token, or null
@@ -123,8 +112,8 @@ class PairingService {
     const device = devices.find(d => d.tokenHash === hash(token));
     if (!device) return null;
     if (!device.lastSeen || Date.now() - Date.parse(device.lastSeen) > SEEN_WRITE_GAP_MS) {
-      device.lastSeen = new Date().toISOString();
-      await this.saveDevices(devices);
+      await getDataStore().update('devices', [], current => current.map(d =>
+        d.id === device.id ? { ...d, lastSeen: new Date().toISOString() } : d));
     }
     return device;
   }
@@ -135,11 +124,13 @@ class PairingService {
   }
 
   async removeDevices(match) {
-    const devices = await this.loadDevices();
-    const kept = devices.filter(d => !match(d));
-    if (kept.length === devices.length) return 0;
-    await this.saveDevices(kept);
-    return devices.length - kept.length;
+    let removed = 0;
+    await getDataStore().update('devices', [], devices => {
+      const kept = devices.filter(d => !match(d));
+      removed = devices.length - kept.length;
+      return kept;
+    });
+    return removed;
   }
 }
 

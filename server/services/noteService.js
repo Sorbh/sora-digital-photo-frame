@@ -1,13 +1,11 @@
 const path = require('path');
 const crypto = require('crypto');
-const fs = require('fs-extra');
-
-const { UPLOADS_DIR, DATA_DIR } = require('../config/paths');
+const { UPLOADS_DIR } = require('../config/paths');
 const thumbnails = require('./thumbnailService');
 const { getLibrary } = require('../library');
+const { getDataStore } = require('../store');
+const LocalDataStore = require('../store/LocalDataStore');
 const { toAdminPath } = require('../utils/safePath');
-
-const NOTES_FILE = path.join(DATA_DIR, 'notes.json');
 
 const THEMES = ['paper', 'berry', 'ink'];
 // Book layouts and the photos each needs (mirrors NotePage.templates in public/js/notePage.js)
@@ -29,13 +27,19 @@ const EVENT_GRACE_MS = 2 * 60 * 60 * 1000;
  * window. Stored as one JSON file, like access accounts.
  */
 class NoteService {
-  constructor(file = NOTES_FILE) {
-    this.file = file;
+  constructor(file) {
+    // A file argument keeps isolated service tests on their own document.
+    this.store = file ? new LocalDataStore(path.dirname(file)) : null;
+    this.name = file ? path.basename(file, '.json') : 'notes';
+  }
+
+  dataStore() {
+    return this.store || getDataStore();
   }
 
   async load() {
     try {
-      const notes = JSON.parse(await fs.readFile(this.file, 'utf8'));
+      const notes = await this.dataStore().get(this.name, []);
       return Array.isArray(notes) ? notes : [];
     } catch (error) {
       if (error.code !== 'ENOENT') console.error('Could not read notes, treating as empty:', error.message);
@@ -43,12 +47,8 @@ class NoteService {
     }
   }
 
-  // Write to a temp file first, so a crash never leaves half a file behind
   async save(notes) {
-    await fs.ensureDir(path.dirname(this.file));
-    const tmp = `${this.file}.${process.pid}.tmp`;
-    await fs.writeFile(tmp, JSON.stringify(notes, null, 2));
-    await fs.rename(tmp, this.file);
+    await this.dataStore().set(this.name, notes);
   }
 
   async list(now = new Date()) {
@@ -62,32 +62,36 @@ class NoteService {
 
     const now = new Date().toISOString();
     const created = { id: `nt_${crypto.randomBytes(5).toString('hex')}`, ...note, createdAt: now, updatedAt: now };
-    const notes = await this.load();
-    notes.push(created);
-    await this.save(notes);
+    await this.dataStore().update(this.name, [], notes => [...notes, created]);
     return { note: created };
   }
 
   async update(id, input) {
-    const notes = await this.load();
-    const index = notes.findIndex(n => n.id === id);
-    if (index === -1) return { notFound: true };
+    let result;
+    await this.dataStore().update(this.name, [], async notes => {
+      const index = notes.findIndex(n => n.id === id);
+      if (index === -1) { result = { notFound: true }; return notes; }
 
-    // Partial updates (e.g. just { enabled: false }) keep the other fields
-    const { note, errors } = await this.validate({ ...notes[index], ...input });
-    if (errors) return { errors };
+      // Partial updates (e.g. just { enabled: false }) keep the other fields
+      const { note, errors } = await this.validate({ ...notes[index], ...input });
+      if (errors) { result = { errors }; return notes; }
 
-    notes[index] = { ...notes[index], ...note, updatedAt: new Date().toISOString() };
-    await this.save(notes);
-    return { note: notes[index] };
+      const next = [...notes];
+      next[index] = { ...notes[index], ...note, updatedAt: new Date().toISOString() };
+      result = { note: next[index] };
+      return next;
+    });
+    return result;
   }
 
   async remove(id) {
-    const notes = await this.load();
-    const remaining = notes.filter(n => n.id !== id);
-    if (remaining.length === notes.length) return false;
-    await this.save(remaining);
-    return true;
+    let removed = false;
+    await this.dataStore().update(this.name, [], notes => {
+      const remaining = notes.filter(n => n.id !== id);
+      removed = remaining.length !== notes.length;
+      return remaining;
+    });
+    return removed;
   }
 
   /**

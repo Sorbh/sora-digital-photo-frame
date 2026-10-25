@@ -1,13 +1,7 @@
-const fs = require('fs').promises;
-const path = require('path');
-const { DATA_DIR } = require('../config/paths');
+const { getDataStore } = require('../store');
 
 class AccessAccountController {
     constructor() {
-        this.dataPath = DATA_DIR;
-        this.accountsFile = path.join(this.dataPath, 'access-accounts.json');
-        this.initializeDataDirectory();
-        
         // Rate limiting for PIN attempts
         this.rateLimiter = new Map(); // Map<IP, {attempts: number, lockoutUntil: number, firstAttempt: number}>
         this.maxAttempts = 5; // Maximum failed attempts
@@ -15,31 +9,16 @@ class AccessAccountController {
         this.attemptWindow = 5 * 60 * 1000; // 5 minutes window for attempts
     }
 
-    async initializeDataDirectory() {
-        try {
-            await fs.access(this.dataPath);
-        } catch (error) {
-            await fs.mkdir(this.dataPath, { recursive: true });
-        }
-
-        try {
-            await fs.access(this.accountsFile);
-        } catch (error) {
-            await this.saveAccounts([]);
-        }
-    }
-
     async loadAccounts() {
         try {
-            const data = await fs.readFile(this.accountsFile, 'utf8');
-            return JSON.parse(data);
+            return await getDataStore().get('access-accounts', []);
         } catch (error) {
             return [];
         }
     }
 
     async saveAccounts(accounts) {
-        await fs.writeFile(this.accountsFile, JSON.stringify(accounts, null, 2));
+        await getDataStore().set('access-accounts', accounts);
     }
 
     // Rate limiting methods
@@ -116,21 +95,22 @@ class AccessAccountController {
 
     // A new account with a PIN nobody has yet (used when a frame is paired by QR code)
     async addAccountWithRandomPin({ name, assignedFolders = [] }) {
-        const accounts = await this.loadAccounts();
-        let pin;
-        do {
-            pin = String(require('crypto').randomInt(100000, 1000000));
-        } while (accounts.some(account => account.pin === pin));
-        const account = {
-            id: this.generateAccountId(),
-            name,
-            pin,
-            assignedFolders,
-            createdAt: new Date().toISOString(),
-            lastAccessed: null
-        };
-        accounts.push(account);
-        await this.saveAccounts(accounts);
+        let account;
+        await getDataStore().update('access-accounts', [], accounts => {
+            let pin;
+            do {
+                pin = String(require('crypto').randomInt(100000, 1000000));
+            } while (accounts.some(existing => existing.pin === pin));
+            account = {
+                id: this.generateAccountId(),
+                name,
+                pin,
+                assignedFolders,
+                createdAt: new Date().toISOString(),
+                lastAccessed: null
+            };
+            return [...accounts, account];
+        });
         return account;
     }
 
@@ -158,29 +138,28 @@ class AccessAccountController {
                 });
             }
 
-            const accounts = await this.loadAccounts();
-            
-            // Check for duplicate PIN
-            const existingAccount = accounts.find(account => account.pin === pin);
-            if (existingAccount) {
+            let duplicate = false;
+            let newAccount;
+            await getDataStore().update('access-accounts', [], accounts => {
+                duplicate = accounts.some(account => account.pin === pin);
+                if (duplicate) return accounts;
+                newAccount = {
+                    id: this.generateAccountId(),
+                    name,
+                    pin,
+                    assignedFolders,
+                    createdAt: new Date().toISOString(),
+                    lastAccessed: null
+                };
+                return [...accounts, newAccount];
+            });
+            if (duplicate) {
                 return res.status(400).json({
                     success: false,
                     error: 'PIN already exists',
                     code: 'DUPLICATE_PIN'
                 });
             }
-
-            const newAccount = {
-                id: this.generateAccountId(),
-                name,
-                pin,
-                assignedFolders,
-                createdAt: new Date().toISOString(),
-                lastAccessed: null
-            };
-
-            accounts.push(newAccount);
-            await this.saveAccounts(accounts);
 
             res.status(201).json({
                 success: true,
@@ -207,10 +186,20 @@ class AccessAccountController {
                 });
             }
 
-            const accounts = await this.loadAccounts();
-            const accountIndex = accounts.findIndex(account => account.id === id);
-
-            if (accountIndex === -1) {
+            let notFound = false;
+            let duplicate = false;
+            let updatedAccount;
+            await getDataStore().update('access-accounts', [], accounts => {
+                const accountIndex = accounts.findIndex(account => account.id === id);
+                if (accountIndex === -1) { notFound = true; return accounts; }
+                duplicate = accounts.some(account => account.pin === pin && account.id !== id);
+                if (duplicate) return accounts;
+                updatedAccount = { ...accounts[accountIndex], name, pin, assignedFolders };
+                const next = [...accounts];
+                next[accountIndex] = updatedAccount;
+                return next;
+            });
+            if (notFound) {
                 return res.status(404).json({
                     success: false,
                     error: 'Account not found',
@@ -218,9 +207,7 @@ class AccessAccountController {
                 });
             }
 
-            // Check for duplicate PIN (excluding current account)
-            const existingAccount = accounts.find(account => account.pin === pin && account.id !== id);
-            if (existingAccount) {
+            if (duplicate) {
                 return res.status(400).json({
                     success: false,
                     error: 'PIN already exists',
@@ -228,18 +215,9 @@ class AccessAccountController {
                 });
             }
 
-            accounts[accountIndex] = {
-                ...accounts[accountIndex],
-                name,
-                pin,
-                assignedFolders
-            };
-
-            await this.saveAccounts(accounts);
-
             res.json({
                 success: true,
-                account: accounts[accountIndex]
+                account: updatedAccount
             });
         } catch (error) {
             console.error('Error updating account:', error);
@@ -253,10 +231,13 @@ class AccessAccountController {
     async deleteAccount(req, res) {
         try {
             const { id } = req.params;
-            const accounts = await this.loadAccounts();
-            const accountIndex = accounts.findIndex(account => account.id === id);
-
-            if (accountIndex === -1) {
+            let notFound = false;
+            await getDataStore().update('access-accounts', [], accounts => {
+                const kept = accounts.filter(account => account.id !== id);
+                notFound = kept.length === accounts.length;
+                return kept;
+            });
+            if (notFound) {
                 return res.status(404).json({
                     success: false,
                     error: 'Account not found',
@@ -264,8 +245,6 @@ class AccessAccountController {
                 });
             }
 
-            accounts.splice(accountIndex, 1);
-            await this.saveAccounts(accounts);
             // Frames paired to this account stop working with it
             await require('../services/pairingService').removeDevices(device => device.accountId === id);
 
@@ -329,8 +308,8 @@ class AccessAccountController {
             console.log(`✅ Successful PIN authentication from IP: ${clientIP} for account: ${account.name}`);
 
             // Update last accessed time
-            account.lastAccessed = new Date().toISOString();
-            await this.saveAccounts(accounts);
+            await getDataStore().update('access-accounts', [], current => current.map(item =>
+                item.id === account.id ? { ...item, lastAccessed: new Date().toISOString() } : item));
 
             // Store account info in session
             req.session.accessAccount = {

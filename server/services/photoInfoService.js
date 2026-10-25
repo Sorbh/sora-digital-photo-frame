@@ -1,13 +1,9 @@
-const path = require('path');
-const fs = require('fs-extra');
 const exifr = require('exifr');
 
-const { CACHE_DIR } = require('../config/paths');
 const { toAdminPath } = require('../utils/safePath');
 const { getLibrary } = require('../library');
+const { getDataStore } = require('../store');
 
-const INFO_FILE = path.join(CACHE_DIR, 'photo-info.json');
-const PLACES_FILE = path.join(CACHE_DIR, 'places.json');
 const EXIF_FIELDS = ['DateTimeOriginal', 'CreateDate', 'GPSLatitude', 'GPSLongitude', 'GPSLatitudeRef', 'GPSLongitudeRef'];
 
 // Nominatim asks for at most one request a second and a real user agent
@@ -35,16 +31,15 @@ class PhotoInfoService {
 
   async loadCache() {
     if (!this.info) {
-      this.info = await fs.readJson(INFO_FILE).catch(() => ({}));
-      this.places = await fs.readJson(PLACES_FILE).catch(() => ({}));
+      this.info = await getDataStore().get('photo-info', {}).catch(() => ({}));
+      this.places = await getDataStore().get('places', {}).catch(() => ({}));
     }
   }
 
   scheduleSave() {
     clearTimeout(this.saveTimer);
     this.saveTimer = setTimeout(() => {
-      fs.ensureDir(CACHE_DIR)
-        .then(() => Promise.all([fs.writeJson(INFO_FILE, this.info), fs.writeJson(PLACES_FILE, this.places)]))
+      Promise.all([getDataStore().set('photo-info', this.info), getDataStore().set('places', this.places)])
         .catch(error => console.error('Could not save photo info cache:', error.message));
     }, 2000);
     this.saveTimer.unref?.();

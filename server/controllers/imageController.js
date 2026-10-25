@@ -239,6 +239,12 @@ class ImageController {
     }
   }
 
+  // Keep a photo's own format when rewriting it (uploads are WebP, older ones JPEG)
+  formatFor(fullPath) {
+    const ext = path.extname(fullPath).toLowerCase().slice(1);
+    return { jpg: 'jpeg', jpeg: 'jpeg', png: 'png', webp: 'webp', gif: 'gif' }[ext] || 'jpeg';
+  }
+
   // Clear image cache to force refresh
   clearImageCache() {
     this.imageCache = null;
@@ -259,21 +265,26 @@ class ImageController {
 
       for (const file of uploadedFiles) {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        const filename = file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname);
-        const buffer = await sharp(file.buffer)
+        const filename = `${file.fieldname}-${uniqueSuffix}.webp`;
+        // A display copy sized for frames: upright, WebP, no metadata (GPS stays private)
+        const buffer = await sharp(file.buffer, { animated: file.mimetype === 'image/gif' })
           .rotate()
           .resize(
-            parseInt(process.env.MAX_RESOLUTION_WIDTH) || 1920,
-            parseInt(process.env.MAX_RESOLUTION_HEIGHT) || 1080,
+            parseInt(process.env.MAX_RESOLUTION_WIDTH) || 2560,
+            parseInt(process.env.MAX_RESOLUTION_HEIGHT) || 2560,
             { fit: 'inside', withoutEnlargement: true }
           )
-          .jpeg({ quality: parseInt(process.env.IMAGE_QUALITY) || 85 })
+          .webp({ quality: parseInt(process.env.IMAGE_QUALITY) || 82 })
           .toBuffer();
         await assertCanAdd(buffer.length);
         const added = await getLibrary().addPhoto(toAdminPath(targetDir), {
-          buffer, originalName: filename, contentType: file.mimetype
+          buffer, originalName: filename, contentType: 'image/webp'
         });
-        processedFiles.push({ filename, originalname: file.originalname, path: added.path, size: file.size });
+        // Keep when and where it was taken, read from the original before it is dropped
+        const storedPath = resolveAdminPath(added.path);
+        await photoInfo.rememberUpload(storedPath, path.relative(this.uploadsDir, storedPath), file.buffer)
+          .catch(error => console.warn('Could not read photo info:', error.message));
+        processedFiles.push({ filename, originalname: file.originalname, path: added.path, size: buffer.length });
       }
 
       // Clear cache after upload to include new images
@@ -440,7 +451,7 @@ class ImageController {
       
       const buffer = await sharp(await getLibrary().readPhoto(toAdminPath(fullPath)))
         .rotate(angle)
-        .jpeg({ quality: parseInt(process.env.IMAGE_QUALITY) || 85 })
+        .toFormat(this.formatFor(fullPath), { quality: parseInt(process.env.IMAGE_QUALITY) || 85 })
         .toBuffer();
       await getLibrary().writeItem(toAdminPath(fullPath), buffer);
 

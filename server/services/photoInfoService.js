@@ -3,6 +3,7 @@ const exifr = require('exifr');
 const { toAdminPath } = require('../utils/safePath');
 const { getLibrary } = require('../library');
 const { getDataStore } = require('../store');
+const { currentTenant } = require('../context');
 
 const EXIF_FIELDS = ['DateTimeOriginal', 'CreateDate', 'GPSLatitude', 'GPSLongitude', 'GPSLatitudeRef', 'GPSLongitudeRef'];
 
@@ -22,27 +23,37 @@ const ADMIN_SUFFIX = /\s+(municipal corporation|municipal council|municipality|m
  */
 class PhotoInfoService {
   constructor() {
-    this.info = null; // relative path -> { key, takenAt, lat, lon }
-    this.places = null; // "lat,lon" -> name or ''
+    this.states = new Map(); // tenant id -> { info, places, saveTimer }
     this.pending = new Map();
-    this.placeQueue = Promise.resolve();
-    this.saveTimer = null;
+    this.placeQueue = Promise.resolve(); // shared: the rate limit is per server, not per tenant
   }
 
+  // Each tenant has its own cache of photo info and place names
+  state() {
+    const { id } = currentTenant();
+    if (!this.states.has(id)) this.states.set(id, { info: null, places: null, saveTimer: null });
+    return this.states.get(id);
+  }
+
+  get info() { return this.state().info; } // relative path -> { key, takenAt, lat, lon }
+  get places() { return this.state().places; } // "lat,lon" -> name or ''
+
   async loadCache() {
-    if (!this.info) {
-      this.info = await getDataStore().get('photo-info', {}).catch(() => ({}));
-      this.places = await getDataStore().get('places', {}).catch(() => ({}));
+    const state = this.state();
+    if (!state.info) {
+      state.info = await getDataStore().get('photo-info', {}).catch(() => ({}));
+      state.places = await getDataStore().get('places', {}).catch(() => ({}));
     }
   }
 
   scheduleSave() {
-    clearTimeout(this.saveTimer);
-    this.saveTimer = setTimeout(() => {
-      Promise.all([getDataStore().set('photo-info', this.info), getDataStore().set('places', this.places)])
+    const state = this.state();
+    clearTimeout(state.saveTimer);
+    state.saveTimer = setTimeout(() => {
+      Promise.all([getDataStore().set('photo-info', state.info), getDataStore().set('places', state.places)])
         .catch(error => console.error('Could not save photo info cache:', error.message));
     }, 2000);
-    this.saveTimer.unref?.();
+    state.saveTimer.unref?.();
   }
 
   // { takenAt, lat, lon, modifiedAt } for a photo (or a snap: its creation date)
@@ -75,9 +86,25 @@ class PhotoInfoService {
     return out;
   }
 
+  /**
+   * Remember when and where a photo was taken from the original upload,
+   * before re-encoding drops its EXIF data. Keyed to the stored file, so
+   * get() uses it instead of reading the (metadata-free) stored copy.
+   */
+  async rememberUpload(fullPath, relativePath, originalBuffer) {
+    await this.loadCache();
+    const stat = await getLibrary().stat(toAdminPath(fullPath));
+    this.info[relativePath] = { key: `${stat.size}:${Math.round(stat.mtimeMs)}`, ...await this.readExifBuffer(originalBuffer) };
+    this.scheduleSave();
+  }
+
   async readExif(fullPath) {
+    return this.readExifBuffer(await getLibrary().readPhoto(toAdminPath(fullPath)).catch(() => null));
+  }
+
+  async readExifBuffer(buffer) {
     try {
-      const exif = await exifr.parse(await getLibrary().readPhoto(toAdminPath(fullPath)), { pick: EXIF_FIELDS });
+      const exif = await exifr.parse(buffer, { pick: EXIF_FIELDS });
       const taken = exif?.DateTimeOriginal || exif?.CreateDate;
       const hasGps = Number.isFinite(exif?.latitude) && Number.isFinite(exif?.longitude)
         && !(exif.latitude === 0 && exif.longitude === 0);

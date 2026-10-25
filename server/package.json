@@ -18,7 +18,7 @@
     "slideshow"
   ],
   "author": "",
-  "license": "ISC",
+  "license": "AGPL-3.0-only",
   "dependencies": {
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",

@@ -11,7 +11,7 @@ Put an old tablet, laptop or smart TV on the shelf and fill it with your photos.
 
 ![Node 18+](https://img.shields.io/badge/node-18%2B-d6336a?style=flat-square)
 ![Docker](https://img.shields.io/badge/docker-ready-a61e6e?style=flat-square)
-![License ISC](https://img.shields.io/badge/license-ISC-f6c56b?style=flat-square)
+![License AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-f6c56b?style=flat-square)
 
 <br>
 
@@ -126,6 +126,6 @@ Node.js + Express on the server, plain HTML, CSS and JavaScript in the browser. 
 
 [Report an issue](https://github.com/Sorbh/sora-digital-photo-frame/issues) · [Discussions](https://github.com/Sorbh/sora-digital-photo-frame/discussions)
 
-Licensed under ISC.
+Licensed under [AGPL-3.0](LICENSE). The hosted service, Sora Frames, runs on this open core.
 
 <p align="center"><sub>Built with ❤️ by Claude Code — monitored &amp; prompted by Saurabh K. Sharma</sub></p>

@@ -4,6 +4,8 @@ const fs = require('fs-extra');
 
 const { UPLOADS_DIR, DATA_DIR } = require('../config/paths');
 const thumbnails = require('./thumbnailService');
+const { getLibrary } = require('../library');
+const { toAdminPath } = require('../utils/safePath');
 
 const NOTES_FILE = path.join(DATA_DIR, 'notes.json');
 
@@ -142,7 +144,7 @@ class NoteService {
 
   async photoExists(photo) {
     const fullPath = thumbnails.resolveInUploads(photo);
-    return Boolean(fullPath && fullPath !== UPLOADS_DIR && thumbnails.IMAGE_PATTERN.test(fullPath) && await fs.pathExists(fullPath));
+    return Boolean(fullPath && fullPath !== UPLOADS_DIR && thumbnails.IMAGE_PATTERN.test(fullPath) && await getLibrary().exists(toAdminPath(fullPath)));
   }
 
   photoUrls(photos = []) {

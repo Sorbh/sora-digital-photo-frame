@@ -4,6 +4,8 @@ const fs = require('fs-extra');
 const sharp = require('sharp');
 
 const { UPLOADS_DIR, CACHE_DIR: CACHE_ROOT } = require('../config/paths');
+const { toAdminPath } = require('../utils/safePath');
+const { getLibrary } = require('../library');
 
 const CACHE_DIR = path.join(CACHE_ROOT, 'thumbs');
 const IMAGE_PATTERN = /\.(jpg|jpeg|png|gif|webp)$/i;
@@ -48,7 +50,7 @@ class ThumbnailService {
     const cachePath = this.cachePathFor(sourcePath);
 
     const [source, cached] = await Promise.all([
-      fs.stat(sourcePath),
+      getLibrary().stat(toAdminPath(sourcePath)),
       fs.stat(cachePath).catch(() => null)
     ]);
     if (cached && cached.mtimeMs >= source.mtimeMs) {
@@ -66,7 +68,7 @@ class ThumbnailService {
 
   async generate(sourcePath, cachePath) {
     const tmpPath = `${cachePath}.${process.pid}.tmp`;
-    await sharp(sourcePath)
+    await sharp(await getLibrary().readPhoto(toAdminPath(sourcePath)))
       .rotate() // honour EXIF orientation from phone cameras
       .resize(THUMB_SIZE, THUMB_SIZE, { fit: 'cover' })
       .webp({ quality: 78 })
@@ -93,7 +95,9 @@ class ThumbnailService {
       const current = queue.shift();
       let items;
       try {
-        items = await fs.readdir(current, { withFileTypes: true });
+        items = (await getLibrary().listItems(toAdminPath(current))).map(item => ({
+          name: item.name, isFile: () => !item.isFolder, isDirectory: () => item.isFolder
+        }));
       } catch {
         continue;
       }

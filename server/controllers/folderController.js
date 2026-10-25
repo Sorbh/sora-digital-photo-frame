@@ -1,6 +1,6 @@
 const path = require('path');
 const { UPLOADS_DIR } = require('../config/paths');
-const fs = require('fs-extra');
+const { getLibrary } = require('../library');
 const thumbnails = require('../services/thumbnailService');
 const snaps = require('../services/snapService');
 const playOrder = require('../services/playOrderService');
@@ -10,6 +10,12 @@ const { resolveAdminPath, toAdminPath } = require('../utils/safePath');
 class FolderController {
   constructor() {
     this.uploadsDir = UPLOADS_DIR;
+  }
+
+  async entries(fullPath) {
+    return (await getLibrary().listItems(toAdminPath(fullPath))).map(item => ({
+      name: item.name, isDirectory: () => item.isFolder, isFile: () => !item.isFolder
+    }));
   }
 
   // Cover URL for a folder (first image, searching subfolders), or null when empty.
@@ -22,7 +28,7 @@ class FolderController {
       const firstImage = await thumbnails.findFirstImage(fullPath);
       if (!firstImage) return null;
 
-      const stat = await fs.stat(firstImage);
+      const stat = await getLibrary().stat(toAdminPath(firstImage));
       const version = `${path.basename(firstImage)}:${Math.round(stat.mtimeMs)}`;
       const encoded = path.relative(this.uploadsDir, fullPath).split(path.sep).map(encodeURIComponent).join('/');
       return `/api/folders/${encoded}/thumbnail?v=${encodeURIComponent(version)}`;
@@ -40,7 +46,7 @@ class FolderController {
 
       const images = (await thumbnails.findImages(fullPath, 3)).slice(1);
       return await Promise.all(images.map(async image => {
-        const stat = await fs.stat(image);
+        const stat = await getLibrary().stat(toAdminPath(image));
         const relativePath = path.relative(this.uploadsDir, image);
         return `/api/images/${encodeURIComponent(relativePath)}/thumbnail?v=${Math.round(stat.mtimeMs)}`;
       }));
@@ -54,7 +60,7 @@ class FolderController {
   async countImagesInFolder(dir) {
     try {
       let count = 0;
-      const items = await fs.readdir(dir, { withFileTypes: true });
+      const items = await this.entries(dir);
       
       for (const item of items) {
         const fullPath = path.join(dir, item.name);
@@ -78,7 +84,7 @@ class FolderController {
       const folderPath = req.params.folderPath || '';
       const fullPath = thumbnails.resolveInUploads(folderPath);
 
-      if (!fullPath || !await fs.pathExists(fullPath)) {
+      if (!fullPath || !await getLibrary().exists(toAdminPath(fullPath))) {
         return res.status(404).json({ 
           success: false,
           error: `Folder not found: ${folderPath}`,
@@ -86,7 +92,7 @@ class FolderController {
         });
       }
       
-      const items = await fs.readdir(fullPath, { withFileTypes: true });
+      const items = await this.entries(fullPath);
       let folders = [];
       let images = [];
       
@@ -128,7 +134,7 @@ class FolderController {
 
           folderJobs.push((async () => {
             const [subItems, imageCount, thumbnail] = await Promise.all([
-              fs.readdir(itemPath, { withFileTypes: true }),
+              this.entries(itemPath),
               this.countImagesInFolder(itemPath),
               this.generateFolderThumbnail(relativePath)
             ]);
@@ -255,11 +261,11 @@ class FolderController {
       const folderPath = req.query.path || 'uploads';
       const fullPath = resolveAdminPath(folderPath, { allowRoot: true });
 
-      if (!fullPath || !await fs.pathExists(fullPath)) {
+      if (!fullPath || !await getLibrary().exists(toAdminPath(fullPath))) {
         return res.status(404).json({ message: 'Folder not found' });
       }
 
-      const items = await fs.readdir(fullPath, { withFileTypes: true });
+      const items = await this.entries(fullPath);
       const folderJobs = [];
       const fileJobs = [];
 
@@ -283,7 +289,7 @@ class FolderController {
           const relativePath = path.relative(this.uploadsDir, imageFullPath);
           const urlPath = relativePath.split(path.sep).map(encodeURIComponent).join('/');
 
-          fileJobs.push(fs.stat(imageFullPath).then(stat => ({
+          fileJobs.push(getLibrary().stat(toAdminPath(imageFullPath)).then(stat => ({
             name: item.name,
             type: 'image',
             path: path.join(folderPath, item.name),
@@ -334,7 +340,7 @@ class FolderController {
   async setPlayOrder(req, res) {
     try {
       const fullPath = resolveAdminPath(req.query.path || 'uploads', { allowRoot: true });
-      if (!fullPath || !(await fs.stat(fullPath).catch(() => null))?.isDirectory()) {
+      if (!fullPath || !(await getLibrary().stat(toAdminPath(fullPath)).catch(() => null))?.isFolder) {
         return res.status(404).json({ success: false, error: 'Folder not found' });
       }
 
@@ -349,7 +355,7 @@ class FolderController {
           return res.status(400).json({ success: false, error: 'Sequence must be a list of file names' });
         }
         // Only names of files in this folder, once each
-        const present = new Set((await fs.readdir(fullPath)).filter(name => !name.startsWith('.')));
+        const present = new Set((await this.entries(fullPath).then(items => items.map(item => item.name))).filter(name => !name.startsWith('.')));
         settings.sequence = [...new Set(sequence)].filter(name => present.has(name));
       }
 
@@ -377,11 +383,11 @@ class FolderController {
       }
 
       const fullPath = path.join(parentDir, name.trim());
-      if (await fs.pathExists(fullPath)) {
+      if (await getLibrary().exists(toAdminPath(fullPath))) {
         return res.status(400).json({ message: 'Folder already exists' });
       }
 
-      await fs.ensureDir(fullPath);
+      await getLibrary().createFolder(toAdminPath(fullPath));
       res.json({ message: 'Folder created successfully', path: toAdminPath(fullPath) });
     } catch (error) {
       console.error('Error creating folder:', error);
@@ -395,11 +401,11 @@ class FolderController {
       // Never the uploads root itself, only folders inside it
       const fullPath = resolveAdminPath(req.query.path);
 
-      if (!fullPath || !await fs.pathExists(fullPath)) {
+      if (!fullPath || !await getLibrary().exists(toAdminPath(fullPath))) {
         return res.status(404).json({ message: 'Folder not found' });
       }
 
-      await fs.remove(fullPath);
+      await getLibrary().deleteFolder(toAdminPath(fullPath));
 
       // Clear image cache after folder deletion as it might contain images
       imageController.clearImageCache();

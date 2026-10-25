@@ -3,6 +3,8 @@ const fs = require('fs-extra');
 const exifr = require('exifr');
 
 const { CACHE_DIR } = require('../config/paths');
+const { toAdminPath } = require('../utils/safePath');
+const { getLibrary } = require('../library');
 
 const INFO_FILE = path.join(CACHE_DIR, 'photo-info.json');
 const PLACES_FILE = path.join(CACHE_DIR, 'places.json');
@@ -51,7 +53,7 @@ class PhotoInfoService {
   // { takenAt, lat, lon, modifiedAt } for a photo (or a snap: its creation date)
   async get(fullPath, relativePath) {
     await this.loadCache();
-    const stat = await fs.stat(fullPath);
+    const stat = await getLibrary().stat(toAdminPath(fullPath));
     const key = `${stat.size}:${Math.round(stat.mtimeMs)}`;
     const modifiedAt = stat.mtime.toISOString();
 
@@ -80,7 +82,7 @@ class PhotoInfoService {
 
   async readExif(fullPath) {
     try {
-      const exif = await exifr.parse(fullPath, { pick: EXIF_FIELDS });
+      const exif = await exifr.parse(await getLibrary().readPhoto(toAdminPath(fullPath)), { pick: EXIF_FIELDS });
       const taken = exif?.DateTimeOriginal || exif?.CreateDate;
       const hasGps = Number.isFinite(exif?.latitude) && Number.isFinite(exif?.longitude)
         && !(exif.latitude === 0 && exif.longitude === 0);
@@ -95,7 +97,8 @@ class PhotoInfoService {
   }
 
   async readSnap(fullPath) {
-    const snap = await fs.readJson(fullPath).catch(() => ({}));
+    const snap = await getLibrary().readItem(toAdminPath(fullPath))
+      .then(buffer => JSON.parse(buffer.toString('utf8'))).catch(() => ({}));
     return { takenAt: snap.createdAt || null, lat: null, lon: null };
   }
 

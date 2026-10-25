@@ -1,6 +1,6 @@
 const path = require('path');
 const { UPLOADS_DIR } = require('../config/paths');
-const fs = require('fs-extra');
+const { getLibrary } = require('../library');
 const sharp = require('sharp');
 const thumbnails = require('../services/thumbnailService');
 const snaps = require('../services/snapService');
@@ -20,33 +20,25 @@ class ImageController {
   }
 
   // Get all images recursively with caching
-  async getAllImages(dir = this.uploadsDir, useCache = true) {
+  async getAllImages(useCache = true) {
     // Check if cache is valid
     if (useCache && this.imageCache && this.cacheTimestamp && 
         (Date.now() - this.cacheTimestamp) < this.cacheExpiry) {
       return this.imageCache;
     }
 
-    const images = [];
-    const items = await fs.readdir(dir, { withFileTypes: true });
-    
-    for (const item of items) {
-      const fullPath = path.join(dir, item.name);
-      if (item.isDirectory()) {
-        if (item.name.startsWith('.')) continue;
-        const subImages = await this.getAllImages(fullPath, false); // Don't use cache for recursion
-        images.push(...subImages);
-      } else if (item.isFile() && (thumbnails.IMAGE_PATTERN.test(item.name) || snaps.isSnap(item.name))) {
-        const imageData = {
-          type: snaps.isSnap(item.name) ? 'snap' : 'image',
-          path: fullPath,
-          relativePath: path.relative(this.uploadsDir, fullPath),
-          folder: path.basename(path.dirname(fullPath)),
-          id: path.relative(this.uploadsDir, fullPath) // Use relative path as unique ID
-        };
-        images.push(imageData);
-      }
-    }
+    const photos = await getLibrary().allPhotos();
+    const images = photos.map(photo => {
+      const fullPath = resolveAdminPath(photo.path);
+      const relativePath = path.relative(this.uploadsDir, fullPath);
+      return {
+        type: photo.type,
+        path: fullPath,
+        relativePath,
+        folder: path.basename(path.dirname(fullPath)),
+        id: relativePath
+      };
+    });
     
     // Update cache only for root call
     if (useCache) {
@@ -138,7 +130,7 @@ class ImageController {
         });
       }
 
-      const relativePath = `/uploads/${randomImage.relativePath}`;
+      const relativePath = getLibrary().photoUrl(toAdminPath(randomImage.path));
       const info = await this.describe(randomImage);
       const fullUrl = `${req.protocol}://${req.get('host')}${relativePath}`;
       
@@ -155,7 +147,7 @@ class ImageController {
           order,
           info,
           metadata: {
-            size: null, // Would need fs.stat to get actual size
+            size: null,
             dimensions: {
               width: null,
               height: null
@@ -211,7 +203,7 @@ class ImageController {
       // Express already decoded the param; a second decode would mangle names containing '%'
       const imagePath = thumbnails.resolveInUploads(req.params.imageId);
 
-      if (!imagePath || !thumbnails.IMAGE_PATTERN.test(imagePath) || !await fs.pathExists(imagePath)) {
+      if (!imagePath || !thumbnails.IMAGE_PATTERN.test(imagePath) || !await getLibrary().exists(toAdminPath(imagePath))) {
         return res.status(404).json({
           success: false,
           error: 'Image not found',
@@ -245,42 +237,27 @@ class ImageController {
       const processedFiles = [];
 
       if (!targetDir) {
-        await Promise.all(uploadedFiles.map(file => fs.remove(file.path)));
         return res.status(400).json({ message: 'Invalid upload folder' });
       }
 
       for (const file of uploadedFiles) {
-        // If the target path is different from where multer uploaded it, move the file
-        const targetFilePath = path.join(targetDir, file.filename);
-        
-        // Ensure target directory exists
-        await fs.ensureDir(targetDir);
-        
-        // Process image with Sharp for optimization
-        const processedPath = path.join(path.dirname(file.path), `processed_${file.filename}`);
-        
-        await sharp(file.path)
-          .rotate() // Auto-rotate based on EXIF orientation
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        const filename = file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname);
+        const buffer = await sharp(file.buffer)
+          .rotate()
           .resize(
-            parseInt(process.env.MAX_RESOLUTION_WIDTH) || 1920, 
-            parseInt(process.env.MAX_RESOLUTION_HEIGHT) || 1080, 
+            parseInt(process.env.MAX_RESOLUTION_WIDTH) || 1920,
+            parseInt(process.env.MAX_RESOLUTION_HEIGHT) || 1080,
             { fit: 'inside', withoutEnlargement: true }
           )
           .jpeg({ quality: parseInt(process.env.IMAGE_QUALITY) || 85 })
-          .toFile(processedPath);
-        
-        // Remove original and move processed to target location
-        await fs.remove(file.path);
-        await fs.move(processedPath, targetFilePath);
-        
-        processedFiles.push({
-          filename: file.filename,
-          originalname: file.originalname,
-          path: toAdminPath(targetFilePath),
-          size: file.size
+          .toBuffer();
+        const added = await getLibrary().addPhoto(toAdminPath(targetDir), {
+          buffer, originalName: filename, contentType: file.mimetype
         });
+        processedFiles.push({ filename, originalname: file.originalname, path: added.path, size: file.size });
       }
-      
+
       // Clear cache after upload to include new images
       this.clearImageCache();
       
@@ -299,11 +276,11 @@ class ImageController {
     try {
       const fullPath = resolveAdminPath(req.query.path);
 
-      if (!fullPath || !await fs.pathExists(fullPath)) {
+      if (!fullPath || !await getLibrary().exists(toAdminPath(fullPath))) {
         return res.status(404).json({ message: 'Image not found' });
       }
 
-      await fs.remove(fullPath);
+      await getLibrary().deletePhoto(toAdminPath(fullPath));
       await thumbnails.remove(fullPath);
       
       // Clear cache after deletion to update available images
@@ -326,7 +303,7 @@ class ImageController {
       }
 
       const destDir = resolveAdminPath(destination || 'uploads', { allowRoot: true });
-      if (!destDir || !(await fs.stat(destDir).catch(() => null))?.isDirectory()) {
+      if (!destDir || !(await getLibrary().stat(toAdminPath(destDir)))?.isFolder) {
         return res.status(404).json({ message: 'Destination folder not found' });
       }
 
@@ -336,7 +313,7 @@ class ImageController {
         const fullPath = resolveAdminPath(imagePath);
 
         const isSnap = Boolean(fullPath) && snaps.isSnap(fullPath);
-        if (!fullPath || !(isSnap || thumbnails.IMAGE_PATTERN.test(fullPath)) || !await fs.pathExists(fullPath)) {
+        if (!fullPath || !(isSnap || thumbnails.IMAGE_PATTERN.test(fullPath)) || !await getLibrary().exists(toAdminPath(fullPath))) {
           results.failedCount++;
           results.errors.push(`Image not found: ${imagePath}`);
           continue;
@@ -344,18 +321,10 @@ class ImageController {
         if (path.dirname(fullPath) === destDir) continue; // already there
 
         try {
-          // Never overwrite a photo that already has this name in the destination
-          const ext = isSnap ? snaps.SNAP_EXT : path.extname(fullPath);
-          const base = path.basename(fullPath, ext);
-          let target = path.join(destDir, base + ext);
-          for (let n = 1; await fs.pathExists(target); n++) {
-            target = path.join(destDir, `${base}-${n}${ext}`);
-          }
-
-          await fs.move(fullPath, target);
+          const moved = await getLibrary().movePhoto(toAdminPath(fullPath), toAdminPath(destDir));
           await thumbnails.remove(fullPath);
           if (!isSnap) {
-            await snaps.photoMoved(path.relative(this.uploadsDir, fullPath), path.relative(this.uploadsDir, target));
+            await snaps.photoMoved(path.relative(this.uploadsDir, fullPath), path.relative('uploads', moved.path));
           }
           results.movedCount++;
         } catch (error) {
@@ -396,8 +365,8 @@ class ImageController {
         try {
           const fullPath = resolveAdminPath(imagePath);
 
-          if (fullPath && await fs.pathExists(fullPath)) {
-            await fs.remove(fullPath);
+          if (fullPath && await getLibrary().exists(toAdminPath(fullPath))) {
+            await getLibrary().deletePhoto(toAdminPath(fullPath));
             await thumbnails.remove(fullPath);
             results.deletedCount++;
           } else {
@@ -437,7 +406,7 @@ class ImageController {
       const { path: imagePath, angle = 90 } = req.body;
       const fullPath = resolveAdminPath(imagePath);
 
-      if (!fullPath || !await fs.pathExists(fullPath)) {
+      if (!fullPath || !await getLibrary().exists(toAdminPath(fullPath))) {
         return res.status(404).json({ message: 'Image not found' });
       }
       
@@ -446,19 +415,12 @@ class ImageController {
         return res.status(400).json({ message: 'Angle must be a multiple of 90 degrees' });
       }
       
-      // Create a temporary file for the rotated image
-      const tempPath = path.join(path.dirname(fullPath), `rotated_temp_${Date.now()}_${path.basename(fullPath)}`);
-      
-      // Rotate image by specified angle
-      await sharp(fullPath)
+      const buffer = await sharp(await getLibrary().readPhoto(toAdminPath(fullPath)))
         .rotate(angle)
         .jpeg({ quality: parseInt(process.env.IMAGE_QUALITY) || 85 })
-        .toFile(tempPath);
-      
-      // Replace original with rotated image
-      await fs.remove(fullPath);
-      await fs.move(tempPath, fullPath);
-      
+        .toBuffer();
+      await getLibrary().writeItem(toAdminPath(fullPath), buffer);
+
       // Clear cache after rotation to update available images
       this.clearImageCache();
       

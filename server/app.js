@@ -8,6 +8,8 @@ const logger = require('./middleware/logger');
 const errorHandler = require('./middleware/errorHandler');
 const routes = require('./routes');
 const { UPLOADS_DIR } = require('./config/paths');
+const LocalPhotoLibrary = require('./library/LocalPhotoLibrary');
+const { setLibrary } = require('./library');
 
 /**
  * Build the photo frame app. The self-hosted server calls this with no
@@ -15,16 +17,19 @@ const { UPLOADS_DIR } = require('./config/paths');
  *
  * Options:
  *   sessionStore  express-session store (default: in-memory)
+ *   library       photo storage implementation (default: local uploads folder)
  *   beforeRoutes  function(app) run after core middleware, before core routes,
  *                 e.g. to mount extra sign-in routes
  */
-function createApp({ sessionStore, beforeRoutes } = {}) {
+function createApp({ sessionStore, beforeRoutes, library } = {}) {
   const sessionSecret = process.env.SESSION_SECRET;
   if (!sessionSecret) {
     throw new Error('SESSION_SECRET environment variable not set');
   }
 
   const app = express();
+  const photoLibrary = library || new LocalPhotoLibrary();
+  setLibrary(photoLibrary);
 
   // Trust proxy if running behind reverse proxy
   app.set('trust proxy', 1);
@@ -50,7 +55,7 @@ function createApp({ sessionStore, beforeRoutes } = {}) {
   app.use(logger);
 
   // Static files
-  app.use('/uploads', express.static(UPLOADS_DIR));
+  if (photoLibrary.staticDir) app.use('/uploads', express.static(photoLibrary.staticDir));
   app.use('/js', express.static(path.join(__dirname, 'public/js')));
   app.use('/admin', express.static(path.join(__dirname, 'public')));
   // Serve CSS and JS files from root for access-accounts page

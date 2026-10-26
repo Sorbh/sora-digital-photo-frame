@@ -1,6 +1,7 @@
 const os = require('os');
 const QRCode = require('qrcode');
 const { currentTenant, runWithTenant } = require('../context');
+const { rotateSession } = require('../utils/session');
 
 const pairing = require('../services/pairingService');
 const accessAccounts = require('./accessAccountController');
@@ -91,6 +92,7 @@ class PairingController {
         return found;
       });
       if (!account) return res.json({ success: true, status: 'expired' });
+      await rotateSession(req);
       req.session.accessAccount = this.sessionAccount(account);
       req.session.tenantId = result.tenant.id;
       res.json({
@@ -159,6 +161,7 @@ class PairingController {
         return res.status(401).json({ success: false, error: 'This frame is no longer paired', code: 'DEVICE_UNKNOWN' });
       }
       accessAccounts.recordSuccessfulAttempt(ip);
+      await rotateSession(req);
       req.session.accessAccount = this.sessionAccount(account);
       // Hosted setups resolve later requests from this (see createApp resolveTenant)
       req.session.tenantId = currentTenant().id;

@@ -1,4 +1,5 @@
 const bcrypt = require('bcryptjs');
+const { rotateSession } = require('../utils/session');
 
 // Check if user is authenticated (default: the admin password session)
 const sessionRequireAuth = (req, res, next) => {
@@ -90,6 +91,7 @@ const login = async (req, res) => {
     : password === adminPassword;
 
   if (isValidPassword) {
+    await rotateSession(req);
     req.session.authenticated = true;
     req.session.loginTime = new Date();
 

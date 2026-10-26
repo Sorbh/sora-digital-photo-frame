@@ -89,6 +89,32 @@ describe('Hosted, many tenants in one process', () => {
     expect((await browser.get('/whoami').expect(200)).body.id).toBe('nobody');
   });
 
+  const sid = res => (/photoframe\.sid=([^;]+)/.exec((res.headers['set-cookie'] || []).join(';')) || [])[1];
+
+  test('frame sign-in gives the browser a new session id and keeps a signed-in admin', async () => {
+    const browser = request.agent(app);
+    const login = await browser.post('/api/auth/login').send({ password: process.env.ADMIN_PASSWORD || 'admin123' }).expect(200);
+    const { body: started } = await browser.post('/api/pair/start').expect(200);
+    await request(app).post(`/api/admin/pair/${started.code}/approve`).set('x-tenant', 'a')
+      .send({ name: 'Shared browser', newAccount: { assignedFolders: [] } }).expect(200);
+    const collected = await browser.get('/api/pair/status').query({ code: started.code, secret: started.secret }).expect(200);
+
+    expect(sid(collected)).toBeDefined();
+    expect(sid(collected)).not.toBe(sid(login));
+    expect((await browser.get('/api/auth/status').expect(200)).body.authenticated).toBe(true);
+    expect((await browser.get('/whoami').expect(200)).body.id).toBe('a');
+  });
+
+  test('device token sign-in gives a new session id', async () => {
+    const { collected } = await pairFrame('b');
+    const later = request.agent(app);
+    const first = await later.post('/api/auth/device').send({ token: collected.token }).expect(200);
+    const again = await later.post('/api/auth/device').send({ token: collected.token }).expect(200);
+    expect(sid(first)).toBeDefined();
+    expect(sid(again)).toBeDefined();
+    expect(sid(again)).not.toBe(sid(first));
+  });
+
   test('device sign-in finds the tenant from the token', async () => {
     const { collected } = await pairFrame('b');
 

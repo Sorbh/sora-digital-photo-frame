@@ -74,10 +74,19 @@ describe('Hosted, many tenants in one process', () => {
     expect((await frame.get('/whoami').expect(200)).body.id).toBe('a');
   });
 
-  test('signing a frame out clears its tenant along with its account', async () => {
-    const { frame } = await pairFrame('a');
-    await frame.delete('/api/auth/session').expect(200);
-    expect((await frame.get('/whoami').expect(200)).body.id).toBe('nobody');
+  test('signing a frame out in an admin browser clears its tenant along with its account', async () => {
+    // The admin is signed in in this browser and pairs it as a frame too
+    const browser = request.agent(app);
+    await browser.post('/api/auth/login').send({ password: process.env.ADMIN_PASSWORD || 'admin123' }).expect(200);
+    const { body: started } = await browser.post('/api/pair/start').expect(200);
+    await request(app).post(`/api/admin/pair/${started.code}/approve`).set('x-tenant', 'a')
+      .send({ name: 'Admin browser', newAccount: { assignedFolders: [] } }).expect(200);
+    await browser.get('/api/pair/status').query({ code: started.code, secret: started.secret }).expect(200);
+    expect((await browser.get('/whoami').expect(200)).body.id).toBe('a');
+
+    // Signing the frame out keeps the admin session but must drop the tenant
+    await browser.delete('/api/auth/session').expect(200);
+    expect((await browser.get('/whoami').expect(200)).body.id).toBe('nobody');
   });
 
   test('device sign-in finds the tenant from the token', async () => {

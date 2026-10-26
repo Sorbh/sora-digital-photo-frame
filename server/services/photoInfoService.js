@@ -1,11 +1,11 @@
-const path = require('path');
-const fs = require('fs-extra');
 const exifr = require('exifr');
 
-const { CACHE_DIR } = require('../config/paths');
+const path = require('path');
+const { toAdminPath, UPLOADS_DIR } = require('../utils/safePath');
+const { getLibrary } = require('../library');
+const { getDataStore } = require('../store');
+const { currentTenant } = require('../context');
 
-const INFO_FILE = path.join(CACHE_DIR, 'photo-info.json');
-const PLACES_FILE = path.join(CACHE_DIR, 'places.json');
 const EXIF_FIELDS = ['DateTimeOriginal', 'CreateDate', 'GPSLatitude', 'GPSLongitude', 'GPSLatitudeRef', 'GPSLongitudeRef'];
 
 // Nominatim asks for at most one request a second and a real user agent
@@ -24,34 +24,43 @@ const ADMIN_SUFFIX = /\s+(municipal corporation|municipal council|municipality|m
  */
 class PhotoInfoService {
   constructor() {
-    this.info = null; // relative path -> { key, takenAt, lat, lon }
-    this.places = null; // "lat,lon" -> name or ''
+    this.states = new Map(); // tenant id -> { info, places, saveTimer }
     this.pending = new Map();
-    this.placeQueue = Promise.resolve();
-    this.saveTimer = null;
+    this.placeQueue = Promise.resolve(); // shared: the rate limit is per server, not per tenant
   }
 
+  // Each tenant has its own cache of photo info and place names
+  state() {
+    const { id } = currentTenant();
+    if (!this.states.has(id)) this.states.set(id, { info: null, places: null, saveTimer: null });
+    return this.states.get(id);
+  }
+
+  get info() { return this.state().info; } // relative path -> { key, takenAt, lat, lon }
+  get places() { return this.state().places; } // "lat,lon" -> name or ''
+
   async loadCache() {
-    if (!this.info) {
-      this.info = await fs.readJson(INFO_FILE).catch(() => ({}));
-      this.places = await fs.readJson(PLACES_FILE).catch(() => ({}));
+    const state = this.state();
+    if (!state.info) {
+      state.info = await getDataStore().get('photo-info', {}).catch(() => ({}));
+      state.places = await getDataStore().get('places', {}).catch(() => ({}));
     }
   }
 
   scheduleSave() {
-    clearTimeout(this.saveTimer);
-    this.saveTimer = setTimeout(() => {
-      fs.ensureDir(CACHE_DIR)
-        .then(() => Promise.all([fs.writeJson(INFO_FILE, this.info), fs.writeJson(PLACES_FILE, this.places)]))
+    const state = this.state();
+    clearTimeout(state.saveTimer);
+    state.saveTimer = setTimeout(() => {
+      Promise.all([getDataStore().set('photo-info', state.info), getDataStore().set('places', state.places)])
         .catch(error => console.error('Could not save photo info cache:', error.message));
     }, 2000);
-    this.saveTimer.unref?.();
+    state.saveTimer.unref?.();
   }
 
   // { takenAt, lat, lon, modifiedAt } for a photo (or a snap: its creation date)
   async get(fullPath, relativePath) {
     await this.loadCache();
-    const stat = await fs.stat(fullPath);
+    const stat = await getLibrary().stat(toAdminPath(fullPath));
     const key = `${stat.size}:${Math.round(stat.mtimeMs)}`;
     const modifiedAt = stat.mtime.toISOString();
 
@@ -78,9 +87,38 @@ class PhotoInfoService {
     return out;
   }
 
+  /**
+   * Remember when and where a photo was taken from the original upload,
+   * before re-encoding drops its EXIF data. Keyed to the stored file, so
+   * get() uses it instead of reading the (metadata-free) stored copy.
+   */
+  async rememberUpload(fullPath, relativePath, originalBuffer) {
+    await this.loadCache();
+    const stat = await getLibrary().stat(toAdminPath(fullPath));
+    this.info[relativePath] = { key: `${stat.size}:${Math.round(stat.mtimeMs)}`, ...await this.readExifBuffer(originalBuffer) };
+    this.scheduleSave();
+  }
+
+  // Carry the original upload's capture data when a photo moves (its WebP copy has no EXIF).
+  async moveUpload(fromPath, toPath) {
+    await this.loadCache();
+    const from = path.relative(UPLOADS_DIR, fromPath);
+    const to = path.relative(UPLOADS_DIR, toPath);
+    const remembered = this.info[from];
+    if (!remembered) return;
+    const stat = await getLibrary().stat(toAdminPath(toPath));
+    this.info[to] = { ...remembered, key: `${stat.size}:${Math.round(stat.mtimeMs)}` };
+    delete this.info[from];
+    this.scheduleSave();
+  }
+
   async readExif(fullPath) {
+    return this.readExifBuffer(await getLibrary().readPhoto(toAdminPath(fullPath)).catch(() => null));
+  }
+
+  async readExifBuffer(buffer) {
     try {
-      const exif = await exifr.parse(fullPath, { pick: EXIF_FIELDS });
+      const exif = await exifr.parse(buffer, { pick: EXIF_FIELDS });
       const taken = exif?.DateTimeOriginal || exif?.CreateDate;
       const hasGps = Number.isFinite(exif?.latitude) && Number.isFinite(exif?.longitude)
         && !(exif.latitude === 0 && exif.longitude === 0);
@@ -95,7 +133,8 @@ class PhotoInfoService {
   }
 
   async readSnap(fullPath) {
-    const snap = await fs.readJson(fullPath).catch(() => ({}));
+    const snap = await getLibrary().readItem(toAdminPath(fullPath))
+      .then(buffer => JSON.parse(buffer.toString('utf8'))).catch(() => ({}));
     return { takenAt: snap.createdAt || null, lat: null, lon: null };
   }
 

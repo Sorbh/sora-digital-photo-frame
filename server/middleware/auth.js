@@ -1,9 +1,9 @@
 const bcrypt = require('bcryptjs');
+const { rotateSession } = require('../utils/session');
 
-// Check if user is authenticated
-const requireAuth = (req, res, next) => {
+// Check if user is authenticated (default: the admin password session)
+const sessionRequireAuth = (req, res, next) => {
   console.log('🔐 Auth Check:', {
-    sessionId: req.sessionID,
     hasSession: !!req.session,
     authenticated: req.session?.authenticated,
     path: req.path,
@@ -62,7 +62,7 @@ const requireAuth = (req, res, next) => {
 const safeNext = (value) => (typeof value === 'string' && /^\/(?![\/\\])/.test(value) ? value : null);
 
 // Check if user is NOT authenticated (for login page)
-const requireGuest = (req, res, next) => {
+const sessionRequireGuest = (req, res, next) => {
   if (req.session && req.session.authenticated) {
     return res.redirect(safeNext(req.query.next) || '/admin');
   }
@@ -91,14 +91,11 @@ const login = async (req, res) => {
     : password === adminPassword;
 
   if (isValidPassword) {
+    await rotateSession(req);
     req.session.authenticated = true;
     req.session.loginTime = new Date();
 
-    console.log('🔓 Login successful:', {
-      sessionId: req.sessionID,
-      sessionData: req.session,
-      cookies: req.headers.cookie ? 'present' : 'missing'
-    });
+    console.log('🔓 Login successful');
 
     // If it's an API request, return JSON success
     if (req.headers['content-type'] === 'application/json') {
@@ -135,9 +132,29 @@ const getAuthStatus = (req, res) => {
   });
 };
 
+// Someone allowed to watch the slideshow: the admin, a PIN account or a paired frame
+const sessionRequireViewer = (req, res, next) => {
+  if (req.session && (req.session.authenticated || req.session.accessAccount)) return next();
+  return res.status(401).json({ message: 'Authentication required', code: 'AUTH_REQUIRED' });
+};
+
+// A hosted setup can swap in its own sign-in, e.g. Google accounts.
+// provider: { requireAuth, requireGuest, requireViewer } middleware, all optional.
+let provider = {};
+
+const setAuthProvider = (next) => {
+  provider = next || {};
+};
+
+const requireAuth = (req, res, next) => (provider.requireAuth || sessionRequireAuth)(req, res, next);
+const requireGuest = (req, res, next) => (provider.requireGuest || sessionRequireGuest)(req, res, next);
+const requireViewer = (req, res, next) => (provider.requireViewer || sessionRequireViewer)(req, res, next);
+
 module.exports = {
   requireAuth,
   requireGuest,
+  requireViewer,
+  setAuthProvider,
   login,
   logout,
   getAuthStatus

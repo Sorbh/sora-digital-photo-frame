@@ -4,6 +4,10 @@ const RENEW_MS = 6 * 60 * 60 * 1000; // sessions last a day; paired frames sign 
 class AuthenticationManager {
     constructor() {
         this.isAuthenticated = false;
+        // Browser-side decryption (remote encrypted storage only): keys by id, and
+        // each slide's object URL so it can be released when the slide is reused
+        this.frameKeys = new Map();
+        this.objectUrls = [null, null];
         this.authOverlay = document.getElementById('authOverlay');
         this.pinForm = document.getElementById('pinForm');
         this.pinInput = document.getElementById('pinInput');
@@ -223,6 +227,8 @@ class AuthenticationManager {
             if (data.authenticated) {
                 this.handleAuthSuccess(data.account);
             } else {
+                // Hosted frames pair by QR code only
+                if (data.pinSignIn === false) this.pinForm.style.display = 'none';
                 this.showAuthOverlay();
             }
         } catch (error) {
@@ -539,8 +545,44 @@ class PhotoFrameSlideshow {
         }
     }
 
+    // Key for browser-side decryption, fetched once per key id
+    frameKey(id) {
+        if (!this.frameKeys.has(id)) {
+            const request = fetch(`/api/frame/keys?ids=${encodeURIComponent(id)}`, { credentials: 'same-origin' })
+                .then(response => (response.ok ? response.json() : Promise.reject(new Error(`HTTP ${response.status}`))))
+                .then(({ keys }) => {
+                    if (!keys || !keys[id]) throw new Error('Key not available');
+                    return Uint8Array.from(atob(keys[id]), c => c.charCodeAt(0));
+                })
+                .catch((error) => {
+                    this.frameKeys.delete(id); // try again with a later photo
+                    throw error;
+                });
+            this.frameKeys.set(id, request);
+        }
+        return this.frameKeys.get(id);
+    }
+
+    // What to put in the <img>: a decrypted object URL when the photo comes
+    // encrypted from remote storage and this browser can decrypt, else the
+    // server URL (local installs always use the server URL)
+    async imageSource(imageData) {
+        const cipher = window.SoraPhotoCipher;
+        if (imageData.rawUrl && cipher && cipher.supported()) {
+            try {
+                return await cipher.loadImage(imageData.rawUrl, id => this.frameKey(id), imageData.mimeType);
+            } catch (error) {
+                console.warn('Decrypting in the browser failed, using the server copy:', error.message);
+            }
+        }
+        return imageData.url;
+    }
+
     async loadImage(imageData) {
         if (!imageData) return false;
+
+        const src = await this.imageSource(imageData);
+        const isObjectUrl = src.startsWith('blob:');
 
         return new Promise((resolve) => {
             const nextSlide = (this.currentSlide + 1) % 2;
@@ -550,7 +592,10 @@ class PhotoFrameSlideshow {
                 img.removeEventListener('load', onLoad);
                 img.removeEventListener('error', onError);
                 this.hideError();
-                this.ambients[nextSlide].style.backgroundImage = `url(${JSON.stringify(imageData.url)})`;
+                this.ambients[nextSlide].style.backgroundImage = `url(${JSON.stringify(src)})`;
+                // The slide's previous photo is gone from screen; free its decrypted copy
+                if (this.objectUrls[nextSlide]) URL.revokeObjectURL(this.objectUrls[nextSlide]);
+                this.objectUrls[nextSlide] = isObjectUrl ? src : null;
                 this.currentImageData = imageData;
                 resolve(true);
             };
@@ -558,6 +603,7 @@ class PhotoFrameSlideshow {
             const onError = (event) => {
                 img.removeEventListener('load', onLoad);
                 img.removeEventListener('error', onError);
+                if (isObjectUrl) URL.revokeObjectURL(src);
                 console.error('Failed to load image:', imageData.url);
                 if (this.errorState.classList.contains('hidden')) {
                     this.showError(`Failed to load image: ${imageData.filename}`);
@@ -567,7 +613,7 @@ class PhotoFrameSlideshow {
 
             img.addEventListener('load', onLoad);
             img.addEventListener('error', onError);
-            img.src = imageData.url;
+            img.src = src;
         });
     }
 

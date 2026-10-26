@@ -4,6 +4,10 @@ const fs = require('fs-extra');
 const sharp = require('sharp');
 
 const { UPLOADS_DIR, CACHE_DIR: CACHE_ROOT } = require('../config/paths');
+const { toAdminPath } = require('../utils/safePath');
+const { getLibrary } = require('../library');
+const { jpegCopy, acceptsWebp } = require('../middleware/webpFallback');
+const { currentTenant, DEFAULT_TENANT } = require('../context');
 
 const CACHE_DIR = path.join(CACHE_ROOT, 'thumbs');
 const IMAGE_PATTERN = /\.(jpg|jpeg|png|gif|webp)$/i;
@@ -35,8 +39,11 @@ class ThumbnailService {
   }
 
   cachePathFor(sourcePath) {
+    // Tenants share admin paths ("uploads/Family/..."), so their thumbnails must not
+    const { id } = currentTenant();
+    const scope = id === DEFAULT_TENANT.id ? '' : `${id}/`;
     const key = crypto.createHash('sha1')
-      .update(`${path.relative(UPLOADS_DIR, sourcePath)}:${THUMB_SIZE}`)
+      .update(`${scope}${path.relative(UPLOADS_DIR, sourcePath)}:${THUMB_SIZE}`)
       .digest('hex');
     return path.join(CACHE_DIR, `${key}.webp`);
   }
@@ -48,7 +55,7 @@ class ThumbnailService {
     const cachePath = this.cachePathFor(sourcePath);
 
     const [source, cached] = await Promise.all([
-      fs.stat(sourcePath),
+      getLibrary().stat(toAdminPath(sourcePath)),
       fs.stat(cachePath).catch(() => null)
     ]);
     if (cached && cached.mtimeMs >= source.mtimeMs) {
@@ -66,7 +73,7 @@ class ThumbnailService {
 
   async generate(sourcePath, cachePath) {
     const tmpPath = `${cachePath}.${process.pid}.tmp`;
-    await sharp(sourcePath)
+    await sharp(await getLibrary().readPhoto(toAdminPath(sourcePath)))
       .rotate() // honour EXIF orientation from phone cameras
       .resize(THUMB_SIZE, THUMB_SIZE, { fit: 'cover' })
       .webp({ quality: 78 })
@@ -93,7 +100,9 @@ class ThumbnailService {
       const current = queue.shift();
       let items;
       try {
-        items = await fs.readdir(current, { withFileTypes: true });
+        items = (await getLibrary().listItems(toAdminPath(current))).map(item => ({
+          name: item.name, isFile: () => !item.isFolder, isDirectory: () => item.isFolder
+        }));
       } catch {
         continue;
       }
@@ -123,8 +132,15 @@ class ThumbnailService {
     res.set('Cache-Control', versioned
       ? 'public, max-age=604800, immutable'
       : 'public, max-age=300, stale-while-revalidate=86400');
-    res.type('image/webp');
-    res.sendFile(thumbPath);
+    res.vary('Accept');
+    if (acceptsWebp(res.req)) {
+      res.type('image/webp');
+      return res.sendFile(thumbPath);
+    }
+    // Old frames without WebP get a JPEG copy
+    return jpegCopy(thumbPath)
+      .then(copy => res.type('jpeg').sendFile(copy))
+      .catch(() => res.status(500).json({ message: 'Server error' }));
   }
 }
 

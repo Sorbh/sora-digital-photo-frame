@@ -78,7 +78,9 @@ describe('Pairing a frame by QR code', () => {
     await admin.post(`/api/admin/pair/${pairing.code}/approve`).send({ name: 'Again', newAccount: {} }).expect(404);
 
     const accounts = await fs.readJson(path.join(testDataDir, 'access-accounts.json'));
-    expect(accounts.find(a => a.name === 'Kitchen frame').pin).toMatch(/^\d{6}$/);
+    const kitchen = accounts.find(a => a.name === 'Kitchen frame');
+    expect(kitchen.pin).toBeUndefined();
+    expect(kitchen.pinHash).toMatch(/^\$2[aby]\$/);
 
     const collected = await status(frame, pairing);
     expect(collected).toMatchObject({ status: 'approved', device: { name: 'Kitchen frame' }, account: { name: 'Kitchen frame' } });

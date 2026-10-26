@@ -1,7 +1,8 @@
-const fs = require('fs-extra');
+const { getLibrary } = require('../library');
 const snaps = require('../services/snapService');
 const imageController = require('./imageController');
 const { resolveAdminPath, toAdminPath } = require('../utils/safePath');
+const { passClientError } = require('../utils/httpError');
 
 // Snaps are addressed like photos: ?path=uploads/Family/visit.snap.json
 class SnapController {
@@ -13,11 +14,12 @@ class SnapController {
   async get(req, res) {
     try {
       const fullPath = this.snapPath(req);
-      if (!fullPath || !await fs.pathExists(fullPath)) {
+      if (!fullPath || !await getLibrary().exists(toAdminPath(fullPath))) {
         return res.status(404).json({ success: false, error: 'Snap not found' });
       }
       res.json({ success: true, path: toAdminPath(fullPath), snap: await snaps.load(fullPath) });
     } catch (error) {
+      if (passClientError(res, error)) return;
       console.error('Error reading snap:', error);
       res.status(500).json({ success: false, error: 'Failed to load snap' });
     }
@@ -26,7 +28,7 @@ class SnapController {
   async create(req, res) {
     try {
       const folder = resolveAdminPath(req.body.folder || 'uploads', { allowRoot: true });
-      if (!folder || !(await fs.stat(folder).catch(() => null))?.isDirectory()) {
+      if (!folder || !(await getLibrary().stat(toAdminPath(folder)))?.isFolder) {
         return res.status(404).json({ success: false, error: 'Folder not found' });
       }
 
@@ -36,6 +38,7 @@ class SnapController {
       imageController.clearImageCache();
       res.status(201).json({ success: true, path: toAdminPath(fullPath), snap });
     } catch (error) {
+      if (passClientError(res, error)) return;
       console.error('Error creating snap:', error);
       res.status(500).json({ success: false, error: 'Failed to save snap' });
     }
@@ -44,7 +47,7 @@ class SnapController {
   async update(req, res) {
     try {
       const fullPath = this.snapPath(req);
-      if (!fullPath || !await fs.pathExists(fullPath)) {
+      if (!fullPath || !await getLibrary().exists(toAdminPath(fullPath))) {
         return res.status(404).json({ success: false, error: 'Snap not found' });
       }
 
@@ -52,6 +55,7 @@ class SnapController {
       if (errors) return res.status(400).json({ success: false, error: 'Please check the snap', errors });
       res.json({ success: true, path: toAdminPath(fullPath), snap });
     } catch (error) {
+      if (passClientError(res, error)) return;
       console.error('Error updating snap:', error);
       res.status(500).json({ success: false, error: 'Failed to save snap' });
     }

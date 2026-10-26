@@ -20,6 +20,8 @@ const { setDataStore } = require('./store');
 const { tenantMiddleware } = require('./context');
 const { setQuota } = require('./services/quotaService');
 const { setAuthProvider } = require('./middleware/auth');
+const { setEvents } = require('./events');
+const accessAccounts = require('./controllers/accessAccountController');
 
 /**
  * Build the photo frame app. The self-hosted server calls this with no
@@ -32,12 +34,14 @@ const { setAuthProvider } = require('./middleware/auth');
  *   resolveTenant async function(req) -> { id, plan } or null (default: one 'default' tenant)
  *   auth          { requireAuth, requireGuest } middleware (default: admin password session)
  *   quota         { canAdd(bytes) -> { ok, message } } for the current tenant (default: unlimited)
+ *   events        { devicePaired, devicesRemoved } handlers (see events.js)
+ *   pinSignIn     false turns off PIN sign-in for frames (hosted: frames pair by QR instead)
  *   keys          key provider ({ currentKey, getKey }, see crypto/keys.js) to encrypt photos
  *                 and data at rest (default: PHOTO_ENCRYPTION_KEY, or no encryption)
  *   beforeRoutes  function(app) run after core middleware, before core routes,
  *                 e.g. to mount extra sign-in routes
  */
-function createApp({ sessionStore, beforeRoutes, library, dataStore, resolveTenant, auth, quota, keys = keysFromEnv() } = {}) {
+function createApp({ sessionStore, beforeRoutes, library, dataStore, resolveTenant, auth, quota, events, pinSignIn = true, keys = keysFromEnv() } = {}) {
   const sessionSecret = process.env.SESSION_SECRET;
   if (!sessionSecret) {
     throw new Error('SESSION_SECRET environment variable not set');
@@ -54,6 +58,8 @@ function createApp({ sessionStore, beforeRoutes, library, dataStore, resolveTena
   setDataStore(store);
   setAuthProvider(auth);
   setQuota(quota);
+  setEvents(events);
+  accessAccounts.pinSignIn = pinSignIn !== false;
 
   // Trust proxy if running behind reverse proxy
   app.set('trust proxy', 1);

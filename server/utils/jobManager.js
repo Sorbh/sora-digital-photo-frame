@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const { currentTenant } = require('../context');
 
 class JobManager {
   constructor() {
@@ -16,6 +17,7 @@ class JobManager {
       status: 'pending', // pending, running, completed, failed
       data,
       userId,
+      tenantId: currentTenant().id,
       createdAt: new Date(),
       startedAt: null,
       completedAt: null,
@@ -208,7 +210,8 @@ class JobManager {
   // Get job status (public info only)
   getJobStatus(jobId) {
     const job = this.getJob(jobId);
-    if (!job) {
+    // Another tenant's job looks the same as no job
+    if (!job || job.tenantId !== currentTenant().id) {
       return null;
     }
 

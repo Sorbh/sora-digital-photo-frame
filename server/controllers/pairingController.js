@@ -1,5 +1,6 @@
 const os = require('os');
 const QRCode = require('qrcode');
+const { currentTenant, runWithTenant } = require('../context');
 
 const pairing = require('../services/pairingService');
 const accessAccounts = require('./accessAccountController');
@@ -83,10 +84,15 @@ class PairingController {
       const result = pairing.collect(req.query.code, req.query.secret);
       if (result.status !== 'approved') return res.json({ success: true, status: result.status });
 
-      const account = (await accessAccounts.loadAccounts()).find(a => a.id === result.device.accountId);
+      // The frame has no session yet; having the pairing secret lets it act as the approving tenant
+      const account = await runWithTenant(result.tenant, async () => {
+        const found = (await accessAccounts.loadAccounts()).find(a => a.id === result.device.accountId);
+        if (found) await pairing.markSeen(result.device.id);
+        return found;
+      });
       if (!account) return res.json({ success: true, status: 'expired' });
-      await pairing.markSeen(result.device.id);
       req.session.accessAccount = this.sessionAccount(account);
+      req.session.tenantId = result.tenant.id;
       res.json({
         success: true,
         status: 'approved',
@@ -154,6 +160,8 @@ class PairingController {
       }
       accessAccounts.recordSuccessfulAttempt(ip);
       req.session.accessAccount = this.sessionAccount(account);
+      // Hosted setups resolve later requests from this (see createApp resolveTenant)
+      req.session.tenantId = currentTenant().id;
       res.json({ success: true, account: req.session.accessAccount, device: { id: device.id, name: device.name } });
     } catch (error) {
       console.error('Error signing in a device:', error);

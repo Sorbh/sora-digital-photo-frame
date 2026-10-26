@@ -1,12 +1,20 @@
 const crypto = require('crypto');
 const { getDataStore } = require('../store');
+const { currentTenant } = require('../context');
+const { emit } = require('../events');
 const PAIRING_TTL_MS = 10 * 60 * 1000;
-const MAX_PENDING = 50;
+// Shared by every tenant on a hosted server, so a few IPs can't fill it (20 starts per IP per 10 min)
+const MAX_PENDING = 2000; 
 const SEEN_WRITE_GAP_MS = 60 * 60 * 1000;
 // No 0/O, 1/I/L: the code is read off a frame across the room
 const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 
 const hash = token => crypto.createHash('sha256').update(token).digest('hex');
+
+// Device tokens are "<deviceId>.<secret>", so a hosted setup can tell which
+// tenant a frame belongs to before looking it up. Older tokens are just the secret.
+const TOKEN_PATTERN = /^(dev_[0-9a-f]{12})\.[A-Za-z0-9_-]{43}$/;
+const deviceIdFromToken = token => (typeof token === 'string' && TOKEN_PATTERN.exec(token)?.[1]) || null;
 
 /**
  * Pairing a frame by QR code. The frame asks for a short code and shows it as
@@ -65,9 +73,10 @@ class PairingService {
   async approve(code, { name, accountId }) {
     const pairing = this.find(code);
     if (!pairing || pairing.approved) return null;
-    const token = crypto.randomBytes(32).toString('base64url');
+    const id = `dev_${crypto.randomBytes(6).toString('hex')}`;
+    const token = `${id}.${crypto.randomBytes(32).toString('base64url')}`;
     const device = {
-      id: `dev_${crypto.randomBytes(6).toString('hex')}`,
+      id,
       name,
       accountId,
       tokenHash: hash(token),
@@ -75,7 +84,15 @@ class PairingService {
       lastSeen: null
     };
     await getDataStore().update('devices', [], devices => [...devices, device]);
-    pairing.approved = { token, device };
+    const tenant = currentTenant();
+    try {
+      await emit('devicePaired', { deviceId: id, tenantId: tenant.id });
+    } catch (error) {
+      await getDataStore().update('devices', [], devices => devices.filter(d => d.id !== id));
+      throw error;
+    }
+    // The frame collects this without a session; it runs as the approving tenant
+    pairing.approved = { token, device, tenant };
     return device;
   }
 
@@ -109,7 +126,10 @@ class PairingService {
   async signIn(token) {
     if (typeof token !== 'string' || !token) return null;
     const devices = await this.loadDevices();
-    const device = devices.find(d => d.tokenHash === hash(token));
+    const id = deviceIdFromToken(token);
+    const device = id
+      ? devices.find(d => d.id === id && crypto.timingSafeEqual(Buffer.from(d.tokenHash), Buffer.from(hash(token))))
+      : devices.find(d => d.tokenHash === hash(token));
     if (!device) return null;
     if (!device.lastSeen || Date.now() - Date.parse(device.lastSeen) > SEEN_WRITE_GAP_MS) {
       await getDataStore().update('devices', [], current => current.map(d =>
@@ -124,15 +144,16 @@ class PairingService {
   }
 
   async removeDevices(match) {
-    let removed = 0;
+    let removedIds = [];
     await getDataStore().update('devices', [], devices => {
-      const kept = devices.filter(d => !match(d));
-      removed = devices.length - kept.length;
-      return kept;
+      removedIds = devices.filter(d => match(d)).map(d => d.id);
+      return devices.filter(d => !match(d));
     });
-    return removed;
+    if (removedIds.length) await emit('devicesRemoved', { deviceIds: removedIds, tenantId: currentTenant().id });
+    return removedIds.length;
   }
 }
 
 module.exports = new PairingService();
+module.exports.deviceIdFromToken = deviceIdFromToken;
 module.exports.PAIRING_TTL_MS = PAIRING_TTL_MS;

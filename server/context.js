@@ -29,8 +29,16 @@ function keepTenant(req, res, next) {
   storage.run(req.tenant || DEFAULT_TENANT, next);
 }
 
+/**
+ * Run fn as `tenant`, e.g. when a frame proves it holds a pairing secret
+ * before it has a session.
+ */
+function runWithTenant(tenant, fn) {
+  return storage.run(tenant || DEFAULT_TENANT, fn);
+}
+
 function currentTenant() {
   return storage.getStore() || DEFAULT_TENANT;
 }
 
-module.exports = { DEFAULT_TENANT, tenantMiddleware, keepTenant, currentTenant };
+module.exports = { DEFAULT_TENANT, tenantMiddleware, keepTenant, runWithTenant, currentTenant };

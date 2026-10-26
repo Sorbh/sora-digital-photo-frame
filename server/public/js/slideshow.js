@@ -227,6 +227,8 @@ class AuthenticationManager {
             if (data.authenticated) {
                 this.handleAuthSuccess(data.account);
             } else {
+                // Hosted frames pair by QR code only
+                if (data.pinSignIn === false) this.pinForm.style.display = 'none';
                 this.showAuthOverlay();
             }
         } catch (error) {

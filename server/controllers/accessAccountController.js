@@ -3,6 +3,7 @@ const { getDataStore } = require('../store');
 class AccessAccountController {
     constructor() {
         // Rate limiting for PIN attempts
+        this.pinSignIn = true; // createApp({ pinSignIn: false }) turns it off (hosted: frames pair instead)
         this.rateLimiter = new Map(); // Map<IP, {attempts: number, lockoutUntil: number, firstAttempt: number}>
         this.maxAttempts = 5; // Maximum failed attempts
         this.lockoutDuration = 15 * 60 * 1000; // 15 minutes in milliseconds
@@ -262,6 +263,9 @@ class AccessAccountController {
     }
 
     async authenticateWithPin(req, res) {
+        if (!this.pinSignIn) {
+            return res.status(404).json({ success: false, error: 'PIN sign-in is turned off', code: 'PIN_DISABLED' });
+        }
         try {
             const { pin } = req.body;
             const clientIP = req.ip || req.connection.remoteAddress || req.socket.remoteAddress;
@@ -340,11 +344,13 @@ class AccessAccountController {
             if (req.session.accessAccount) {
                 res.json({
                     authenticated: true,
-                    account: req.session.accessAccount
+                    account: req.session.accessAccount,
+                    pinSignIn: this.pinSignIn
                 });
             } else {
                 res.json({
-                    authenticated: false
+                    authenticated: false,
+                    pinSignIn: this.pinSignIn
                 });
             }
         } catch (error) {

@@ -1,5 +1,9 @@
+const bcrypt = require('bcryptjs');
 const { getDataStore } = require('../store');
 const { passClientError } = require('../utils/httpError');
+
+// bcrypt cost for PINs: each sign-in compares against every account's hash, so keep it modest
+const PIN_ROUNDS = 10;
 
 class AccessAccountController {
     constructor() {
@@ -13,10 +17,42 @@ class AccessAccountController {
 
     async loadAccounts() {
         try {
-            return await getDataStore().get('access-accounts', []);
+            const accounts = await getDataStore().get('access-accounts', []);
+            // Accounts saved before PINs were hashed are hashed the first time they're read
+            return accounts.some(account => account.pin !== undefined) ? await this.hashStoredPins() : accounts;
         } catch (error) {
             return [];
         }
+    }
+
+    hashStoredPins() {
+        return getDataStore().update('access-accounts', [], accounts => Promise.all(accounts.map(async (account) => {
+            if (account.pin === undefined) return account;
+            const { pin, ...rest } = account;
+            return { ...rest, pinHash: await this.hashPin(pin) };
+        })));
+    }
+
+    hashPin(pin) {
+        return bcrypt.hash(String(pin), PIN_ROUNDS);
+    }
+
+    async pinMatches(account, pin) {
+        if (account.pinHash) return bcrypt.compare(String(pin), account.pinHash);
+        return account.pin !== undefined && String(account.pin) === String(pin);
+    }
+
+    // The account with this PIN, if any (optionally ignoring one account)
+    async findByPin(accounts, pin, exceptId = null) {
+        for (const account of accounts) {
+            if (account.id !== exceptId && await this.pinMatches(account, pin)) return account;
+        }
+        return null;
+    }
+
+    // What the admin page gets: never the PIN or its hash
+    publicAccount({ pin, pinHash, ...account }) {
+        return { ...account, hasPin: Boolean(pin || pinHash) };
     }
 
     async saveAccounts(accounts) {
@@ -98,15 +134,15 @@ class AccessAccountController {
     // A new account with a PIN nobody has yet (used when a frame is paired by QR code)
     async addAccountWithRandomPin({ name, assignedFolders = [] }) {
         let account;
-        await getDataStore().update('access-accounts', [], accounts => {
+        await getDataStore().update('access-accounts', [], async accounts => {
             let pin;
             do {
                 pin = String(require('crypto').randomInt(100000, 1000000));
-            } while (accounts.some(existing => existing.pin === pin));
+            } while (await this.findByPin(accounts, pin));
             account = {
                 id: this.generateAccountId(),
                 name,
-                pin,
+                pinHash: await this.hashPin(pin),
                 assignedFolders,
                 createdAt: new Date().toISOString(),
                 lastAccessed: null
@@ -119,7 +155,7 @@ class AccessAccountController {
     async getAllAccounts(req, res) {
         try {
             const accounts = await this.loadAccounts();
-            res.json({ accounts });
+            res.json({ accounts: accounts.map(account => this.publicAccount(account)) });
         } catch (error) {
             if (passClientError(res, error)) return;
             console.error('Error fetching accounts:', error);
@@ -143,13 +179,15 @@ class AccessAccountController {
 
             let duplicate = false;
             let newAccount;
-            await getDataStore().update('access-accounts', [], accounts => {
-                duplicate = accounts.some(account => account.pin === pin);
+            const pinHash = await this.hashPin(pin);
+            await this.loadAccounts(); // hash any PINs still stored as-is first
+            await getDataStore().update('access-accounts', [], async accounts => {
+                duplicate = Boolean(await this.findByPin(accounts, pin));
                 if (duplicate) return accounts;
                 newAccount = {
                     id: this.generateAccountId(),
                     name,
-                    pin,
+                    pinHash,
                     assignedFolders,
                     createdAt: new Date().toISOString(),
                     lastAccessed: null
@@ -166,7 +204,7 @@ class AccessAccountController {
 
             res.status(201).json({
                 success: true,
-                account: newAccount
+                account: this.publicAccount(newAccount)
             });
         } catch (error) {
             if (passClientError(res, error)) return;
@@ -183,22 +221,26 @@ class AccessAccountController {
             const { id } = req.params;
             const { name, pin, assignedFolders = [] } = req.body;
 
-            if (!name || !pin) {
+            // PINs can't be shown, so a blank PIN keeps the current one
+            if (!name) {
                 return res.status(400).json({
                     success: false,
-                    error: 'Name and PIN are required'
+                    error: 'Name is required'
                 });
             }
 
             let notFound = false;
             let duplicate = false;
             let updatedAccount;
-            await getDataStore().update('access-accounts', [], accounts => {
+            const pinHash = pin ? await this.hashPin(pin) : null;
+            await this.loadAccounts();
+            await getDataStore().update('access-accounts', [], async accounts => {
                 const accountIndex = accounts.findIndex(account => account.id === id);
                 if (accountIndex === -1) { notFound = true; return accounts; }
-                duplicate = accounts.some(account => account.pin === pin && account.id !== id);
+                duplicate = Boolean(pin && await this.findByPin(accounts, pin, id));
                 if (duplicate) return accounts;
-                updatedAccount = { ...accounts[accountIndex], name, pin, assignedFolders };
+                updatedAccount = { ...accounts[accountIndex], name, assignedFolders };
+                if (pinHash) { delete updatedAccount.pin; updatedAccount.pinHash = pinHash; }
                 const next = [...accounts];
                 next[accountIndex] = updatedAccount;
                 return next;
@@ -221,7 +263,7 @@ class AccessAccountController {
 
             res.json({
                 success: true,
-                account: updatedAccount
+                account: this.publicAccount(updatedAccount)
             });
         } catch (error) {
             if (passClientError(res, error)) return;
@@ -295,7 +337,7 @@ class AccessAccountController {
             }
 
             const accounts = await this.loadAccounts();
-            const account = accounts.find(acc => acc.pin === pin);
+            const account = await this.findByPin(accounts, pin);
 
             if (!account) {
                 // Record failed attempt

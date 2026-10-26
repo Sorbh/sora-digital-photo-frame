@@ -135,11 +135,7 @@ body {
     font-family: var(--font-mono);
     font-size: 0.8125rem;
     letter-spacing: 0.2em;
-    cursor: pointer;
-}
-
-.pin-reveal:hover {
-    color: var(--foreground);
+    cursor: help;
 }
 
 .pin-reveal .material-symbols-outlined {

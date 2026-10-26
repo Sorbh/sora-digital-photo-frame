@@ -49,6 +49,7 @@ class AccessAccountsManager {
 
         // Form validation
         document.getElementById('accountPin').addEventListener('input', (e) => {
+            if (this.currentEditingAccount && !e.target.value) return this.clearErrors();
             this.validatePin(e.target.value);
         });
 
@@ -166,10 +167,10 @@ class AccessAccountsManager {
                     <div class="account-avatar" aria-hidden="true">${esc(account.name.trim().charAt(0).toUpperCase() || '?')}</div>
                     <div class="account-heading">
                         <h3 class="account-name">${esc(account.name)}</h3>
-                        <button class="pin-reveal" data-pin="${esc(account.pin)}" title="Show PIN" aria-label="Show PIN">
+                        <span class="pin-reveal" title="PINs are stored hashed, so they can't be shown. Edit the account to set a new one.">
                             <span class="material-symbols-outlined">key</span>
-                            <span class="pin-value">${'•'.repeat(String(account.pin).length)}</span>
-                        </button>
+                            <span class="pin-value">••••••</span>
+                        </span>
                     </div>
                     <div class="account-actions">
                         <button class="tb-btn icon edit-account" title="Edit account" data-account-id="${esc(account.id)}">
@@ -237,16 +238,6 @@ class AccessAccountsManager {
             btn.addEventListener('click', () => this.removeDevice(btn.dataset.deviceId, btn.dataset.deviceName));
         });
 
-        // PINs stay masked until asked for
-        document.querySelectorAll('.pin-reveal').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const value = btn.querySelector('.pin-value');
-                const shown = btn.classList.toggle('revealed');
-                value.textContent = shown ? btn.dataset.pin : '•'.repeat(btn.dataset.pin.length);
-                btn.title = shown ? 'Hide PIN' : 'Show PIN';
-                btn.setAttribute('aria-label', btn.title);
-            });
-        });
 
         // Edit account buttons
         document.querySelectorAll('.edit-account').forEach(btn => {
@@ -274,10 +265,17 @@ class AccessAccountsManager {
         if (account) {
             title.textContent = 'Edit Access Account';
             document.getElementById('accountName').value = account.name;
-            document.getElementById('accountPin').value = account.pin;
+            // PINs are stored hashed: leave it blank to keep the current one
+            const pinInput = document.getElementById('accountPin');
+            pinInput.value = '';
+            pinInput.required = false;
+            pinInput.placeholder = 'Leave blank to keep the current PIN';
         } else {
             title.textContent = 'Create Access Account';
             form.reset();
+            const pinInput = document.getElementById('accountPin');
+            pinInput.required = true;
+            pinInput.placeholder = '4-6 digit PIN';
         }
 
         this.clearErrors();
@@ -442,7 +440,8 @@ class AccessAccountsManager {
             isValid = false;
         }
 
-        if (!this.validatePin(pin)) {
+        // Editing with a blank PIN keeps the current one
+        if (!(this.currentEditingAccount && !pin) && !this.validatePin(pin)) {
             isValid = false;
         }
 

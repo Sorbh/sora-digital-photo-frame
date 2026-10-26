@@ -324,8 +324,7 @@ class AccessAccountController {
                     id: account.id,
                     name: account.name,
                     assignedFolders: account.assignedFolders
-                },
-                sessionId: req.sessionID
+                }
             });
         } catch (error) {
             console.error('Error authenticating with PIN:', error);

@@ -3,7 +3,6 @@ const bcrypt = require('bcryptjs');
 // Check if user is authenticated (default: the admin password session)
 const sessionRequireAuth = (req, res, next) => {
   console.log('🔐 Auth Check:', {
-    sessionId: req.sessionID,
     hasSession: !!req.session,
     authenticated: req.session?.authenticated,
     path: req.path,
@@ -94,11 +93,7 @@ const login = async (req, res) => {
     req.session.authenticated = true;
     req.session.loginTime = new Date();
 
-    console.log('🔓 Login successful:', {
-      sessionId: req.sessionID,
-      sessionData: req.session,
-      cookies: req.headers.cookie ? 'present' : 'missing'
-    });
+    console.log('🔓 Login successful');
 
     // If it's an API request, return JSON success
     if (req.headers['content-type'] === 'application/json') {

@@ -1,6 +1,7 @@
 const exifr = require('exifr');
 
-const { toAdminPath } = require('../utils/safePath');
+const path = require('path');
+const { toAdminPath, UPLOADS_DIR } = require('../utils/safePath');
 const { getLibrary } = require('../library');
 const { getDataStore } = require('../store');
 const { currentTenant } = require('../context');
@@ -95,6 +96,19 @@ class PhotoInfoService {
     await this.loadCache();
     const stat = await getLibrary().stat(toAdminPath(fullPath));
     this.info[relativePath] = { key: `${stat.size}:${Math.round(stat.mtimeMs)}`, ...await this.readExifBuffer(originalBuffer) };
+    this.scheduleSave();
+  }
+
+  // Carry the original upload's capture data when a photo moves (its WebP copy has no EXIF).
+  async moveUpload(fromPath, toPath) {
+    await this.loadCache();
+    const from = path.relative(UPLOADS_DIR, fromPath);
+    const to = path.relative(UPLOADS_DIR, toPath);
+    const remembered = this.info[from];
+    if (!remembered) return;
+    const stat = await getLibrary().stat(toAdminPath(toPath));
+    this.info[to] = { ...remembered, key: `${stat.size}:${Math.round(stat.mtimeMs)}` };
+    delete this.info[from];
     this.scheduleSave();
   }
 

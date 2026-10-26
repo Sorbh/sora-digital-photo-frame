@@ -360,6 +360,8 @@ class ImageController {
         try {
           const moved = await getLibrary().movePhoto(toAdminPath(fullPath), toAdminPath(destDir));
           await thumbnails.remove(fullPath);
+          await photoInfo.moveUpload(fullPath, resolveAdminPath(moved.path))
+            .catch(error => console.warn('Could not move photo info:', error.message));
           if (!isSnap) {
             await snaps.photoMoved(path.relative(this.uploadsDir, fullPath), path.relative('uploads', moved.path));
           }

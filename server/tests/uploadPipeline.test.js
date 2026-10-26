@@ -28,6 +28,7 @@ describe('Upload pipeline', () => {
 
   beforeAll(async () => {
     await fs.ensureDir(path.join(testUploadsDir, 'family'));
+    await fs.ensureDir(path.join(testUploadsDir, 'trips'));
     await agent.post('/api/auth/login').send({ password: 'test-admin-pass' }).expect(200);
 
     // A 4000px-wide camera photo with a capture date and camera make in EXIF
@@ -82,6 +83,15 @@ describe('Upload pipeline', () => {
   test('keeps the capture date read from the original', async () => {
     const fullPath = path.join(testUploadsDir, 'family', path.basename(stored.path));
     const info = await photoInfo.get(fullPath, path.relative(testUploadsDir, fullPath));
+    expect(info.takenAt).toBe('2019-03-12T18:04:00');
+  });
+
+  // Runs last: it moves the stored photo
+  test('moving a photo keeps its capture date (the stored copy has no EXIF)', async () => {
+    await agent.post('/api/images/move').send({ paths: [stored.path], destination: 'uploads/trips' }).expect(200);
+    const movedPath = path.join(testUploadsDir, 'trips', path.basename(stored.path));
+    expect(await fs.pathExists(movedPath)).toBe(true);
+    const info = await photoInfo.get(movedPath, path.relative(testUploadsDir, movedPath));
     expect(info.takenAt).toBe('2019-03-12T18:04:00');
   });
 });

@@ -74,6 +74,12 @@ describe('Hosted, many tenants in one process', () => {
     expect((await frame.get('/whoami').expect(200)).body.id).toBe('a');
   });
 
+  test('signing a frame out clears its tenant along with its account', async () => {
+    const { frame } = await pairFrame('a');
+    await frame.delete('/api/auth/session').expect(200);
+    expect((await frame.get('/whoami').expect(200)).body.id).toBe('nobody');
+  });
+
   test('device sign-in finds the tenant from the token', async () => {
     const { collected } = await pairFrame('b');
 

@@ -367,6 +367,7 @@ class AccessAccountController {
             // A frame signing out in the admin's browser keeps the admin signed in
             if (req.session.authenticated) {
                 delete req.session.accessAccount;
+                delete req.session.tenantId;
                 return res.json({ success: true, message: 'Session cleared' });
             }
 

@@ -1,4 +1,5 @@
 const { getDataStore } = require('../store');
+const { passClientError } = require('../utils/httpError');
 
 class AccessAccountController {
     constructor() {
@@ -120,6 +121,7 @@ class AccessAccountController {
             const accounts = await this.loadAccounts();
             res.json({ accounts });
         } catch (error) {
+            if (passClientError(res, error)) return;
             console.error('Error fetching accounts:', error);
             res.status(500).json({
                 success: false,
@@ -167,6 +169,7 @@ class AccessAccountController {
                 account: newAccount
             });
         } catch (error) {
+            if (passClientError(res, error)) return;
             console.error('Error creating account:', error);
             res.status(500).json({
                 success: false,
@@ -221,6 +224,7 @@ class AccessAccountController {
                 account: updatedAccount
             });
         } catch (error) {
+            if (passClientError(res, error)) return;
             console.error('Error updating account:', error);
             res.status(500).json({
                 success: false,
@@ -254,6 +258,7 @@ class AccessAccountController {
                 message: 'Account deleted successfully'
             });
         } catch (error) {
+            if (passClientError(res, error)) return;
             console.error('Error deleting account:', error);
             res.status(500).json({
                 success: false,
@@ -331,6 +336,7 @@ class AccessAccountController {
                 }
             });
         } catch (error) {
+            if (passClientError(res, error)) return;
             console.error('Error authenticating with PIN:', error);
             res.status(500).json({
                 success: false,
@@ -354,6 +360,7 @@ class AccessAccountController {
                 });
             }
         } catch (error) {
+            if (passClientError(res, error)) return;
             console.error('Error checking session:', error);
             res.status(500).json({
                 success: false,
@@ -387,6 +394,7 @@ class AccessAccountController {
                 });
             });
         } catch (error) {
+            if (passClientError(res, error)) return;
             console.error('Error clearing session:', error);
             res.status(500).json({
                 success: false,

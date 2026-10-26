@@ -1,4 +1,5 @@
 const { getLibrary } = require('../library');
+const { passClientError } = require('../utils/httpError');
 
 const MAX_IDS = 10;
 
@@ -25,6 +26,7 @@ class FrameKeyController {
       res.set('Cache-Control', 'no-store');
       res.json({ keys });
     } catch (error) {
+      if (passClientError(res, error)) return;
       console.error('Error getting frame keys:', error);
       res.status(500).json({ message: 'Server error' });
     }

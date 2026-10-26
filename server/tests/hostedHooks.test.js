@@ -80,3 +80,27 @@ describe('Hosted hooks: tenant, auth provider, quota', () => {
     expect(tenants[0]).toEqual({ id: 'default', plan: 'self-hosted' });
   });
 });
+
+describe('Client errors from a hosted library keep their status', () => {
+  const LocalPhotoLibrary = require('../library/LocalPhotoLibrary');
+
+  // What a hosted library does for a request with no family signed in
+  class SignedOutLibrary extends LocalPhotoLibrary {
+    async listFolder() {
+      throw Object.assign(new Error('Sign in first'), { status: 401, code: 'AUTH_REQUIRED' });
+    }
+    async allPhotos() { return this.listFolder(); }
+    async exists() { return this.listFolder(); }
+  }
+
+  let app;
+  // createApp sets the library for the whole process, so only after the suite above has run
+  beforeAll(() => {
+    app = createApp({ library: new SignedOutLibrary(testUploadsDir), auth: { requireAuth: (req, res, next) => next() } });
+  });
+
+  test.each(['/api/images/random', '/api/folders'])('%s answers 401, not 500', async (url) => {
+    const res = await request(app).get(url).expect(401);
+    expect(res.body.code).toBe('AUTH_REQUIRED');
+  });
+});

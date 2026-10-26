@@ -6,6 +6,7 @@ const snaps = require('../services/snapService');
 const playOrder = require('../services/playOrderService');
 const imageController = require('./imageController');
 const { resolveAdminPath, toAdminPath } = require('../utils/safePath');
+const { passClientError } = require('../utils/httpError');
 
 class FolderController {
   constructor() {
@@ -214,6 +215,7 @@ class FolderController {
       
       res.json(response);
     } catch (error) {
+      if (passClientError(res, error)) return;
       console.error('Error getting folder structure:', error);
       res.status(500).json({ 
         success: false,
@@ -246,6 +248,7 @@ class FolderController {
 
       thumbnails.send(res, await thumbnails.getThumbnail(firstImage), { versioned: Boolean(req.query.v) });
     } catch (error) {
+      if (passClientError(res, error)) return;
       console.error('Error serving folder thumbnail:', error);
       res.status(500).json({
         success: false,
@@ -330,6 +333,7 @@ class FolderController {
         files: sorted.map(entry => entry.file)
       });
     } catch (error) {
+      if (passClientError(res, error)) return;
       console.error('Error reading folder:', error);
       res.status(500).json({ message: 'Server error' });
     }
@@ -362,6 +366,7 @@ class FolderController {
       const saved = await playOrder.write(fullPath, settings);
       res.json({ success: true, order: saved.order });
     } catch (error) {
+      if (passClientError(res, error)) return;
       console.error('Error saving play order:', error);
       res.status(500).json({ success: false, error: 'Failed to save play order' });
     }
@@ -390,6 +395,7 @@ class FolderController {
       await getLibrary().createFolder(toAdminPath(fullPath));
       res.json({ message: 'Folder created successfully', path: toAdminPath(fullPath) });
     } catch (error) {
+      if (passClientError(res, error)) return;
       console.error('Error creating folder:', error);
       res.status(500).json({ message: 'Server error' });
     }
@@ -412,6 +418,7 @@ class FolderController {
 
       res.json({ message: 'Folder deleted successfully' });
     } catch (error) {
+      if (passClientError(res, error)) return;
       console.error('Error deleting folder:', error);
       res.status(500).json({ message: 'Server error' });
     }

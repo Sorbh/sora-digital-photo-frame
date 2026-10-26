@@ -5,6 +5,7 @@ const { rotateSession } = require('../utils/session');
 
 const pairing = require('../services/pairingService');
 const accessAccounts = require('./accessAccountController');
+const { passClientError } = require('../utils/httpError');
 
 const START_LIMIT = 20; // new codes per IP in START_WINDOW_MS
 const START_WINDOW_MS = 10 * 60 * 1000;
@@ -75,6 +76,7 @@ class PairingController {
       const qr = await QRCode.toString(url, { type: 'svg', margin: 1, errorCorrectionLevel: 'M', color: { dark: '#2a1020', light: '#ffffff' } });
       res.json({ success: true, code: created.code, secret: created.secret, expiresAt: created.expiresAt, url, qr });
     } catch (error) {
+      if (passClientError(res, error)) return;
       console.error('Error starting pairing:', error);
       res.status(500).json({ success: false, error: 'Could not start pairing' });
     }
@@ -103,6 +105,7 @@ class PairingController {
         account: req.session.accessAccount
       });
     } catch (error) {
+      if (passClientError(res, error)) return;
       console.error('Error checking pairing:', error);
       res.status(500).json({ success: false, error: 'Could not check pairing' });
     }
@@ -143,6 +146,7 @@ class PairingController {
       if (!device) return res.status(404).json({ success: false, error: 'This code has expired', code: 'PAIRING_EXPIRED' });
       res.json({ success: true, device: { id: device.id, name: device.name }, account: this.sessionAccount(account) });
     } catch (error) {
+      if (passClientError(res, error)) return;
       console.error('Error approving pairing:', error);
       res.status(500).json({ success: false, error: 'Could not pair the frame' });
     }
@@ -167,6 +171,7 @@ class PairingController {
       req.session.tenantId = currentTenant().id;
       res.json({ success: true, account: req.session.accessAccount, device: { id: device.id, name: device.name } });
     } catch (error) {
+      if (passClientError(res, error)) return;
       console.error('Error signing in a device:', error);
       res.status(500).json({ success: false, error: 'Could not sign in' });
     }
@@ -178,6 +183,7 @@ class PairingController {
       const names = new Map(accounts.map(a => [a.id, a.name]));
       res.json({ success: true, devices: devices.map(d => ({ ...d, accountName: names.get(d.accountId) || null })) });
     } catch (error) {
+      if (passClientError(res, error)) return;
       console.error('Error listing devices:', error);
       res.status(500).json({ success: false, error: 'Could not list frames' });
     }
@@ -189,6 +195,7 @@ class PairingController {
       if (!removed) return res.status(404).json({ success: false, error: 'Frame not found' });
       res.json({ success: true });
     } catch (error) {
+      if (passClientError(res, error)) return;
       console.error('Error removing device:', error);
       res.status(500).json({ success: false, error: 'Could not remove the frame' });
     }

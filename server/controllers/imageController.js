@@ -9,6 +9,7 @@ const snaps = require('../services/snapService');
 const playOrder = require('../services/playOrderService');
 const photoInfo = require('../services/photoInfoService');
 const { resolveAdminPath, toAdminPath } = require('../utils/safePath');
+const { passClientError } = require('../utils/httpError');
 
 class ImageController {
   constructor() {
@@ -177,6 +178,7 @@ class ImageController {
         }
       });
     } catch (error) {
+      if (passClientError(res, error)) return;
       console.error('Error getting random image:', error);
       res.status(500).json({ message: 'Server error' });
     }
@@ -233,6 +235,7 @@ class ImageController {
 
       thumbnails.send(res, await thumbnails.getThumbnail(imagePath), { versioned: Boolean(req.query.v) });
     } catch (error) {
+      if (passClientError(res, error)) return;
       console.error('Error generating image thumbnail:', error);
       res.status(500).json({
         success: false,
@@ -303,6 +306,7 @@ class ImageController {
         this.clearImageCache();
         return res.status(413).json({ message: error.message, code: error.code, files: processedFiles });
       }
+      if (passClientError(res, error)) return;
       console.error('Error uploading images:', error);
       res.status(500).json({ message: 'Server error' });
     }
@@ -325,6 +329,7 @@ class ImageController {
       
       res.json({ message: 'Image deleted successfully' });
     } catch (error) {
+      if (passClientError(res, error)) return;
       console.error('Error deleting image:', error);
       res.status(500).json({ message: 'Server error' });
     }
@@ -380,6 +385,7 @@ class ImageController {
         ...results
       });
     } catch (error) {
+      if (passClientError(res, error)) return;
       console.error('Error moving images:', error);
       res.status(500).json({ message: 'Server error' });
     }
@@ -434,6 +440,7 @@ class ImageController {
         });
       }
     } catch (error) {
+      if (passClientError(res, error)) return;
       console.error('Error in batch delete:', error);
       res.status(500).json({ message: 'Server error during batch deletion' });
     }
@@ -466,6 +473,7 @@ class ImageController {
       const direction = angle > 0 ? 'clockwise' : 'counter-clockwise';
       res.json({ message: `Image rotated ${Math.abs(angle)}° ${direction} successfully` });
     } catch (error) {
+      if (passClientError(res, error)) return;
       console.error('Error rotating image:', error);
       res.status(500).json({ message: 'Server error' });
     }

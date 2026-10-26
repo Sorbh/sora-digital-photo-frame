@@ -2,6 +2,7 @@ const { getLibrary } = require('../library');
 const snaps = require('../services/snapService');
 const imageController = require('./imageController');
 const { resolveAdminPath, toAdminPath } = require('../utils/safePath');
+const { passClientError } = require('../utils/httpError');
 
 // Snaps are addressed like photos: ?path=uploads/Family/visit.snap.json
 class SnapController {
@@ -18,6 +19,7 @@ class SnapController {
       }
       res.json({ success: true, path: toAdminPath(fullPath), snap: await snaps.load(fullPath) });
     } catch (error) {
+      if (passClientError(res, error)) return;
       console.error('Error reading snap:', error);
       res.status(500).json({ success: false, error: 'Failed to load snap' });
     }
@@ -36,6 +38,7 @@ class SnapController {
       imageController.clearImageCache();
       res.status(201).json({ success: true, path: toAdminPath(fullPath), snap });
     } catch (error) {
+      if (passClientError(res, error)) return;
       console.error('Error creating snap:', error);
       res.status(500).json({ success: false, error: 'Failed to save snap' });
     }
@@ -52,6 +55,7 @@ class SnapController {
       if (errors) return res.status(400).json({ success: false, error: 'Please check the snap', errors });
       res.json({ success: true, path: toAdminPath(fullPath), snap });
     } catch (error) {
+      if (passClientError(res, error)) return;
       console.error('Error updating snap:', error);
       res.status(500).json({ success: false, error: 'Failed to save snap' });
     }

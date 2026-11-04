@@ -105,7 +105,12 @@ class PairingService {
     }
     if (!pairing.approved) return { status: 'waiting' };
     this.pairings.delete(pairing.code);
-    return { status: 'approved', ...pairing.approved };
+    return {
+      status: 'approved',
+      ...pairing.approved,
+      // If handing over fails, the frame can collect again on its next poll
+      restore: () => this.pairings.set(pairing.code, pairing)
+    };
   }
 
   // The frame just showed up, so Access can say when it was last seen
@@ -115,7 +120,12 @@ class PairingService {
   }
 
   async loadDevices() {
-    return getDataStore().get('devices', []);
+    // A client error means there's no tenant to look in, so no such device.
+    // Anything else is an outage, and must not look like an unpaired frame.
+    return getDataStore().get('devices', []).catch((error) => {
+      if (error.status >= 400 && error.status < 500) return [];
+      throw error;
+    });
   }
 
   async saveDevices(devices) {

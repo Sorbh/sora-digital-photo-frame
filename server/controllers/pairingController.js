@@ -88,11 +88,17 @@ class PairingController {
       if (result.status !== 'approved') return res.json({ success: true, status: result.status });
 
       // The frame has no session yet; having the pairing secret lets it act as the approving tenant
-      const account = await runWithTenant(result.tenant, async () => {
-        const found = (await accessAccounts.loadAccounts()).find(a => a.id === result.device.accountId);
-        if (found) await pairing.markSeen(result.device.id);
-        return found;
-      });
+      let account;
+      try {
+        account = await runWithTenant(result.tenant, async () => {
+          const found = (await accessAccounts.loadAccounts()).find(a => a.id === result.device.accountId);
+          if (found) await pairing.markSeen(result.device.id);
+          return found;
+        });
+      } catch (error) {
+        result.restore();
+        throw error;
+      }
       if (!account) return res.json({ success: true, status: 'expired' });
       await rotateSession(req);
       req.session.accessAccount = this.sessionAccount(account);

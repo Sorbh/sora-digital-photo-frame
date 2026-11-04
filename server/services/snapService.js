@@ -1,5 +1,6 @@
 const path = require('path');
-const fs = require('fs-extra');
+const { getLibrary } = require('../library');
+const { toAdminPath } = require('../utils/safePath');
 
 const { UPLOADS_DIR } = require('../config/paths');
 const notes = require('./noteService');
@@ -26,7 +27,7 @@ class SnapService {
   }
 
   async read(fullPath) {
-    const data = JSON.parse(await fs.readFile(fullPath, 'utf8'));
+    const data = JSON.parse((await getLibrary().readItem(toAdminPath(fullPath))).toString('utf8'));
     return data && typeof data === 'object' ? data : null;
   }
 
@@ -67,7 +68,7 @@ class SnapService {
 
     const base = this.slug(snap.title);
     let target = path.join(folderPath, base + SNAP_EXT);
-    for (let n = 2; await fs.pathExists(target); n++) {
+    for (let n = 2; await getLibrary().exists(toAdminPath(target)); n++) {
       target = path.join(folderPath, `${base}-${n}${SNAP_EXT}`);
     }
 
@@ -88,9 +89,7 @@ class SnapService {
   }
 
   async write(fullPath, snap) {
-    const tmp = `${fullPath}.${process.pid}.tmp`;
-    await fs.writeFile(tmp, JSON.stringify(snap, null, 2));
-    await fs.rename(tmp, fullPath);
+    await getLibrary().writeItem(toAdminPath(fullPath), Buffer.from(JSON.stringify(snap, null, 2)));
   }
 
   slug(title) {
@@ -106,7 +105,8 @@ class SnapService {
   // Every snap file under dir
   async findAll(dir = UPLOADS_DIR) {
     const found = [];
-    const items = await fs.readdir(dir, { withFileTypes: true }).catch(() => []);
+    const items = (await getLibrary().listItems(toAdminPath(dir)).catch(() => []))
+      .map(item => ({ name: item.name, isDirectory: () => item.isFolder, isFile: () => !item.isFolder }));
     for (const item of items) {
       if (item.name.startsWith('.')) continue;
       const fullPath = path.join(dir, item.name);

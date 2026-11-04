@@ -1,5 +1,6 @@
 const oauthManager = require('../utils/oauthManager');
 const jobManager = require('../utils/jobManager');
+const { passClientError } = require('../utils/httpError');
 
 // Simple async handler for error handling
 const asyncHandler = (fn) => (req, res, next) => {
@@ -21,6 +22,7 @@ const googlePhotosController = {
         }
       });
     } catch (error) {
+      if (passClientError(res, error)) return;
       res.status(500).json({
         success: false,
         error: {
@@ -46,6 +48,7 @@ const googlePhotosController = {
         }
       });
     } catch (error) {
+      if (passClientError(res, error)) return;
       res.status(500).json({
         success: false,
         error: {
@@ -178,6 +181,7 @@ const googlePhotosController = {
         }
       });
     } catch (error) {
+      if (passClientError(res, error)) return;
       res.status(500).json({
         success: false,
         error: {
@@ -226,6 +230,7 @@ const googlePhotosController = {
         pollingConfig: sessionData.pollingConfig
       });
     } catch (error) {
+      if (passClientError(res, error)) return;
       console.error('Picker session creation error:', error);
       res.status(500).json({
         success: false,
@@ -276,6 +281,7 @@ const googlePhotosController = {
         pollingConfig: sessionData.pollingConfig
       });
     } catch (error) {
+      if (passClientError(res, error)) return;
       console.error('Get picker session error:', error);
       res.status(500).json({
         success: false,
@@ -324,6 +330,7 @@ const googlePhotosController = {
         mediaItems: mediaItems
       });
     } catch (error) {
+      if (passClientError(res, error)) return;
       console.error('Get session media items error:', error);
       res.status(500).json({
         success: false,
@@ -394,6 +401,7 @@ const googlePhotosController = {
 
       res.send(Buffer.from(imageBuffer));
     } catch (error) {
+      if (passClientError(res, error)) return;
       console.error('Thumbnail proxy error:', error);
       res.status(500).json({
         success: false,
@@ -464,6 +472,7 @@ const googlePhotosController = {
       });
 
     } catch (error) {
+      if (passClientError(res, error)) return;
       console.error('❌ [DEBUG] Import photos error:', error);
       res.status(500).json({
         success: false,
@@ -509,6 +518,7 @@ const googlePhotosController = {
       });
 
     } catch (error) {
+      if (passClientError(res, error)) return;
       console.error('❌ [DEBUG] Get job status error:', error);
       res.status(500).json({
         success: false,

@@ -1,5 +1,6 @@
 const path = require('path');
-const fs = require('fs-extra');
+const { UPLOADS_DIR } = require('../config/paths');
+const { getDataStore } = require('../store');
 
 const photoInfo = require('./photoInfoService');
 
@@ -16,8 +17,14 @@ const ORDERS = ['shuffle', 'newest', 'oldest', 'custom'];
  *            file names; anything not listed plays after, by name)
  */
 class PlayOrderService {
+  name(dirPath) {
+    const relative = path.relative(UPLOADS_DIR, dirPath);
+    if (relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) throw new Error('Invalid folder path');
+    return `folder-settings:${relative.split(path.sep).join('/')}`;
+  }
+
   async read(dirPath) {
-    const saved = await fs.readJson(path.join(dirPath, SETTINGS_FILE)).catch(() => ({}));
+    const saved = await getDataStore().get(this.name(dirPath), {}).catch(() => ({}));
     return {
       order: ORDERS.includes(saved.order) ? saved.order : 'shuffle',
       sequence: Array.isArray(saved.sequence) ? saved.sequence.filter(n => typeof n === 'string') : []
@@ -25,10 +32,11 @@ class PlayOrderService {
   }
 
   async write(dirPath, settings) {
-    const current = await this.read(dirPath);
-    const next = { ...current, ...settings };
-    await fs.writeJson(path.join(dirPath, SETTINGS_FILE), next, { spaces: 2 });
-    return next;
+    return getDataStore().update(this.name(dirPath), {}, saved => ({
+      order: ORDERS.includes(saved.order) ? saved.order : 'shuffle',
+      sequence: Array.isArray(saved.sequence) ? saved.sequence.filter(n => typeof n === 'string') : [],
+      ...settings
+    }));
   }
 
   /**

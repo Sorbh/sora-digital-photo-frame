@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const { currentTenant } = require('../context');
 
 class JobManager {
   constructor() {
@@ -16,6 +17,7 @@ class JobManager {
       status: 'pending', // pending, running, completed, failed
       data,
       userId,
+      tenantId: currentTenant().id,
       createdAt: new Date(),
       startedAt: null,
       completedAt: null,
@@ -72,8 +74,8 @@ class JobManager {
   // Execute Google Photos import job
   async executeGooglePhotosImport(job) {
     const { mediaItems, destinationPath, accessToken } = job.data;
-    const path = require('path');
-    const fs = require('fs').promises;
+    const { getLibrary } = require('../library');
+    const { assertCanAdd } = require('../services/quotaService');
 
     console.log('🔧 [DEBUG] Executing Google Photos import job:', job.id);
     console.log('🔧 [DEBUG] Importing', mediaItems.length, 'photos to', destinationPath);
@@ -81,15 +83,21 @@ class JobManager {
     // Set up progress tracking
     job.progress.total = mediaItems.length;
 
-    // Ensure destination directory exists
-    const fullDestinationPath = path.join(process.cwd(), destinationPath);
-    await fs.mkdir(fullDestinationPath, { recursive: true });
+    // Ensure destination folder exists (the library refuses paths outside uploads/)
+    await getLibrary().createFolder(destinationPath);
+    let quotaReached = false;
 
     const importResults = [];
 
     for (let i = 0; i < mediaItems.length; i++) {
       const item = mediaItems[i];
       
+      if (quotaReached) {
+        job.progress.failed++;
+        importResults.push({ id: item.id, success: false, error: 'Storage limit reached' });
+        continue;
+      }
+
       try {
         console.log('🔧 [DEBUG] Processing item', i + 1, 'of', mediaItems.length, ':', item.id);
 
@@ -144,11 +152,15 @@ class JobManager {
 
         // Ensure filename is safe
         filename = filename.replace(/[^a-zA-Z0-9.-]/g, '_');
-        const filePath = path.join(fullDestinationPath, filename);
 
         // Save the file
-        const imageBuffer = await response.arrayBuffer();
-        await fs.writeFile(filePath, Buffer.from(imageBuffer));
+        const imageBuffer = Buffer.from(await response.arrayBuffer());
+        await assertCanAdd(imageBuffer.length);
+        const added = await getLibrary().addPhoto(destinationPath, {
+          buffer: imageBuffer,
+          originalName: filename,
+          contentType: response.headers.get('content-type')
+        });
 
         console.log('✅ [DEBUG] Successfully imported:', filename);
         job.progress.completed++;
@@ -156,11 +168,12 @@ class JobManager {
           id: item.id,
           success: true,
           filename: filename,
-          path: path.join(destinationPath, filename)
+          path: added.path
         });
 
       } catch (error) {
         console.error('❌ [DEBUG] Error importing photo:', item.id, error);
+        if (error.code === 'QUOTA_EXCEEDED') quotaReached = true;
         job.progress.failed++;
         importResults.push({
           id: item.id,
@@ -197,7 +210,8 @@ class JobManager {
   // Get job status (public info only)
   getJobStatus(jobId) {
     const job = this.getJob(jobId);
-    if (!job) {
+    // Another tenant's job looks the same as no job
+    if (!job || job.tenantId !== currentTenant().id) {
       return null;
     }
 

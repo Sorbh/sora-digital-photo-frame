@@ -995,22 +995,41 @@ class PhotoFrameAdmin {
         return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
     }
 
+    // The server takes a limited number of files per request. Answers like a fetch
+    // response: null if the session expired, otherwise { ok, json() } for the whole upload.
+    async uploadInBatches(files, targetPath, batchSize = 10) {
+        const list = Array.from(files);
+        const uploaded = [];
+        for (let i = 0; i < list.length; i += batchSize) {
+            // path goes first so multer sees it before the files arrive
+            const formData = new FormData();
+            formData.append('path', targetPath);
+            list.slice(i, i + batchSize).forEach(file => formData.append('images', file));
+
+            const response = await this.authenticatedFetch('/api/upload', { method: 'POST', body: formData });
+            if (!response) return null;
+            const data = await response.json().catch(() => ({}));
+            // A failed batch can still have saved some files (quota running out mid-way)
+            uploaded.push(...(data.files || []));
+            if (!response.ok) {
+                const message = data.message || 'Upload failed';
+                if (uploaded.length) this.loadFolderContents(); // show what did get saved
+                return { ok: false, json: async () => ({
+                    ...data,
+                    message: uploaded.length ? `${uploaded.length} of ${list.length} uploaded. ${message}` : message
+                }) };
+            }
+        }
+        return { ok: true, json: async () => ({ files: uploaded }) };
+    }
+
     async uploadFiles() {
         if (this.selectedFiles.length === 0) return;
-        
-        const formData = new FormData();
-        this.selectedFiles.forEach(file => {
-            formData.append('images', file);
-        });
-        formData.append('path', this.currentPath);
         
         this.showUploadProgress();
         
         try {
-            const response = await this.authenticatedFetch('/api/upload', {
-                method: 'POST',
-                body: formData
-            });
+            const response = await this.uploadInBatches(this.selectedFiles, this.currentPath);
             if (!response) {
                 this.hideUploadProgress();
                 return; // Session expired
@@ -1058,21 +1077,11 @@ class PhotoFrameAdmin {
     async uploadFilesDirectly(files, targetPath = this.currentPath) {
         if (files.length === 0) return;
         
-        // path goes first so multer sees it before the files arrive
-        const formData = new FormData();
-        formData.append('path', targetPath);
-        files.forEach(file => {
-            formData.append('images', file);
-        });
-
         const folderName = targetPath === 'uploads' ? 'Library' : targetPath.split('/').pop();
         this.showToast(`Uploading ${files.length} ${files.length === 1 ? 'photo' : 'photos'} to ${folderName}…`, 'info');
         
         try {
-            const response = await this.authenticatedFetch('/api/upload', {
-                method: 'POST',
-                body: formData
-            });
+            const response = await this.uploadInBatches(files, targetPath);
             if (!response) return; // Session expired
             
             const data = await response.json();
@@ -1865,19 +1874,10 @@ class PhotoFrameAdmin {
     async uploadEmptyStateFiles() {
         if (!this.emptyStateSelectedFiles || this.emptyStateSelectedFiles.length === 0) return;
         
-        const formData = new FormData();
-        this.emptyStateSelectedFiles.forEach(file => {
-            formData.append('images', file);
-        });
-        formData.append('path', this.currentPath);
-        
         this.showEmptyStateUploadProgress();
         
         try {
-            const response = await this.authenticatedFetch('/api/upload', {
-                method: 'POST',
-                body: formData
-            });
+            const response = await this.uploadInBatches(this.emptyStateSelectedFiles, this.currentPath);
             if (!response) {
                 this.hideEmptyStateUploadProgress();
                 return; // Session expired

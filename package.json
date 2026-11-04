@@ -12,5 +12,5 @@
   "engines": {
     "node": ">=18"
   },
-  "license": "ISC"
+  "license": "AGPL-3.0-only"
 }

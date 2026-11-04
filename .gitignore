@@ -128,6 +128,9 @@ Thumbs.db
 uploads/
 !uploads/.gitkeep
 server/data/
+
+# Private plans (paid service, pricing): never in the public repo
+docs/private/
 temp/
 logs/
 *.log

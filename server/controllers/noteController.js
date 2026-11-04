@@ -1,4 +1,5 @@
 const notes = require('../services/noteService');
+const { passClientError } = require('../utils/httpError');
 
 class NoteController {
   // All notes for the admin Notes page, each with its current status
@@ -6,6 +7,7 @@ class NoteController {
     try {
       res.json({ success: true, notes: await notes.list() });
     } catch (error) {
+      if (passClientError(res, error)) return;
       console.error('Error listing notes:', error);
       res.status(500).json({ success: false, error: 'Failed to load notes' });
     }
@@ -17,6 +19,7 @@ class NoteController {
       if (errors) return res.status(400).json({ success: false, error: 'Please check the note', errors });
       res.status(201).json({ success: true, note });
     } catch (error) {
+      if (passClientError(res, error)) return;
       console.error('Error creating note:', error);
       res.status(500).json({ success: false, error: 'Failed to save note' });
     }
@@ -29,6 +32,7 @@ class NoteController {
       if (errors) return res.status(400).json({ success: false, error: 'Please check the note', errors });
       res.json({ success: true, note });
     } catch (error) {
+      if (passClientError(res, error)) return;
       console.error('Error updating note:', error);
       res.status(500).json({ success: false, error: 'Failed to save note' });
     }
@@ -41,6 +45,7 @@ class NoteController {
       }
       res.json({ success: true });
     } catch (error) {
+      if (passClientError(res, error)) return;
       console.error('Error deleting note:', error);
       res.status(500).json({ success: false, error: 'Failed to delete note' });
     }
@@ -51,6 +56,7 @@ class NoteController {
     try {
       res.json({ success: true, notes: await notes.active(req.session) });
     } catch (error) {
+      if (passClientError(res, error)) return;
       console.error('Error loading active notes:', error);
       res.status(500).json({ success: false, error: 'Failed to load notes' });
     }

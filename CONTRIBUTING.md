@@ -6,6 +6,8 @@ Thanks for helping improve SORA Frame.
 2. Run `npm test` before opening a pull request.
 3. Keep pull requests focused on one change.
 
+Changing an option of `createApp()`? See [HOOKS.md](HOOKS.md): those options are a public contract.
+
 ## Sign your commits (DCO)
 
 This project uses the [Developer Certificate of Origin](https://developercertificate.org/).

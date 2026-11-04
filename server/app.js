@@ -32,7 +32,8 @@ const accessAccounts = require('./controllers/accessAccountController');
  *   library       photo storage implementation (default: local uploads folder)
  *   dataStore     JSON document storage (default: local data, cache and folder files)
  *   resolveTenant async function(req) -> { id, plan } or null (default: one 'default' tenant)
- *   auth          { requireAuth, requireGuest } middleware (default: admin password session)
+ *   auth          { requireAuth, requireGuest, requireViewer } middleware, all optional
+ *                 (default: admin password session)
  *   quota         { canAdd(bytes) -> { ok, message } } for the current tenant (default: unlimited)
  *   events        { devicePaired, devicesRemoved } handlers (see events.js)
  *   pinSignIn     false turns off PIN sign-in for frames (hosted: frames pair by QR instead)

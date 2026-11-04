@@ -149,7 +149,9 @@ class ImageController {
       }
 
       const relativePath = getLibrary().photoUrl(toAdminPath(randomImage.path));
-      const info = await this.describe(randomImage);
+      // When and where a photo was taken is private: only signed-in viewers get it
+      const signedIn = req.session && (req.session.authenticated || req.session.accessAccount);
+      const info = signedIn ? await this.describe(randomImage) : { takenAt: null, place: null };
       const fullUrl = `${req.protocol}://${req.get('host')}${relativePath}`;
       // Remote encrypted storage: the frame may fetch the stored bytes and decrypt them itself
       const rawUrl = getLibrary().rawUrl?.(toAdminPath(randomImage.path)) || null;
@@ -466,6 +468,8 @@ class ImageController {
         .toFormat(this.formatFor(fullPath), { quality: parseInt(process.env.IMAGE_QUALITY) || 85 })
         .toBuffer();
       await getLibrary().writeItem(toAdminPath(fullPath), buffer);
+      await photoInfo.moveUpload(fullPath, fullPath)
+        .catch(error => console.warn('Could not keep photo info:', error.message));
 
       // Clear cache after rotation to update available images
       this.clearImageCache();

@@ -108,7 +108,7 @@ class PhotoInfoService {
     if (!remembered) return;
     const stat = await getLibrary().stat(toAdminPath(toPath));
     this.info[to] = { ...remembered, key: `${stat.size}:${Math.round(stat.mtimeMs)}` };
-    delete this.info[from];
+    if (from !== to) delete this.info[from];
     this.scheduleSave();
   }
 

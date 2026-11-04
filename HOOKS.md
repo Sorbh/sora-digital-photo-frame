@@ -6,7 +6,7 @@ These options are a public contract. Treat a change to a name, an argument or a 
 
 | Option | Shape | Default | Defined in |
 |---|---|---|---|
-| `library` | `PhotoLibrary` subclass | Local uploads folder | `server/library/PhotoLibrary.js` |
+| `library` | `PhotoLibrary` subclass. May also offer `rawUrl(adminPath)`, which lets frames fetch encrypted photos from remote storage and decrypt them in the browser | Local uploads folder | `server/library/PhotoLibrary.js` |
 | `dataStore` | `DataStore` subclass: `get`, `set`, `update` | Local data files | `server/store/DataStore.js` |
 | `resolveTenant` | `async (req) => ({ id, plan })` or `null` | One `default` tenant | `server/context.js` |
 | `auth` | `{ requireAuth, requireGuest, requireViewer }` middleware, all optional | Admin password session | `server/middleware/auth.js` |

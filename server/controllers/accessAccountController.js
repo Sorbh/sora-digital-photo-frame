@@ -1,6 +1,8 @@
 const bcrypt = require('bcryptjs');
 const { getDataStore } = require('../store');
 const { passClientError } = require('../utils/httpError');
+const { rotateSession } = require('../utils/session');
+const { currentTenant } = require('../context');
 
 // bcrypt cost for PINs: each sign-in compares against every account's hash, so keep it modest
 const PIN_ROUNDS = 10;
@@ -16,13 +18,9 @@ class AccessAccountController {
     }
 
     async loadAccounts() {
-        try {
-            const accounts = await getDataStore().get('access-accounts', []);
-            // Accounts saved before PINs were hashed are hashed the first time they're read
-            return accounts.some(account => account.pin !== undefined) ? await this.hashStoredPins() : accounts;
-        } catch (error) {
-            return [];
-        }
+        const accounts = await getDataStore().get('access-accounts', []);
+        // Accounts saved before PINs were hashed are hashed the first time they're read
+        return accounts.some(account => account.pin !== undefined) ? await this.hashStoredPins() : accounts;
     }
 
     hashStoredPins() {
@@ -278,13 +276,7 @@ class AccessAccountController {
     async deleteAccount(req, res) {
         try {
             const { id } = req.params;
-            let notFound = false;
-            await getDataStore().update('access-accounts', [], accounts => {
-                const kept = accounts.filter(account => account.id !== id);
-                notFound = kept.length === accounts.length;
-                return kept;
-            });
-            if (notFound) {
+            if (!(await this.loadAccounts()).some(account => account.id === id)) {
                 return res.status(404).json({
                     success: false,
                     error: 'Account not found',
@@ -294,6 +286,7 @@ class AccessAccountController {
 
             // Frames paired to this account stop working with it
             await require('../services/pairingService').removeDevices(device => device.accountId === id);
+            await getDataStore().update('access-accounts', [], accounts => accounts.filter(account => account.id !== id));
 
             res.json({
                 success: true,
@@ -362,12 +355,14 @@ class AccessAccountController {
             await getDataStore().update('access-accounts', [], current => current.map(item =>
                 item.id === account.id ? { ...item, lastAccessed: new Date().toISOString() } : item));
 
-            // Store account info in session
+            // Store account info in a new session, so an id planted before sign-in is worthless
+            await rotateSession(req);
             req.session.accessAccount = {
                 id: account.id,
                 name: account.name,
                 assignedFolders: account.assignedFolders
             };
+            req.session.tenantId = currentTenant().id;
 
             res.json({
                 success: true,

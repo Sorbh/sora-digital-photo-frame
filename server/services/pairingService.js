@@ -115,7 +115,7 @@ class PairingService {
   }
 
   async loadDevices() {
-    return getDataStore().get('devices', []).catch(() => []);
+    return getDataStore().get('devices', []);
   }
 
   async saveDevices(devices) {
@@ -144,13 +144,20 @@ class PairingService {
   }
 
   async removeDevices(match) {
-    let removedIds = [];
+    let removed = [];
     await getDataStore().update('devices', [], devices => {
-      removedIds = devices.filter(d => match(d)).map(d => d.id);
+      removed = devices.filter(d => match(d));
       return devices.filter(d => !match(d));
     });
-    if (removedIds.length) await emit('devicesRemoved', { deviceIds: removedIds, tenantId: currentTenant().id });
-    return removedIds.length;
+    if (!removed.length) return 0;
+    try {
+      await emit('devicesRemoved', { deviceIds: removed.map(d => d.id), tenantId: currentTenant().id });
+    } catch (error) {
+      // As in approve(): the action fails as a whole, so the host's index never misses it
+      await getDataStore().update('devices', [], devices => [...devices, ...removed]);
+      throw error;
+    }
+    return removed.length;
   }
 }
 

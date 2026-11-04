@@ -109,6 +109,7 @@ Settings live in `server/.env` (created on first `npm install`).
 | `UPLOAD_DIR` | `uploads` | Where photos are stored |
 | `DEFAULT_SLIDESHOW_INTERVAL` | `15000` | Time per photo, in ms |
 | `MAX_FILE_SIZE` | `10485760` | Upload limit, in bytes (10 MB) |
+| `MAX_FILES_PER_UPLOAD` | `10` | Files per upload request; the admin page sends larger selections in batches |
 | `ENABLE_GOOGLE_PHOTOS` | `false` | Turn on Google Photos import |
 
 Supported formats: JPEG, PNG, WebP and GIF.

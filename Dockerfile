@@ -48,9 +48,12 @@ RUN npm ci --only=production --omit=dev && \
 COPY --from=builder --chown=photoframe:nodejs /app/*.js ./
 COPY --from=builder --chown=photoframe:nodejs /app/config ./config
 COPY --from=builder --chown=photoframe:nodejs /app/controllers ./controllers
+COPY --from=builder --chown=photoframe:nodejs /app/crypto ./crypto
+COPY --from=builder --chown=photoframe:nodejs /app/library ./library
 COPY --from=builder --chown=photoframe:nodejs /app/middleware ./middleware
 COPY --from=builder --chown=photoframe:nodejs /app/routes ./routes
 COPY --from=builder --chown=photoframe:nodejs /app/services ./services
+COPY --from=builder --chown=photoframe:nodejs /app/store ./store
 COPY --from=builder --chown=photoframe:nodejs /app/utils ./utils
 COPY --from=builder --chown=photoframe:nodejs /app/public ./public
 

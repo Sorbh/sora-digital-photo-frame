@@ -21,3 +21,19 @@ jobs:
           cache-dependency-path: server/package-lock.json
       - run: npm ci
       - run: npx jest --ci
+
+  docker:
+    name: Docker image starts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t sora-frame:ci .
+      - run: docker run -d --name sora -p 3000:3000 -e NODE_ENV=production -e SESSION_SECRET=ci-secret -e ADMIN_PASSWORD=ci-password sora-frame:ci
+      - name: Wait for the health check
+        run: |
+          for i in $(seq 1 30); do
+            curl -fs http://localhost:3000/api/health && exit 0
+            sleep 2
+          done
+          docker logs sora
+          exit 1

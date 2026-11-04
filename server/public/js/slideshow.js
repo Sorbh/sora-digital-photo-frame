@@ -4,10 +4,6 @@ const RENEW_MS = 6 * 60 * 60 * 1000; // sessions last a day; paired frames sign 
 class AuthenticationManager {
     constructor() {
         this.isAuthenticated = false;
-        // Browser-side decryption (remote encrypted storage only): keys by id, and
-        // each slide's object URL so it can be released when the slide is reused
-        this.frameKeys = new Map();
-        this.objectUrls = [null, null];
         this.authOverlay = document.getElementById('authOverlay');
         this.pinForm = document.getElementById('pinForm');
         this.pinInput = document.getElementById('pinInput');
@@ -382,6 +378,10 @@ function formatTakenAt(takenAt) {
 class PhotoFrameSlideshow {
     constructor() {
         this.currentSlide = 0;
+        // Browser-side decryption (remote encrypted storage only): keys by id, and
+        // each slide's object URL so it can be released when the slide is reused
+        this.frameKeys = new Map();
+        this.objectUrls = [null, null];
         this.isPlaying = true;
         this.interval = Number(document.documentElement.dataset.interval) || 15000; // DEFAULT_SLIDESHOW_INTERVAL
         this.timer = null;

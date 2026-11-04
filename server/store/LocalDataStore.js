@@ -4,7 +4,8 @@ const fs = require('fs-extra');
 const DataStore = require('./DataStore');
 const { DATA_DIR, CACHE_DIR, UPLOADS_DIR } = require('../config/paths');
 
-const CACHE_NAMES = new Set(['photo-info', 'places']);
+// photo-info is real data: stored photos have no EXIF to read it back from
+const CACHE_NAMES = new Set(['places']);
 
 class LocalDataStore extends DataStore {
   constructor(root = DATA_DIR) {

@@ -42,8 +42,10 @@ class PhotoInfoService {
   async loadCache() {
     const state = this.state();
     if (!state.info) {
-      state.info = await getDataStore().get('photo-info', {}).catch(() => ({}));
-      state.places = await getDataStore().get('places', {}).catch(() => ({}));
+      // A failed read stays an error: treating it as empty would save over real data
+      const info = await getDataStore().get('photo-info', {});
+      state.places = await getDataStore().get('places', {});
+      state.info = info;
     }
   }
 

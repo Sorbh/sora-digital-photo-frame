@@ -463,6 +463,10 @@ class ImageController {
         return res.status(400).json({ message: 'Angle must be a multiple of 90 degrees' });
       }
       
+      // Rotating drops EXIF, so make sure it's been read before the file changes
+      await photoInfo.get(fullPath, path.relative(this.uploadsDir, fullPath))
+        .catch(error => console.warn('Could not read photo info:', error.message));
+
       const buffer = await sharp(await getLibrary().readPhoto(toAdminPath(fullPath)))
         .rotate(angle)
         .toFormat(this.formatFor(fullPath), { quality: parseInt(process.env.IMAGE_QUALITY) || 85 })

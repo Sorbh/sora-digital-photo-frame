@@ -12,7 +12,6 @@ process.env.CACHE_DIR = testCacheDir;
 process.env.DATA_DIR = testDataDir;
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
 process.env.ADMIN_PASSWORD = 'test-admin-pass';
-delete process.env.MAX_FILES_PER_UPLOAD;
 
 const LocalDataStore = require('../store/LocalDataStore');
 const LocalPhotoLibrary = require('../library/LocalPhotoLibrary');
@@ -22,9 +21,11 @@ const photoInfo = require('../services/photoInfoService');
 
 // A store that can break on demand, like a database going away
 let storeDown = false;
+let noTenant = false;
 class FlakyStore extends LocalDataStore {
   async get(name, fallback) {
     if (storeDown) throw new Error('store is down');
+    if (noTenant) throw Object.assign(new Error('Authentication required'), { status: 401, code: 'AUTH_REQUIRED' });
     return super.get(name, fallback);
   }
 }
@@ -65,6 +66,7 @@ describe('Robustness', () => {
 
   afterEach(() => {
     storeDown = false;
+    noTenant = false;
     failEvents = false;
     jest.restoreAllMocks();
   });
@@ -113,6 +115,44 @@ describe('Robustness', () => {
       const res = await request(app).post('/api/auth/device').send({ token: 'dev_abc.secret' });
       expect(res.status).toBe(500);
       expect(res.body.code).not.toBe('DEVICE_UNKNOWN');
+    });
+
+    test('a frame with no tenant to look in is told it was unpaired', async () => {
+      noTenant = true;
+      const res = await request(app).post('/api/auth/device').send({ token: 'dev_abc.secret' });
+      expect(res.status).toBe(401);
+      expect(res.body.code).toBe('DEVICE_UNKNOWN');
+    });
+
+    test('a frame can still collect its pairing on the next poll', async () => {
+      await dataStore.set('access-accounts', [{ id: 'acc_pair', name: 'Grandma', pinHash: 'x', assignedFolders: [] }]);
+      const { body: started } = await request(app).post('/api/pair/start').expect(200);
+      await pairing.approve(started.code, { name: 'Tablet', accountId: 'acc_pair' });
+      const poll = () => request(app).get('/api/pair/status').query({ code: started.code, secret: started.secret });
+
+      storeDown = true;
+      await poll().expect(500);
+      storeDown = false;
+      const { body } = await poll().expect(200);
+      expect(body.status).toBe('approved');
+      expect(body.token).toBeTruthy();
+    });
+
+    test('saved photo info is not replaced after a failed read', async () => {
+      await dataStore.set('photo-info', { 'family/old.webp': { key: 'k', takenAt: '2001-01-01T00:00:00' } });
+      const state = photoInfo.state();
+      const kept = state.info;
+      state.info = null;
+      try {
+        storeDown = true;
+        await expect(photoInfo.loadCache()).rejects.toThrow('store is down');
+        expect(state.info).toBeNull();
+        storeDown = false;
+        await photoInfo.loadCache();
+        expect(state.info['family/old.webp'].takenAt).toBe('2001-01-01T00:00:00');
+      } finally {
+        state.info = kept; // other tests rely on what's been remembered so far
+      }
     });
 
     test('a PIN is not counted as wrong', async () => {
@@ -193,6 +233,25 @@ describe('Robustness', () => {
       const fullPath = path.join(testUploadsDir, 'family', path.basename(stored.path));
       const info = await photoInfo.get(fullPath, path.relative(testUploadsDir, fullPath));
       expect(info.takenAt).toBe('2019-03-12T18:04:00');
+    });
+  });
+
+  describe('photo info', () => {
+    test('is kept with durable data, not in the cache folder', async () => {
+      await dataStore.set('photo-info', {});
+      expect(await fs.pathExists(path.join(testDataDir, 'photo-info.json'))).toBe(true);
+    });
+
+    test('survives rotating a photo that was never viewed', async () => {
+      const name = 'never-viewed.jpg';
+      await sharp({ create: { width: 40, height: 30, channels: 3, background: '#3a6' } })
+        .jpeg()
+        .withMetadata({ exif: { IFD2: { DateTimeOriginal: '2015:06:01 09:30:00' } } })
+        .toFile(path.join(testUploadsDir, 'family', name));
+      await admin.post('/api/images/rotate').send({ path: `uploads/family/${name}`, angle: 90 }).expect(200);
+      const fullPath = path.join(testUploadsDir, 'family', name);
+      const info = await photoInfo.get(fullPath, path.relative(testUploadsDir, fullPath));
+      expect(info.takenAt).toBe('2015-06-01T09:30:00');
     });
   });
 

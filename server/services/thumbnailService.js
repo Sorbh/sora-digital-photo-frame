@@ -129,9 +129,10 @@ class ThumbnailService {
    */
   send(res, thumbPath, { versioned = true } = {}) {
     // Versioned URLs (?v=...) change with the source, so they can be cached for long
+    // private: tenants share these URLs, so a shared cache must never keep one
     res.set('Cache-Control', versioned
-      ? 'public, max-age=604800, immutable'
-      : 'public, max-age=300, stale-while-revalidate=86400');
+      ? 'private, max-age=604800, immutable'
+      : 'private, max-age=300, stale-while-revalidate=86400');
     res.vary('Accept');
     if (acceptsWebp(res.req)) {
       res.type('image/webp');

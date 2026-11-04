@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **License is now AGPL-3.0** (was ISC), with DCO sign-off and a contributor grant (see CONTRIBUTING).
 - New uploads are saved as WebP, at most 2560px, with all metadata removed from the file.
-- An upload request takes at most 10 files (`MAX_FILES_PER_UPLOAD`); the admin page sends larger selections in batches.
+- An upload request takes at most 10 files; the admin page sends larger selections in batches.
 - Thumbnails are `Cache-Control: private`, and a photo's date and place only go to signed-in viewers.
 
 ### Added

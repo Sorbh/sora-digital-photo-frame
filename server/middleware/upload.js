@@ -8,7 +8,7 @@ const upload = multer({
   storage: storage,
   limits: {
     fileSize: parseInt(process.env.MAX_FILE_SIZE) || 10 * 1024 * 1024, // Default 10MB
-    files: parseInt(process.env.MAX_FILES_PER_UPLOAD) || 10
+    files: 10 // uploadInBatches in public/admin.js sends this many at a time
   },
   fileFilter: (req, file, cb) => {
     const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];

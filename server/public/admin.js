@@ -1008,15 +1008,17 @@ class PhotoFrameAdmin {
 
             const response = await this.authenticatedFetch('/api/upload', { method: 'POST', body: formData });
             if (!response) return null;
-            const data = await response.json();
+            const data = await response.json().catch(() => ({}));
+            // A failed batch can still have saved some files (quota running out mid-way)
+            uploaded.push(...(data.files || []));
             if (!response.ok) {
                 const message = data.message || 'Upload failed';
+                if (uploaded.length) this.loadFolderContents(); // show what did get saved
                 return { ok: false, json: async () => ({
                     ...data,
                     message: uploaded.length ? `${uploaded.length} of ${list.length} uploaded. ${message}` : message
                 }) };
             }
-            uploaded.push(...(data.files || []));
         }
         return { ok: true, json: async () => ({ files: uploaded }) };
     }

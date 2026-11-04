@@ -32,7 +32,12 @@ class LocalPhotoLibrary extends PhotoLibrary {
       const entry = { name: item.name, path: this.admin(full) };
       if (item.isDirectory()) folders.push(entry);
       else if (item.isFile()) {
-        const stat = await fs.stat(full);
+        // A temp file can be renamed away between readdir and stat; skip it
+        const stat = await fs.stat(full).catch(error => {
+          if (error.code === 'ENOENT') return null;
+          throw error;
+        });
+        if (!stat) continue;
         photos.push({ ...entry, size: stat.size, mtime: stat.mtime, mtimeMs: stat.mtimeMs,
           type: SNAP_PATTERN.test(item.name) ? 'snap' : IMAGE_PATTERN.test(item.name) ? 'image' : 'item' });
       }

@@ -25,6 +25,9 @@ function escapeHtml(value) {
 }
 
 // Drag payload for photos moved inside the library (a JSON list of admin paths)
+// Some browsers give HEIC photos no type, so the name decides
+const isImageFile = (file) => file.type.startsWith('image/') || /\.(heic|heif)$/i.test(file.name);
+
 const PHOTO_DRAG_TYPE = 'application/x-sora-photos';
 
 const isFileDrag = (e) => Array.from(e.dataTransfer?.types || []).includes('Files');
@@ -373,7 +376,7 @@ class PhotoFrameAdmin {
             e.preventDefault();
             dropZone.classList.remove('dragover');
             
-            const files = Array.from(e.dataTransfer.files).filter(file => file.type.startsWith('image/'));
+            const files = Array.from(e.dataTransfer.files).filter(isImageFile);
             this.selectedFiles = files;
             this.updateUploadButton();
             this.updateSelectedFilesDisplay();
@@ -475,7 +478,7 @@ class PhotoFrameAdmin {
     }
 
     uploadDroppedFiles(e, targetPath) {
-        const files = Array.from(e.dataTransfer.files).filter(file => file.type.startsWith('image/'));
+        const files = Array.from(e.dataTransfer.files).filter(isImageFile);
         if (files.length > 0) {
             this.uploadFilesDirectly(files, targetPath);
         } else {
@@ -1084,7 +1087,7 @@ class PhotoFrameAdmin {
                 this.hideUploadModal();
                 this.loadFolderContents();
             } else {
-                this.showToast(data.message || t('admin.uploadFailed'), 'error');
+                this.showToast(i18n.error(data, 'admin.uploadFailed'), 'error');
             }
         } catch (error) {
             console.error('Error uploading files:', error);
@@ -1132,7 +1135,7 @@ class PhotoFrameAdmin {
                 this.showToast(t('admin.photosAddedTo', { count: data.files.length, name: folderName }), 'success');
                 this.loadFolderContents();
             } else {
-                this.showToast(data.message || t('admin.uploadFailed'), 'error');
+                this.showToast(i18n.error(data, 'admin.uploadFailed'), 'error');
             }
         } catch (error) {
             console.error('Error uploading files:', error);
@@ -1866,13 +1869,13 @@ class PhotoFrameAdmin {
             e.preventDefault();
             dropZone.classList.remove('dragover');
             
-            const files = Array.from(e.dataTransfer.files).filter(file => file.type.startsWith('image/'));
+            const files = Array.from(e.dataTransfer.files).filter(isImageFile);
             this.handleEmptyStateFileSelection(files);
         });
     }
 
     handleEmptyStateFileSelection(files) {
-        this.emptyStateSelectedFiles = files.filter(file => file.type.startsWith('image/'));
+        this.emptyStateSelectedFiles = files.filter(isImageFile);
         this.updateEmptyStateUploadButton();
         this.updateEmptyStateFilesDisplay();
     }
@@ -1930,7 +1933,7 @@ class PhotoFrameAdmin {
                 this.resetEmptyStateUpload();
                 this.loadFolderContents(); // This will hide the empty state and show the uploaded files
             } else {
-                this.showToast(data.message || t('admin.uploadFailed'), 'error');
+                this.showToast(i18n.error(data, 'admin.uploadFailed'), 'error');
             }
         } catch (error) {
             console.error('Error uploading files:', error);

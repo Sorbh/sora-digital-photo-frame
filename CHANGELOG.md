@@ -7,7 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- HEIC uploads (iPhone photos), decoded with libheif in WebAssembly and stored as WebP like other photos.
+
 ### Changed
+- Uploads can be up to 25 MB each (was 10 MB), so 48 MP phone photos fit. Only the resized copy is stored.
 - **License is now AGPL-3.0** (was ISC), with DCO sign-off and a contributor grant (see CONTRIBUTING).
 - New uploads are saved as WebP, at most 2560px, with all metadata removed from the file.
 - An upload request takes at most 10 files; the admin page sends larger selections in batches.

@@ -4,9 +4,16 @@ const errorHandler = (err, req, res, next) => {
 
   // Multer errors
   if (err.code === 'LIMIT_FILE_SIZE') {
+    const size = Math.round(require('./upload').MAX_FILE_SIZE / (1024 * 1024));
     return res.status(400).json({
-      message: 'File size too large. Maximum size is 10MB.'
+      code: 'FILE_TOO_LARGE',
+      size,
+      message: `File size too large. Maximum size is ${size}MB.`
     });
+  }
+
+  if (err.code === 'UNSUPPORTED_TYPE') {
+    return res.status(400).json({ code: err.code, message: err.message });
   }
 
   if (err.code === 'LIMIT_FILE_COUNT') {

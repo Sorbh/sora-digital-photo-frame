@@ -108,10 +108,10 @@ Settings live in `server/.env` (created on first `npm install`).
 | `PORT` | `3000` | Port the server listens on |
 | `UPLOAD_DIR` | `uploads` | Where photos are stored |
 | `DEFAULT_SLIDESHOW_INTERVAL` | `15000` | Time per photo, in ms |
-| `MAX_FILE_SIZE` | `10485760` | Upload limit, in bytes (10 MB) |
+| `MAX_FILE_SIZE` | `26214400` | Upload limit per photo, in bytes (25 MB). Only the resized copy is stored |
 | `ENABLE_GOOGLE_PHOTOS` | `false` | Turn on Google Photos import |
 
-Supported formats: JPEG, PNG, WebP and GIF.
+Supported formats: JPEG, PNG, WebP, GIF and HEIC (iPhone photos).
 
 ## Development
 

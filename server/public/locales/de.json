@@ -208,7 +208,9 @@
     "PAIRING_EXPIRED": "Dieser Code ist abgelaufen",
     "RATE_LIMITED": "Zu viele Versuche. Bitte versuchen Sie es später noch einmal.",
     "connection": "Verbindungsfehler. Bitte versuchen Sie es noch einmal.",
-    "unknown": "Etwas ist schiefgelaufen. Bitte versuchen Sie es noch einmal."
+    "unknown": "Etwas ist schiefgelaufen. Bitte versuchen Sie es noch einmal.",
+    "FILE_TOO_LARGE": "Jedes Foto darf höchstens {size} MB groß sein",
+    "UNSUPPORTED_TYPE": "Es können nur JPEG-, PNG-, GIF-, WebP- und HEIC-Fotos hochgeladen werden"
   },
   "admin": {
     "static_001": "Bibliothek · Sora Frame",
@@ -218,7 +220,7 @@
     "static_006": "Noch keine Bilder",
     "static_007": "Laden Sie ein paar Bilder hoch, um loszulegen",
     "static_008": "Klicken, um Bilder auszuwählen, oder hierher ziehen",
-    "static_009": "JPEG, PNG, GIF, WebP (je max. 10 MB)",
+    "static_009": "JPEG, PNG, GIF, WebP, HEIC (je max. 25 MB)",
     "static_010": "Ausgewählte Dateien",
     "static_011": "Wird hochgeladen…",
     "static_012": "Dateien auswählen",
@@ -227,7 +229,7 @@
     "static_015": "Einen neuen Ordner an dieser Stelle erstellen",
     "static_016": "Bilder hochladen",
     "static_017": "Klicken, um Bilder auszuwählen, oder hierher ziehen",
-    "static_018": "JPEG, PNG, GIF, WebP (je max. 10 MB)",
+    "static_018": "JPEG, PNG, GIF, WebP, HEIC (je max. 25 MB)",
     "static_019": "Ausgewählte Dateien",
     "static_020": "Wird hochgeladen…",
     "static_021": "Dateien auswählen",

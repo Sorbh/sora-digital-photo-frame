@@ -208,7 +208,9 @@
     "PAIRING_EXPIRED": "Deze code is verlopen",
     "RATE_LIMITED": "Te veel pogingen. Probeer het later opnieuw.",
     "connection": "Verbindingsfout. Probeer het opnieuw.",
-    "unknown": "Er ging iets mis. Probeer het opnieuw."
+    "unknown": "Er ging iets mis. Probeer het opnieuw.",
+    "FILE_TOO_LARGE": "Elke foto mag maximaal {size} MB zijn",
+    "UNSUPPORTED_TYPE": "Je kunt alleen JPEG-, PNG-, GIF-, WebP- en HEIC-foto's uploaden"
   },
   "admin": {
     "static_001": "Bibliotheek · Sora Frame",
@@ -218,7 +220,7 @@
     "static_006": "Nog geen foto's",
     "static_007": "Upload een paar foto's om te beginnen",
     "static_008": "Klik om foto's te kiezen of sleep ze hierheen",
-    "static_009": "JPEG, PNG, GIF en WebP (max. 10 MB per foto)",
+    "static_009": "JPEG, PNG, GIF, WebP en HEIC (max. 25 MB per foto)",
     "static_010": "Gekozen bestanden",
     "static_011": "Uploaden...",
     "static_012": "Bestanden kiezen",
@@ -227,7 +229,7 @@
     "static_015": "Maak een nieuwe map op deze plek",
     "static_016": "Foto's uploaden",
     "static_017": "Klik om foto's te kiezen of sleep ze hierheen",
-    "static_018": "JPEG, PNG, GIF en WebP (max. 10 MB per foto)",
+    "static_018": "JPEG, PNG, GIF, WebP en HEIC (max. 25 MB per foto)",
     "static_019": "Gekozen bestanden",
     "static_020": "Uploaden...",
     "static_021": "Bestanden kiezen",

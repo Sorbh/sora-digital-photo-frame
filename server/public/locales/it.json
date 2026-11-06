@@ -209,7 +209,9 @@
     "PAIRING_EXPIRED": "Questo codice è scaduto",
     "RATE_LIMITED": "Troppi tentativi. Riprova più tardi.",
     "connection": "Errore di connessione. Riprova.",
-    "unknown": "Qualcosa è andato storto. Riprova."
+    "unknown": "Qualcosa è andato storto. Riprova.",
+    "FILE_TOO_LARGE": "Ogni foto può pesare al massimo {size} MB",
+    "UNSUPPORTED_TYPE": "Puoi caricare solo foto JPEG, PNG, GIF, WebP e HEIC"
   },
   "admin": {
     "static_001": "Libreria · Sora Frame",
@@ -219,7 +221,7 @@
     "static_006": "Ancora nessuna immagine",
     "static_007": "Carica qualche immagine per iniziare",
     "static_008": "Fai clic per scegliere le immagini o trascinale qui",
-    "static_009": "Formati supportati: JPEG, PNG, GIF, WebP (max 10 MB ciascuna)",
+    "static_009": "Formati supportati: JPEG, PNG, GIF, WebP, HEIC (max 25 MB ciascuna)",
     "static_010": "File selezionati",
     "static_011": "Caricamento...",
     "static_012": "Scegli file",
@@ -228,7 +230,7 @@
     "static_015": "Crea una nuova cartella in questa posizione",
     "static_016": "Carica immagini",
     "static_017": "Fai clic per scegliere le immagini o trascinale qui",
-    "static_018": "Formati supportati: JPEG, PNG, GIF, WebP (max 10 MB ciascuna)",
+    "static_018": "Formati supportati: JPEG, PNG, GIF, WebP, HEIC (max 25 MB ciascuna)",
     "static_019": "File selezionati",
     "static_020": "Caricamento...",
     "static_021": "Scegli file",

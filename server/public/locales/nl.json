@@ -210,7 +210,8 @@
     "connection": "Verbindingsfout. Probeer het opnieuw.",
     "unknown": "Er ging iets mis. Probeer het opnieuw.",
     "FILE_TOO_LARGE": "Elke foto mag maximaal {size} MB zijn",
-    "UNSUPPORTED_TYPE": "Je kunt alleen JPEG-, PNG-, GIF-, WebP- en HEIC-foto's uploaden"
+    "UNSUPPORTED_TYPE": "Je kunt alleen JPEG-, PNG-, GIF-, WebP- en HEIC-foto's uploaden",
+    "SCREEN_LIMIT": "Deze familie heeft al {limit} schermen. Verwijder er een die je niet meer gebruikt om dit scherm toe te voegen."
   },
   "admin": {
     "static_001": "Bibliotheek · Sora Frame",

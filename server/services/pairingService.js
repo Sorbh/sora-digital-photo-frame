@@ -83,7 +83,15 @@ class PairingService {
       pairedAt: new Date().toISOString(),
       lastSeen: null
     };
-    await getDataStore().update('devices', [], devices => [...devices, device]);
+    // MAX_SCREENS caps paired frames per library (0, the default, means no cap)
+    const limit = parseInt(process.env.MAX_SCREENS, 10) || 0;
+    await getDataStore().update('devices', [], devices => {
+      if (limit && devices.length >= limit) {
+        throw Object.assign(new Error(`This family already has ${limit} screens. Remove one you no longer use to add this one.`),
+          { status: 403, code: 'SCREEN_LIMIT', vars: { limit } });
+      }
+      return [...devices, device];
+    });
     const tenant = currentTenant();
     try {
       await emit('devicePaired', { deviceId: id, tenantId: tenant.id });

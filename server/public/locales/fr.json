@@ -211,7 +211,8 @@
     "connection": "Erreur de connexion. Veuillez réessayer.",
     "unknown": "Un problème est survenu. Veuillez réessayer.",
     "FILE_TOO_LARGE": "Chaque photo peut faire au maximum {size} Mo",
-    "UNSUPPORTED_TYPE": "Seules les photos JPEG, PNG, GIF, WebP et HEIC peuvent être importées"
+    "UNSUPPORTED_TYPE": "Seules les photos JPEG, PNG, GIF, WebP et HEIC peuvent être importées",
+    "SCREEN_LIMIT": "Cette famille a déjà {limit} écrans. Retirez-en un que vous n’utilisez plus pour ajouter celui-ci."
   },
   "admin": {
     "static_001": "Photothèque · Sora Frame",

@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `MAX_SCREENS` caps how many frames a library can pair (off by default); pairing past it explains how to free a spot.
 - HEIC uploads (iPhone photos), decoded with libheif in WebAssembly and stored as WebP like other photos.
 
 ### Changed

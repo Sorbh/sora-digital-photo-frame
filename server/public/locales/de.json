@@ -210,7 +210,8 @@
     "connection": "Verbindungsfehler. Bitte versuchen Sie es noch einmal.",
     "unknown": "Etwas ist schiefgelaufen. Bitte versuchen Sie es noch einmal.",
     "FILE_TOO_LARGE": "Jedes Foto darf höchstens {size} MB groß sein",
-    "UNSUPPORTED_TYPE": "Es können nur JPEG-, PNG-, GIF-, WebP- und HEIC-Fotos hochgeladen werden"
+    "UNSUPPORTED_TYPE": "Es können nur JPEG-, PNG-, GIF-, WebP- und HEIC-Fotos hochgeladen werden",
+    "SCREEN_LIMIT": "Diese Familie hat bereits {limit} Bildschirme. Entfernen Sie einen, den Sie nicht mehr nutzen, um diesen hinzuzufügen."
   },
   "admin": {
     "static_001": "Bibliothek · Sora Frame",

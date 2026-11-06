@@ -214,7 +214,8 @@
     "connection": "خطأ في الاتصال. يُرجى المحاولة مرة أخرى.",
     "unknown": "حدث خطأ ما. يُرجى المحاولة مرة أخرى.",
     "FILE_TOO_LARGE": "الحد الأقصى لحجم كل صورة {size} MB",
-    "UNSUPPORTED_TYPE": "يمكن رفع صور JPEG وPNG وGIF وWebP وHEIC فقط"
+    "UNSUPPORTED_TYPE": "يمكن رفع صور JPEG وPNG وGIF وWebP وHEIC فقط",
+    "SCREEN_LIMIT": "لدى هذه العائلة {limit} شاشة بالفعل. أزل شاشة لم تعد تستخدمها لإضافة هذه."
   },
   "admin": {
     "static_001": "المكتبة · Sora Frame",

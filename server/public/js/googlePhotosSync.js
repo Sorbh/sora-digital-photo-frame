@@ -12,6 +12,10 @@ class GooglePhotosSync {
   }
 
   init() {
+    // The toolbar button text and title come from here, so redo them in the new language
+    window.addEventListener('sora:languagechange', () => {
+      if (!this.authenticationInProgress) this.updateButtonState();
+    });
     this.checkAuthStatus('init');
     this.bindEvents();
     this.setupMessageListener();
@@ -83,7 +87,7 @@ class GooglePhotosSync {
 
   // Handle session expiration for Google Photos
   handleSessionExpired() {
-    this.showError('Session expired. Redirecting to login...');
+    this.showError(t('googlePhotos.sessionExpired'));
     setTimeout(() => {
       window.location.href = '/login?expired=true';
     }, 2000);
@@ -97,15 +101,15 @@ class GooglePhotosSync {
 
     if (this.isAuthenticated && this.userInfo) {
       console.log('Setting authenticated state'); // Debug log
-      googlePhotosBtn.title = `Connected to Google Photos (${this.userInfo.email})`;
+      googlePhotosBtn.title = t('googlePhotos.connectedAs', { email: this.userInfo.email });
       googlePhotosBtn.classList.add('authenticated');
-      googlePhotosBtn.innerHTML = '<span class="material-symbols-outlined">check_circle</span><span class="tb-label">Google Photos</span>';
+      googlePhotosBtn.innerHTML = `<span class="material-symbols-outlined">check_circle</span><span class="tb-label">${escapeHtml(t('admin.static_002'))}</span>`;
     } else if (!this.justAuthenticated) {
       // Only set to unauthenticated if we haven't just authenticated
       console.log('Setting unauthenticated state'); // Debug log
-      googlePhotosBtn.title = 'Connect to Google Photos';
+      googlePhotosBtn.title = t('googlePhotos.connect');
       googlePhotosBtn.classList.remove('authenticated');
-      googlePhotosBtn.innerHTML = '<span class="material-symbols-outlined">add_photo_alternate</span><span class="tb-label">Google Photos</span>';
+      googlePhotosBtn.innerHTML = `<span class="material-symbols-outlined">add_photo_alternate</span><span class="tb-label">${escapeHtml(t('admin.static_002'))}</span>`;
     } else {
       console.log('Preserving button state - just authenticated'); // Debug log
     }
@@ -115,7 +119,7 @@ class GooglePhotosSync {
     if (!this.isAuthenticated) {
       this.startAuthentication();
     } else {
-      this.showMessage('Successfully connected to Google Photos!');
+      this.showMessage(t('googlePhotos.connected'));
     }
   }
 
@@ -129,7 +133,7 @@ class GooglePhotosSync {
       const googlePhotosBtn = document.getElementById('googlePhotosBtn');
       if (googlePhotosBtn) {
         googlePhotosBtn.disabled = true;
-        googlePhotosBtn.innerHTML = '<span class="material-symbols-outlined">hourglass_empty</span><span class="tb-label">Connecting</span>';
+        googlePhotosBtn.innerHTML = `<span class="material-symbols-outlined">hourglass_empty</span><span class="tb-label">${escapeHtml(t('googlePhotos.connecting'))}</span>`;
         console.log('🔧 [DEBUG] Button set to loading state');
       }
 
@@ -183,13 +187,13 @@ class GooglePhotosSync {
         }, 1000);
       } else {
         console.error('❌ [DEBUG] Auth request failed:', result.error);
-        this.showError('Failed to start authentication: ' + result.error.message);
+        this.showError(t('googlePhotos.authStartFailedWith', { message: i18n.error(result.error) }));
         this.resetButtonState();
         this.authenticationInProgress = false;
       }
     } catch (error) {
       console.error('❌ [DEBUG] Authentication error:', error);
-      this.showError('Failed to start Google Photos authentication');
+      this.showError(t('googlePhotos.authStartFailed'));
       this.resetButtonState();
       this.authenticationInProgress = false;
     }
@@ -219,7 +223,7 @@ class GooglePhotosSync {
 
       // Fetch fresh user info before updating button state
       await this.checkAuthStatus('handleAuthCallback');
-      this.showMessage('Successfully connected to Google Photos!');
+      this.showMessage(t('googlePhotos.connected'));
 
       // Refresh the admin page to show the "Import from Google Photos" button
       if (window.photoFrameAdmin && window.photoFrameAdmin.loadFolderContents) {
@@ -232,7 +236,7 @@ class GooglePhotosSync {
       this.justAuthenticated = false;
       this.resetButtonState();
       if (data.error !== 'Authentication cancelled by user') {
-        this.showError(data.error || 'Authentication failed');
+        this.showError(data.error || t('googlePhotos.authFailed'));
       }
     }
 
@@ -261,13 +265,13 @@ class GooglePhotosSync {
         this.isAuthenticated = false;
         this.userInfo = null;
         this.updateButtonState();
-        this.showMessage('Disconnected from Google Photos');
+        this.showMessage(t('googlePhotos.disconnected'));
       } else {
-        this.showError('Failed to disconnect: ' + result.error.message);
+        this.showError(t('googlePhotos.disconnectFailedWith', { message: i18n.error(result.error) }));
       }
     } catch (error) {
       console.error('Logout error:', error);
-      this.showError('Failed to disconnect from Google Photos');
+      this.showError(t('googlePhotos.disconnectFailed'));
     }
   }
 
@@ -293,7 +297,7 @@ class GooglePhotosSync {
     console.log('🔧 [DEBUG] openGooglePhotosModal called with path:', currentPath);
 
     if (!this.isAuthenticated) {
-      this.showError('Please connect to Google Photos first');
+      this.showError(t('googlePhotos.connectFirst'));
       return;
     }
 
@@ -380,11 +384,11 @@ class GooglePhotosSync {
         this.showSessionReady();
       } else {
         console.error('❌ [DEBUG] Failed to create session:', data.error);
-        this.showSessionError(data.error || 'Failed to create picker session');
+        this.showSessionError(i18n.error(data, 'googlePhotos.sessionCreateFailed'));
       }
     } catch (error) {
       console.error('❌ [DEBUG] Error creating picker session:', error);
-      this.showSessionError('Failed to create picker session');
+      this.showSessionError(t('googlePhotos.sessionCreateFailed'));
     }
   }
 
@@ -421,11 +425,11 @@ class GooglePhotosSync {
       <div class="session-icon">
         <span class="material-icons">access_time</span>
       </div>
-      <p>Waiting for photo selection...</p>
+      <p>${escapeHtml(t('googlePhotos.waitingForSelection'))}</p>
       <div class="session-timer">
         <span id="sessionTimer">--:--</span>
       </div>
-      <small>Select photos in the Google Photos tab and confirm your selection.</small>
+      <small>${escapeHtml(t('googlePhotos.selectInTab'))}</small>
     `;
 
     // Replace the ready state with polling state
@@ -522,11 +526,11 @@ class GooglePhotosSync {
         this.handleSessionComplete(data.mediaItems);
       } else {
         console.error('❌ [DEBUG] Failed to fetch media items:', data.error);
-        this.showSessionError('Failed to fetch selected photos');
+        this.showSessionError(t('googlePhotos.fetchSelectedFailed'));
       }
     } catch (error) {
       console.error('❌ [DEBUG] Error fetching media items:', error);
-      this.showSessionError('Failed to fetch selected photos');
+      this.showSessionError(t('googlePhotos.fetchSelectedFailed'));
     }
   }
 
@@ -540,7 +544,7 @@ class GooglePhotosSync {
       <div class="session-loader">
         <div class="spinner"></div>
       </div>
-      <p>Loading selected photos...</p>
+      <p>${escapeHtml(t('googlePhotos.loadingSelected'))}</p>
     `;
 
     const modalContent = document.querySelector('.google-photos-content');
@@ -569,7 +573,7 @@ class GooglePhotosSync {
 
     // Close modal and show timeout message
     this.hideGooglePhotosModal();
-    this.showMessage('Google Photos session timed out. Please try again.');
+    this.showMessage(t('googlePhotos.sessionTimedOut'));
   }
 
   clearSessionTimers() {
@@ -645,10 +649,10 @@ class GooglePhotosSync {
 
       return `
         <div class="photo-thumbnail" data-media-id="${item.id || index}">
-          <img src="${thumbnailUrl}" alt="Selected photo ${index + 1}" loading="lazy" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgdmlld0JveD0iMCAwIDE1MCAxNTAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi0vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIxNTAiIGhlaWdodD0iMTUwIiBmaWxsPSIjZjVmNWY1Ii8+CjxwYXRoIGQ9Ik03NSA0MEM2OC4zNzUgNDAgNjMgNDUuMzc1IDYzIDUyVjk4QzYzIDEwNC42MjUgNjguMzc1IDExMCA3NSAxMTBIMTIxQzEyNy42MjUgMTEwIDEzMyAxMDQuNjI1IDEzMyA5OFY1MkMxMzMgNDUuMzc1IDEyNy42MjUgNDAgMTIxIDQwSDc1WiIgZmlsbD0iIzlFOUU5RSIvPgo8L3N2Zz4K'">
+          <img src="${thumbnailUrl}" alt="${escapeHtml(t('googlePhotos.selectedPhotoAlt', { number: index + 1 }))}" loading="lazy" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgdmlld0JveD0iMCAwIDE1MCAxNTAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi0vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIxNTAiIGhlaWdodD0iMTUwIiBmaWxsPSIjZjVmNWY1Ii8+CjxwYXRoIGQ9Ik03NSA0MEM2OC4zNzUgNDAgNjMgNDUuMzc1IDYzIDUyVjk4QzYzIDEwNC42MjUgNjguMzc1IDExMCA3NSAxMTBIMTIxQzEyNy42MjUgMTEwIDEzMyAxMDQuNjI1IDEzMyA5OFY1MkMxMzMgNDUuMzc1IDEyNy42MjUgNDAgMTIxIDQwSDc1WiIgZmlsbD0iIzlFOUU5RSIvPgo8L3N2Zz4K'">
           ${isLastThumbnail ? `
             <div class="thumbnail-count-overlay">
-              <div class="count-text">+${remainingCount}<br>more</div>
+              <div class="count-text">${t('googlePhotos.moreCount', { count: remainingCount })}</div>
             </div>
           ` : `
             <div class="thumbnail-overlay">
@@ -665,8 +669,8 @@ class GooglePhotosSync {
       <div class="session-icon">
         <span class="material-icons">check_circle</span>
       </div>
-      <p>Photos selected successfully!</p>
-      <small>${mediaItems.length} photo(s) ready to import</small>
+      <p>${escapeHtml(t('googlePhotos.selectedSuccess'))}</p>
+      <small>${escapeHtml(t('googlePhotos.readyToImport', { count: mediaItems.length }))}</small>
       
       <div class="selected-photos-container">
         <div class="photos-thumbnails">
@@ -677,7 +681,7 @@ class GooglePhotosSync {
       <div class="import-actions">
         <button id="importToFolderBtn" class="btn-primary">
           <span class="material-icons">folder</span>
-          Import to ${this.currentImportPath.split('/').pop()}
+          ${escapeHtml(t('googlePhotos.importTo', { name: this.currentImportPath === 'uploads' ? t('common.library') : this.currentImportPath.split('/').pop() }))}
         </button>
       </div>
     `;
@@ -743,7 +747,7 @@ class GooglePhotosSync {
 
   async importPhotosToFolder() {
     if (!this.selectedMediaItems || this.selectedMediaItems.length === 0) {
-      this.showError('No photos selected for import');
+      this.showError(t('googlePhotos.noneSelected'));
       return;
     }
 
@@ -775,7 +779,7 @@ class GooglePhotosSync {
         data = JSON.parse(responseText);
       } catch (parseError) {
         console.error('❌ [DEBUG] Failed to parse response as JSON:', parseError);
-        this.showSessionError('Server returned invalid response');
+        this.showSessionError(t('googlePhotos.invalidResponse'));
         return;
       }
 
@@ -796,7 +800,7 @@ class GooglePhotosSync {
         const jobId = data.data?.jobId;
 
         const folderName = destinationPath.split('/').pop();
-        this.showMessage(`Started importing ${mediaCount} photo${mediaCount !== 1 ? 's' : ''} to ${folderName} in the background. You can continue working while we sync your photos.`);
+        this.showMessage(t('googlePhotos.importStarted', { count: mediaCount, name: folderName }));
 
         // Start monitoring job progress only if we have a valid jobId
         if (jobId) {
@@ -807,11 +811,11 @@ class GooglePhotosSync {
 
       } else {
         console.error('❌ [DEBUG] Import job failed to start:', data.error);
-        this.showSessionError(data.error?.message || 'Failed to start import job');
+        this.showSessionError(data.error ? i18n.error(data.error, 'googlePhotos.importStartFailed') : t('googlePhotos.importStartFailed'));
       }
     } catch (error) {
       console.error('❌ [DEBUG] Error starting import job:', error);
-      this.showSessionError('Failed to start import job');
+      this.showSessionError(t('googlePhotos.importStartFailed'));
     }
   }
 
@@ -836,10 +840,9 @@ class GooglePhotosSync {
           if (job.status === 'completed') {
             clearInterval(checkInterval);
             const { successCount, failCount } = job.result;
-            let message = `Import completed! ${successCount} photo${successCount !== 1 ? 's' : ''} imported successfully`;
-            if (failCount > 0) {
-              message += ` (${failCount} failed)`;
-            }
+            const message = failCount > 0
+              ? t('googlePhotos.importCompletedWithFailures', { count: successCount, failed: failCount })
+              : t('googlePhotos.importCompleted', { count: successCount });
             this.showMessage(message);
 
             // Refresh page to show new photos
@@ -851,7 +854,7 @@ class GooglePhotosSync {
 
           } else if (job.status === 'failed') {
             clearInterval(checkInterval);
-            this.showError(`Import failed: ${job.error || 'Unknown error'}`);
+            this.showError(t('googlePhotos.importFailed', { error: job.error || t('googlePhotos.unknownError') }));
           }
         }
       } catch (error) {
@@ -876,8 +879,8 @@ class GooglePhotosSync {
       <div class="session-loader">
         <div class="spinner"></div>
       </div>
-      <p>Importing photos to your folder...</p>
-      <small>This may take a few moments</small>
+      <p>${escapeHtml(t('googlePhotos.importing'))}</p>
+      <small>${escapeHtml(t('googlePhotos.mayTakeMoments'))}</small>
     `;
 
     const modalContent = document.querySelector('.google-photos-content');

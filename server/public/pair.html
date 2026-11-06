@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="theme-color" content="#d6336a">
-    <title>Pair a frame · Sora Frame</title>
+    <title data-i18n="pair.static_001">Pair a frame · Sora Frame</title>
     <link rel="icon" href="/icons/favicon.ico" sizes="48x48">
     <link rel="icon" href="/icons/favicon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
@@ -23,51 +23,52 @@
     })();
     </script>
     <link rel="stylesheet" href="/css/pair.css">
+    <link rel="stylesheet" href="/css/i18n.css">
 </head>
 
 <body>
     <header class="pair-top">
-        <a href="/admin" class="sora-wordmark" aria-label="Sora library home">Sora</a>
-        <span class="sora-eyebrow">Pair a frame</span>
+        <a href="/admin" class="sora-wordmark" aria-label="Sora library home" data-i18n-attr="aria-label:pair.static_014">Sora</a>
+        <span class="sora-eyebrow" data-i18n="pair.static_002">Pair a frame</span>
     </header>
 
     <main class="pair-main">
         <!-- Checking the code -->
         <section class="pair-state" id="stateLoading">
             <div class="pair-spinner" aria-hidden="true"></div>
-            <p class="pair-note">Checking the code</p>
+            <p class="pair-note" data-i18n="pair.static_003">Checking the code</p>
         </section>
 
         <!-- The code is gone: expired, used, or mistyped -->
         <section class="pair-state hidden" id="stateExpired">
             <span class="material-icons pair-big-icon">timer_off</span>
-            <h1 class="sora-display">This code has <em>expired</em></h1>
-            <p class="pair-note">The frame shows a fresh code every ten minutes. Scan the one on its screen now.</p>
-            <a class="pair-link" href="/access-accounts"><span class="material-icons">key</span>Go to Access</a>
+            <h1 class="sora-display" data-i18n-html="pair.expiredHeading">This code has <em>expired</em></h1>
+            <p class="pair-note" data-i18n="pair.static_004">The frame shows a fresh code every ten minutes. Scan the one on its screen now.</p>
+            <a class="pair-link" href="/access-accounts"><span class="material-icons">key</span><span data-i18n="pair.go_access">Go to Access</span></a>
         </section>
 
         <!-- Approve -->
         <form class="pair-state hidden" id="pairForm" novalidate>
-            <p class="sora-eyebrow">New frame</p>
-            <h1 class="sora-display">Show photos on <em>this frame</em></h1>
+            <p class="sora-eyebrow" data-i18n="pair.static_005">New frame</p>
+            <h1 class="sora-display" data-i18n-html="pair.heading">Show photos on <em>this frame</em></h1>
 
             <div class="code-check">
-                <span class="code-check-label">Code on the frame</span>
+                <span class="code-check-label" data-i18n="pair.static_007">Code on the frame</span>
                 <span class="code-check-code" id="codeShown">······</span>
-                <span class="code-check-hint"><span class="material-icons">visibility</span>Check it matches the frame's screen</span>
+                <span class="code-check-hint"><span class="material-icons">visibility</span><span data-i18n="pair.codeMatchHint">Check it matches the frame's screen</span></span>
             </div>
 
             <label class="field">
-                <span class="field-label">Frame name</span>
-                <input type="text" id="frameName" maxlength="60" placeholder="Kitchen frame" autocomplete="off" required>
+                <span class="field-label" data-i18n="pair.static_008">Frame name</span>
+                <input type="text" id="frameName" maxlength="60" placeholder="Kitchen frame" data-i18n-attr="placeholder:pair.static_015" autocomplete="off" required>
             </label>
 
             <fieldset class="field">
-                <legend class="field-label">Which photos</legend>
+                <legend class="field-label" data-i18n="pair.static_009">Which photos</legend>
                 <div class="choice-list" id="accountList"></div>
 
                 <div class="new-account hidden" id="newAccount">
-                    <p class="pair-note">Pick the folders this frame plays. Leave all unticked to play every folder.</p>
+                    <p class="pair-note" data-i18n="pair.static_010">Pick the folders this frame plays. Leave all unticked to play every folder.</p>
                     <div class="folder-list" id="folderList"></div>
                 </div>
             </fieldset>
@@ -76,19 +77,20 @@
 
             <button type="submit" class="pair-submit" id="pairButton">
                 <span class="material-icons">link</span>
-                <span>Pair this frame</span>
+                <span data-i18n="pair.static_011">Pair this frame</span>
             </button>
         </form>
 
         <!-- Done -->
         <section class="pair-state hidden" id="stateDone">
             <span class="material-icons pair-big-icon is-done">check_circle</span>
-            <h1 class="sora-display"><span id="doneName">The frame</span> is <em>paired</em></h1>
-            <p class="pair-note">It starts the slideshow in a moment and stays signed in. You can remove it any time from Access.</p>
-            <a class="pair-link" href="/access-accounts"><span class="material-icons">key</span>Go to Access</a>
+            <h1 class="sora-display" id="doneTitle"></h1>
+            <p class="pair-note" data-i18n="pair.static_013">It starts the slideshow in a moment and stays signed in. You can remove it any time from Access.</p>
+            <a class="pair-link" href="/access-accounts"><span class="material-icons">key</span><span data-i18n="pair.go_access">Go to Access</span></a>
         </section>
     </main>
 
+<script src="/js/i18n.js"></script>
 <script src="/js/pair.js"></script>
 </body>
 

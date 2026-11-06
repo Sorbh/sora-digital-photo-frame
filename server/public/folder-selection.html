@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="theme-color" content="#d6336a">
-    <title>Choose folder · Sora Frame</title>
+    <title data-i18n="folders.static_001">Choose folder · Sora Frame</title>
     <link rel="icon" href="/icons/favicon.ico" sizes="48x48">
     <link rel="icon" href="/icons/favicon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
@@ -107,18 +107,19 @@
             }
         }
     </style>
+    <link rel="stylesheet" href="/css/i18n.css">
 </head>
 <body>
     <header class="topbar">
         <div class="topbar-brand">
-            <a href="/slideshow" class="sora-wordmark" aria-label="Back to the slideshow">Sora</a>
+            <a href="/slideshow" class="sora-wordmark" aria-label="Back to the slideshow" data-i18n-attr="aria-label:folders.static_008">Sora</a>
             <span class="topbar-divider"></span>
-            <span class="sora-eyebrow">Now playing</span>
+            <span class="sora-eyebrow" data-i18n="folders.static_002">Now playing</span>
         </div>
         <div class="topbar-actions">
-            <a href="/admin" class="tb-btn tb-desktop" title="Manage the library">
+            <a href="/admin" class="tb-btn tb-desktop" title="Manage the library" data-i18n-attr="title:folders.static_009">
                 <span class="material-symbols-outlined">photo_library</span>
-                <span class="tb-label">Library</span>
+                <span class="tb-label" data-i18n="common.library">Library</span>
             </a>
         </div>
     </header>
@@ -126,29 +127,29 @@
     <section class="library-head">
         <div class="library-title">
             <div class="crumb-row">
-                <button class="back-btn" onclick="goBack()" title="Back" aria-label="Back">
+                <button class="back-btn" onclick="goBack()" title="Back" aria-label="Back" data-i18n-attr="title:folders.static_010; aria-label:folders.static_011">
                     <span class="material-symbols-outlined">arrow_back</span>
                 </button>
-                <p class="sora-eyebrow" style="margin: 0;">Slideshow source</p>
+                <p class="sora-eyebrow" style="margin: 0;" data-i18n="folders.static_003">Slideshow source</p>
             </div>
-            <h1 class="page-title sora-display no-transform">What should <em>play?</em></h1>
+            <h1 class="page-title sora-display no-transform" data-i18n-html="folders.heading">What should <em>play?</em></h1>
             <p class="page-meta">
                 <span class="material-symbols-outlined" style="font-size:16px;font-variation-settings:'FILL' 1">favorite</span>
-                <span id="currentSelection">All folders</span>
+                <span id="currentSelection" data-i18n="folders.static_005">All folders</span>
             </p>
         </div>
         <div class="library-actions">
             <a href="/slideshow" class="btn mobile-hide">
                 <span class="material-symbols-outlined">play_arrow</span>
-                Start slideshow
+                <span data-i18n="folders.static_013">Start slideshow</span>
             </a>
         </div>
     </section>
 
     <main class="main-content">
         <div class="browser-head">
-            <h2 class="browser-title">Choose a folder</h2>
-            <p class="browser-subtitle">Only photos from the chosen folder will play.</p>
+            <h2 class="browser-title" data-i18n="folders.static_006">Choose a folder</h2>
+            <p class="browser-subtitle" data-i18n="folders.static_007">Only photos from the chosen folder will play.</p>
         </div>
 
         <div id="folderBrowser">
@@ -157,25 +158,26 @@
     </main>
 
     <!-- Mobile tab bar -->
-    <nav class="tabbar" aria-label="Sections">
+    <nav class="tabbar" aria-label="Sections" data-i18n-attr="aria-label:folders.static_012">
         <a href="/admin" class="tab">
-            <span class="material-symbols-outlined">photo_library</span><span>Library</span>
+            <span class="material-symbols-outlined">photo_library</span><span data-i18n="common.library">Library</span>
         </a>
         <a href="/access-accounts" class="tab">
-            <span class="material-symbols-outlined">key</span><span>Access</span>
+            <span class="material-symbols-outlined">key</span><span data-i18n="common.access">Access</span>
         </a>
-        <a href="/slideshow" class="tab-fab" aria-label="Start slideshow">
+        <a href="/slideshow" class="tab-fab" aria-label="Start slideshow" data-i18n-attr="aria-label:folders.static_013">
             <span class="material-symbols-outlined">play_arrow</span>
         </a>
         <a href="/folder-selection" class="tab active" aria-current="page">
-            <span class="material-symbols-outlined">folder_special</span><span>Folders</span>
+            <span class="material-symbols-outlined">folder_special</span><span data-i18n="common.folders">Folders</span>
         </a>
         <a href="/slideshow" class="tab">
-            <span class="material-symbols-outlined">slideshow</span><span>Slideshow</span>
+            <span class="material-symbols-outlined">slideshow</span><span data-i18n="common.slideshow">Slideshow</span>
         </a>
     </nav>
 
     <!-- Load required scripts -->
+    <script src="/js/i18n.js"></script>
     <script src="/js/folderService.js"></script>
     <script src="/js/folderStorage.js"></script>
     <script src="/js/folderBrowser.js"></script>
@@ -188,6 +190,7 @@
             initializeFolderBrowser();
             updateCurrentSelection();
         });
+        window.addEventListener('sora:languagechange', updateCurrentSelection);
 
         function initializeFolderBrowser() {
             const container = document.getElementById('folderBrowser');
@@ -205,7 +208,7 @@
             updateCurrentSelection();
             
             // Show success feedback
-            showNotification(`Now playing ${folderName}`);
+            showNotification(t('folders.nowPlaying', { name: folderName }));
         }
 
         function onFolderChanged(folderPath, folderName) {
@@ -219,9 +222,9 @@
             const selectionElement = document.getElementById('currentSelection');
             
             if (selection) {
-                selectionElement.textContent = `Playing ${selection.name}`;
+                selectionElement.textContent = t('folders.playingFolder', { name: selection.name });
             } else {
-                selectionElement.textContent = 'Playing all folders';
+                selectionElement.textContent = t('folders.playingAll');
             }
         }
 

@@ -8,7 +8,7 @@
     const show = id => states.forEach(s => $(s).classList.toggle('hidden', s !== id));
     const pretty = c => `${c.slice(0, 3)}-${c.slice(3)}`;
 
-    const folderSummary = folders => (folders && folders.length ? folders.join(', ') : 'All folders');
+    const folderSummary = folders => (folders && folders.length ? folders.join(', ') : t('pair.all_folders'));
 
     function choice(value, title, detail, checked) {
         const label = document.createElement('label');
@@ -22,22 +22,26 @@
         return label;
     }
 
+    let loaded = null; // { accounts, folders } once fetched, to re-render on language change
+    let doneName = null;
+
     function renderAccounts(accounts) {
         const list = $('accountList');
+        const selected = selectedAccount();
         list.innerHTML = '';
         accounts.forEach((account, i) => {
-            list.appendChild(choice(account.id, account.name, folderSummary(account.assignedFolders), i === 0));
+            list.appendChild(choice(account.id, account.name, folderSummary(account.assignedFolders), selected ? selected === account.id : i === 0));
         });
-        list.appendChild(choice(NEW, 'A new account for this frame', 'Choose its folders below', accounts.length === 0));
-        list.addEventListener('change', updateNewAccount);
+        list.appendChild(choice(NEW, t('pair.new_account'), t('pair.choose_folders'), selected ? selected === NEW : accounts.length === 0));
         updateNewAccount();
     }
 
     function renderFolders(folders) {
         const list = $('folderList');
+        if (list.querySelector('input')) return; // folder names need no translation, keep the ticks
         list.innerHTML = '';
         if (!folders.length) {
-            list.innerHTML = '<p class="pair-note">No folders yet: the frame will play every photo.</p>';
+            list.innerHTML = `<p class="pair-note">${t('pair.no_folders')}</p>`;
             return;
         }
         folders.forEach(folder => {
@@ -80,8 +84,9 @@
 
             const [accounts, folders] = await Promise.all([getJson('/api/access-accounts'), getJson('/api/folders')]);
             $('codeShown').textContent = pretty(pairing.data.code);
-            renderAccounts(accounts.data.accounts || []);
-            renderFolders(folders.data.folders || []);
+            loaded = { accounts: accounts.data.accounts || [], folders: folders.data.folders || [] };
+            renderAccounts(loaded.accounts);
+            renderFolders(loaded.folders);
             show('pairForm');
             if (matchMedia('(pointer: fine)').matches) $('frameName').focus();
         } catch (error) {
@@ -94,7 +99,7 @@
         event.preventDefault();
         const name = $('frameName').value.trim();
         if (!name) {
-            showError('Give the frame a name, like "Kitchen frame".');
+            showError(t('pair.name_required'));
             $('frameName').focus();
             return;
         }
@@ -112,17 +117,36 @@
                 body: JSON.stringify(body)
             });
             if (result.ok) {
-                $('doneName').textContent = result.data.device.name;
+                doneName = result.data.device.name;
+                renderDone();
                 show('stateDone');
             } else if (result.data.code === 'PAIRING_EXPIRED') {
                 show('stateExpired');
             } else {
-                showError(result.data.error || 'Could not pair the frame.');
+                showError(i18n.error(result.data, 'pair.failed'));
             }
         } catch (error) {
-            showError('Connection error. Please try again.');
+            showError(t('errors.connection'));
         } finally {
             $('pairButton').disabled = false;
+        }
+    });
+
+    // "Kitchen frame is paired" is one sentence, so the name goes inside the translation
+    function renderDone() {
+        const name = doneName || t('pair.static_012');
+        const span = document.createElement('span');
+        span.id = 'doneName';
+        span.textContent = name;
+        $('doneTitle').innerHTML = t('pair.donePaired', { name: span.outerHTML });
+    }
+
+    $('accountList').addEventListener('change', updateNewAccount);
+    window.addEventListener('sora:languagechange', () => {
+        renderDone();
+        if (loaded) {
+            renderAccounts(loaded.accounts);
+            renderFolders(loaded.folders);
         }
     });
 

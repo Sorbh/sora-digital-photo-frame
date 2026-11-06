@@ -10,7 +10,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Sora">
-    <title>Sora Frame</title>
+    <title data-i18n="slideshow.pageTitle">Sora Frame</title>
     <link rel="icon" href="/icons/favicon.ico" sizes="48x48">
     <link rel="icon" href="/icons/favicon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
@@ -18,6 +18,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="/css/sora.css">
+    <link rel="stylesheet" href="/css/i18n.css">
 
     <link rel="stylesheet" href="/css/slideshow.css">
     <link rel="stylesheet" href="/css/notePage.css">
@@ -30,14 +31,14 @@
 
         <header class="auth-top">
             <span class="sora-wordmark">Sora</span>
-            <span class="sora-eyebrow">Photo frame</span>
+            <span class="sora-eyebrow" data-i18n="slideshow.photo_frame">Photo frame</span>
         </header>
 
         <main class="auth-panel">
             <header class="auth-intro">
-                <p class="sora-eyebrow">Private gallery</p>
-                <h1 class="auth-title sora-display">Welcome <em>home</em></h1>
-                <p class="auth-sub">Enter your PIN, or scan the code to set up this frame.</p>
+                <p class="sora-eyebrow" data-i18n="slideshow.private_gallery">Private gallery</p>
+                <h1 class="auth-title sora-display" data-i18n-html="slideshow.welcome_home">Welcome <em>home</em></h1>
+                <p class="auth-sub" data-i18n="slideshow.enter_pin">Enter your PIN, or scan the code to set up this frame.</p>
             </header>
 
             <section class="auth-pin">
@@ -45,7 +46,7 @@
             <form id="pinForm" novalidate>
                 <div class="pin-field">
                     <input type="password" id="pinInput" maxlength="6" autocomplete="off" inputmode="numeric"
-                        pattern="[0-9]*" aria-label="PIN, 4 to 6 digits">
+                        pattern="[0-9]*" aria-label="PIN, 4 to 6 digits" data-i18n-attr="aria-label:slideshow.static_005">
                     <div class="pin-cells" aria-hidden="true">
                         <span class="pin-cell is-next"></span>
                         <span class="pin-cell"></span>
@@ -61,7 +62,7 @@
                         <span class="material-icons">error</span>
                         <span id="authErrorMessage"></span>
                     </div>
-                    <div class="auth-loading hidden" id="authLoading">Checking</div>
+                    <div class="auth-loading hidden" id="authLoading" data-i18n="slideshow.checking">Checking</div>
                 </div>
 
                 <div class="keypad">
@@ -74,11 +75,11 @@
                     <button type="button" class="key" data-key="7">7</button>
                     <button type="button" class="key" data-key="8">8</button>
                     <button type="button" class="key" data-key="9">9</button>
-                    <button type="button" class="key ghost" data-key="back" aria-label="Delete digit">
+                    <button type="button" class="key ghost" data-key="back" aria-label="Delete digit" data-i18n-attr="aria-label:slideshow.static_006">
                         <span class="material-icons">backspace</span>
                     </button>
                     <button type="button" class="key" data-key="0">0</button>
-                    <button type="submit" class="key go" id="authButton" aria-label="Unlock">
+                    <button type="submit" class="key go" id="authButton" aria-label="Unlock" data-i18n-attr="aria-label:slideshow.static_007">
                         <span class="material-icons">arrow_forward</span>
                     </button>
                 </div>
@@ -86,11 +87,11 @@
             </section>
 
             <aside class="auth-pair" id="pairCard" aria-labelledby="pairTitle">
-                <div class="pair-qr" id="pairQr" role="img" aria-label="QR code to set up this frame"></div>
+                <div class="pair-qr" id="pairQr" role="img" aria-label="QR code to set up this frame" data-i18n-attr="aria-label:slideshow.static_008"></div>
                 <div class="pair-text">
-                    <p class="sora-eyebrow" id="pairTitle">No keyboard?</p>
-                    <p class="pair-lede">Scan with your phone to set up this frame.</p>
-                    <p class="pair-code-label">Or open <span id="pairUrl">/pair</span> and check the code</p>
+                    <p class="sora-eyebrow" id="pairTitle" data-i18n="slideshow.no_keyboard">No keyboard?</p>
+                    <p class="pair-lede" data-i18n="slideshow.scan_phone">Scan with your phone to set up this frame.</p>
+                    <p class="pair-code-label" id="pairHint"></p>
                     <p class="pair-code" id="pairCode" aria-live="polite">······</p>
                     <p class="pair-status" id="pairStatus" aria-live="polite"></p>
                 </div>
@@ -98,8 +99,8 @@
         </main>
 
         <footer class="auth-foot">
-            <span class="sora-eyebrow">4 to 6 digits</span>
-            <a href="/login"><span class="material-icons">photo_library</span>Manage library</a>
+            <span class="sora-eyebrow" data-i18n="slideshow.static_002">4 to 6 digits</span>
+            <a href="/login"><span class="material-icons">photo_library</span><span data-i18n="slideshow.manageLibrary">Manage library</span></a>
         </footer>
     </div>
 
@@ -125,30 +126,30 @@
         <div class="stage-state" id="loadingState">
             <span class="sora-wordmark">Sora</span>
             <div class="developing-line"></div>
-            <p class="developing">Developing your photos</p>
+            <p class="developing" data-i18n="slideshow.developing">Developing your photos</p>
         </div>
 
         <!-- Error State -->
         <div class="stage-state hidden" id="errorState">
             <div class="error-card" role="alert">
                 <span class="material-icons">photo_library</span>
-                <h2>Nothing to show yet</h2>
-                <p id="errorMessage">Unable to load images. Please check your connection.</p>
-                <a href="/login">Open the library &rarr;</a>
+                <h2 data-i18n="slideshow.nothing">Nothing to show yet</h2>
+                <p id="errorMessage" data-i18n="slideshow.unable_images">Unable to load images. Please check your connection.</p>
+                <a href="/login" data-i18n="slideshow.open_library">Open the library &rarr;</a>
             </div>
         </div>
 
         <!-- Progress Bar -->
         <div class="progress-bar" id="progressBar"></div>
 
-        <div class="paused-badge" aria-hidden="true">Paused</div>
+        <div class="paused-badge" aria-hidden="true" data-i18n="slideshow.paused">Paused</div>
 
         <!-- Controls -->
         <div class="controls" id="controls">
-            <button class="dock-btn primary" id="playPauseBtn" aria-label="Pause slideshow" title="Pause (Space)">
+            <button class="dock-btn primary" id="playPauseBtn" aria-label="Pause slideshow" title="Pause (Space)" data-i18n-attr="aria-label:slideshow.static_009; title:slideshow.static_010">
                 <span class="material-icons">pause</span>
             </button>
-            <button class="dock-btn" id="nextBtn" aria-label="Next photo" title="Next photo (N)">
+            <button class="dock-btn" id="nextBtn" aria-label="Next photo" title="Next photo (N)" data-i18n-attr="aria-label:slideshow.static_011; title:slideshow.static_012">
                 <span class="material-icons">skip_next</span>
             </button>
 
@@ -160,13 +161,16 @@
 
             <span class="dock-divider" aria-hidden="true"></span>
 
-            <button class="dock-btn" id="infoBtn" aria-label="Photo details" title="Photo details (I)">
+            <button class="dock-btn" id="infoBtn" aria-label="Photo details" title="Photo details (I)" data-i18n-attr="aria-label:slideshow.static_013; title:slideshow.static_014">
                 <span class="material-icons">info</span>
             </button>
-            <button class="dock-btn" id="fullscreenBtn" aria-label="Toggle fullscreen" title="Fullscreen (F)">
+            <button class="dock-btn" id="fullscreenBtn" aria-label="Toggle fullscreen" title="Fullscreen (F)" data-i18n-attr="aria-label:slideshow.static_015; title:slideshow.static_016">
                 <span class="material-icons">fullscreen</span>
             </button>
-            <button class="dock-btn" id="logoutBtn" aria-label="Lock frame" title="Lock frame">
+            <button class="dock-btn" id="languageBtn" aria-label="Language" title="Language" data-i18n-attr="aria-label:slideshow.static_017; title:slideshow.static_018">
+                <span class="material-icons">language</span>
+            </button>
+            <button class="dock-btn" id="logoutBtn" aria-label="Lock frame" title="Lock frame" data-i18n-attr="aria-label:slideshow.static_019; title:slideshow.static_020">
                 <span class="material-icons">lock</span>
             </button>
         </div>
@@ -191,13 +195,21 @@
 
         <!-- Info Overlay -->
         <div class="info-overlay hidden" id="infoOverlay">
-            <div class="sora-eyebrow">Now showing</div>
+            <div class="sora-eyebrow" data-i18n="slideshow.static_004">Now showing</div>
             <div id="folder"></div>
             <div id="filename"></div>
         </div>
     </div>
 
+    <dialog id="languageModal" class="dialog" aria-labelledby="languageTitle">
+        <article><header><h2 id="languageTitle" data-i18n="common.language">Language</h2></header>
+        <section><label for="frameLanguage" data-i18n="accessAccounts.screen_language">Frame language</label>
+        <select id="frameLanguage" class="input"></select></section>
+        <footer><button id="closeLanguage" class="btn-outline" data-i18n="common.close">Close</button></footer></article>
+    </dialog>
+
     <!-- Load folder selection scripts -->
+    <script src="/js/i18n.js"></script>
     <script src="/js/folderService.js"></script>
     <script src="/js/folderStorage.js"></script>
     <script src="/js/folderSelector.js"></script>
@@ -207,6 +219,17 @@
     <script src="/js/noteScheduler.js"></script>
     <script src="/js/photoCipher.js"></script>
     <script src="/js/slideshow.js"></script>
+    <script>
+      document.addEventListener('DOMContentLoaded', () => {
+        const modal = document.getElementById('languageModal');
+        const select = document.getElementById('frameLanguage');
+        const fill = () => { select.innerHTML = i18n.supported.map(code => `<option value="${code}">${i18n.names[code]}</option>`).join(''); select.value = i18n.locale; };
+        fill(); window.addEventListener('sora:languagechange', fill);
+        document.getElementById('languageBtn').onclick = () => modal.showModal();
+        document.getElementById('closeLanguage').onclick = () => modal.close();
+        select.onchange = async () => { await i18n.setLanguage(select.value, false); await fetch('/api/device/language', { method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({language: select.value}) }); };
+      });
+    </script>
 </body>
 
 </html>

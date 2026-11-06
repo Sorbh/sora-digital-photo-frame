@@ -1,13 +1,18 @@
 /**
  * Page-wide toast via Basecoat, shared by admin.js, settings.js and googlePhotosSync.js.
  */
-const TOAST_TITLES = { success: 'Success!', error: 'Error!', warning: 'Warning!', info: 'Info' };
+const toastTitle = (category) => ({
+    success: t('admin.toastSuccess'),
+    error: t('admin.toastError'),
+    warning: t('admin.toastWarning'),
+    info: t('admin.toastInfo')
+})[category];
 
 function showToast(message, type = 'info') {
-    const category = type in TOAST_TITLES ? type : 'info';
+    const category = ['success', 'error', 'warning', 'info'].includes(type) ? type : 'info';
     document.dispatchEvent(new CustomEvent('basecoat:toast', {
         detail: {
-            config: { category, title: TOAST_TITLES[category], description: message, duration: 5000 }
+            config: { category, title: toastTitle(category), description: message, duration: 5000 }
         }
     }));
 }
@@ -44,6 +49,7 @@ class PhotoFrameAdmin {
         this.availableImages = [];
         
         this.initializeEventListeners();
+        window.addEventListener('sora:languagechange', () => this.onLanguageChange());
         this.updateURL(); // Ensure URL reflects current path
         this.loadFolderContents();
         this.checkFeatureFlags();
@@ -74,8 +80,8 @@ class PhotoFrameAdmin {
             detail: {
                 config: {
                     category: 'error',
-                    title: 'Session Expired',
-                    description: 'Your session has expired. Redirecting to login...',
+                    title: t('admin.sessionExpiredTitle'),
+                    description: t('admin.sessionExpired'),
                     duration: 8000 // Longer duration for important message
                 }
             }
@@ -319,7 +325,7 @@ class PhotoFrameAdmin {
 
         // Session buttons (will be available after Google Photos sync loads)
         document.addEventListener('click', (e) => {
-            if (e.target.id === 'openSessionBtn' && window.googlePhotosSync) {
+            if (e.target.closest('#openSessionBtn') && window.googlePhotosSync) {
                 window.googlePhotosSync.openPickerSession();
             }
             if (e.target.id === 'retrySessionBtn' && window.googlePhotosSync) {
@@ -338,15 +344,15 @@ class PhotoFrameAdmin {
         switch (mode) {
             case 'light':
                 themeIcon.textContent = 'light_mode';
-                themeButton.title = 'Switch to dark mode';
+                themeButton.title = t('admin.themeToDark');
                 break;
             case 'dark':
                 themeIcon.textContent = 'dark_mode';
-                themeButton.title = 'Switch to system theme';
+                themeButton.title = t('admin.themeToSystem');
                 break;
             case 'system':
                 themeIcon.textContent = 'brightness_auto';
-                themeButton.title = 'Switch to light mode';
+                themeButton.title = t('admin.themeToLight');
                 break;
         }
     }
@@ -473,7 +479,7 @@ class PhotoFrameAdmin {
         if (files.length > 0) {
             this.uploadFilesDirectly(files, targetPath);
         } else {
-            this.showToast('Only image files can be uploaded', 'warning');
+            this.showToast(t('admin.onlyImages'), 'warning');
         }
     }
 
@@ -488,7 +494,7 @@ class PhotoFrameAdmin {
     }
 
     async movePhotos(paths, destination) {
-        const folderName = destination === 'uploads' ? 'Library' : destination.split('/').pop();
+        const folderName = this.folderDisplayName(destination);
         try {
             const response = await this.authenticatedFetch('/api/images/move', {
                 method: 'POST',
@@ -499,21 +505,21 @@ class PhotoFrameAdmin {
 
             const data = await response.json();
             if (!response.ok && response.status !== 207) {
-                this.showToast(data.message || 'Could not move photos', 'error');
+                this.showToast(i18n.error(data, 'admin.moveFailed'), 'error');
                 return;
             }
 
             const moved = data.movedCount || 0;
             if (moved > 0) {
-                this.showToast(`Moved ${moved} ${moved === 1 ? 'photo' : 'photos'} to ${folderName}`, 'success');
+                this.showToast(t('admin.movedTo', { count: moved, name: folderName }), 'success');
             }
             if (data.failedCount > 0) {
-                this.showToast(`${data.failedCount} ${data.failedCount === 1 ? 'photo' : 'photos'} could not be moved`, 'error');
+                this.showToast(t('admin.moveFailedCount', { count: data.failedCount }), 'error');
             }
             this.loadFolderContents();
         } catch (error) {
             console.error('Error moving photos:', error);
-            this.showToast('Could not move photos', 'error');
+            this.showToast(t('admin.moveFailed'), 'error');
         }
     }
 
@@ -531,11 +537,11 @@ class PhotoFrameAdmin {
                 this.updateBreadcrumb();
                 this.updateBackButton();
             } else {
-                this.showToast(data.message || 'Failed to load folder contents', 'error');
+                this.showToast(i18n.error(data, 'admin.loadFolderFailed'), 'error');
             }
         } catch (error) {
             console.error('Error loading folder contents:', error);
-            this.showToast('Failed to load folder contents', 'error');
+            this.showToast(t('admin.loadFolderFailed'), 'error');
         }
     }
 
@@ -544,6 +550,7 @@ class PhotoFrameAdmin {
         const emptyState = document.getElementById('emptyState');
         
         fileGrid.innerHTML = '';
+        this.folderData = data; // kept to redraw the grid when the language changes
         
         // Update available images for navigation
         // Snaps open in their own editor, so the photo viewer steps over them
@@ -560,9 +567,8 @@ class PhotoFrameAdmin {
         
         // Background hint under the grid; the empty state has its own upload box
         const isEmpty = data.folders.length === 0 && data.files.length === 0;
-        const folderName = this.currentPath === 'uploads' ? 'Library' : this.currentPath.split('/').pop();
         document.getElementById('dropHint').classList.toggle('hidden', isEmpty);
-        document.querySelectorAll('.drop-folder-name').forEach(el => { el.textContent = folderName; });
+        this.renderDropTexts();
         document.getElementById('dropHintMove').classList.toggle('hidden', !(data.folders.length && data.files.length));
 
         if (isEmpty) {
@@ -579,18 +585,51 @@ class PhotoFrameAdmin {
         }
         
         // Render folders
-        if (data.folders.length > 0) fileGrid.appendChild(this.createGridLabel('Folders'));
+        if (data.folders.length > 0) fileGrid.appendChild(this.createGridLabel(t('admin.gridFolders')));
         data.folders.forEach(folder => {
             const folderElement = this.createFolderElement(folder);
             fileGrid.appendChild(folderElement);
         });
         
         // Render files
-        if (data.files.length > 0) fileGrid.appendChild(this.createGridLabel('Photos'));
+        if (data.files.length > 0) fileGrid.appendChild(this.createGridLabel(t('admin.gridPhotos')));
         data.files.forEach(file => {
             const fileElement = this.createFileElement(file);
             fileGrid.appendChild(fileElement);
         });
+    }
+
+    // The library root shows as "Library"; any other folder by its own name
+    folderDisplayName(path) {
+        return path === 'uploads' ? t('common.library') : path.split('/').pop();
+    }
+
+    // "Drop … to add them to <folder>": whole sentences, the folder name dropped into {name}
+    renderDropTexts() {
+        const name = `<strong class="drop-folder-name">${escapeHtml(this.folderDisplayName(this.currentPath))}</strong>`;
+        const zone = document.getElementById('dropZoneText');
+        const hint = document.getElementById('dropHintText');
+        if (zone) zone.innerHTML = t('admin.dropToAdd', { name });
+        if (hint) hint.innerHTML = t('admin.dropHint', { name });
+    }
+
+    // Redraw what this script wrote, after i18n.apply() has re-translated the static page
+    onLanguageChange() {
+        this.updateThemeButton(localStorage.getItem('themeMode') || 'system');
+        this.updateUploadButton();
+        this.updateEmptyStateUploadButton();
+        if (!this.folderData) return;
+        const selected = [...this.selectedItems];
+        this.renderFolderContents(this.folderData);
+        this.updateBreadcrumb();
+        selected.forEach(path => {
+            const tile = document.querySelector(`.file-item[data-path="${CSS.escape(path)}"]`);
+            if (!tile) return this.selectedItems.delete(path);
+            tile.classList.add('selected');
+            const checkbox = tile.querySelector('input[type="checkbox"]');
+            if (checkbox) checkbox.checked = true;
+        });
+        this.updateSelectionUI();
     }
 
     updateLibraryHeading(data) {
@@ -598,15 +637,15 @@ class PhotoFrameAdmin {
         const title = document.getElementById('folderTitle');
         const meta = document.getElementById('folderMeta');
 
-        if (title) title.textContent = parts.length > 1 ? parts[parts.length - 1] : 'Library';
+        if (title) title.textContent = parts.length > 1 ? parts[parts.length - 1] : t('common.library');
         if (meta) {
             const folders = data.folders.length;
             const snaps = data.files.filter(file => file.type === 'snap').length;
             const photos = data.files.length - snaps;
             const counts = [];
-            if (folders) counts.push(`${folders} ${folders === 1 ? 'folder' : 'folders'}`);
-            counts.push(`${photos} ${photos === 1 ? 'photo' : 'photos'}`);
-            if (snaps) counts.push(`${snaps} ${snaps === 1 ? 'snap' : 'snaps'}`);
+            if (folders) counts.push(t('admin.countFolders', { count: folders }));
+            counts.push(t('admin.countPhotos', { count: photos }));
+            if (snaps) counts.push(t('admin.countSnaps', { count: snaps }));
             meta.textContent = counts.join(' · ');
         }
     }
@@ -634,7 +673,7 @@ class PhotoFrameAdmin {
             </div>
             <div class="folder-meta">
                 <div class="folder-name"></div>
-                <button type="button" class="folder-more" aria-label="Folder options" aria-haspopup="menu">
+                <button type="button" class="folder-more" aria-label="${escapeHtml(t('admin.folderOptions'))}" aria-haspopup="menu">
                     <span class="material-symbols-outlined">more_vert</span>
                 </button>
                 <span class="folder-kind material-symbols-outlined" aria-hidden="true">chevron_right</span>
@@ -690,17 +729,17 @@ class PhotoFrameAdmin {
                 <div class="photo-grid-overlay-top">
                     <div class="photo-grid-checkbox">
                         <label class="label">
-                            <input type="checkbox" class="input" aria-label="Select Photo">
-                            <span class="sr-only">Select Photo</span>
+                            <input type="checkbox" class="input" aria-label="${escapeHtml(t('admin.selectPhoto'))}">
+                            <span class="sr-only">${escapeHtml(t('admin.selectPhoto'))}</span>
                         </label>
                     </div>
                 </div>
                 <div class="photo-grid-overlay-bottom">
                     <div class="photo-grid-actions">
-                        <button class="btn-icon" data-tooltip="View Photo" data-action="view" aria-label="View Photo">
+                        <button class="btn-icon" data-tooltip="${escapeHtml(t('admin.viewPhoto'))}" data-action="view" aria-label="${escapeHtml(t('admin.viewPhoto'))}">
                             <span class="material-symbols-outlined">visibility</span>
                         </button>
-                        <button class="btn-icon" data-tooltip="Delete Photo" data-action="delete" aria-label="Delete Photo">
+                        <button class="btn-icon" data-tooltip="${escapeHtml(t('admin.deletePhoto'))}" data-action="delete" aria-label="${escapeHtml(t('admin.deletePhoto'))}">
                             <span class="material-symbols-outlined">delete</span>
                         </button>
                     </div>
@@ -792,17 +831,18 @@ class PhotoFrameAdmin {
 
         const badge = document.createElement('span');
         badge.className = 'snap-badge';
-        badge.innerHTML = '<span class="material-symbols-outlined">auto_stories</span>Snap';
+        badge.innerHTML = '<span class="material-symbols-outlined">auto_stories</span>';
+        badge.append(t('admin.snapBadge'));
         div.appendChild(badge);
 
         div.querySelector('.photo-grid-name').textContent = snap.title || file.name;
         const view = div.querySelector('[data-action="view"]');
-        view.dataset.tooltip = 'Edit Snap';
-        view.setAttribute('aria-label', 'Edit Snap');
+        view.dataset.tooltip = t('admin.editSnap');
+        view.setAttribute('aria-label', t('admin.editSnap'));
         view.querySelector('.material-symbols-outlined').textContent = 'edit';
         const del = div.querySelector('[data-action="delete"]');
-        del.dataset.tooltip = 'Delete Snap';
-        del.setAttribute('aria-label', 'Delete Snap');
+        del.dataset.tooltip = t('admin.deleteSnap');
+        del.setAttribute('aria-label', t('admin.deleteSnap'));
     }
 
     createGooglePhotosImportElement() {
@@ -811,8 +851,9 @@ class PhotoFrameAdmin {
         div.dataset.type = 'google-photos-import';
         div.innerHTML = `
             <span class="material-icons">add</span>
-            <span class="import-text">Import from Google Photos</span>
+            <span class="import-text"></span>
         `;
+        div.querySelector('.import-text').textContent = t('admin.static_022');
         
         div.addEventListener('click', () => this.openGooglePhotosImport());
         
@@ -823,7 +864,7 @@ class PhotoFrameAdmin {
         if (window.googlePhotosSync) {
             window.googlePhotosSync.openGooglePhotosModal(this.currentPath);
         } else {
-            this.showToast('Google Photos integration not available', 'error');
+            this.showToast(t('admin.googlePhotosUnavailable'), 'error');
         }
     }
 
@@ -880,7 +921,7 @@ class PhotoFrameAdmin {
             }
             
             span.dataset.path = currentPath;
-            span.textContent = index === 0 ? 'Home' : part;
+            span.textContent = index === 0 ? t('admin.breadcrumbHome') : part;
             
             li.appendChild(span);
             container.appendChild(li);
@@ -908,7 +949,7 @@ class PhotoFrameAdmin {
         const name = document.getElementById('folderNameInput').value.trim();
         
         if (!name) {
-            this.showToast('Please enter a folder name', 'error');
+            this.showToast(t('admin.enterFolderName'), 'error');
             return;
         }
         
@@ -928,15 +969,15 @@ class PhotoFrameAdmin {
             const data = await response.json();
             
             if (response.ok) {
-                this.showToast('Folder created successfully', 'success');
+                this.showToast(t('admin.folderCreated'), 'success');
                 this.hideCreateFolderModal();
                 this.loadFolderContents();
             } else {
-                this.showToast(data.message || 'Failed to create folder', 'error');
+                this.showToast(i18n.error(data, 'admin.createFolderFailed'), 'error');
             }
         } catch (error) {
             console.error('Error creating folder:', error);
-            this.showToast('Failed to create folder', 'error');
+            this.showToast(t('admin.createFolderFailed'), 'error');
         }
     }
 
@@ -963,9 +1004,9 @@ class PhotoFrameAdmin {
         btn.disabled = this.selectedFiles.length === 0;
         
         if (this.selectedFiles.length > 0) {
-            btnText.textContent = `Upload ${this.selectedFiles.length} file${this.selectedFiles.length > 1 ? 's' : ''}`;
+            btnText.textContent = t('admin.uploadFilesButton', { count: this.selectedFiles.length });
         } else {
-            btnText.textContent = 'Select Files';
+            btnText.textContent = t('admin.static_012');
         }
     }
 
@@ -1012,11 +1053,12 @@ class PhotoFrameAdmin {
             // A failed batch can still have saved some files (quota running out mid-way)
             uploaded.push(...(data.files || []));
             if (!response.ok) {
-                const message = data.message || 'Upload failed';
+                const message = i18n.error(data, 'admin.uploadFailed');
                 if (uploaded.length) this.loadFolderContents(); // show what did get saved
                 return { ok: false, json: async () => ({
                     ...data,
-                    message: uploaded.length ? `${uploaded.length} of ${list.length} uploaded. ${message}` : message
+                    code: undefined, // already translated into message
+                    message: uploaded.length ? t('admin.uploadPartial', { done: uploaded.length, total: list.length, message }) : message
                 }) };
             }
         }
@@ -1038,15 +1080,15 @@ class PhotoFrameAdmin {
             const data = await response.json();
             
             if (response.ok) {
-                this.showToast(`${data.files.length} file(s) uploaded successfully`, 'success');
+                this.showToast(t('admin.filesUploaded', { count: data.files.length }), 'success');
                 this.hideUploadModal();
                 this.loadFolderContents();
             } else {
-                this.showToast(data.message || 'Upload failed', 'error');
+                this.showToast(data.message || t('admin.uploadFailed'), 'error');
             }
         } catch (error) {
             console.error('Error uploading files:', error);
-            this.showToast('Upload failed', 'error');
+            this.showToast(t('admin.uploadFailed'), 'error');
         }
         
         this.hideUploadProgress();
@@ -1077,8 +1119,8 @@ class PhotoFrameAdmin {
     async uploadFilesDirectly(files, targetPath = this.currentPath) {
         if (files.length === 0) return;
         
-        const folderName = targetPath === 'uploads' ? 'Library' : targetPath.split('/').pop();
-        this.showToast(`Uploading ${files.length} ${files.length === 1 ? 'photo' : 'photos'} to ${folderName}…`, 'info');
+        const folderName = this.folderDisplayName(targetPath);
+        this.showToast(t('admin.uploadingTo', { count: files.length, name: folderName }), 'info');
         
         try {
             const response = await this.uploadInBatches(files, targetPath);
@@ -1087,14 +1129,14 @@ class PhotoFrameAdmin {
             const data = await response.json();
             
             if (response.ok) {
-                this.showToast(`${data.files.length} ${data.files.length === 1 ? 'photo' : 'photos'} added to ${folderName}`, 'success');
+                this.showToast(t('admin.photosAddedTo', { count: data.files.length, name: folderName }), 'success');
                 this.loadFolderContents();
             } else {
-                this.showToast(data.message || 'Upload failed', 'error');
+                this.showToast(data.message || t('admin.uploadFailed'), 'error');
             }
         } catch (error) {
             console.error('Error uploading files:', error);
-            this.showToast('Upload failed', 'error');
+            this.showToast(t('admin.uploadFailed'), 'error');
         }
     }
 
@@ -1204,17 +1246,17 @@ class PhotoFrameAdmin {
             });
             if (!response) return false;
             const data = await response.json();
-            if (!response.ok) throw new Error(data.error || 'Could not save the play order');
+            if (!response.ok) throw new Error(i18n.error(data, 'admin.playOrderSaveFailed'));
 
             if (sequence) {
-                if (previous !== 'custom') this.showToast('Playing in your order. Drag photos to rearrange.', 'success');
+                if (previous !== 'custom') this.showToast(t('admin.playOrderCustom'), 'success');
                 return true;
             }
             const messages = {
-                shuffle: 'Photos will play shuffled',
-                newest: 'Newest photos will play first',
-                oldest: 'Oldest photos will play first',
-                custom: 'Playing in your order. Drag photos to rearrange.'
+                shuffle: t('admin.playOrderShuffle'),
+                newest: t('admin.playOrderNewest'),
+                oldest: t('admin.playOrderOldest'),
+                custom: t('admin.playOrderCustom')
             };
             this.showToast(messages[order], 'success');
             this.loadFolderContents(); // the grid follows the play order
@@ -1286,7 +1328,7 @@ class PhotoFrameAdmin {
         const index = this.fileNames.indexOf(item.name);
         const neighbour = this.fileNames[index + step];
         if (index < 0 || !neighbour) {
-            this.showToast(step < 0 ? 'Already first' : 'Already last', 'info');
+            this.showToast(step < 0 ? t('admin.alreadyFirst') : t('admin.alreadyLast'), 'info');
             return;
         }
         this.reorder([item.name], neighbour, step < 0 ? 'before' : 'after');
@@ -1313,7 +1355,7 @@ class PhotoFrameAdmin {
         
         if (!item || !item.name) {
             console.error('Invalid item for deletion:', item);
-            this.showToast('Cannot delete: Invalid item', 'error');
+            this.showToast(t('admin.deleteInvalid'), 'error');
             return;
         }
         
@@ -1333,14 +1375,14 @@ class PhotoFrameAdmin {
             console.log('Delete response:', data);
             
             if (response.ok) {
-                this.showToast(`${{ folder: 'Folder', snap: 'Snap' }[item.type] || 'Image'} deleted successfully`, 'success');
+                this.showToast({ folder: t('admin.folderDeleted'), snap: t('admin.snapDeleted') }[item.type] || t('admin.imageDeleted'), 'success');
                 this.loadFolderContents();
             } else {
-                this.showToast(data.message || 'Delete failed', 'error');
+                this.showToast(i18n.error(data, 'admin.deleteFailed'), 'error');
             }
         } catch (error) {
             console.error('Error deleting item:', error);
-            this.showToast('Delete failed', 'error');
+            this.showToast(t('admin.deleteFailed'), 'error');
         }
     }
 
@@ -1349,13 +1391,13 @@ class PhotoFrameAdmin {
         
         if (!item || !item.path || item.type !== 'image') {
             console.error('Invalid item for rotation:', item);
-            this.showToast('Cannot rotate: Invalid item', 'error');
+            this.showToast(t('admin.rotateInvalid'), 'error');
             return;
         }
         
         try {
-            const direction = angle > 0 ? 'right' : 'left';
-            this.showToast(`Rotating image ${direction}...`, 'info');
+            const right = angle > 0;
+            this.showToast(right ? t('admin.rotatingRight') : t('admin.rotatingLeft'), 'info');
             const response = await this.authenticatedFetch('/api/images/rotate', {
                 method: 'POST',
                 headers: {
@@ -1372,15 +1414,15 @@ class PhotoFrameAdmin {
             console.log('Rotate response:', data);
             
             if (response.ok) {
-                this.showToast(`Image rotated ${direction} successfully`, 'success');
+                this.showToast(right ? t('admin.rotatedRight') : t('admin.rotatedLeft'), 'success');
                 // Force UI refresh with cache busting
                 await this.refreshImageInGrid(item);
             } else {
-                this.showToast(data.message || 'Rotation failed', 'error');
+                this.showToast(i18n.error(data, 'admin.rotationFailed'), 'error');
             }
         } catch (error) {
             console.error('Error rotating image:', error);
-            this.showToast('Rotation failed', 'error');
+            this.showToast(t('admin.rotationFailed'), 'error');
         }
     }
 
@@ -1433,16 +1475,16 @@ class PhotoFrameAdmin {
             });
             
             if (response && response.ok) {
-                this.showToast('Logging out...', 'info');
+                this.showToast(t('admin.loggingOut'), 'info');
                 setTimeout(() => {
                     window.location.href = '/login';
                 }, 1000);
             } else {
-                this.showToast('Logout failed', 'error');
+                this.showToast(t('admin.logoutFailed'), 'error');
             }
         } catch (error) {
             console.error('Error during logout:', error);
-            this.showToast('Logout failed', 'error');
+            this.showToast(t('admin.logoutFailed'), 'error');
         }
     }
 
@@ -1689,9 +1731,7 @@ class PhotoFrameAdmin {
         if (this.selectedItems.size === 0) return;
         
         const modal = document.getElementById('bulkDeleteModal');
-        const deleteCountElement = document.getElementById('deleteCount');
-        
-        deleteCountElement.textContent = this.selectedItems.size;
+        document.getElementById('bulk-delete-description').textContent = t('admin.bulkDeleteConfirm', { count: this.selectedItems.size });
         modal.showModal();
     }
 
@@ -1709,7 +1749,7 @@ class PhotoFrameAdmin {
         }
         
         try {
-            this.showToast('Deleting photos...', 'info');
+            this.showToast(t('admin.deletingPhotos'), 'info');
             
             const response = await this.authenticatedFetch('/api/images/batch', {
                 method: 'DELETE',
@@ -1726,16 +1766,16 @@ class PhotoFrameAdmin {
             const data = await response.json();
             
             if (response.ok) {
-                this.showToast(`Successfully deleted ${data.deletedCount} photos`, 'success');
+                this.showToast(t('admin.photosDeleted', { count: data.deletedCount }), 'success');
                 this.clearSelection();
                 this.loadFolderContents(); // Refresh the grid
             } else {
                 console.error('Bulk delete failed:', data);
-                this.showToast(data.message || 'Failed to delete photos', 'error');
+                this.showToast(i18n.error(data, 'admin.deletePhotosFailed'), 'error');
             }
         } catch (error) {
             console.error('Error during bulk delete:', error);
-            this.showToast('Failed to delete photos', 'error');
+            this.showToast(t('admin.deletePhotosFailed'), 'error');
         } finally {
             this.hideBulkDeleteModal();
         }
@@ -1743,24 +1783,24 @@ class PhotoFrameAdmin {
 
     // Enhanced confirmation dialog for single item deletion
     async showDeleteConfirmation(itemName, itemType = 'image') {
-        const itemLabel = { folder: 'Folder', snap: 'Snap' }[itemType] || 'Photo';
+        const deleteLabel = escapeHtml({ folder: t('admin.deleteFolder'), snap: t('admin.deleteSnap') }[itemType] || t('admin.deletePhoto'));
         return new Promise((resolve) => {
             // Create a custom confirmation dialog
             const dialogHtml = `
                 <dialog id="deleteConfirmModal" class="dialog" aria-labelledby="delete-confirm-title">
                     <article>
                         <header>
-                            <h2 id="delete-confirm-title">Delete ${itemLabel}</h2>
+                            <h2 id="delete-confirm-title">${deleteLabel}</h2>
                         </header>
                         <section>
-                            <p>Are you sure you want to delete <strong>"${itemName}"</strong>?</p>
-                            <p class="text-sm text-destructive mt-2">This action cannot be undone.</p>
+                            <p>${t('admin.deleteConfirm', { name: escapeHtml(itemName) })}</p>
+                            <p class="text-sm text-destructive mt-2">${escapeHtml(t('admin.cannotUndo'))}</p>
                         </section>
                         <footer>
-                            <button id="cancelSingleDeleteBtn" class="btn-outline">Cancel</button>
+                            <button id="cancelSingleDeleteBtn" class="btn-outline">${escapeHtml(t('common.cancel'))}</button>
                             <button id="confirmSingleDeleteBtn" class="btn-destructive">
                                 <span class="material-symbols-outlined">delete</span>
-                                Delete ${itemLabel}
+                                ${deleteLabel}
                             </button>
                         </footer>
                     </article>
@@ -1845,10 +1885,10 @@ class PhotoFrameAdmin {
         btn.disabled = !this.emptyStateSelectedFiles || this.emptyStateSelectedFiles.length === 0;
         
         if (this.emptyStateSelectedFiles && this.emptyStateSelectedFiles.length > 0) {
-            btnText.textContent = `Upload ${this.emptyStateSelectedFiles.length} file${this.emptyStateSelectedFiles.length > 1 ? 's' : ''}`;
+            btnText.textContent = t('admin.uploadFilesButton', { count: this.emptyStateSelectedFiles.length });
             cancelBtn.classList.remove('hidden');
         } else {
-            btnText.textContent = 'Select Files';
+            btnText.textContent = t('admin.static_012');
             cancelBtn.classList.add('hidden');
         }
     }
@@ -1886,15 +1926,15 @@ class PhotoFrameAdmin {
             const data = await response.json();
             
             if (response.ok) {
-                this.showToast(`${data.files.length} file(s) uploaded successfully`, 'success');
+                this.showToast(t('admin.filesUploaded', { count: data.files.length }), 'success');
                 this.resetEmptyStateUpload();
                 this.loadFolderContents(); // This will hide the empty state and show the uploaded files
             } else {
-                this.showToast(data.message || 'Upload failed', 'error');
+                this.showToast(data.message || t('admin.uploadFailed'), 'error');
             }
         } catch (error) {
             console.error('Error uploading files:', error);
-            this.showToast('Upload failed', 'error');
+            this.showToast(t('admin.uploadFailed'), 'error');
         }
         
         this.hideEmptyStateUploadProgress();

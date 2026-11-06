@@ -22,19 +22,19 @@ class FolderService {
             });
             
             if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+                throw new Error(t('folders.httpError', { status: response.status }));
             }
             
             const data = await response.json();
             
             if (!data.success) {
-                throw new Error(data.error || 'Failed to fetch folder structure');
+                throw new Error(i18n.error(data, 'folders.fetchStructureFailed'));
             }
             
             return data;
         } catch (error) {
             console.error('Error fetching folder structure:', error);
-            throw new Error(`Failed to load folders: ${error.message}`);
+            throw new Error(t('folders.loadFailedDetail', { detail: error.message }));
         }
     }
 
@@ -54,13 +54,13 @@ class FolderService {
             });
             
             if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+                throw new Error(t('folders.httpError', { status: response.status }));
             }
             
             const data = await response.json();
             
             if (!data.success) {
-                throw new Error(data.error || 'Failed to fetch random image');
+                throw new Error(i18n.error(data, 'folders.fetchRandomFailed'));
             }
             
             return data;

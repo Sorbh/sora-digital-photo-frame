@@ -83,6 +83,8 @@ router.post('/auth/device', pairingController.signIn.bind(pairingController));
 router.get('/admin/pair/:code', requireAuth, pairingController.show.bind(pairingController));
 router.post('/admin/pair/:code/approve', requireAuth, pairingController.approve.bind(pairingController));
 router.get('/admin/devices', requireAuth, pairingController.listDevices.bind(pairingController));
+router.put('/admin/devices/:id/language', requireAuth, pairingController.setDeviceLanguage.bind(pairingController));
+router.put('/device/language', requireViewer, pairingController.setOwnLanguage.bind(pairingController));
 router.delete('/admin/devices/:id', requireAuth, pairingController.removeDevice.bind(pairingController));
 
 // Google Photos routes (admin only) - conditionally enabled

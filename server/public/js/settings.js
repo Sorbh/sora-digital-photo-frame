@@ -17,8 +17,8 @@ class SettingsManager {
             <dialog id="settingsModal" class="dialog" aria-labelledby="settings-title">
                 <article style="max-width: 500px;">
                     <header>
-                        <h2 id="settings-title">Settings</h2>
-                        <button id="closeSettingsModal" class="btn-sm-icon-ghost absolute top-4 right-4" aria-label="Close">
+                        <h2 id="settings-title" data-i18n="common.settings">Settings</h2>
+                        <button id="closeSettingsModal" class="btn-sm-icon-ghost absolute top-4 right-4" aria-label="Close" data-i18n-attr="aria-label:common.close">
                             <span class="material-symbols-outlined">close</span>
                         </button>
                     </header>
@@ -28,8 +28,8 @@ class SettingsManager {
                             <div class="flex items-center gap-3">
                                 <span class="material-symbols-outlined text-2xl">wb_sunny</span>
                                 <div>
-                                    <div class="font-medium">Weather Widget</div>
-                                    <div class="text-sm text-muted-foreground">Show clock and weather overlay</div>
+                                    <div class="font-medium" data-i18n="settings.weatherWidget">Weather Widget</div>
+                                    <div class="text-sm text-muted-foreground" data-i18n="settings.weatherWidgetHint">Show clock and weather overlay</div>
                                 </div>
                             </div>
                             <label class="switch">
@@ -43,8 +43,8 @@ class SettingsManager {
                             <div class="flex items-center gap-3">
                                 <span class="material-symbols-outlined text-2xl">calendar_today</span>
                                 <div>
-                                    <div class="font-medium">Date Display</div>
-                                    <div class="text-sm text-muted-foreground">Show date below clock</div>
+                                    <div class="font-medium" data-i18n="settings.dateDisplay">Date Display</div>
+                                    <div class="text-sm text-muted-foreground" data-i18n="settings.dateDisplayHint">Show date below clock</div>
                                 </div>
                             </div>
                             <label class="switch">
@@ -58,8 +58,8 @@ class SettingsManager {
                             <div class="flex items-center gap-3">
                                 <span class="material-symbols-outlined text-2xl">location_on</span>
                                 <div>
-                                    <div class="font-medium">Where and when</div>
-                                    <div class="text-sm text-muted-foreground">Show the place and date a photo was taken</div>
+                                    <div class="font-medium" data-i18n="settings.photoDetails">Where and when</div>
+                                    <div class="text-sm text-muted-foreground" data-i18n="settings.photoDetailsHint">Show the place and date a photo was taken</div>
                                 </div>
                             </div>
                             <label class="switch">
@@ -73,13 +73,13 @@ class SettingsManager {
                             <div class="flex items-center gap-3">
                                 <span class="material-symbols-outlined text-2xl">schedule</span>
                                 <div>
-                                    <div class="font-medium">Time Format</div>
-                                    <div class="text-sm text-muted-foreground">12-hour or 24-hour clock</div>
+                                    <div class="font-medium" data-i18n="settings.timeFormat">Time Format</div>
+                                    <div class="text-sm text-muted-foreground" data-i18n="settings.timeFormatHint">12-hour or 24-hour clock</div>
                                 </div>
                             </div>
                             <div class="btn-group" role="group">
-                                <button id="time12HrBtn" class="btn-sm" data-format="12">12h</button>
-                                <button id="time24HrBtn" class="btn-sm" data-format="24">24h</button>
+                                <button id="time12HrBtn" class="btn-sm" data-format="12" data-i18n="settings.hours12">12h</button>
+                                <button id="time24HrBtn" class="btn-sm" data-format="24" data-i18n="settings.hours24">24h</button>
                             </div>
                         </div>
 
@@ -88,8 +88,8 @@ class SettingsManager {
                             <div class="flex items-center gap-3">
                                 <span class="material-symbols-outlined text-2xl">thermostat</span>
                                 <div>
-                                    <div class="font-medium">Temperature Unit</div>
-                                    <div class="text-sm text-muted-foreground">Celsius or Fahrenheit</div>
+                                    <div class="font-medium" data-i18n="settings.temperatureUnit">Temperature Unit</div>
+                                    <div class="text-sm text-muted-foreground" data-i18n="settings.temperatureUnitHint">Celsius or Fahrenheit</div>
                                 </div>
                             </div>
                             <div class="btn-group" role="group">
@@ -103,8 +103,8 @@ class SettingsManager {
                             <div class="flex items-center gap-3 mb-2">
                                 <span class="material-symbols-outlined text-2xl">opacity</span>
                                 <div>
-                                    <div class="font-medium">Widget Opacity</div>
-                                    <div class="text-sm text-muted-foreground">Adjust overlay transparency</div>
+                                    <div class="font-medium" data-i18n="settings.widgetOpacity">Widget Opacity</div>
+                                    <div class="text-sm text-muted-foreground" data-i18n="settings.widgetOpacityHint">Adjust overlay transparency</div>
                                 </div>
                             </div>
                             <div class="flex items-center gap-3">
@@ -195,6 +195,8 @@ class SettingsManager {
 
         document.body.insertAdjacentHTML('beforeend', modalHTML);
         this.modal = document.getElementById('settingsModal');
+        // Later language changes re-translate the whole page; translate now if the catalogue is already in
+        if (window.i18n && Object.keys(window.i18n.fallback).length) window.i18n.apply(this.modal);
     }
 
     bindEvents() {
@@ -221,20 +223,20 @@ class SettingsManager {
         document.getElementById('weatherWidgetToggle').addEventListener('change', (e) => {
             const enabled = e.target.checked;
             localStorage.setItem('weatherWidgetEnabled', enabled.toString());
-            this.showToast(`Weather widget ${enabled ? 'enabled' : 'disabled'}`, 'success');
+            this.showToast(enabled ? t('settings.weatherEnabled') : t('settings.weatherDisabled'), 'success');
         });
 
         // Date display toggle
         document.getElementById('dateDisplayToggle').addEventListener('change', (e) => {
             const enabled = e.target.checked;
             localStorage.setItem('dateDisplayEnabled', enabled.toString());
-            this.showToast(`Date display ${enabled ? 'enabled' : 'disabled'}`, 'success');
+            this.showToast(enabled ? t('settings.dateEnabled') : t('settings.dateDisabled'), 'success');
         });
 
         document.getElementById('photoDetailsToggle').addEventListener('change', (e) => {
             const enabled = e.target.checked;
             localStorage.setItem('photoDetailsEnabled', enabled.toString());
-            this.showToast(`Place and date ${enabled ? 'shown' : 'hidden'} on photos`, 'success');
+            this.showToast(enabled ? t('settings.photoDetailsShown') : t('settings.photoDetailsHidden'), 'success');
         });
 
         // Time format buttons
@@ -269,13 +271,13 @@ class SettingsManager {
     setTempUnit(unit) {
         localStorage.setItem('temperatureUnit', unit);
         this.updateTempUnitButtons();
-        this.showToast(`Temperature unit: °${unit}`, 'success');
+        this.showToast(t('settings.temperatureUnitSet', { unit }), 'success');
     }
 
     setTimeFormat(format) {
         localStorage.setItem('timeFormat', format);
         this.updateTimeFormatButtons();
-        this.showToast(`Time format: ${format}-hour`, 'success');
+        this.showToast(t('settings.timeFormatSet', { format }), 'success');
     }
 
     updateAllSettings() {

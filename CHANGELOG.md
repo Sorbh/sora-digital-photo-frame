@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Thumbnails are `Cache-Control: private`, and a photo's date and place only go to signed-in viewers.
 
 ### Added
+- Browser localization with eleven locales, including per-frame language settings and Arabic right-to-left support.
 - `createApp()` hooks for running this code as a hosted service, listed in [HOOKS.md](HOOKS.md).
 - Optional encryption at rest (`PHOTO_ENCRYPTION_KEY`).
 - macOS Finder-like admin panel interface

@@ -10,6 +10,10 @@ class LoginManager {
 
         this.setupEventListeners();
         this.checkUrlParams();
+        // Messages shown before the catalogue loaded, or in the previous language
+        window.addEventListener('sora:languagechange', () => {
+            if (this.messageKey) document.getElementById(this.messageKey.target).textContent = t(this.messageKey.key);
+        });
     }
 
     setupEventListeners() {
@@ -23,9 +27,9 @@ class LoginManager {
         const expired = urlParams.get('expired');
 
         if (error === 'invalid') {
-            this.showError('Invalid password. Please try again.');
+            this.showError(t('login.invalid_password'), 'login.invalid_password');
         } else if (expired === 'true') {
-            this.showError('Your session has expired. Please login again.');
+            this.showError(t('login.session_expired'), 'login.session_expired');
         }
     }
 
@@ -34,7 +38,7 @@ class LoginManager {
 
         const password = this.passwordInput.value.trim();
         if (!password) {
-            this.showError('Please enter a password');
+            this.showError(t('login.enter_password'), 'login.enter_password');
             return;
         }
 
@@ -53,7 +57,7 @@ class LoginManager {
             const data = await response.json();
 
             if (response.ok) {
-                this.showSuccess('Login successful! Redirecting...');
+                this.showSuccess(t('login.success'), 'login.success');
                 // Back to the page that asked for sign-in (e.g. pairing a frame), else the library
                 const next = new URLSearchParams(window.location.search).get('next');
                 const target = next && /^\/(?![\/\\])/.test(next) ? next : '/admin';
@@ -61,11 +65,11 @@ class LoginManager {
                     window.location.href = target;
                 }, 1000);
             } else {
-                this.showError(data.message || 'Login failed');
+                this.showError(i18n.error(data, 'login.failed'));
             }
         } catch (error) {
             console.error('Login error:', error);
-            this.showError('Connection error. Please try again.');
+            this.showError(t('errors.connection'), 'errors.connection');
         } finally {
             this.setLoading(false);
         }
@@ -74,15 +78,16 @@ class LoginManager {
     setLoading(loading) {
         this.loginBtn.disabled = loading;
         if (loading) {
-            this.btnText.textContent = 'Signing in';
+            this.btnText.textContent = t('login.signing_in');
             this.spinner.style.display = 'inline-block';
         } else {
-            this.btnText.textContent = 'Sign in';
+            this.btnText.textContent = t('login.sign_in');
             this.spinner.style.display = 'none';
         }
     }
 
-    showError(message) {
+    showError(message, key = null) {
+        this.messageKey = key && { target: 'errorText', key };
         const errorText = document.getElementById('errorText');
         if (errorText) {
             errorText.textContent = message;
@@ -91,7 +96,8 @@ class LoginManager {
         this.successMessage.style.display = 'none';
     }
 
-    showSuccess(message) {
+    showSuccess(message, key = null) {
+        this.messageKey = key && { target: 'successText', key };
         const successText = document.getElementById('successText');
         if (successText) {
             successText.textContent = message;

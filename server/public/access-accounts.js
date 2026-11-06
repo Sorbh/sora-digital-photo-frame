@@ -9,6 +9,12 @@ class AccessAccountsManager {
 
     init() {
         this.bindEvents();
+        // Re-render what this page builds itself when the language changes
+        window.addEventListener('sora:languagechange', () => {
+            if (this.loaded) this.renderAccounts();
+            this.renderDeleteDescription();
+            if (document.getElementById('accountModal').open) this.renderModalText();
+        });
         this.loadAccounts();
         this.loadFolders();
     }
@@ -72,12 +78,12 @@ class AccessAccountsManager {
                 this.devices = devices.devices || [];
                 this.renderAccounts();
             } else {
-                this.showToast('Failed to load accounts', 'error');
+                this.showToast(t('accessAccounts.loadFailed'), 'error');
                 this.showEmptyState();
             }
         } catch (error) {
             console.error('Error loading accounts:', error);
-            this.showToast('Failed to load accounts', 'error');
+            this.showToast(t('accessAccounts.loadFailed'), 'error');
             this.showEmptyState();
         }
     }
@@ -116,13 +122,14 @@ class AccessAccountsManager {
 
     renderAccounts() {
         document.getElementById('loadingState').classList.add('hidden');
+        this.loaded = true;
 
         const meta = document.getElementById('accountsMetaText');
         if (meta) {
             const count = this.accounts.length;
             meta.textContent = count === 0
-                ? 'No accounts yet'
-                : `${count} ${count === 1 ? 'account' : 'accounts'} with their own PIN`;
+                ? t('accessAccounts.no_accounts')
+                : t('accessAccounts.accounts', { count });
         }
         
         if (this.accounts.length === 0) {
@@ -154,11 +161,11 @@ class AccessAccountsManager {
                     <span class="material-symbols-outlined">folder</span>
                     ${esc(folder)}
                 </span>`).join('')
-            : '<span class="folder-tag no-folders-tag">No folders assigned</span>';
+            : `<span class="folder-tag no-folders-tag">${esc(t('accessAccounts.noFoldersAssigned'))}</span>`;
 
         const lastAccessed = account.lastAccessed
-            ? new Date(account.lastAccessed).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
-            : 'Never';
+            ? new Date(account.lastAccessed).toLocaleDateString(window.i18n?.locale, { month: 'short', day: 'numeric', year: 'numeric' })
+            : t('accessAccounts.lastUsedNever');
         const folderCount = account.assignedFolders.length;
 
         return `
@@ -167,23 +174,23 @@ class AccessAccountsManager {
                     <div class="account-avatar" aria-hidden="true">${esc(account.name.trim().charAt(0).toUpperCase() || '?')}</div>
                     <div class="account-heading">
                         <h3 class="account-name">${esc(account.name)}</h3>
-                        <span class="pin-reveal" title="PINs are stored hashed, so they can't be shown. Edit the account to set a new one.">
+                        <span class="pin-reveal" title="${esc(t('accessAccounts.pinHidden'))}">
                             <span class="material-symbols-outlined">key</span>
                             <span class="pin-value">••••••</span>
                         </span>
                     </div>
                     <div class="account-actions">
-                        <button class="tb-btn icon edit-account" title="Edit account" data-account-id="${esc(account.id)}">
+                        <button class="tb-btn icon edit-account" title="${esc(t('accessAccounts.editAccount'))}" data-account-id="${esc(account.id)}">
                             <span class="material-symbols-outlined">edit</span>
                         </button>
-                        <button class="tb-btn icon delete-account" data-danger title="Delete account" data-account-id="${esc(account.id)}">
+                        <button class="tb-btn icon delete-account" data-danger title="${esc(t('accessAccounts.deleteAccount'))}" data-account-id="${esc(account.id)}">
                             <span class="material-symbols-outlined">delete</span>
                         </button>
                     </div>
                 </div>
                 <dl class="account-stats">
-                    <div><dt>Folders</dt><dd>${folderCount === 0 ? 'None' : folderCount}</dd></div>
-                    <div><dt>Last used</dt><dd>${esc(lastAccessed)}</dd></div>
+                    <div><dt>${esc(t('accessAccounts.statFolders'))}</dt><dd>${folderCount === 0 ? esc(t('accessAccounts.statFoldersNone')) : folderCount}</dd></div>
+                    <div><dt>${esc(t('accessAccounts.statLastUsed'))}</dt><dd>${esc(lastAccessed)}</dd></div>
                 </dl>
                 <div class="folder-tags">
                     ${folderTags}
@@ -199,11 +206,12 @@ class AccessAccountsManager {
         const devices = this.devices.filter(device => device.accountId === account.id);
         if (devices.length === 0) return '';
         const seen = (device) => device.lastSeen
-            ? `Seen ${new Date(device.lastSeen).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`
-            : 'Paired, not seen yet';
+            ? t('accessAccounts.frameSeen', { date: new Date(device.lastSeen).toLocaleDateString(window.i18n?.locale, { month: 'short', day: 'numeric' }) })
+            : t('accessAccounts.frameNotSeen');
+        const languages = window.i18n?.supported || ['en', 'es', 'fr', 'de', 'pt-BR', 'it', 'nl', 'hi', 'ja', 'zh-CN', 'ar'];
         return `
             <div class="paired-frames">
-                <span class="paired-label">Paired frames</span>
+                <span class="paired-label">${esc(t('accessAccounts.pairedFrames'))}</span>
                 ${devices.map(device => `
                     <div class="paired-frame">
                         <span class="material-symbols-outlined">tv</span>
@@ -211,7 +219,11 @@ class AccessAccountsManager {
                             <span class="paired-name">${esc(device.name)}</span>
                             <span class="paired-seen">${esc(seen(device))}</span>
                         </span>
-                        <button class="tb-btn icon remove-device" data-danger title="Remove ${esc(device.name)}" aria-label="Remove ${esc(device.name)}" data-device-id="${esc(device.id)}" data-device-name="${esc(device.name)}">
+                        <label class="sr-only" for="language-${esc(device.id)}">${esc(t('accessAccounts.screen_language'))}</label>
+                        <select class="device-language input" id="language-${esc(device.id)}" data-device-id="${esc(device.id)}">
+                            ${languages.map(code => `<option value="${code}" ${device.language === code ? 'selected' : ''}>${window.i18n?.names?.[code] || code}</option>`).join('')}
+                        </select>
+                        <button class="tb-btn icon remove-device" data-danger title="${esc(t('accessAccounts.removeFrame', { name: device.name }))}" aria-label="${esc(t('accessAccounts.removeFrame', { name: device.name }))}" data-device-id="${esc(device.id)}" data-device-name="${esc(device.name)}">
                             <span class="material-symbols-outlined">link_off</span>
                         </button>
                     </div>`).join('')}
@@ -220,22 +232,25 @@ class AccessAccountsManager {
     }
 
     async removeDevice(id, name) {
-        if (!confirm(`Remove ${name}? It goes back to its sign-in screen and needs pairing again.`)) return;
+        if (!confirm(t('accessAccounts.remove_frame', { name }))) return;
         try {
             const response = await fetch(`/api/admin/devices/${encodeURIComponent(id)}`, { method: 'DELETE' });
             if (!response.ok) throw new Error('Remove failed');
             this.devices = this.devices.filter(device => device.id !== id);
             this.renderAccounts();
-            this.showToast(`${name} removed`, 'success');
+            this.showToast(t('accessAccounts.frameRemoved', { name }), 'success');
         } catch (error) {
             console.error('Error removing frame:', error);
-            this.showToast('Could not remove the frame', 'error');
+            this.showToast(t('accessAccounts.removeFrameFailed'), 'error');
         }
     }
 
     bindAccountActions() {
         document.querySelectorAll('.remove-device').forEach(btn => {
             btn.addEventListener('click', () => this.removeDevice(btn.dataset.deviceId, btn.dataset.deviceName));
+        });
+        document.querySelectorAll('.device-language').forEach(select => {
+            select.addEventListener('change', () => this.setDeviceLanguage(select.dataset.deviceId, select.value));
         });
 
 
@@ -256,32 +271,53 @@ class AccessAccountsManager {
         });
     }
 
+    async setDeviceLanguage(id, language) {
+        try {
+            const response = await fetch(`/api/admin/devices/${encodeURIComponent(id)}/language`, {
+                method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ language })
+            });
+            if (!response.ok) throw new Error('Could not save language');
+            const device = this.devices.find(item => item.id === id);
+            if (device) device.language = language;
+            this.showToast(t('accessAccounts.frameLanguageSaved', { language: window.i18n?.names?.[language] || language }), 'success');
+        } catch (error) {
+            console.error('Error saving frame language:', error);
+            this.showToast(t('accessAccounts.frameLanguageFailed'), 'error');
+        }
+    }
+
     openAccountModal(account = null) {
         this.currentEditingAccount = account;
         const modal = document.getElementById('accountModal');
-        const title = document.getElementById('modalTitle');
         const form = document.getElementById('accountForm');
         
         if (account) {
-            title.textContent = 'Edit Access Account';
             document.getElementById('accountName').value = account.name;
             // PINs are stored hashed: leave it blank to keep the current one
             const pinInput = document.getElementById('accountPin');
             pinInput.value = '';
             pinInput.required = false;
-            pinInput.placeholder = 'Leave blank to keep the current PIN';
         } else {
-            title.textContent = 'Create Access Account';
             form.reset();
             const pinInput = document.getElementById('accountPin');
             pinInput.required = true;
-            pinInput.placeholder = '4-6 digit PIN';
         }
+        this.renderModalText();
 
         this.clearErrors();
         this.renderFolderGrid(account ? account.assignedFolders : []);
         modal.showModal();
         document.getElementById('accountName').focus();
+    }
+
+    // Title and PIN placeholder depend on whether an account is being edited
+    renderModalText() {
+        const editing = Boolean(this.currentEditingAccount);
+        document.getElementById('modalTitle').textContent = t(editing ? 'accessAccounts.editAccountTitle' : 'accessAccounts.static_007');
+        const pinInput = document.getElementById('accountPin');
+        pinInput.placeholder = t(editing ? 'accessAccounts.pinKeepPlaceholder' : 'accessAccounts.static_024');
+        // The placeholder is set here, not by i18n.apply()
+        pinInput.removeAttribute('data-i18n-attr');
     }
 
     closeAccountModal() {
@@ -370,21 +406,21 @@ class AccessAccountsManager {
 
             if (response.ok) {
                 this.showToast(
-                    this.currentEditingAccount ? 'Account updated successfully' : 'Account created successfully',
+                    t(this.currentEditingAccount ? 'accessAccounts.accountUpdated' : 'accessAccounts.accountCreated'),
                     'success'
                 );
                 this.closeAccountModal();
                 this.loadAccounts();
             } else {
                 if (data.code === 'DUPLICATE_PIN') {
-                    this.showError('pinError', 'This PIN is already in use');
+                    this.showError('pinError', t('accessAccounts.pinInUse'));
                 } else {
-                    this.showToast(data.error || 'Failed to save account', 'error');
+                    this.showToast(i18n.error(data, 'accessAccounts.saveFailed'), 'error');
                 }
             }
         } catch (error) {
             console.error('Error saving account:', error);
-            this.showToast('Failed to save account', 'error');
+            this.showToast(t('accessAccounts.saveFailed'), 'error');
         }
     }
 
@@ -398,10 +434,18 @@ class AccessAccountsManager {
     confirmDeleteAccount(accountId) {
         const account = this.accounts.find(acc => acc.id === accountId);
         if (account) {
-            document.getElementById('deleteAccountName').textContent = account.name;
+            this.deletingName = account.name;
+            this.renderDeleteDescription();
             document.getElementById('confirmDeleteBtn').setAttribute('data-account-id', accountId);
             document.getElementById('deleteModal').showModal();
         }
+    }
+
+    // One whole sentence with the account name inside it
+    renderDeleteDescription() {
+        if (this.deletingName == null) return;
+        document.getElementById('delete-description').innerHTML =
+            t('accessAccounts.deleteConfirm', { name: this.escapeHtml(this.deletingName) });
     }
 
     async deleteAccount() {
@@ -413,16 +457,16 @@ class AccessAccountsManager {
             });
 
             if (response.ok) {
-                this.showToast('Account deleted successfully', 'success');
+                this.showToast(t('accessAccounts.accountDeleted'), 'success');
                 this.closeDeleteModal();
                 this.loadAccounts();
             } else {
                 const data = await response.json();
-                this.showToast(data.error || 'Failed to delete account', 'error');
+                this.showToast(i18n.error(data, 'accessAccounts.deleteFailed'), 'error');
             }
         } catch (error) {
             console.error('Error deleting account:', error);
-            this.showToast('Failed to delete account', 'error');
+            this.showToast(t('accessAccounts.deleteFailed'), 'error');
         }
     }
 
@@ -453,13 +497,13 @@ class AccessAccountsManager {
         const errorElement = document.getElementById('nameError');
         
         if (!name) {
-            this.showError('nameError', 'Account name is required');
+            this.showError('nameError', t('accessAccounts.nameRequired'));
             nameInput.classList.add('error');
             return false;
         }
         
         if (name.length > 50) {
-            this.showError('nameError', 'Account name must be 50 characters or less');
+            this.showError('nameError', t('accessAccounts.nameTooLong'));
             nameInput.classList.add('error');
             return false;
         }
@@ -474,13 +518,13 @@ class AccessAccountsManager {
         const errorElement = document.getElementById('pinError');
         
         if (!pin) {
-            this.showError('pinError', 'PIN is required');
+            this.showError('pinError', t('accessAccounts.pinRequired'));
             pinInput.classList.add('error');
             return false;
         }
         
         if (!/^[0-9]{4,6}$/.test(pin)) {
-            this.showError('pinError', 'PIN must be 4-6 digits');
+            this.showError('pinError', t('accessAccounts.pinInvalid'));
             pinInput.classList.add('error');
             return false;
         }

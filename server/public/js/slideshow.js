@@ -14,10 +14,32 @@ class AuthenticationManager {
         this.pairCard = document.getElementById('pairCard');
         this.pairQr = document.getElementById('pairQr');
         this.pairCode = document.getElementById('pairCode');
-        this.pairUrl = document.getElementById('pairUrl');
+        this.pairHint = document.getElementById('pairHint') || document.querySelector('.pair-code-label');
         this.pairStatus = document.getElementById('pairStatus');
+        this.pairUrlText = null; // host/pair once a code is shown
 
         this.init();
+    }
+
+    // "Or open example.com/pair and check the code" is one sentence with the address inside
+    renderPairHint() {
+        if (!this.pairHint) return;
+        const url = document.createElement('span');
+        url.id = 'pairUrl';
+        url.textContent = this.pairUrlText || t('slideshow.static_001');
+        this.pairHint.innerHTML = t('slideshow.pairHint', { url: url.outerHTML });
+    }
+
+    // Re-draws the text this class sets itself, in the current language
+    renderLanguage() {
+        this.renderPairHint();
+        if (this.pairStatusText) this.pairStatus.textContent = t(...this.pairStatusText);
+        if (this.errorText) this.authErrorMessage.textContent = t(...this.errorText);
+    }
+
+    setPairStatus(key, vars) {
+        this.pairStatusText = key ? [key, vars] : null;
+        this.pairStatus.textContent = key ? t(key, vars) : '';
     }
 
     init() {
@@ -45,6 +67,7 @@ class AuthenticationManager {
         try {
             const data = await this.requestDevice(token);
             if (data.success) {
+                this.useScreenLanguage(data.device?.language);
                 this.handleAuthSuccess(data.account);
                 this.keepSignedIn(() => this.requestDevice(token));
                 return;
@@ -70,7 +93,7 @@ class AuthenticationManager {
         if (!this.pairCard || this.pairing) return;
         this.pairing = { starting: true };
         this.pairCard.classList.remove('is-approved', 'is-error');
-        this.pairStatus.textContent = '';
+        this.setPairStatus(null);
         try {
             const response = await fetch('/api/pair/start', { method: 'POST' });
             const data = await response.json();
@@ -80,7 +103,8 @@ class AuthenticationManager {
             this.pairing = { code: data.code, secret: data.secret, expiresAt: data.expiresAt };
             this.pairQr.innerHTML = data.qr; // an SVG drawn by our server
             this.pairCode.textContent = `${data.code.slice(0, 3)}-${data.code.slice(3)}`;
-            this.pairUrl.textContent = `${new URL(data.url).host}/pair`;
+            this.pairUrlText = `${new URL(data.url).host}/pair`;
+            this.renderPairHint();
             this.pairTimer = setTimeout(() => this.checkPairing(), 2000);
         } catch (error) {
             console.error('Pairing could not start:', error);
@@ -88,7 +112,7 @@ class AuthenticationManager {
             this.pairQr.innerHTML = '';
             this.pairCode.textContent = '······';
             this.pairCard.classList.add('is-error');
-            this.pairStatus.textContent = 'No code right now. Trying again in a minute.';
+            this.setPairStatus('slideshow.noCode');
             this.pairTimer = setTimeout(() => this.startPairing(), 60 * 1000);
         }
     }
@@ -110,13 +134,23 @@ class AuthenticationManager {
         if (data?.status === 'approved') {
             localStorage.setItem(DEVICE_TOKEN_KEY, data.token);
             this.pairCard.classList.add('is-approved');
-            this.pairStatus.textContent = `Paired as ${data.device.name}`;
+            this.useScreenLanguage(data.device?.language);
+            this.setPairStatus('slideshow.paired_as', { name: data.device.name });
             this.keepSignedIn(() => this.requestDevice(data.token));
             setTimeout(() => this.handleAuthSuccess(data.account), 700);
         } else if (data?.status === 'expired') {
             this.restartPairing();
         } else {
             this.pairTimer = setTimeout(() => this.checkPairing(), data ? 2000 : 5000);
+        }
+    }
+
+    useScreenLanguage(language) {
+        if (!language || !window.i18n) return;
+        document.documentElement.dataset.screenLanguage = language;
+        // A URL or an explicit browser preference still wins; otherwise this is the frame's language.
+        if (!new URLSearchParams(location.search).has('lang') && !localStorage.getItem('sora.lang')) {
+            window.i18n.setLanguage(language, false);
         }
     }
 
@@ -143,7 +177,7 @@ class AuthenticationManager {
         } catch (error) {
             console.error('Sign-in from the address failed:', error);
             this.showAuthOverlay();
-            this.showError('Connection error. Please try again.');
+            this.showErrorKey('errors.connection');
         }
     }
 
@@ -237,12 +271,12 @@ class AuthenticationManager {
         const pin = this.pinInput.value.trim();
 
         if (!pin) {
-            this.showError('Please enter your PIN');
+            this.showErrorKey('slideshow.pinRequired');
             return;
         }
 
         if (pin.length < 4) {
-            this.showError('PIN must be at least 4 digits');
+            this.showErrorKey('slideshow.pinTooShort');
             return;
         }
 
@@ -258,7 +292,7 @@ class AuthenticationManager {
             }
         } catch (error) {
             console.error('Authentication error:', error);
-            this.showError('Connection error. Please try again.');
+            this.showErrorKey('errors.connection');
         } finally {
             this.setLoading(false);
         }
@@ -279,7 +313,7 @@ class AuthenticationManager {
     }
 
     handleAuthError(error, errorCode) {
-        this.showError(error || 'Invalid PIN');
+        this.showError(i18n.error({ code: errorCode, message: error }, 'slideshow.invalidPin'));
 
         if (errorCode === 'RATE_LIMITED') {
             this.pinInput.disabled = true;
@@ -340,11 +374,19 @@ class AuthenticationManager {
     }
 
     showError(message) {
+        this.errorText = null;
         this.authErrorMessage.textContent = message;
         this.authErrorAlert.classList.remove('hidden');
     }
 
+    // Same, but kept as a key so it follows a language change
+    showErrorKey(key, vars) {
+        this.showError(t(key, vars));
+        this.errorText = [key, vars];
+    }
+
     clearError() {
+        this.errorText = null;
         this.authErrorAlert.classList.add('hidden');
         this.authErrorMessage.textContent = '';
     }
@@ -372,7 +414,7 @@ const LAST_SHOWN_KEY = 'photoframe_last_shown';
 function formatTakenAt(takenAt) {
     const date = takenAt ? new Date(takenAt) : null;
     if (!date || isNaN(date)) return '';
-    return date.toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' });
+    return date.toLocaleDateString(window.i18n?.locale, { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
 class PhotoFrameSlideshow {
@@ -504,7 +546,7 @@ class PhotoFrameSlideshow {
         this.images.forEach(img => {
             img.addEventListener('error', () => {
                 if (this.errorState.classList.contains('hidden')) {
-                    this.showError('Failed to load image');
+                    this.showErrorKey('slideshow.loadImageFailed');
                 }
             });
         });
@@ -521,18 +563,18 @@ class PhotoFrameSlideshow {
             if (last && last.folder === (selectedFolderPath || '')) params.set('after', last.id);
 
             const response = await fetch(`/api/images/next?${params}`);
-            if (!response.ok) throw new Error('Failed to fetch image');
+            if (!response.ok) throw new Error(t('slideshow.fetchImageFailed'));
             const data = await response.json();
 
             if (!data.success) {
-                throw new Error(data.error || 'Failed to fetch image');
+                throw new Error(i18n.error(data, 'slideshow.fetchImageFailed'));
             }
 
             localStorage.setItem(LAST_SHOWN_KEY, JSON.stringify({ folder: selectedFolderPath || '', id: data.image.id }));
             return data.image;
         } catch (error) {
             console.error('Error fetching random image:', error);
-            this.showError(`Failed to load image: ${error.message}`);
+            this.showErrorKey('slideshow.loadImageFailedDetail', { detail: error.message });
             return null;
         }
     }
@@ -606,7 +648,7 @@ class PhotoFrameSlideshow {
                 if (isObjectUrl) URL.revokeObjectURL(src);
                 console.error('Failed to load image:', imageData.url);
                 if (this.errorState.classList.contains('hidden')) {
-                    this.showError(`Failed to load image: ${imageData.filename}`);
+                    this.showErrorKey('slideshow.loadImageFailedDetail', { detail: imageData.filename });
                 }
                 resolve(false);
             };
@@ -647,7 +689,7 @@ class PhotoFrameSlideshow {
         this.updateCaption();
         if (this.currentImageData) {
             this.filename.textContent = this.currentImageData.filename;
-            this.folder.textContent = this.currentImageData.folder || 'Library';
+            this.folder.textContent = this.currentImageData.folder || t('common.library');
 
             // Auto-hide info after 3 seconds if visible
             if (!this.infoOverlay.classList.contains('hidden')) {
@@ -829,9 +871,7 @@ class PhotoFrameSlideshow {
     togglePlayPause() {
         this.isPlaying = !this.isPlaying;
         document.body.classList.toggle('is-paused', !this.isPlaying);
-        this.playPauseBtn.querySelector('.material-icons').textContent = this.isPlaying ? 'pause' : 'play_arrow';
-        this.playPauseBtn.setAttribute('aria-label', this.isPlaying ? 'Pause slideshow' : 'Resume slideshow');
-        this.playPauseBtn.title = this.isPlaying ? 'Pause (Space)' : 'Play (Space)';
+        this.renderPlayPause();
 
         if (this.isPlaying) {
             // Resume slideshow (a note keeps its own, longer duration)
@@ -841,6 +881,20 @@ class PhotoFrameSlideshow {
             this.clearTimers();
             this.resetProgress();
         }
+    }
+
+    // Icon, label and tooltip follow the play state (and the language)
+    renderPlayPause() {
+        this.playPauseBtn.querySelector('.material-icons').textContent = this.isPlaying ? 'pause' : 'play_arrow';
+        this.playPauseBtn.setAttribute('aria-label', this.isPlaying ? t('slideshow.static_009') : t('slideshow.resume'));
+        this.playPauseBtn.title = this.isPlaying ? t('slideshow.static_010') : t('slideshow.playTitle');
+    }
+
+    // Re-draws the text this class sets itself, in the current language
+    renderLanguage() {
+        this.renderPlayPause();
+        if (this.currentImageData) this.folder.textContent = this.currentImageData.folder || t('common.library');
+        if (this.errorText && !this.errorState.classList.contains('hidden')) this.errorMessage.textContent = t(...this.errorText);
     }
 
     logout() {
@@ -864,9 +918,17 @@ class PhotoFrameSlideshow {
     }
 
     showError(message) {
+        this.errorText = null;
+        this.errorMessage.removeAttribute('data-i18n'); // the message is set here from now on
         this.errorMessage.textContent = message;
         this.errorState.classList.remove('hidden');
         this.loadingState.classList.add('hidden');
+    }
+
+    // Same, but kept as a key so it follows a language change
+    showErrorKey(key, vars) {
+        this.showError(t(key, vars));
+        this.errorText = [key, vars];
     }
 
     hideError() {
@@ -923,10 +985,11 @@ class PhotoFrameSlideshow {
             if (loaded) {
                 this.scheduleNext();
             } else {
-                this.showError('Failed to load image from selected folder');
+                this.showErrorKey('slideshow.loadFolderImageFailed');
             }
         } else {
-            this.showError(`No images found in folder: ${folderName || 'All Folders'}`);
+            if (folderName) this.showErrorKey('slideshow.noImagesInFolder', { folder: folderName });
+            else this.showErrorKey('slideshow.noImagesInAllFolders');
         }
     }
 
@@ -960,10 +1023,10 @@ class PhotoFrameSlideshow {
             if (loaded) {
                 this.scheduleNext();
             } else {
-                this.showError('Failed to load first image');
+                this.showErrorKey('slideshow.loadFirstImageFailed');
             }
         } else {
-            this.showError('No images available');
+            this.showErrorKey('slideshow.noImages');
         }
     }
 }
@@ -1087,7 +1150,9 @@ class WeatherWidget {
         let timeStr;
         if (format === '12') {
             let hours = now.getHours();
-            const ampm = hours >= 12 ? 'PM' : 'AM';
+            // AM/PM in the page language ("PM" in English)
+            const ampm = new Intl.DateTimeFormat(window.i18n?.locale, { hour: 'numeric', hour12: true })
+                .formatToParts(now).find(part => part.type === 'dayPeriod')?.value || (hours >= 12 ? 'PM' : 'AM');
             hours = hours % 12;
             hours = hours ? hours : 12; // 0 should be 12
             const minutes = now.getMinutes().toString().padStart(2, '0');
@@ -1102,7 +1167,7 @@ class WeatherWidget {
 
         // Update date (e.g., "Mon, Jan 1")
         const options = { weekday: 'short', month: 'short', day: 'numeric' };
-        const dateStr = now.toLocaleDateString('en-US', options);
+        const dateStr = now.toLocaleDateString(window.i18n?.locale, options);
         this.dateDisplay.textContent = dateStr;
     }
 
@@ -1181,6 +1246,11 @@ document.addEventListener('DOMContentLoaded', () => {
     window.authManager = new AuthenticationManager();
     window.slideshow = new PhotoFrameSlideshow();
     window.weatherWidget = new WeatherWidget();
+    window.addEventListener('sora:languagechange', () => {
+        window.weatherWidget.updateTime();
+        window.authManager.renderLanguage();
+        window.slideshow.renderLanguage();
+    });
 
     document.addEventListener('authenticationComplete', async (e) => {
         console.log('Authentication complete, starting slideshow for:', e.detail.account.name);
@@ -1196,7 +1266,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 await window.slideshow.startSlideshow();
             } catch (error) {
                 console.error('Failed to initialize slideshow:', error);
-                window.slideshow.showError('Failed to load folders');
+                window.slideshow.showErrorKey('slideshow.loadFoldersFailed');
             }
         } else {
             window.slideshow.startSlideshow();

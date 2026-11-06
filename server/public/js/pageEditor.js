@@ -34,6 +34,13 @@ class PageEditor {
             this.renderPhotoTiles();
             this.updatePreview();
         });
+
+        // The picker builds its own text; i18n.apply() only covers the static markup
+        window.addEventListener('sora:languagechange', () => {
+            if (!document.getElementById('photoPicker').open) return;
+            this.renderCrumbs(this.pickerPath);
+            this.updatePickerCount();
+        });
     }
 
     // The page fields every editor shares
@@ -100,6 +107,7 @@ class PageEditor {
 
     renderLayoutPicker() {
         const picker = document.getElementById('layoutPicker');
+        picker.replaceChildren(); // also called again on language change
         Object.entries(NotePage.templates).forEach(([key, template]) => {
             const btn = document.createElement('button');
             btn.type = 'button';
@@ -110,7 +118,7 @@ class PageEditor {
             stage.className = 'note-stage nf-layout-stage';
             const label = document.createElement('span');
             label.className = 'nf-layout-label';
-            label.textContent = template.label;
+            label.textContent = NotePage.layoutLabel(key);
             btn.append(stage, label);
             btn.addEventListener('click', () => {
                 this.layout = key;
@@ -130,15 +138,15 @@ class PageEditor {
             btn.setAttribute('aria-checked', String(on));
             btn.classList.toggle('needs-photos', template.photos > this.photos.length);
             btn.title = template.photos
-                ? `${template.label} · ${template.photos} photo${template.photos === 1 ? '' : 's'}`
-                : 'Auto · fits any number of photos';
+                ? t('editor.layoutTitle', { label: NotePage.layoutLabel(key), count: template.photos })
+                : t('editor.layoutAutoTitle');
             btn.firstChild.replaceChildren(NotePage.render({ ...previewNote, layout: key }, { fill: true }));
         });
 
         const needed = NotePage.templates[this.layout]?.photos || 0;
         const missing = needed - this.photos.length;
         const hint = document.getElementById('layoutHint');
-        hint.textContent = missing > 0 ? `add ${missing} more photo${missing === 1 ? '' : 's'}` : '';
+        hint.textContent = missing > 0 ? t('editor.addMorePhotos', { count: missing }) : '';
         hint.classList.toggle('is-warn', missing > 0);
     }
 
@@ -176,8 +184,8 @@ class PageEditor {
             const remove = document.createElement('button');
             remove.type = 'button';
             remove.className = 'nf-photo-remove';
-            remove.title = 'Remove photo';
-            remove.setAttribute('aria-label', 'Remove photo');
+            remove.title = t('editor.removePhoto');
+            remove.setAttribute('aria-label', t('editor.removePhoto'));
             remove.innerHTML = '<span class="material-symbols-outlined">close</span>';
             remove.addEventListener('click', () => {
                 this.photos.splice(i, 1);
@@ -193,7 +201,7 @@ class PageEditor {
             add.type = 'button';
             add.className = 'nf-photo nf-photo-add';
             add.innerHTML = '<span class="material-symbols-outlined">add_photo_alternate</span><span></span>';
-            add.lastChild.textContent = this.photos.length ? 'Change' : 'Add photos';
+            add.lastChild.textContent = this.photos.length ? t('editor.changePhotos') : t('editor.addPhotos');
             add.addEventListener('click', () => this.openPicker());
             wrap.appendChild(add);
         }
@@ -207,10 +215,10 @@ class PageEditor {
 
     async browse(folderPath) {
         const grid = document.getElementById('pickerGrid');
-        grid.replaceChildren(this.pickerMessage('hourglass_empty', 'Loading'));
+        grid.replaceChildren(this.pickerMessage('hourglass_empty', t('editor.loading')));
         try {
             const { ok, data } = await this.api(`/api/admin/folders?path=${encodeURIComponent(folderPath)}`);
-            if (!ok) throw new Error(data.error || 'Could not open the folder');
+            if (!ok) throw new Error(i18n.error(data, 'editor.openFolderFailed'));
             this.pickerPath = folderPath;
             this.renderCrumbs(folderPath);
             this.renderPicker(data.folders || [], (data.files || []).filter(f => /\.(jpe?g|png|gif|webp|bmp|heic|heif|avif)$/i.test(f.name)));
@@ -229,7 +237,7 @@ class PageEditor {
         parts.forEach((part, i) => {
             const btn = document.createElement('button');
             btn.type = 'button';
-            btn.textContent = i === 0 ? 'Library' : part;
+            btn.textContent = i === 0 ? t('common.library') : part;
             btn.disabled = i === parts.length - 1;
             btn.addEventListener('click', () => this.browse(parts.slice(0, i + 1).join('/')));
             nav.appendChild(btn);
@@ -246,7 +254,7 @@ class PageEditor {
         const grid = document.getElementById('pickerGrid');
         grid.replaceChildren();
         if (!folders.length && !files.length) {
-            grid.appendChild(this.pickerMessage('photo_library', 'This folder is empty'));
+            grid.appendChild(this.pickerMessage('photo_library', t('editor.folderEmpty')));
             return;
         }
 
@@ -302,7 +310,7 @@ class PageEditor {
                 if (at !== -1) {
                     this.picked.splice(at, 1);
                 } else if (this.picked.length >= 4) {
-                    this.showToast(`A ${this.noun} holds up to 4 photos`, 'info');
+                    this.showToast(t({ note: 'editor.maxPhotosNote', snap: 'editor.maxPhotosSnap' }[this.noun] || 'editor.maxPhotosPage'), 'info');
                     return;
                 } else {
                     this.picked.push(photo);
@@ -330,8 +338,8 @@ class PageEditor {
 
     updatePickerCount() {
         const n = this.picked.length;
-        document.getElementById('pickerCount').textContent = n ? `${n} of 4 picked` : 'Pick up to 4 photos';
-        document.getElementById('pickerDone').textContent = n ? 'Use photos' : 'No photos';
+        document.getElementById('pickerCount').textContent = n ? t('editor.pickedCount', { count: n }) : t('editor.pickUpTo4');
+        document.getElementById('pickerDone').textContent = n ? t('notes.static_016') : t('editor.noPhotos');
     }
 
     // ---------- Toasts ----------------------------------------------

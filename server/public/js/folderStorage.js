@@ -75,7 +75,7 @@ class FolderStorage {
      */
     getCurrentFolderName() {
         const folder = this.loadSelectedFolder();
-        return folder ? folder.name : 'All Folders';
+        return folder && folder.path ? folder.name : t('folders.allFoldersTitle');
     }
 
     /**

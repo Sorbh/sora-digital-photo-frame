@@ -153,6 +153,18 @@ class PairingService {
     return devices.map(({ tokenHash, ...device }) => device);
   }
 
+  async setLanguage(id, language) {
+    const allowed = ['en', 'es', 'fr', 'de', 'pt-BR', 'it', 'nl', 'hi', 'ja', 'zh-CN', 'ar'];
+    if (!allowed.includes(language)) return null;
+    let changed = null;
+    await getDataStore().update('devices', [], devices => devices.map(device => {
+      if (device.id !== id) return device;
+      changed = { ...device, language };
+      return changed;
+    }));
+    return changed;
+  }
+
   async removeDevices(match) {
     let removed = [];
     await getDataStore().update('devices', [], devices => {

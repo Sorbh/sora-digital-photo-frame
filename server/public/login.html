@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sign in · Sora Frame</title>
+    <title data-i18n="login.static_001">Sign in · Sora Frame</title>
     <link rel="icon" href="/icons/favicon.ico" sizes="48x48">
     <link rel="icon" href="/icons/favicon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
@@ -24,13 +24,14 @@
     })();
     </script>
     <link rel="stylesheet" href="/css/login.css">
+    <link rel="stylesheet" href="/css/i18n.css">
 </head>
 
 <body>
     <aside class="hero" aria-hidden="true">
         <div class="hero-top">
             <span class="sora-wordmark">Sora</span>
-            <span class="days-pill"><span class="material-icons">favorite</span>Photo frame</span>
+            <span class="days-pill"><span class="material-icons">favorite</span><span data-i18n="slideshow.photo_frame">Photo frame</span></span>
         </div>
 
         <figure class="shelf">
@@ -38,50 +39,51 @@
         </figure>
 
         <div class="hero-copy">
-            <h1>Every photo, <em>on the wall</em></h1>
-            <p>Curate the library your frames play from: folders, uploads and Google Photos imports.</p>
+            <h1 data-i18n-html="login.heroTitle">Every photo, <em>on the wall</em></h1>
+            <p data-i18n="login.static_003">Curate the library your frames play from: folders, uploads and Google Photos imports.</p>
         </div>
         <div class="clouds"></div>
     </aside>
 
     <main class="sign-in">
         <div class="sign-in-inner">
-            <span class="sora-eyebrow">Library admin</span>
-            <h2>Sign in</h2>
-            <p class="lede">Enter the admin password to manage your photos.</p>
+            <span class="sora-eyebrow" data-i18n="login.static_004">Library admin</span>
+            <h2 data-i18n="login.static_005">Sign in</h2>
+            <p class="lede" data-i18n="login.static_006">Enter the admin password to manage your photos.</p>
 
             <form id="loginForm">
                 <div class="field">
-                    <label for="passwordInput">Password</label>
-                    <input type="password" name="password" placeholder="Admin password" required
+                    <label for="passwordInput" data-i18n="login.passwordLabel">Password</label>
+                    <input type="password" name="password" placeholder="Admin password" data-i18n-attr="placeholder:login.static_010" required
                         autocomplete="current-password" id="passwordInput" autofocus>
                 </div>
 
                 <button type="submit" class="submit" id="loginBtn">
-                    <span class="btn-text">Sign in</span>
+                    <span class="btn-text" data-i18n="login.static_007">Sign in</span>
                     <span class="material-icons">arrow_forward</span>
                     <div class="spinner" id="spinner"></div>
                 </button>
 
                 <div id="errorMessage" class="notice error" role="alert" style="display: none;">
                     <span class="material-icons">error</span>
-                    <h3>Login failed</h3>
+                    <h3 data-i18n="login.static_008">Login failed</h3>
                     <section id="errorText"></section>
                 </div>
 
                 <div id="successMessage" class="notice success" role="status" style="display: none;">
                     <span class="material-icons">check_circle</span>
-                    <h3>Welcome back</h3>
+                    <h3 data-i18n="login.static_009">Welcome back</h3>
                     <section id="successText"></section>
                 </div>
             </form>
 
             <div class="sign-in-foot">
-                <a href="/slideshow"><span class="material-icons">slideshow</span>Open the slideshow</a>
+                <a href="/slideshow"><span class="material-icons">slideshow</span><span data-i18n="accessAccounts.static_019">Open the slideshow</span></a>
             </div>
         </div>
     </main>
 
+<script src="/js/i18n.js"></script>
 <script src="/js/login.js"></script>
 </body>
 

@@ -102,12 +102,13 @@ class PairingController {
       if (!account) return res.json({ success: true, status: 'expired' });
       await rotateSession(req);
       req.session.accessAccount = this.sessionAccount(account);
+      req.session.deviceId = result.device.id;
       req.session.tenantId = result.tenant.id;
       res.json({
         success: true,
         status: 'approved',
         token: result.token,
-        device: { id: result.device.id, name: result.device.name },
+        device: { id: result.device.id, name: result.device.name, language: result.device.language || null },
         account: req.session.accessAccount
       });
     } catch (error) {
@@ -173,9 +174,10 @@ class PairingController {
       accessAccounts.recordSuccessfulAttempt(ip);
       await rotateSession(req);
       req.session.accessAccount = this.sessionAccount(account);
+      req.session.deviceId = device.id;
       // Hosted setups resolve later requests from this (see createApp resolveTenant)
       req.session.tenantId = currentTenant().id;
-      res.json({ success: true, account: req.session.accessAccount, device: { id: device.id, name: device.name } });
+      res.json({ success: true, account: req.session.accessAccount, device: { id: device.id, name: device.name, language: device.language || null } });
     } catch (error) {
       if (passClientError(res, error)) return;
       console.error('Error signing in a device:', error);
@@ -205,6 +207,17 @@ class PairingController {
       console.error('Error removing device:', error);
       res.status(500).json({ success: false, error: 'Could not remove the frame' });
     }
+  }
+
+  async setDeviceLanguage(req, res) {
+    const device = await pairing.setLanguage(req.params.id, req.body?.language);
+    if (!device) return res.status(400).json({ success: false, error: 'Choose a supported language', code: 'INVALID_LANGUAGE' });
+    res.json({ success: true, device: { id: device.id, language: device.language } });
+  }
+
+  async setOwnLanguage(req, res) {
+    if (!req.session?.deviceId) return res.status(403).json({ success: false, error: 'Only a paired frame can save this setting', code: 'DEVICE_REQUIRED' });
+    return this.setDeviceLanguage({ ...req, params: { id: req.session.deviceId } }, res);
   }
 }
 

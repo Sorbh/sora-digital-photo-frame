@@ -33,15 +33,15 @@ class FolderSelector {
     initializeComponent() {
         this.container.innerHTML = `
             <div class="folder-selector">
-                <button class="folder-selector-btn" title="Select folder for slideshow">
+                <button class="folder-selector-btn" title="${t('folders.selectForSlideshow')}" data-i18n-attr="title:folders.selectForSlideshow">
                     <span class="material-icons">folder</span>
-                    <span class="selected-folder-name">All Folders</span>
+                    <span class="selected-folder-name">${t('folders.allFoldersTitle')}</span>
                     <span class="material-icons dropdown-arrow">keyboard_arrow_down</span>
                 </button>
                 
                 <div class="folder-dropdown hidden">
                     <div class="folder-dropdown-header">
-                        <span>Select Folder</span>
+                        <span data-i18n="folders.selectFolder">${t('folders.selectFolder')}</span>
                         <button class="close-dropdown">
                             <span class="material-icons">close</span>
                         </button>
@@ -53,8 +53,8 @@ class FolderSelector {
                                 <div class="folder-spacer"></div>
                                 <span class="material-icons folder-icon">photo_library</span>
                                 <div class="folder-details">
-                                    <div class="folder-name">All Folders</div>
-                                    <div class="folder-count">All images</div>
+                                    <div class="folder-name" data-i18n="folders.allFoldersTitle">${t('folders.allFoldersTitle')}</div>
+                                    <div class="folder-count" data-i18n="folders.allImages">${t('folders.allImages')}</div>
                                 </div>
                             </div>
                         </div>
@@ -66,13 +66,13 @@ class FolderSelector {
                     
                     <div class="folder-loading">
                         <div class="loading-spinner"></div>
-                        <span>Loading folders...</span>
+                        <span data-i18n="folders.loadingFolders">${t('folders.loadingFolders')}</span>
                     </div>
                     
                     <div class="folder-error hidden">
                         <span class="material-icons">error</span>
-                        <span class="error-text">Failed to load folders</span>
-                        <button class="retry-btn">Retry</button>
+                        <span class="error-text">${t('slideshow.loadFoldersFailed')}</span>
+                        <button class="retry-btn" data-i18n="folders.retry">${t('folders.retry')}</button>
                     </div>
                 </div>
             </div>
@@ -80,6 +80,12 @@ class FolderSelector {
 
         this.setupEventListeners();
         this.addStyles();
+        // Static labels above carry data-i18n; the folder list and selection are drawn here
+        window.addEventListener('sora:languagechange', () => {
+            this.renderFolders();
+            this.updateSelectedState();
+            this.updateCurrentSelection();
+        });
     }
 
     /**
@@ -539,7 +545,7 @@ class FolderSelector {
                         : `<span class="material-icons folder-icon">folder</span>`}
                     <div class="folder-details">
                         <div class="folder-name"></div>
-                        ${this.options.showFolderCount ? `<div class="folder-count">${folder.imageCount} images</div>` : ''}
+                        ${this.options.showFolderCount ? `<div class="folder-count">${t('folders.imageCount', { count: folder.imageCount })}</div>` : ''}
                     </div>
                 </div>
             `;
@@ -594,7 +600,7 @@ class FolderSelector {
         const nameElement = this.container.querySelector('.selected-folder-name');
         
         if (nameElement) {
-            nameElement.textContent = selectedFolder ? selectedFolder.name : 'All Folders';
+            nameElement.textContent = selectedFolder && selectedFolder.path ? selectedFolder.name : t('folders.allFoldersTitle');
         }
     }
 

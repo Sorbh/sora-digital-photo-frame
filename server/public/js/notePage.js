@@ -12,29 +12,35 @@ const NotePage = {
      * features (e.g. photo messages) can reuse the same layouts.
      */
     templates: {
-        auto: { label: 'Auto', photos: 0 },
-        cover: { label: 'Cover', photos: 1,
+        auto: { label: 'Auto', labelKey: 'editor.layoutAuto', photos: 0 },
+        cover: { label: 'Cover', labelKey: 'editor.layoutCover', photos: 1,
             book: ['title', 'message', 'p1', 'signoff', 'eyebrow'] },
-        quote: { label: 'Quote', photos: 2,
+        quote: { label: 'Quote', labelKey: 'editor.layoutQuote', photos: 2,
             left: ['message', 'p1', 'signoff'],
             right: ['title', 'eyebrow', 'p2:2', 'foot'] },
-        remember: { label: 'Remember', photos: 3,
+        remember: { label: 'Remember', labelKey: 'editor.layoutRemember', photos: 3,
             left: ['eyebrow', 'title', 'p1:2', { row: [{ col: ['message', 'signoff'] }, 'p3'] }],
             right: ['p2'], bleed: 'right' },
-        stack: { label: 'Stack', photos: 3,
+        stack: { label: 'Stack', labelKey: 'editor.layoutStack', photos: 3,
             left: ['title', 'p1'],
             right: [{ row: [{ col: ['eyebrow', 'message', 'signoff'] }, { col: ['p2', 'p3'] }] }] },
-        collage: { label: 'Collage', photos: 4,
+        collage: { label: 'Collage', labelKey: 'editor.layoutCollage', photos: 4,
             left: [{ row: [{ col: ['eyebrow', 'title'] }, 'p1:2'] }, { row: ['p2', 'p3'] }],
             right: ['p4:2', 'message', 'signoff'] },
-        spine: { label: 'Spine', photos: 4,
+        spine: { label: 'Spine', labelKey: 'editor.layoutSpine', photos: 4,
             left: [{ row: ['title', 'p1'] }],
             right: [{ row: [{ col: ['eyebrow', 'message', 'signoff'] }, { col: ['p2', 'p3', 'p4'] }] }],
             vertical: true },
-        gallery: { label: 'Gallery', photos: 4,
+        gallery: { label: 'Gallery', labelKey: 'editor.layoutGallery', photos: 4,
             left: ['p1'],
             right: [{ row: [{ col: ['p2', 'p3', 'p4'] }, { col: ['eyebrow', 'title', 'message', 'signoff'] }] }],
             bleed: 'left' }
+    },
+
+    // The layout's name in the page language (label stays the English name)
+    layoutLabel(key) {
+        const template = this.templates[key];
+        return template ? t(template.labelKey) : key;
     },
 
     // Auto layout follows the number of photos: cover, split, mosaic or grid
@@ -59,10 +65,10 @@ const NotePage = {
 
         const pieces = {
             eyebrow: ['p', 'np-eyebrow', this.eyebrowFor(note, now)],
-            title: ['h2', 'np-title', note.title || 'Your headline'],
+            title: ['h2', 'np-title', note.title || t('notes.your_headline')],
             message: ['p', 'np-message', note.message],
             signoff: ['p', 'np-signoff', note.signoff],
-            foot: ['p', 'np-foot', 'Sora · Notes']
+            foot: ['p', 'np-foot', t('notes.sora_notes')]
         };
         const textEl = (key) => {
             const [tag, className, value] = pieces[key];
@@ -167,31 +173,31 @@ const NotePage = {
         if (Number.isNaN(event.getTime())) return note.eyebrow || '';
 
         const minutes = Math.round((event - now) / 60000);
-        if (minutes <= 0) return 'Happening now';
-        if (minutes <= 60) return `In ${minutes} min`;
+        if (minutes <= 0) return t('notes.happening_now');
+        if (minutes <= 60) return t('notes.in_minutes', { count: minutes });
 
         const time = this.formatTime(event);
         const startOfDay = d => new Date(d.getFullYear(), d.getMonth(), d.getDate());
         const days = Math.round((startOfDay(event) - startOfDay(now)) / 86400000);
 
-        if (days === 0) return `Today · ${time}`;
-        if (days === 1) return `Tomorrow · ${time}`;
+        if (days === 0) return t('notes.today_at', { time });
+        if (days === 1) return t('notes.tomorrow_at', { time });
         if (days < 7) {
-            const weekday = event.toLocaleDateString(undefined, { weekday: 'short' });
-            return `In ${days} days · ${weekday} ${time}`;
+            const weekday = event.toLocaleDateString(window.i18n?.locale, { weekday: 'short' });
+            return t('notes.in_days_at', { count: days, weekday, time });
         }
-        const date = event.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
-        return `${date} · ${time}`;
+        const date = event.toLocaleDateString(window.i18n?.locale, { weekday: 'short', day: 'numeric', month: 'short' });
+        return t('notes.date_at', { date, time });
     },
 
     // "5 PM" on the hour, "5:30 PM" otherwise (or 17:00 in 24-hour locales)
     formatTime(date) {
         const options = { hour: 'numeric' };
         if (date.getMinutes() !== 0) options.minute = '2-digit';
-        const time = date.toLocaleTimeString(undefined, options);
+        const time = date.toLocaleTimeString(window.i18n?.locale, options);
         // A bare "17" reads like a date; 24-hour locales get "17:00"
         return /^\d+$/.test(time.trim())
-            ? date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+            ? date.toLocaleTimeString(window.i18n?.locale, { hour: '2-digit', minute: '2-digit' })
             : time;
     }
 };

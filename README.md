@@ -122,6 +122,10 @@ npm test      # API tests
 
 Node.js + Express on the server, plain HTML, CSS and JavaScript in the browser. Photos are plain files in folders — no database.
 
+## Translations
+
+The browser UI supports English, Spanish, French, German, Brazilian Portuguese, Italian, Dutch, Hindi, Japanese, Simplified Chinese and Arabic. English lives in `server/public/locales/en.json` and is the source catalogue. Add a new string there first, then add the same key and placeholders to every locale (a language may add the plural forms it needs, such as `_few` or `_many`, next to `_one`/`_other`). Each frame can have its own language, set from Access or on the frame itself. Mark static HTML with `data-i18n`, attributes with `data-i18n-attr`, and browser-generated text with `i18n.t('area.key')`. Run `cd server && npx jest` to check catalogue keys and placeholders.
+
 ## Support
 
 [Report an issue](https://github.com/Sorbh/sora-digital-photo-frame/issues) · [Discussions](https://github.com/Sorbh/sora-digital-photo-frame/discussions)

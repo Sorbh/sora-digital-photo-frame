@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="theme-color" content="#d6336a">
-    <title>Library · Sora Frame</title>
+    <title data-i18n="admin.static_001">Library · Sora Frame</title>
     <link rel="icon" href="/icons/favicon.ico" sizes="48x48">
     <link rel="icon" href="/icons/favicon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
@@ -14,6 +14,7 @@
     <script src="https://cdn.jsdelivr.net/npm/basecoat-css@0.3.1/dist/js/basecoat.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/basecoat-css@0.3.1/dist/js/toast.min.js" defer></script>
     <link rel="stylesheet" href="/css/sora.css">
+    <link rel="stylesheet" href="/css/i18n.css">
     <link rel="stylesheet" href="/css/tailwind.css">
 
     <!-- Theme Switcher Script -->
@@ -64,35 +65,35 @@
     <div class="app">
         <header class="topbar">
             <div class="topbar-brand">
-                <a href="/admin" class="sora-wordmark" aria-label="Sora library home">Sora</a>
+                <a href="/admin" class="sora-wordmark" aria-label="Sora library home" data-i18n-attr="aria-label:admin.static_032">Sora</a>
                 <span class="topbar-divider"></span>
-                <span class="sora-eyebrow">Library</span>
+                <span class="sora-eyebrow" data-i18n="common.library">Library</span>
             </div>
             <div class="topbar-actions">
-                <button id="accessAccountsBtn" class="tb-btn tb-desktop" title="Manage access accounts">
+                <button id="accessAccountsBtn" class="tb-btn tb-desktop" title="Manage access accounts" data-i18n-attr="title:admin.static_033">
                     <span class="material-symbols-outlined">key</span>
-                    <span class="tb-label">Access</span>
+                    <span class="tb-label" data-i18n="common.access">Access</span>
                 </button>
-                <a href="/notes" class="tb-btn" title="Notes shown on the frame">
+                <a href="/notes" class="tb-btn" title="Notes shown on the frame" data-i18n-attr="title:admin.static_034">
                     <span class="material-symbols-outlined">sticky_note_2</span>
-                    <span class="tb-label">Notes</span>
+                    <span class="tb-label" data-i18n="common.notes">Notes</span>
                 </a>
-                <button id="googlePhotosBtn" class="tb-btn" title="Sync Google Photos">
+                <button id="googlePhotosBtn" class="tb-btn" title="Sync Google Photos" data-i18n-attr="title:admin.static_035">
                     <span class="material-symbols-outlined">add_photo_alternate</span>
-                    <span class="tb-label">Google Photos</span>
+                    <span class="tb-label" data-i18n="admin.static_002">Google Photos</span>
                 </button>
-                <a href="/slideshow" class="tb-btn tb-desktop" title="Open the slideshow">
+                <a href="/slideshow" class="tb-btn tb-desktop" title="Open the slideshow" data-i18n-attr="title:admin.static_036">
                     <span class="material-symbols-outlined">slideshow</span>
-                    <span class="tb-label">Slideshow</span>
+                    <span class="tb-label" data-i18n="common.slideshow">Slideshow</span>
                 </a>
                 <span class="topbar-divider tb-desktop"></span>
-                <button id="settingsBtn" class="tb-btn icon tb-desktop" title="Settings">
+                <button id="settingsBtn" class="tb-btn icon tb-desktop" title="Settings" data-i18n-attr="title:admin.static_037">
                     <span class="material-symbols-outlined">tune</span>
                 </button>
-                <button id="themeToggle" class="tb-btn icon" title="Switch to dark mode">
+                <button id="themeToggle" class="tb-btn icon" title="Switch to dark mode" data-i18n-attr="title:admin.static_038">
                     <span class="material-symbols-outlined" id="themeIcon">brightness_auto</span>
                 </button>
-                <button id="logoutBtn" class="tb-btn icon" title="Log out">
+                <button id="logoutBtn" class="tb-btn icon" title="Log out" data-i18n-attr="title:admin.static_039">
                     <span class="material-symbols-outlined">logout</span>
                 </button>
             </div>
@@ -101,43 +102,43 @@
         <section class="library-head">
             <div class="library-title">
                 <div class="crumb-row">
-                    <button id="backBtn" class="back-btn" title="Back" aria-label="Back" style="display: none;">
+                    <button id="backBtn" class="back-btn" title="Back" aria-label="Back" data-i18n-attr="title:admin.static_040; aria-label:admin.static_041" style="display: none;">
                         <span class="material-symbols-outlined">arrow_back</span>
                     </button>
-                    <nav aria-label="Breadcrumb">
+                    <nav aria-label="Breadcrumb" data-i18n-attr="aria-label:admin.static_042">
                         <ol id="breadcrumbContainer" class="breadcrumb flex flex-wrap items-center gap-1.5">
                             <li>
-                                <span class="breadcrumb-item text-foreground" data-path="uploads">Home</span>
+                                <span class="breadcrumb-item text-foreground" data-path="uploads" data-i18n="admin.breadcrumbHome">Home</span>
                             </li>
                         </ol>
                     </nav>
                 </div>
-                <h1 id="folderTitle" class="page-title sora-display">Library</h1>
+                <h1 id="folderTitle" class="page-title sora-display"></h1>
                 <p id="folderMeta" class="page-meta sora-mono">&nbsp;</p>
             </div>
             <div class="library-actions">
-                <label class="play-order" title="How this folder plays on the frame">
+                <label class="play-order" title="How this folder plays on the frame" data-i18n-attr="title:admin.static_043">
                     <span class="material-symbols-outlined" id="playOrderIcon" aria-hidden="true">shuffle</span>
-                    <span class="sr-only">Play order</span>
+                    <span class="sr-only" data-i18n="admin.static_004">Play order</span>
                     <select id="playOrderSelect">
-                        <option value="shuffle">Shuffle</option>
-                        <option value="newest">Newest first</option>
-                        <option value="oldest">Oldest first</option>
-                        <option value="custom">My order</option>
+                        <option value="shuffle" data-i18n="admin.sortShuffle">Shuffle</option>
+                        <option value="newest" data-i18n="admin.sortNewest">Newest first</option>
+                        <option value="oldest" data-i18n="admin.sortOldest">Oldest first</option>
+                        <option value="custom" data-i18n="admin.sortCustom">My order</option>
                     </select>
                     <span class="material-symbols-outlined play-order-caret" aria-hidden="true">expand_more</span>
                 </label>
-                <button id="createFolderBtn" class="btn-outline" title="Create folder">
+                <button id="createFolderBtn" class="btn-outline" title="Create folder" data-i18n-attr="title:admin.static_044">
                     <span class="material-symbols-outlined">create_new_folder</span>
-                    New folder
+                    <span data-i18n="admin.newFolder">New folder</span>
                 </button>
-                <button id="createSnapBtn" class="btn-outline" title="Make a memory-book page for this folder">
+                <button id="createSnapBtn" class="btn-outline" title="Make a memory-book page for this folder" data-i18n-attr="title:admin.static_045">
                     <span class="material-symbols-outlined">auto_stories</span>
-                    New snap
+                    <span data-i18n="admin.newSnap">New snap</span>
                 </button>
-                <button id="uploadBtn" class="btn mobile-hide" title="Upload images">
+                <button id="uploadBtn" class="btn mobile-hide" title="Upload images" data-i18n-attr="title:admin.static_046">
                     <span class="material-symbols-outlined">upload</span>
-                    Upload
+                    <span data-i18n="admin.upload">Upload</span>
                 </button>
             </div>
         </section>
@@ -147,14 +148,14 @@
             <div id="dropZone" class="drop-zone" aria-hidden="true">
                 <div class="drop-zone-content">
                     <span class="material-symbols-outlined">cloud_upload</span>
-                    <p>Drop to add to <strong class="drop-folder-name">Library</strong></p>
+                    <p id="dropZoneText"></p>
                 </div>
             </div>
 
             <!-- Floating Action Button -->
             <div id="selectionFab" class="selection-fab hidden">
                 <button id="bulkDeleteBtn" class="fab-button" data-tooltip="Delete Selected Photos"
-                    aria-label="Delete Selected Photos">
+                    aria-label="Delete Selected Photos" data-i18n-attr="aria-label:admin.static_047; data-tooltip:admin.static_047">
                     <span class="material-symbols-outlined">delete</span>
                 </button>
                 <span class="fab-badge" id="fabBadge">0</span>
@@ -167,30 +168,30 @@
             <!-- Quiet reminder in the free space below the grid -->
             <div id="dropHint" class="drop-hint hidden" aria-hidden="true">
                 <span class="material-symbols-outlined">place_item</span>
-                <p>Drop photos here to add them to <strong class="drop-folder-name">Library</strong></p>
-                <p id="dropHintMove" class="drop-hint-sub hidden">Drag a photo onto a folder to move it there</p>
+                <p id="dropHintText"></p>
+                <p id="dropHintMove" class="drop-hint-sub hidden" data-i18n="admin.static_005">Drag a photo onto a folder to move it there</p>
             </div>
 
             <div id="emptyState" class="empty-state hidden">
                 <div class="max-w-md mx-auto">
                     <div class="text-center mb-6">
                         <span class="material-symbols-outlined text-6xl text-muted-foreground">photo_library</span>
-                        <h3 class="text-xl font-semibold mt-4 mb-2">No images yet</h3>
-                        <p class="text-muted-foreground">Upload some images to get started</p>
+                        <h3 class="text-xl font-semibold mt-4 mb-2" data-i18n="admin.static_006">No images yet</h3>
+                        <p class="text-muted-foreground" data-i18n="admin.static_007">Upload some images to get started</p>
                     </div>
 
                     <input type="file" id="emptyStateFileInput" multiple accept="image/*" hidden>
                     <div class="upload-drop-zone border-2 border-dashed border-muted rounded-lg p-8 text-center cursor-pointer hover:bg-muted/50 transition-colors"
                         id="emptyStateUploadZone">
                         <span class="material-symbols-outlined text-4xl text-muted-foreground">cloud_upload</span>
-                        <p class="text-lg font-medium mt-2">Click to select images or drag and drop</p>
-                        <p class="text-sm text-muted-foreground">Supports JPEG, PNG, GIF, WebP (max 10MB each)</p>
+                        <p class="text-lg font-medium mt-2" data-i18n="admin.static_008">Click to select images or drag and drop</p>
+                        <p class="text-sm text-muted-foreground" data-i18n="admin.static_009">Supports JPEG, PNG, GIF, WebP (max 10MB each)</p>
                     </div>
 
                     <div id="emptyStateSelectedFiles" class="hidden mt-4">
                         <div class="card">
                             <header>
-                                <h3 class="text-lg font-semibold">Selected Files</h3>
+                                <h3 class="text-lg font-semibold" data-i18n="admin.static_010">Selected Files</h3>
                             </header>
                             <section>
                                 <div id="emptyStateFilesList" class="grid gap-2 text-sm text-muted-foreground">
@@ -206,14 +207,14 @@
                                 style="width: 0%"></div>
                         </div>
                         <span
-                            class="empty-state-progress-text text-sm text-muted-foreground mt-2 block text-center">Uploading...</span>
+                            class="empty-state-progress-text text-sm text-muted-foreground mt-2 block text-center" data-i18n="admin.static_011">Uploading...</span>
                     </div>
 
                     <div class="flex gap-2 justify-center mt-4">
-                        <button id="emptyStateCancelBtn" class="btn-outline hidden">Cancel</button>
+                        <button id="emptyStateCancelBtn" class="btn-outline hidden" data-i18n="common.cancel">Cancel</button>
                         <button id="emptyStateUploadBtn" class="btn" disabled>
                             <span class="material-symbols-outlined">upload</span>
-                            <span id="emptyStateUploadBtnText">Select Files</span>
+                            <span id="emptyStateUploadBtnText" data-i18n="admin.static_012">Select Files</span>
                         </button>
                     </div>
                 </div>
@@ -229,32 +230,32 @@
                 <div role="menu" class="min-w-48">
                     <div role="menuitem" class="menu-item" data-action="rotate-right" data-for="image">
                         <span class="material-symbols-outlined mr-2">rotate_right</span>
-                        Rotate Right
+                        <span data-i18n="admin.menuRotateRight">Rotate Right</span>
                     </div>
                     <div role="menuitem" class="menu-item" data-action="rotate-left" data-for="image">
                         <span class="material-symbols-outlined mr-2">rotate_left</span>
-                        Rotate Left
+                        <span data-i18n="admin.menuRotateLeft">Rotate Left</span>
                     </div>
                     <div role="menuitem" class="menu-item" data-action="create-snap" data-for="image">
                         <span class="material-symbols-outlined mr-2">auto_stories</span>
-                        Create snap
+                        <span data-i18n="admin.menuCreateSnap">Create snap</span>
                     </div>
                     <div role="menuitem" class="menu-item" data-action="edit-snap" data-for="snap">
                         <span class="material-symbols-outlined mr-2">edit</span>
-                        Edit snap
+                        <span data-i18n="admin.menuEditSnap">Edit snap</span>
                     </div>
                     <div role="menuitem" class="menu-item" data-action="move-earlier" data-for="image snap">
                         <span class="material-symbols-outlined mr-2">arrow_back</span>
-                        Move earlier
+                        <span data-i18n="admin.menuMoveEarlier">Move earlier</span>
                     </div>
                     <div role="menuitem" class="menu-item" data-action="move-later" data-for="image snap">
                         <span class="material-symbols-outlined mr-2">arrow_forward</span>
-                        Move later
+                        <span data-i18n="admin.menuMoveLater">Move later</span>
                     </div>
                     <hr class="menu-divider" data-for="image snap">
                     <div role="menuitem" class="menu-item menu-item-destructive" data-action="delete">
                         <span class="material-symbols-outlined mr-2">delete</span>
-                        Delete
+                        <span data-i18n="common.delete">Delete</span>
                     </div>
                 </div>
             </div>
@@ -264,27 +265,27 @@
         <dialog id="createFolderModal" class="dialog" aria-labelledby="create-folder-title">
             <article>
                 <header>
-                    <h2 id="create-folder-title">Create New Folder</h2>
+                    <h2 id="create-folder-title" data-i18n="admin.static_013">Create New Folder</h2>
                     <button id="closeCreateFolderModal" class="btn-sm-icon-ghost absolute top-4 right-4"
-                        aria-label="Close">
+                        aria-label="Close" data-i18n-attr="aria-label:admin.static_048">
                         <span class="material-symbols-outlined">close</span>
                     </button>
                 </header>
                 <section>
                     <form class="form grid gap-6" id="createFolderForm">
                         <div class="grid gap-2">
-                            <label for="folderNameInput" class="label">Folder Name</label>
-                            <input type="text" id="folderNameInput" class="input" placeholder="Enter folder name"
+                            <label for="folderNameInput" class="label" data-i18n="admin.static_014">Folder Name</label>
+                            <input type="text" id="folderNameInput" class="input" placeholder="Enter folder name" data-i18n-attr="placeholder:admin.static_049"
                                 maxlength="50" required>
-                            <p class="text-sm text-muted-foreground">Create a new folder in the current location</p>
+                            <p class="text-sm text-muted-foreground" data-i18n="admin.static_015">Create a new folder in the current location</p>
                         </div>
                     </form>
                 </section>
                 <footer>
-                    <button id="cancelCreateBtn" class="btn-outline">Cancel</button>
+                    <button id="cancelCreateBtn" class="btn-outline" data-i18n="common.cancel">Cancel</button>
                     <button id="confirmCreateBtn" class="btn">
                         <span class="material-symbols-outlined">create_new_folder</span>
-                        Create Folder
+                        <span data-i18n="admin.createFolder">Create Folder</span>
                     </button>
                 </footer>
             </article>
@@ -293,8 +294,8 @@
         <dialog id="uploadModal" class="dialog" aria-labelledby="upload-title">
             <article>
                 <header>
-                    <h2 id="upload-title">Upload Images</h2>
-                    <button id="closeUploadModal" class="btn-sm-icon-ghost absolute top-4 right-4" aria-label="Close">
+                    <h2 id="upload-title" data-i18n="admin.static_016">Upload Images</h2>
+                    <button id="closeUploadModal" class="btn-sm-icon-ghost absolute top-4 right-4" aria-label="Close" data-i18n-attr="aria-label:admin.static_050">
                         <span class="material-symbols-outlined">close</span>
                     </button>
                 </header>
@@ -304,13 +305,13 @@
                         <div class="upload-drop-zone border-2 border-dashed border-muted rounded-lg p-8 text-center cursor-pointer hover:bg-muted/50 transition-colors"
                             id="uploadDropZone">
                             <span class="material-symbols-outlined text-4xl text-muted-foreground">cloud_upload</span>
-                            <p class="text-lg font-medium mt-2">Click to select images or drag and drop</p>
-                            <p class="text-sm text-muted-foreground">Supports JPEG, PNG, GIF, WebP (max 10MB each)</p>
+                            <p class="text-lg font-medium mt-2" data-i18n="admin.static_017">Click to select images or drag and drop</p>
+                            <p class="text-sm text-muted-foreground" data-i18n="admin.static_018">Supports JPEG, PNG, GIF, WebP (max 10MB each)</p>
                         </div>
                         <div id="selectedFilesInfo" class="hidden">
                             <div class="card">
                                 <header>
-                                    <h3>Selected Files</h3>
+                                    <h3 data-i18n="admin.static_019">Selected Files</h3>
                                 </header>
                                 <section>
                                     <div id="filesList" class="grid gap-2 text-sm text-muted-foreground">
@@ -324,15 +325,15 @@
                                 <div class="progress-fill bg-primary h-2 rounded-full transition-all duration-300"
                                     style="width: 0%"></div>
                             </div>
-                            <span class="progress-text text-sm text-muted-foreground mt-2">Uploading...</span>
+                            <span class="progress-text text-sm text-muted-foreground mt-2" data-i18n="admin.static_020">Uploading...</span>
                         </div>
                     </div>
                 </section>
                 <footer>
-                    <button id="cancelUploadBtn" class="btn-outline">Cancel</button>
+                    <button id="cancelUploadBtn" class="btn-outline" data-i18n="common.cancel">Cancel</button>
                     <button id="confirmUploadBtn" class="btn" disabled>
                         <span class="material-symbols-outlined">upload</span>
-                        <span id="uploadBtnText">Select Files</span>
+                        <span id="uploadBtnText" data-i18n="admin.static_021">Select Files</span>
                     </button>
                 </footer>
             </article>
@@ -340,34 +341,34 @@
 
         <div id="googlePhotosModal" class="modal hidden">
             <div class="modal-content card card-elevated">
-                <h2 class="light-title">Import from Google Photos</h2>
+                <h2 class="light-title" data-i18n="admin.static_022">Import from Google Photos</h2>
                 <div class="google-photos-content">
                     <div id="sessionLoadingState" class="session-state">
                         <div class="session-loader">
                             <div class="spinner"></div>
                         </div>
-                        <p>Creating Google Photos session...</p>
+                        <p data-i18n="admin.static_023">Creating Google Photos session...</p>
                     </div>
                     <div id="sessionReadyState" class="session-state hidden">
                         <div class="session-icon">
                             <span class="material-symbols-outlined">photo_library</span>
                         </div>
-                        <p>Google Photos session is ready!</p>
+                        <p data-i18n="admin.static_024">Google Photos session is ready!</p>
                         <button id="openSessionBtn" class="btn btn-primary">
                             <span class="material-symbols-outlined">open_in_new</span>
-                            Open Google Photos Picker
+                            <span data-i18n="admin.openGooglePhotosPicker">Open Google Photos Picker</span>
                         </button>
                     </div>
                     <div id="sessionErrorState" class="session-state hidden">
                         <div class="session-icon error">
                             <span class="material-symbols-outlined">error</span>
                         </div>
-                        <p id="sessionErrorMessage">Failed to create session</p>
-                        <button id="retrySessionBtn" class="btn btn-secondary">Try Again</button>
+                        <p id="sessionErrorMessage" data-i18n="admin.static_025">Failed to create session</p>
+                        <button id="retrySessionBtn" class="btn btn-secondary" data-i18n="admin.static_026">Try Again</button>
                     </div>
                 </div>
                 <div class="modal-actions">
-                    <button id="cancelGooglePhotosBtn" class="btn btn-secondary">Cancel</button>
+                    <button id="cancelGooglePhotosBtn" class="btn btn-secondary" data-i18n="common.cancel">Cancel</button>
                 </div>
             </div>
         </div>
@@ -377,19 +378,18 @@
             aria-describedby="bulk-delete-description">
             <article>
                 <header>
-                    <h2 id="bulk-delete-title">Delete Photos</h2>
+                    <h2 id="bulk-delete-title" data-i18n="admin.static_027">Delete Photos</h2>
                     <button id="closeBulkDeleteModal" class="btn-sm-icon-ghost absolute top-4 right-4"
-                        aria-label="Close">
+                        aria-label="Close" data-i18n-attr="aria-label:admin.static_051">
                         <span class="material-symbols-outlined">close</span>
                     </button>
-                    <p id="bulk-delete-description">Are you sure you want to delete <span id="deleteCount">0</span>
-                        selected photos? This action cannot be undone.</p>
+                    <p id="bulk-delete-description"></p>
                 </header>
                 <footer>
-                    <button id="cancelBulkDeleteBtn" class="btn-outline">Cancel</button>
+                    <button id="cancelBulkDeleteBtn" class="btn-outline" data-i18n="common.cancel">Cancel</button>
                     <button id="confirmBulkDeleteBtn" class="btn-destructive">
                         <span class="material-symbols-outlined">delete</span>
-                        Delete Photos
+                        <span data-i18n="admin.static_027">Delete Photos</span>
                     </button>
                 </footer>
             </article>
@@ -398,16 +398,16 @@
         <!-- Photo Modal - Enhanced with navigation hints -->
         <dialog id="photoModal" class="photo-modal-dialog" aria-labelledby="modalPhotoName">
             <div class="photo-modal-content">
-                <button id="closePhotoModal" class="photo-modal-close" aria-label="Close Photo">
+                <button id="closePhotoModal" class="photo-modal-close" aria-label="Close Photo" data-i18n-attr="aria-label:admin.static_052">
                     <span class="material-symbols-outlined">close</span>
                 </button>
 
-                <div class="photo-modal-hints" aria-label="Keyboard shortcuts">
+                <div class="photo-modal-hints" aria-label="Keyboard shortcuts" data-i18n-attr="aria-label:admin.static_053">
                     <ul>
-                        <li><span class="keys"><kbd class="key">Esc</kbd></span><span>Close photo</span></li>
-                        <li><span class="keys"><kbd class="key">←</kbd><kbd class="key">→</kbd></span><span>Previous / next</span></li>
-                        <li><span class="keys"><kbd class="key">Click</kbd></span><span>Zoom in / out</span></li>
-                        <li><span class="keys"><kbd class="key">Drag</kbd></span><span>Pan when zoomed</span></li>
+                        <li><span class="keys"><kbd class="key">Esc</kbd></span><span data-i18n="admin.static_028">Close photo</span></li>
+                        <li><span class="keys"><kbd class="key">←</kbd><kbd class="key">→</kbd></span><span data-i18n="admin.static_029">Previous / next</span></li>
+                        <li><span class="keys"><kbd class="key" data-i18n="admin.keyClick">Click</kbd></span><span data-i18n="admin.static_030">Zoom in / out</span></li>
+                        <li><span class="keys"><kbd class="key" data-i18n="admin.keyDrag">Drag</kbd></span><span data-i18n="admin.static_031">Pan when zoomed</span></li>
                     </ul>
                 </div>
 
@@ -420,21 +420,21 @@
     </div>
 
     <!-- Mobile tab bar -->
-    <nav class="tabbar" aria-label="Sections">
+    <nav class="tabbar" aria-label="Sections" data-i18n-attr="aria-label:admin.static_054">
         <a href="/admin" class="tab active" aria-current="page">
-            <span class="material-symbols-outlined">photo_library</span><span>Library</span>
+            <span class="material-symbols-outlined">photo_library</span><span data-i18n="common.library">Library</span>
         </a>
         <a href="/access-accounts" class="tab">
-            <span class="material-symbols-outlined">key</span><span>Access</span>
+            <span class="material-symbols-outlined">key</span><span data-i18n="common.access">Access</span>
         </a>
-        <button class="tab-fab" data-proxy="uploadBtn" aria-label="Upload photos">
+        <button class="tab-fab" data-proxy="uploadBtn" aria-label="Upload photos" data-i18n-attr="aria-label:admin.static_055">
             <span class="material-symbols-outlined">add</span>
         </button>
         <a href="/slideshow" class="tab">
-            <span class="material-symbols-outlined">slideshow</span><span>Slideshow</span>
+            <span class="material-symbols-outlined">slideshow</span><span data-i18n="common.slideshow">Slideshow</span>
         </a>
         <button class="tab" data-proxy="settingsBtn">
-            <span class="material-symbols-outlined">tune</span><span>Settings</span>
+            <span class="material-symbols-outlined">tune</span><span data-i18n="common.settings">Settings</span>
         </button>
     </nav>
     <script>
@@ -444,6 +444,7 @@
         });
     </script>
 
+    <script src="/js/i18n.js"></script>
     <script src="js/notePage.js"></script>
     <script src="admin.js"></script>
     <script src="js/settings.js"></script>

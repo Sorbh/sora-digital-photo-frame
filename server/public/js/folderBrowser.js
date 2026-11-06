@@ -44,8 +44,8 @@ class FolderBrowser {
                                 <span class="material-icons">auto_awesome_mosaic</span>
                             </div>
                             <div class="folder-info">
-                                <div class="folder-name">All folders</div>
-                                <div class="folder-count">Every photo in the library</div>
+                                <div class="folder-name" data-i18n="folders.static_005">${t('folders.static_005')}</div>
+                                <div class="folder-count" data-i18n="folders.everyPhoto">${t('folders.everyPhoto')}</div>
                             </div>
                         </button>
                     ` : ''}
@@ -57,19 +57,26 @@ class FolderBrowser {
                 
                 <div class="folder-loading hidden">
                     <div class="loading-spinner"></div>
-                    <div class="loading-text">Loading folders...</div>
+                    <div class="loading-text" data-i18n="folders.loadingFolders">${t('folders.loadingFolders')}</div>
                 </div>
                 
                 <div class="folder-error hidden">
                     <span class="material-icons">error</span>
-                    <div class="error-text">Failed to load folders</div>
-                    <button class="retry-btn">Retry</button>
+                    <div class="error-text">${t('slideshow.loadFoldersFailed')}</div>
+                    <button class="retry-btn" data-i18n="folders.retry">${t('folders.retry')}</button>
                 </div>
             </div>
         `;
 
         this.setupEventListeners();
         this.addStyles();
+        // Static labels above carry data-i18n; folder cards and the breadcrumb are drawn here
+        window.addEventListener('sora:languagechange', () => {
+            if (!this.currentFolder) return;
+            this.renderFolderContent();
+            this.updateBreadcrumb();
+            this.updateSelectedState();
+        });
     }
 
     /**
@@ -445,7 +452,7 @@ class FolderBrowser {
             : `<div class="folder-icon"><span class="material-icons">folder</span></div>`;
 
         const navigationBtn = hasSubfolders && folder.hasSubfolders 
-            ? `<button class="folder-nav" title="Browse folder">
+            ? `<button class="folder-nav" title="${t('folders.browseFolder')}">
                  <span class="material-icons">arrow_forward</span>
                </button>`
             : '';
@@ -454,7 +461,7 @@ class FolderBrowser {
             ${thumbnailHtml}
             <div class="folder-info">
                 <div class="folder-name"></div>
-                <div class="folder-count">${folder.imageCount} ${folder.imageCount === 1 ? 'photo' : 'photos'}</div>
+                <div class="folder-count">${t('folders.photoCount', { count: folder.imageCount })}</div>
             </div>
             ${navigationBtn}
         `;
@@ -496,7 +503,7 @@ class FolderBrowser {
             const rootItem = document.createElement('button');
             rootItem.className = 'breadcrumb-item';
             rootItem.dataset.path = '';
-            rootItem.textContent = 'All Folders';
+            rootItem.textContent = t('folders.allFoldersTitle');
             container.appendChild(rootItem);
         }
     }

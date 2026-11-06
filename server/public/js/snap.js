@@ -24,13 +24,18 @@ class SnapEditor extends PageEditor {
             e.preventDefault();
             this.save();
         });
+        window.addEventListener('sora:languagechange', () => {
+            this.renderLayoutPicker();
+            this.renderPhotoTiles();
+            this.updatePreview();
+            this.renderHeadings();
+        });
 
         this.pickerPath = this.folder;
         const back = `/admin?path=${encodeURIComponent(this.folder)}`;
         document.getElementById('backLink').href = back;
         document.getElementById('cancelSnapBtn').href = back;
-        const parts = this.folder.split('/').filter(Boolean);
-        document.getElementById('snapFolder').textContent = parts.length > 1 ? parts.slice(1).join(' / ') : 'Library';
+        this.renderHeadings();
 
         if (this.path) {
             await this.load();
@@ -41,6 +46,18 @@ class SnapEditor extends PageEditor {
         this.renderPhotoTiles();
         this.updatePreview();
         this.form.elements.title.focus();
+    }
+
+    // Folder eyebrow, "New snap" / "Edit snap" and the tab title, all set here rather than by i18n.apply()
+    renderHeadings() {
+        const parts = this.folder.split('/').filter(Boolean);
+        const folder = document.getElementById('snapFolder');
+        folder.removeAttribute('data-i18n');
+        folder.textContent = parts.length > 1 ? parts.slice(1).join(' / ') : t('common.library');
+        const heading = document.getElementById('snapHeading');
+        heading.removeAttribute('data-i18n-html');
+        heading.innerHTML = t(this.loadedTitle != null ? 'snap.editHeading' : 'snap.newHeading');
+        if (this.loadedTitle != null) document.title = t('snap.documentTitle', { title: this.loadedTitle });
     }
 
     parentOf(adminPath) {
@@ -60,9 +77,9 @@ class SnapEditor extends PageEditor {
     async load() {
         try {
             const { ok, data } = await this.api(`/api/snaps?path=${encodeURIComponent(this.path)}`);
-            if (!ok) throw new Error(data.error || 'Could not open the snap');
-            document.getElementById('snapHeading').innerHTML = 'Edit <em>snap</em>';
-            document.title = `${data.snap.title} · Sora Frame`;
+            if (!ok) throw new Error(i18n.error(data, 'snap.openFailed'));
+            this.loadedTitle = data.snap.title;
+            this.renderHeadings();
             this.fillPage(data.snap);
         } catch (error) {
             if (error.message === 'Signed out') return;
@@ -75,7 +92,7 @@ class SnapEditor extends PageEditor {
         this.clearErrors();
         const payload = this.readForm();
         if (!payload.title.trim()) {
-            this.showErrors({ title: 'Give the snap a headline' });
+            this.showErrors({ title: t('snap.headlineRequired') });
             return;
         }
 
@@ -87,7 +104,7 @@ class SnapEditor extends PageEditor {
                 : await this.api('/api/snaps', { method: 'POST', body: JSON.stringify({ ...payload, folder: this.folder }) });
             if (!ok) {
                 if (data.errors) this.showErrors(data.errors);
-                throw new Error(data.error || 'Could not save the snap');
+                throw new Error(i18n.error(data, 'snap.saveFailed'));
             }
             window.location.href = `/admin?path=${encodeURIComponent(this.folder)}`;
         } catch (error) {

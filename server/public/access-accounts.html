@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="theme-color" content="#d6336a">
-    <title>Access · Sora Frame</title>
+    <title data-i18n="accessAccounts.static_001">Access · Sora Frame</title>
     <link rel="icon" href="/icons/favicon.ico" sizes="48x48">
     <link rel="icon" href="/icons/favicon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
@@ -13,6 +13,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/basecoat-css@0.3.1/dist/basecoat.cdn.min.css">
     <script src="https://cdn.jsdelivr.net/npm/basecoat-css@0.3.1/dist/js/all.min.js" defer></script>
     <link rel="stylesheet" href="/css/sora.css">
+    <link rel="stylesheet" href="/css/i18n.css">
     <link rel="stylesheet" href="/css/tailwind.css">
 
     <!-- Theme: follow the admin's saved choice (system / dark / light) -->
@@ -32,22 +33,22 @@
     <div class="app">
         <header class="topbar">
             <div class="topbar-brand">
-                <a href="/admin" class="sora-wordmark" aria-label="Sora library home">Sora</a>
+                <a href="/admin" class="sora-wordmark" aria-label="Sora library home" data-i18n-attr="aria-label:accessAccounts.static_016">Sora</a>
                 <span class="topbar-divider"></span>
-                <span class="sora-eyebrow">Access</span>
+                <span class="sora-eyebrow" data-i18n="common.access">Access</span>
             </div>
             <div class="topbar-actions">
-                <a href="/admin" class="tb-btn tb-desktop" title="Back to the library">
+                <a href="/admin" class="tb-btn tb-desktop" title="Back to the library" data-i18n-attr="title:accessAccounts.static_017">
                     <span class="material-symbols-outlined">photo_library</span>
-                    <span class="tb-label">Library</span>
+                    <span class="tb-label" data-i18n="common.library">Library</span>
                 </a>
-                <a href="/notes" class="tb-btn" title="Notes shown on the frame">
+                <a href="/notes" class="tb-btn" title="Notes shown on the frame" data-i18n-attr="title:accessAccounts.static_018">
                     <span class="material-symbols-outlined">sticky_note_2</span>
-                    <span class="tb-label">Notes</span>
+                    <span class="tb-label" data-i18n="common.notes">Notes</span>
                 </a>
-                <a href="/slideshow" class="tb-btn tb-desktop" title="Open the slideshow">
+                <a href="/slideshow" class="tb-btn tb-desktop" title="Open the slideshow" data-i18n-attr="title:accessAccounts.static_019">
                     <span class="material-symbols-outlined">slideshow</span>
-                    <span class="tb-label">Slideshow</span>
+                    <span class="tb-label" data-i18n="common.slideshow">Slideshow</span>
                 </a>
             </div>
         </header>
@@ -55,18 +56,18 @@
         <section class="library-head">
             <div class="library-title">
                 <div class="crumb-row">
-                    <button id="backBtn" class="back-btn" title="Back to library" aria-label="Back to library">
+                    <button id="backBtn" class="back-btn" title="Back to library" aria-label="Back to library" data-i18n-attr="title:accessAccounts.static_020; aria-label:accessAccounts.static_021">
                         <span class="material-symbols-outlined">arrow_back</span>
                     </button>
-                    <p class="sora-eyebrow" style="margin: 0;">Frames &amp; PINs</p>
+                    <p class="sora-eyebrow" style="margin: 0;" data-i18n="accessAccounts.static_002">Frames &amp; PINs</p>
                 </div>
-                <h1 class="page-title sora-display no-transform">Who can <em>visit</em></h1>
-                <p id="accountsMeta" class="page-meta sora-mono"><span class="material-symbols-outlined" style="font-size:16px;font-variation-settings:'FILL' 1">favorite</span><span id="accountsMetaText">Loading accounts</span></p>
+                <h1 class="page-title sora-display no-transform" data-i18n-html="accessAccounts.who_visit">Who can <em>visit</em></h1>
+                <p id="accountsMeta" class="page-meta sora-mono"><span class="material-symbols-outlined" style="font-size:16px;font-variation-settings:'FILL' 1">favorite</span><span id="accountsMetaText" data-i18n="accessAccounts.static_003">Loading accounts</span></p>
             </div>
             <div class="library-actions">
-                <button id="createAccountBtn" class="btn mobile-hide" title="Create account">
+                <button id="createAccountBtn" class="btn mobile-hide" title="Create account" data-i18n-attr="title:accessAccounts.static_022">
                     <span class="material-symbols-outlined">person_add</span>
-                    New account
+                    <span data-i18n="accessAccounts.new_account">New account</span>
                 </button>
             </div>
         </section>
@@ -74,7 +75,7 @@
         <main class="main-content">
             <div id="loadingState" class="loading-state">
                 <span class="material-symbols-outlined">hourglass_empty</span>
-                <p>Loading accounts</p>
+                <p data-i18n="accessAccounts.static_004">Loading accounts</p>
             </div>
 
             <div id="accountsList" class="accounts-grid hidden">
@@ -83,8 +84,8 @@
 
             <div id="emptyState" class="empty-state hidden">
                 <span class="material-symbols-outlined">key</span>
-                <h3>No one has a key yet</h3>
-                <p>Create an account to give a frame or a family member their own PIN.</p>
+                <h3 data-i18n="accessAccounts.static_005">No one has a key yet</h3>
+                <p data-i18n="accessAccounts.static_006">Create an account to give a frame or a family member their own PIN.</p>
             </div>
         </main>
 
@@ -92,7 +93,7 @@
         <dialog id="accountModal" class="dialog" aria-labelledby="modal-title">
             <article>
                 <header>
-                    <h2 id="modalTitle">Create Access Account</h2>
+                    <h2 id="modalTitle" data-i18n="accessAccounts.static_007">Create Access Account</h2>
                     <button id="closeAccountModal" class="btn-sm-icon-ghost absolute top-4 right-4">
                         <span class="material-symbols-outlined">close</span>
                     </button>
@@ -101,34 +102,34 @@
                     <form id="accountForm" class="form grid gap-6">
                         <div class="card">
                             <header>
-                                <h3>Account Details</h3>
+                                <h3 data-i18n="accessAccounts.static_008">Account Details</h3>
                             </header>
                             <section class="grid gap-4">
                                 <div class="grid gap-2">
-                                    <label for="accountName" class="label">Account Name</label>
+                                    <label for="accountName" class="label" data-i18n="accessAccounts.static_009">Account Name</label>
                                     <input type="text" id="accountName" name="name" class="input" required
-                                        maxlength="50" placeholder="e.g. Family Photos">
+                                        maxlength="50" placeholder="e.g. Family Photos" data-i18n-attr="placeholder:accessAccounts.static_023">
                                     <span class="error-message hidden" id="nameError"></span>
                                 </div>
 
                                 <div class="grid gap-2">
-                                    <label for="accountPin" class="label">PIN Code</label>
+                                    <label for="accountPin" class="label" data-i18n="accessAccounts.static_010">PIN Code</label>
                                     <input type="text" id="accountPin" name="pin" class="input" required
-                                        pattern="[0-9]{4,6}" placeholder="4-6 digit PIN" maxlength="6">
+                                        pattern="[0-9]{4,6}" placeholder="4-6 digit PIN" data-i18n-attr="placeholder:accessAccounts.static_024" maxlength="6">
                                     <span class="error-message hidden" id="pinError"></span>
-                                    <p class="text-sm text-muted-foreground">4-6 digits, must be unique</p>
+                                    <p class="text-sm text-muted-foreground" data-i18n="accessAccounts.static_011">4-6 digits, must be unique</p>
                                 </div>
                             </section>
                         </div>
 
                         <div class="card">
                             <header>
-                                <h3>Folder Access</h3>
+                                <h3 data-i18n="accessAccounts.static_012">Folder Access</h3>
                             </header>
                             <section>
                                 <div id="loadingFolders" class="loading-state">
                                     <span class="material-symbols-outlined">folder</span>
-                                    <p>Loading folders...</p>
+                                    <p data-i18n="accessAccounts.static_013">Loading folders...</p>
                                 </div>
                                 <div id="folderGrid" class="folder-grid hidden">
                                     <!-- Folder checkboxes will be populated here -->
@@ -138,10 +139,10 @@
                     </form>
                 </section>
                 <footer>
-                    <button id="cancelAccountBtn" class="btn-outline">Cancel</button>
+                    <button id="cancelAccountBtn" class="btn-outline" data-i18n="common.cancel">Cancel</button>
                     <button id="saveAccountBtn" class="btn" type="submit" form="accountForm">
                         <span class="material-symbols-outlined">save</span>
-                        Save Account
+                        <span data-i18n="accessAccounts.saveAccount">Save Account</span>
                     </button>
                 </footer>
             </article>
@@ -151,18 +152,17 @@
         <dialog id="deleteModal" class="dialog" aria-labelledby="delete-title" aria-describedby="delete-description">
             <article>
                 <header>
-                    <h2 id="delete-title">Delete Account</h2>
+                    <h2 id="delete-title" data-i18n="accessAccounts.static_014">Delete Account</h2>
                 </header>
                 <section>
-                    <p id="delete-description">Are you sure you want to delete <strong id="deleteAccountName"></strong>?
-                    </p>
-                    <p class="text-sm text-destructive mt-2">This action cannot be undone.</p>
+                    <p id="delete-description"></p>
+                    <p class="text-sm text-destructive mt-2" data-i18n="accessAccounts.static_015">This action cannot be undone.</p>
                 </section>
                 <footer>
-                    <button id="cancelDeleteBtn" class="btn-outline">Cancel</button>
+                    <button id="cancelDeleteBtn" class="btn-outline" data-i18n="common.cancel">Cancel</button>
                     <button id="confirmDeleteBtn" class="btn-destructive">
                         <span class="material-symbols-outlined">delete</span>
-                        Delete Account
+                        <span data-i18n="accessAccounts.static_014">Delete Account</span>
                     </button>
                 </footer>
             </article>
@@ -173,21 +173,21 @@
     </div>
 
     <!-- Mobile tab bar -->
-    <nav class="tabbar" aria-label="Sections">
+    <nav class="tabbar" aria-label="Sections" data-i18n-attr="aria-label:accessAccounts.static_025">
         <a href="/admin" class="tab">
-            <span class="material-symbols-outlined">photo_library</span><span>Library</span>
+            <span class="material-symbols-outlined">photo_library</span><span data-i18n="common.library">Library</span>
         </a>
         <a href="/access-accounts" class="tab active" aria-current="page">
-            <span class="material-symbols-outlined">key</span><span>Access</span>
+            <span class="material-symbols-outlined">key</span><span data-i18n="common.access">Access</span>
         </a>
-        <button class="tab-fab" data-proxy="createAccountBtn" aria-label="New account">
+        <button class="tab-fab" data-proxy="createAccountBtn" aria-label="New account" data-i18n-attr="aria-label:accessAccounts.static_026">
             <span class="material-symbols-outlined">person_add</span>
         </button>
         <a href="/slideshow" class="tab">
-            <span class="material-symbols-outlined">slideshow</span><span>Slideshow</span>
+            <span class="material-symbols-outlined">slideshow</span><span data-i18n="common.slideshow">Slideshow</span>
         </a>
         <a href="/folder-selection" class="tab">
-            <span class="material-symbols-outlined">folder_special</span><span>Folders</span>
+            <span class="material-symbols-outlined">folder_special</span><span data-i18n="common.folders">Folders</span>
         </a>
     </nav>
     <script>
@@ -195,6 +195,7 @@
             btn.addEventListener('click', () => document.getElementById(btn.dataset.proxy)?.click());
         });
     </script>
+    <script src="/js/i18n.js"></script>
     <script src="access-accounts.js"></script>
 </body>
 

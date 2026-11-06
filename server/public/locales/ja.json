@@ -210,7 +210,8 @@
     "connection": "接続エラーです。もう一度お試しください。",
     "unknown": "問題が発生しました。もう一度お試しください。",
     "FILE_TOO_LARGE": "写真は1枚{size}MBまでです",
-    "UNSUPPORTED_TYPE": "アップロードできるのはJPEG、PNG、GIF、WebP、HEICの写真だけです"
+    "UNSUPPORTED_TYPE": "アップロードできるのはJPEG、PNG、GIF、WebP、HEICの写真だけです",
+    "SCREEN_LIMIT": "このファミリーにはすでに{limit}台の画面があります。追加するには、使わなくなった画面を1台削除してください。"
   },
   "admin": {
     "static_001": "ライブラリ · Sora Frame",

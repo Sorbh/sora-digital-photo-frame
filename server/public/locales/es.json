@@ -210,7 +210,8 @@
     "connection": "Error de conexión. Inténtalo de nuevo.",
     "unknown": "Algo ha fallado. Inténtalo de nuevo.",
     "FILE_TOO_LARGE": "Cada foto puede pesar como máximo {size} MB",
-    "UNSUPPORTED_TYPE": "Solo se pueden subir fotos JPEG, PNG, GIF, WebP y HEIC"
+    "UNSUPPORTED_TYPE": "Solo se pueden subir fotos JPEG, PNG, GIF, WebP y HEIC",
+    "SCREEN_LIMIT": "Esta familia ya tiene {limit} pantallas. Quita una que ya no uses para añadir esta."
   },
   "admin": {
     "static_001": "Biblioteca · Sora Frame",

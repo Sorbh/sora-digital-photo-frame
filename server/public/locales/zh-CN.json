@@ -210,7 +210,8 @@
     "connection": "连接出错，请重试。",
     "unknown": "出了点问题，请重试。",
     "FILE_TOO_LARGE": "每张照片最大 {size}MB",
-    "UNSUPPORTED_TYPE": "只能上传 JPEG、PNG、GIF、WebP 和 HEIC 照片"
+    "UNSUPPORTED_TYPE": "只能上传 JPEG、PNG、GIF、WebP 和 HEIC 照片",
+    "SCREEN_LIMIT": "这个家庭已有 {limit} 块屏幕。请先移除一块不再使用的屏幕，再添加这一块。"
   },
   "admin": {
     "static_001": "照片库 · Sora Frame",

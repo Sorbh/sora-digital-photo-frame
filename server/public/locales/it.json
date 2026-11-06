@@ -211,7 +211,8 @@
     "connection": "Errore di connessione. Riprova.",
     "unknown": "Qualcosa è andato storto. Riprova.",
     "FILE_TOO_LARGE": "Ogni foto può pesare al massimo {size} MB",
-    "UNSUPPORTED_TYPE": "Puoi caricare solo foto JPEG, PNG, GIF, WebP e HEIC"
+    "UNSUPPORTED_TYPE": "Puoi caricare solo foto JPEG, PNG, GIF, WebP e HEIC",
+    "SCREEN_LIMIT": "Questa famiglia ha già {limit} schermi. Rimuovine uno che non usi più per aggiungere questo."
   },
   "admin": {
     "static_001": "Libreria · Sora Frame",

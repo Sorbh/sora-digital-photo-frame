@@ -6,7 +6,7 @@
 function passClientError(res, error) {
   const status = error && error.status;
   if (!Number.isInteger(status) || status < 400 || status > 499 || res.headersSent) return false;
-  res.status(status).json({ message: error.expose === false ? 'Request failed' : error.message, ...(error.code && { code: error.code }) });
+  res.status(status).json({ message: error.expose === false ? 'Request failed' : error.message, ...(error.code && { code: error.code }), ...(error.vars && { ...error.vars }) });
   return true;
 }
 

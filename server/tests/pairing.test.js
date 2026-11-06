@@ -159,4 +159,23 @@ describe('Pairing a frame by QR code', () => {
     const offsite = await admin.get('/login').query({ next: '//evil.example' }).expect(302);
     expect(offsite.headers.location).toBe('/admin');
   });
+
+  test('MAX_SCREENS caps how many frames a library can pair', async () => {
+    const before = (await admin.get('/api/admin/devices').expect(200)).body.devices.length;
+    const devices = before + 1;
+    process.env.MAX_SCREENS = String(devices);
+    try {
+      const first = await start(request.agent(app));
+      await admin.post(`/api/admin/pair/${first.code}/approve`).send({ name: 'Fits', newAccount: {} }).expect(200);
+      const pairing = await start(request.agent(app));
+      const res = await admin.post(`/api/admin/pair/${pairing.code}/approve`).send({ name: 'One too many', newAccount: {} }).expect(403);
+      expect(res.body).toMatchObject({ code: 'SCREEN_LIMIT', limit: devices });
+      expect((await admin.get('/api/admin/devices').expect(200)).body.devices).toHaveLength(devices);
+
+      process.env.MAX_SCREENS = String(devices + 1);
+      await admin.post(`/api/admin/pair/${pairing.code}/approve`).send({ name: 'Fits now', newAccount: {} }).expect(200);
+    } finally {
+      delete process.env.MAX_SCREENS;
+    }
+  });
 });

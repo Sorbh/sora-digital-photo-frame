@@ -209,7 +209,9 @@
     "PAIRING_EXPIRED": "Ce code a expiré",
     "RATE_LIMITED": "Trop de tentatives. Veuillez réessayer plus tard.",
     "connection": "Erreur de connexion. Veuillez réessayer.",
-    "unknown": "Un problème est survenu. Veuillez réessayer."
+    "unknown": "Un problème est survenu. Veuillez réessayer.",
+    "FILE_TOO_LARGE": "Chaque photo peut faire au maximum {size} Mo",
+    "UNSUPPORTED_TYPE": "Seules les photos JPEG, PNG, GIF, WebP et HEIC peuvent être importées"
   },
   "admin": {
     "static_001": "Photothèque · Sora Frame",
@@ -219,7 +221,7 @@
     "static_006": "Aucune image pour l’instant",
     "static_007": "Importez des images pour commencer",
     "static_008": "Cliquez pour choisir des images ou glissez-les ici",
-    "static_009": "Formats JPEG, PNG, GIF, WebP (10 Mo max. chacune)",
+    "static_009": "Formats JPEG, PNG, GIF, WebP, HEIC (25 Mo max. chacune)",
     "static_010": "Fichiers sélectionnés",
     "static_011": "Importation…",
     "static_012": "Choisir des fichiers",
@@ -228,7 +230,7 @@
     "static_015": "Créer un dossier à cet emplacement",
     "static_016": "Importer des images",
     "static_017": "Cliquez pour choisir des images ou glissez-les ici",
-    "static_018": "Formats JPEG, PNG, GIF, WebP (10 Mo max. chacune)",
+    "static_018": "Formats JPEG, PNG, GIF, WebP, HEIC (25 Mo max. chacune)",
     "static_019": "Fichiers sélectionnés",
     "static_020": "Importation…",
     "static_021": "Choisir des fichiers",

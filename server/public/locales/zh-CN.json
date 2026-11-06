@@ -208,7 +208,9 @@
     "PAIRING_EXPIRED": "此代码已过期",
     "RATE_LIMITED": "尝试次数过多，请稍后再试。",
     "connection": "连接出错，请重试。",
-    "unknown": "出了点问题，请重试。"
+    "unknown": "出了点问题，请重试。",
+    "FILE_TOO_LARGE": "每张照片最大 {size}MB",
+    "UNSUPPORTED_TYPE": "只能上传 JPEG、PNG、GIF、WebP 和 HEIC 照片"
   },
   "admin": {
     "static_001": "照片库 · Sora Frame",
@@ -218,7 +220,7 @@
     "static_006": "还没有照片",
     "static_007": "上传一些照片开始使用",
     "static_008": "点击选择照片，或拖放到这里",
-    "static_009": "支持 JPEG、PNG、GIF、WebP（每张最大 10MB）",
+    "static_009": "支持 JPEG、PNG、GIF、WebP、HEIC（每张最大 25MB）",
     "static_010": "已选文件",
     "static_011": "正在上传…",
     "static_012": "选择文件",
@@ -227,7 +229,7 @@
     "static_015": "在当前位置新建文件夹",
     "static_016": "上传照片",
     "static_017": "点击选择照片，或拖放到这里",
-    "static_018": "支持 JPEG、PNG、GIF、WebP（每张最大 10MB）",
+    "static_018": "支持 JPEG、PNG、GIF、WebP、HEIC（每张最大 25MB）",
     "static_019": "已选文件",
     "static_020": "正在上传…",
     "static_021": "选择文件",

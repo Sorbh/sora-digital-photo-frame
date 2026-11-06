@@ -39,7 +39,7 @@
     error(payload, fallback = 'errors.unknown') {
       const code = typeof payload === 'object' && payload ? payload.code : null;
       const message = typeof payload === 'object' && payload ? (payload.message || payload.error) : payload;
-      const translated = code && this.t(`errors.${code}`);
+      const translated = code && this.t(`errors.${code}`, payload);
       return translated && translated !== `errors.${code}` ? translated : (message || this.t(fallback));
     },
     apply(root = document) {

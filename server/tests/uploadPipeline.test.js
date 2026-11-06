@@ -94,4 +94,44 @@ describe('Upload pipeline', () => {
     const info = await photoInfo.get(movedPath, path.relative(testUploadsDir, movedPath));
     expect(info.takenAt).toBe('2019-03-12T18:04:00');
   });
+
+  // libheif's 1x1 conformance sample (LGPL-3.0, github.com/strukturag/libheif tests/data)
+  const heic = fs.readFileSync(path.join(__dirname, 'fixtures', 'tiny.heic'));
+
+  test('HEIC photos from iPhones are stored as WebP', async () => {
+    const res = await agent.post('/api/upload')
+      .field('path', 'uploads/family')
+      .attach('images', heic, { filename: 'IMG_0002.HEIC', contentType: 'image/heic' })
+      .expect(200);
+    const file = res.body.files[0];
+    expect(file.path).toMatch(/\.webp$/);
+    const meta = await sharp(path.join(testUploadsDir, 'family', path.basename(file.path))).metadata();
+    expect(meta.format).toBe('webp');
+  });
+
+  test('HEIC files sent without a type are accepted by name', async () => {
+    await agent.post('/api/upload')
+      .field('path', 'uploads/family')
+      .attach('images', heic, { filename: 'IMG_0003.heic', contentType: 'application/octet-stream' })
+      .expect(200);
+  });
+
+  test('other file types are refused with a code', async () => {
+    const res = await agent.post('/api/upload')
+      .field('path', 'uploads/family')
+      .attach('images', Buffer.from('hello'), { filename: 'notes.txt', contentType: 'text/plain' })
+      .expect(400);
+    expect(res.body.code).toBe('UNSUPPORTED_TYPE');
+  });
+
+  test('photos up to 25 MB are accepted, larger ones get a code and the limit', async () => {
+    const big = await sharp({ create: { width: 3000, height: 3000, channels: 3, background: '#963' } }).png().toBuffer();
+    const padded = Buffer.concat([big, Buffer.alloc(20 * 1024 * 1024)]); // extra bytes after the PNG end are ignored
+    await agent.post('/api/upload').field('path', 'uploads/family').attach('images', padded, 'big.png').expect(200);
+    const res = await agent.post('/api/upload')
+      .field('path', 'uploads/family')
+      .attach('images', Buffer.alloc(26 * 1024 * 1024), 'huge.jpg')
+      .expect(400);
+    expect(res.body).toMatchObject({ code: 'FILE_TOO_LARGE', size: 25 });
+  });
 });

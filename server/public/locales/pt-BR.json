@@ -209,7 +209,9 @@
     "PAIRING_EXPIRED": "Este código expirou",
     "RATE_LIMITED": "Muitas tentativas. Tente de novo mais tarde.",
     "connection": "Erro de conexão. Tente de novo.",
-    "unknown": "Algo deu errado. Tente de novo."
+    "unknown": "Algo deu errado. Tente de novo.",
+    "FILE_TOO_LARGE": "Cada foto pode ter no máximo {size} MB",
+    "UNSUPPORTED_TYPE": "Só é possível enviar fotos JPEG, PNG, GIF, WebP e HEIC"
   },
   "admin": {
     "static_001": "Biblioteca · Sora Frame",
@@ -219,7 +221,7 @@
     "static_006": "Nenhuma foto ainda",
     "static_007": "Envie algumas fotos para começar",
     "static_008": "Clique para escolher fotos ou arraste e solte",
-    "static_009": "Aceita JPEG, PNG, GIF e WebP (até 10 MB cada)",
+    "static_009": "Aceita JPEG, PNG, GIF, WebP e HEIC (até 25 MB cada)",
     "static_010": "Arquivos escolhidos",
     "static_011": "Enviando...",
     "static_012": "Escolher arquivos",
@@ -228,7 +230,7 @@
     "static_015": "Criar uma nova pasta neste local",
     "static_016": "Enviar fotos",
     "static_017": "Clique para escolher fotos ou arraste e solte",
-    "static_018": "Aceita JPEG, PNG, GIF e WebP (até 10 MB cada)",
+    "static_018": "Aceita JPEG, PNG, GIF, WebP e HEIC (até 25 MB cada)",
     "static_019": "Arquivos escolhidos",
     "static_020": "Enviando...",
     "static_021": "Escolher arquivos",

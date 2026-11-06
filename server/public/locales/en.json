@@ -208,7 +208,9 @@
     "PAIRING_EXPIRED": "This code has expired",
     "RATE_LIMITED": "Too many attempts. Please try again later.",
     "connection": "Connection error. Please try again.",
-    "unknown": "Something went wrong. Please try again."
+    "unknown": "Something went wrong. Please try again.",
+    "FILE_TOO_LARGE": "Each photo can be up to {size} MB",
+    "UNSUPPORTED_TYPE": "Only JPEG, PNG, GIF, WebP and HEIC photos can be uploaded"
   },
   "admin": {
     "static_001": "Library · Sora Frame",
@@ -218,7 +220,7 @@
     "static_006": "No images yet",
     "static_007": "Upload some images to get started",
     "static_008": "Click to select images or drag and drop",
-    "static_009": "Supports JPEG, PNG, GIF, WebP (max 10MB each)",
+    "static_009": "Supports JPEG, PNG, GIF, WebP, HEIC (max 25MB each)",
     "static_010": "Selected Files",
     "static_011": "Uploading...",
     "static_012": "Select Files",
@@ -227,7 +229,7 @@
     "static_015": "Create a new folder in the current location",
     "static_016": "Upload Images",
     "static_017": "Click to select images or drag and drop",
-    "static_018": "Supports JPEG, PNG, GIF, WebP (max 10MB each)",
+    "static_018": "Supports JPEG, PNG, GIF, WebP, HEIC (max 25MB each)",
     "static_019": "Selected Files",
     "static_020": "Uploading...",
     "static_021": "Select Files",

@@ -208,7 +208,9 @@
     "PAIRING_EXPIRED": "このコードは期限切れです",
     "RATE_LIMITED": "試行回数が多すぎます。しばらくしてからもう一度お試しください。",
     "connection": "接続エラーです。もう一度お試しください。",
-    "unknown": "問題が発生しました。もう一度お試しください。"
+    "unknown": "問題が発生しました。もう一度お試しください。",
+    "FILE_TOO_LARGE": "写真は1枚{size}MBまでです",
+    "UNSUPPORTED_TYPE": "アップロードできるのはJPEG、PNG、GIF、WebP、HEICの写真だけです"
   },
   "admin": {
     "static_001": "ライブラリ · Sora Frame",
@@ -218,7 +220,7 @@
     "static_006": "まだ写真がありません",
     "static_007": "写真をアップロードして始めましょう",
     "static_008": "クリックして写真を選ぶか、ドラッグ＆ドロップしてください",
-    "static_009": "JPEG、PNG、GIF、WebPに対応（1枚10MBまで）",
+    "static_009": "JPEG、PNG、GIF、WebP、HEICに対応（1枚25MBまで）",
     "static_010": "選択したファイル",
     "static_011": "アップロード中…",
     "static_012": "ファイルを選択",
@@ -227,7 +229,7 @@
     "static_015": "現在の場所に新しいフォルダを作成します",
     "static_016": "写真をアップロード",
     "static_017": "クリックして写真を選ぶか、ドラッグ＆ドロップしてください",
-    "static_018": "JPEG、PNG、GIF、WebPに対応（1枚10MBまで）",
+    "static_018": "JPEG、PNG、GIF、WebP、HEICに対応（1枚25MBまで）",
     "static_019": "選択したファイル",
     "static_020": "アップロード中…",
     "static_021": "ファイルを選択",

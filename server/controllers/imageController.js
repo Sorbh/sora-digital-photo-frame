@@ -5,6 +5,7 @@ const { currentTenant } = require('../context');
 const { assertCanAdd } = require('../services/quotaService');
 const sharp = require('sharp');
 const thumbnails = require('../services/thumbnailService');
+const { sharpInput } = require('../utils/heic');
 const snaps = require('../services/snapService');
 const playOrder = require('../services/playOrderService');
 const photoInfo = require('../services/photoInfoService');
@@ -275,7 +276,7 @@ class ImageController {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
         const filename = `${file.fieldname}-${uniqueSuffix}.webp`;
         // A display copy sized for frames: upright, WebP, no metadata (GPS stays private)
-        const buffer = await sharp(file.buffer, { animated: file.mimetype === 'image/gif' })
+        const buffer = await sharp(...await sharpInput(file.buffer, { animated: file.mimetype === 'image/gif' }))
           .rotate()
           .resize(
             parseInt(process.env.MAX_RESOLUTION_WIDTH) || 2560,

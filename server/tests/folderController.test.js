@@ -15,8 +15,11 @@ const app = require('../server');
 
 describe('Folder Controller API', () => {
   let server;
-  
+  // Photos and folders are for signed-in viewers only (issue #30)
+  const viewer = request.agent(app);
+
   beforeAll(async () => {
+    await viewer.post('/api/auth/login').send({ password: 'test-admin-pass' }).expect(200);
     // Create test folder structure
     await fs.ensureDir(path.join(testUploadsDir, 'vacation'));
     await fs.ensureDir(path.join(testUploadsDir, 'vacation/2023'));
@@ -44,7 +47,7 @@ describe('Folder Controller API', () => {
 
   describe('GET /api/folders', () => {
     test('should return folder structure', async () => {
-      const response = await request(app)
+      const response = await viewer
         .get('/api/folders')
         .expect(200);
       
@@ -62,7 +65,7 @@ describe('Folder Controller API', () => {
 
   describe('GET /api/folders/:folderPath', () => {
     test('should return specific folder contents', async () => {
-      const response = await request(app)
+      const response = await viewer
         .get('/api/folders/vacation')
         .expect(200);
       
@@ -76,7 +79,7 @@ describe('Folder Controller API', () => {
     });
     
     test('should return 404 for non-existent folder', async () => {
-      const response = await request(app)
+      const response = await viewer
         .get('/api/folders/nonexistent')
         .expect(404);
       
@@ -87,7 +90,7 @@ describe('Folder Controller API', () => {
 
   describe('GET /api/images/random', () => {
     test('should return random image without folder filter', async () => {
-      const response = await request(app)
+      const response = await viewer
         .get('/api/images/random')
         .expect(200);
       
@@ -100,7 +103,7 @@ describe('Folder Controller API', () => {
     });
     
     test('should return random image with folder filter', async () => {
-      const response = await request(app)
+      const response = await viewer
         .get('/api/images/random?folder=vacation')
         .expect(200);
       
@@ -109,7 +112,7 @@ describe('Folder Controller API', () => {
     });
     
     test('should return 404 for empty folder', async () => {
-      const response = await request(app)
+      const response = await viewer
         .get('/api/images/random?folder=nonexistent')
         .expect(404);
       
@@ -120,7 +123,7 @@ describe('Folder Controller API', () => {
 
   describe('GET /api/folders/:folderPath/thumbnail', () => {
     test('should return folder thumbnail', async () => {
-      const response = await request(app)
+      const response = await viewer
         .get('/api/folders/vacation/thumbnail')
         .expect(200);
       
@@ -133,7 +136,7 @@ describe('Folder Controller API', () => {
       const emptyFolderPath = path.join(testUploadsDir, 'empty');
       await fs.ensureDir(emptyFolderPath);
       
-      const response = await request(app)
+      const response = await viewer
         .get('/api/folders/empty/thumbnail')
         .expect(404);
       
@@ -147,7 +150,7 @@ describe('Folder Controller API', () => {
 
   describe('GET /api/images/:imageId/thumbnail', () => {
     test('should return image thumbnail', async () => {
-      const response = await request(app)
+      const response = await viewer
         .get('/api/images/vacation%2Fbeach.jpg/thumbnail')
         .expect(200);
       
@@ -156,7 +159,7 @@ describe('Folder Controller API', () => {
     });
     
     test('should return 404 for non-existent image', async () => {
-      const response = await request(app)
+      const response = await viewer
         .get('/api/images/nonexistent.jpg/thumbnail')
         .expect(404);
       

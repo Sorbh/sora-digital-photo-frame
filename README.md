@@ -111,6 +111,7 @@ Settings live in `server/.env` (created on first `npm install`).
 | `MAX_FILE_SIZE` | `26214400` | Upload limit per photo, in bytes (25 MB). Only the resized copy is stored |
 | `MAX_SCREENS` | `0` | Most screens one library can have, paired by QR code or signed in with a PIN. `0` means no limit |
 | `ENABLE_GOOGLE_PHOTOS` | `false` | Turn on Google Photos import |
+| `PUBLIC_PHOTOS` | `false` | `true` lets anyone who can reach the server see photos, thumbnails, folders and notes without signing in, as before 2026-11. Only for setups that load photos outside the slideshow, such as a home dashboard |
 
 Supported formats: JPEG, PNG, WebP, GIF and HEIC (iPhone photos).
 

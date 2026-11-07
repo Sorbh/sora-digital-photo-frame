@@ -150,11 +150,21 @@ const requireAuth = (req, res, next) => (provider.requireAuth || sessionRequireA
 const requireGuest = (req, res, next) => (provider.requireGuest || sessionRequireGuest)(req, res, next);
 const requireViewer = (req, res, next) => (provider.requireViewer || sessionRequireViewer)(req, res, next);
 
+// Photos, thumbnails, folders and notes are for viewers only: the admin, a PIN
+// account or a paired frame. PUBLIC_PHOTOS=true (or createApp({ publicPhotos }))
+// keeps the old open behaviour for setups that load photos without signing in,
+// e.g. a home dashboard that shows /api/images/random.
+let publicPhotos = false;
+const setPublicPhotos = (value) => { publicPhotos = value === true; };
+const requirePhotoViewer = (req, res, next) => (publicPhotos ? next() : requireViewer(req, res, next));
+
 module.exports = {
   requireAuth,
   requireGuest,
   requireViewer,
+  requirePhotoViewer,
   setAuthProvider,
+  setPublicPhotos,
   login,
   logout,
   getAuthStatus

@@ -107,19 +107,19 @@ describe('Encrypted storage in the app', () => {
   });
 
   test('/uploads serves the decrypted photo', async () => {
-    const res = await request(app).get('/' + stored).set('Accept', 'image/webp').buffer(true).expect(200);
+    const res = await agent.get('/' + stored).set('Accept', 'image/webp').buffer(true).expect(200);
     expect(res.headers['content-type']).toBe('image/webp');
     expect((await sharp(res.body).metadata()).width).toBe(300);
   });
 
   test('old browsers get a decrypted JPEG', async () => {
-    const res = await request(app).get('/' + stored).set('Accept', 'image/*').buffer(true).expect(200);
+    const res = await agent.get('/' + stored).set('Accept', 'image/*').buffer(true).expect(200);
     expect(res.headers['content-type']).toMatch(/^image\/jpeg/);
     expect((await sharp(res.body).metadata()).format).toBe('jpeg');
   });
 
   test('photos from before encryption still show', async () => {
-    const res = await request(app).get('/uploads/family/old.jpg').buffer(true).expect(200);
+    const res = await agent.get('/uploads/family/old.jpg').buffer(true).expect(200);
     expect((await sharp(res.body).metadata()).format).toBe('jpeg');
   });
 
@@ -130,7 +130,8 @@ describe('Encrypted storage in the app', () => {
   });
 
   test('paths outside uploads are refused', async () => {
-    await request(app).get('/uploads/..%2f..%2fserver.js').expect(404);
+    await agent.get('/uploads/..%2f..%2fserver.js').expect(404);
+    await request(app).get('/uploads/..%2f..%2fserver.js').expect(401);
   });
 
   test('notes are stored encrypted and read back', async () => {

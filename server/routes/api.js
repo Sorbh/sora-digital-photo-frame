@@ -9,7 +9,7 @@ const snapController = require('../controllers/snapController');
 const pairingController = require('../controllers/pairingController');
 const frameKeyController = require('../controllers/frameKeyController');
 const upload = require('../middleware/upload');
-const { requireAuth, requireViewer } = require('../middleware/auth');
+const { requireAuth, requireViewer, requirePhotoViewer } = require('../middleware/auth');
 const { keepTenant } = require('../context');
 
 // Health check endpoint
@@ -18,16 +18,16 @@ router.get('/health', (req, res) => {
 });
 
 // Public routes (no authentication required)
-router.get('/random-image', imageController.getRandomImage.bind(imageController));
-router.get('/images/random', imageController.getRandomImage.bind(imageController)); // New endpoint for consistency
-router.get('/images/next', imageController.getRandomImage.bind(imageController)); // follows the folder's play order
-router.get('/images/:imageId/thumbnail', imageController.getImageThumbnail.bind(imageController));
+router.get('/random-image', requirePhotoViewer, imageController.getRandomImage.bind(imageController));
+router.get('/images/random', requirePhotoViewer, imageController.getRandomImage.bind(imageController)); // New endpoint for consistency
+router.get('/images/next', requirePhotoViewer, imageController.getRandomImage.bind(imageController)); // follows the folder's play order
+router.get('/images/:imageId/thumbnail', requirePhotoViewer, imageController.getImageThumbnail.bind(imageController));
 
 // Public folder routes for slideshow
-router.get('/folders', folderController.getFolderStructure.bind(folderController));
+router.get('/folders', requirePhotoViewer, folderController.getFolderStructure.bind(folderController));
 // Thumbnail route must come first: the (*) catch-all below would swallow it
-router.get('/folders/:folderPath(*)/thumbnail', folderController.getFolderThumbnail.bind(folderController));
-router.get('/folders/:folderPath(*)', folderController.getFolderStructure.bind(folderController));
+router.get('/folders/:folderPath(*)/thumbnail', requirePhotoViewer, folderController.getFolderThumbnail.bind(folderController));
+router.get('/folders/:folderPath(*)', requirePhotoViewer, folderController.getFolderStructure.bind(folderController));
 
 // Protected routes (authentication required)
 router.post('/upload', requireAuth, upload.array('images'), keepTenant, imageController.uploadImages.bind(imageController));
@@ -53,7 +53,7 @@ router.post('/admin/family-code', requireAuth, accessAccountController.renewFami
 // Notes shown in the slideshow (admin manages, frames read their active ones)
 router.get('/notes', requireAuth, noteController.list.bind(noteController));
 router.post('/notes', requireAuth, noteController.create.bind(noteController));
-router.get('/notes/active', noteController.active.bind(noteController));
+router.get('/notes/active', requirePhotoViewer, noteController.active.bind(noteController));
 router.put('/notes/:id', requireAuth, noteController.update.bind(noteController));
 router.delete('/notes/:id', requireAuth, noteController.remove.bind(noteController));
 

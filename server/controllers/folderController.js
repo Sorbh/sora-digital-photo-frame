@@ -7,6 +7,7 @@ const playOrder = require('../services/playOrderService');
 const imageController = require('./imageController');
 const { resolveAdminPath, toAdminPath } = require('../utils/safePath');
 const { passClientError } = require('../utils/httpError');
+const { canSee, canOpen, foldersBelow } = require('../utils/viewerAccess');
 
 class FolderController {
   constructor() {
@@ -79,13 +80,37 @@ class FolderController {
     }
   }
   
+  // A folder's photo count and cover, as this viewer may see them. A folder that
+  // is only on the way to the viewer's assigned folders counts and shows only
+  // what is inside those.
+  async visibleSummary(req, relativePath, fullPath) {
+    if (canSee(req, relativePath)) {
+      const [imageCount, thumbnail] = await Promise.all([
+        this.countImagesInFolder(fullPath),
+        this.generateFolderThumbnail(relativePath)
+      ]);
+      return { imageCount, thumbnail };
+    }
+    const below = foldersBelow(req, relativePath)
+      .map(folder => ({ folder, full: thumbnails.resolveInUploads(folder) }))
+      .filter(({ full }) => full);
+    const counts = await Promise.all(below.map(({ full }) => this.countImagesInFolder(full)));
+    let thumbnail = null;
+    for (const { folder } of below) {
+      thumbnail = await this.generateFolderThumbnail(folder);
+      if (thumbnail) break;
+    }
+    return { imageCount: counts.reduce((sum, n) => sum + n, 0), thumbnail };
+  }
+
   // Get folder structure for slideshow selection
   async getFolderStructure(req, res) {
     try {
       const folderPath = req.params.folderPath || '';
       const fullPath = thumbnails.resolveInUploads(folderPath);
 
-      if (!fullPath || !await getLibrary().exists(toAdminPath(fullPath))) {
+      // Folders a frame can't open look like they don't exist
+      if (!fullPath || !canOpen(req, path.relative(this.uploadsDir, fullPath)) || !await getLibrary().exists(toAdminPath(fullPath))) {
         return res.status(404).json({ 
           success: false,
           error: `Folder not found: ${folderPath}`,
@@ -134,10 +159,9 @@ class FolderController {
           }
 
           folderJobs.push((async () => {
-            const [subItems, imageCount, thumbnail] = await Promise.all([
+            const [subItems, { imageCount, thumbnail }] = await Promise.all([
               this.entries(itemPath),
-              this.countImagesInFolder(itemPath),
-              this.generateFolderThumbnail(relativePath)
+              this.visibleSummary(req, relativePath, itemPath)
             ]);
 
             return {
@@ -194,8 +218,7 @@ class FolderController {
       
       if (folderPath) {
         // Specific folder request
-        const imageCount = await this.countImagesInFolder(fullPath);
-        const thumbnail = await this.generateFolderThumbnail(folderPath);
+        const { imageCount, thumbnail } = await this.visibleSummary(req, folderPath, fullPath);
         const parentPath = path.dirname(folderPath);
         
         response.folder = {
@@ -229,6 +252,14 @@ class FolderController {
   async getFolderThumbnail(req, res) {
     try {
       const fullPath = thumbnails.resolveInUploads(req.params.folderPath);
+      // Only a cover from inside the frame's own folders
+      if (fullPath && !canSee(req, path.relative(this.uploadsDir, fullPath))) {
+        return res.status(404).json({
+          success: false,
+          error: 'No thumbnail available for folder',
+          code: 'THUMBNAIL_NOT_FOUND'
+        });
+      }
       if (!fullPath) {
         return res.status(400).json({
           success: false,

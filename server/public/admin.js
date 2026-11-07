@@ -19,9 +19,8 @@ function showToast(message, type = 'info') {
 window.showToast = showToast;
 
 function escapeHtml(value) {
-    const div = document.createElement('div');
-    div.textContent = String(value);
-    return div.innerHTML;
+    // Quotes too, so the result is also safe inside an attribute (data-folder="...")
+    return String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 }
 
 // Drag payload for photos moved inside the library (a JSON list of admin paths)

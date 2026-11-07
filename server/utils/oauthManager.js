@@ -132,7 +132,18 @@ class OAuthManager {
   }
 
   // OAuth flow methods
-  getAuthUrl(redirectUri) {
+  // A client of its own per sign-in, so two admins signing in at once never
+  // share credentials
+  newClient() {
+    return new google.auth.OAuth2(
+      process.env.GOOGLE_CLIENT_ID,
+      process.env.GOOGLE_CLIENT_SECRET,
+      process.env.GOOGLE_REDIRECT_URI
+    );
+  }
+
+  // state: a random value the callback has to bring back (see the controller)
+  getAuthUrl(redirectUri, state) {
     console.log('🔧 [DEBUG] getAuthUrl called with redirectUri:', redirectUri);
     
     const scopes = [
@@ -147,7 +158,8 @@ class OAuthManager {
       const authUrl = this.oauth2Client.generateAuthUrl({
         access_type: 'offline',
         scope: scopes,
-        include_granted_scopes: true
+        include_granted_scopes: true,
+        state
       });
       console.log('🔧 [DEBUG] Generated auth URL:', authUrl);
       return authUrl;
@@ -170,20 +182,18 @@ class OAuthManager {
       
       // Fetch user profile information
       try {
-        this.oauth2Client.setCredentials(tokens);
-        const oauth2 = google.oauth2({ version: 'v2', auth: this.oauth2Client });
+        const client = this.newClient();
+        client.setCredentials(tokens);
+        const oauth2 = google.oauth2({ version: 'v2', auth: client });
         const userInfo = await oauth2.userinfo.get();
-        console.log('🔧 [DEBUG] User profile fetched:', userInfo.data);
+        console.log('🔧 [DEBUG] User profile fetched');
         
         // Add user info to tokens
         tokens.userEmail = userInfo.data.email;
         tokens.userName = userInfo.data.name;
         tokens.userPicture = userInfo.data.picture;
         
-        console.log('🔧 [DEBUG] Enhanced tokens with user info:', {
-          email: tokens.userEmail,
-          name: tokens.userName
-        });
+        console.log('🔧 [DEBUG] Enhanced tokens with user info');
       } catch (profileError) {
         console.error('❌ [DEBUG] Failed to fetch user profile:', profileError.message);
         // Continue without user info

@@ -21,6 +21,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Changes (POST, PUT, PATCH, DELETE) are refused unless they come from the frame's own pages, so another site on the same network, such as a router page, can't send a form as the signed-in admin.
 - Google Photos: thumbnails and imports are only fetched from Google's photo addresses, so the admin's Google token can't be sent elsewhere; the thumbnail route only sends images. Imported photos are stored like uploads (WebP, a name of our own, no metadata), so a file named `x.html` can't end up on the site.
 - Dependencies: express 4.22, sharp 0.35 (libvips fixes), multer 2. The Docker image runs Node 22 (sharp needs 20+).
+- A PIN account or frame with assigned folders gets only those folders by every route: `/uploads/…`, photo and folder thumbnails, and folder listings. Before, it could open any photo by its address, and see covers and counts of other folders. A folder above its own shows only what leads there.
+- Removing a screen or a PIN account signs that frame out within 30 seconds, and changing an account's folders reaches frames already signed in. Before, both waited for the 24-hour session to end.
+- Google Photos sign-in checks a one-time `state`, so nobody can attach their own Google account to the admin's session, and each sign-in uses its own Google client. The Google profile is no longer written to the log.
+- The access-accounts page escapes quotes, so a folder name can't add HTML attributes.
 
 ### Changed
 - Uploads can be up to 25 MB each (was 10 MB), so 48 MP phone photos fit. Only the resized copy is stored.

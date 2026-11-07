@@ -35,14 +35,16 @@ const accessAccounts = require('./controllers/accessAccountController');
  *   auth          { requireAuth, requireGuest, requireViewer } middleware, all optional
  *                 (default: admin password session)
  *   quota         { canAdd(bytes) -> { ok, message } } for the current tenant (default: unlimited)
- *   events        { devicePaired, devicesRemoved } handlers (see events.js)
- *   pinSignIn     false turns off PIN sign-in for frames (hosted: frames pair by QR instead)
+ *   events        { devicePaired, devicesRemoved, familyCodeSet } handlers (see events.js)
+ *   pinSignIn     false turns off PIN sign-in for frames
+ *   familyCode    true: a frame signing in with a PIN also gives its family code, so a
+ *                 hosted resolveTenant can tell whose frame it is (see familyCodeService)
  *   keys          key provider ({ currentKey, getKey }, see crypto/keys.js) to encrypt photos
  *                 and data at rest (default: PHOTO_ENCRYPTION_KEY, or no encryption)
  *   beforeRoutes  function(app) run after core middleware, before core routes,
  *                 e.g. to mount extra sign-in routes
  */
-function createApp({ sessionStore, beforeRoutes, library, dataStore, resolveTenant, auth, quota, events, pinSignIn = true, keys = keysFromEnv() } = {}) {
+function createApp({ sessionStore, beforeRoutes, library, dataStore, resolveTenant, auth, quota, events, pinSignIn = true, familyCode = false, keys = keysFromEnv() } = {}) {
   const sessionSecret = process.env.SESSION_SECRET;
   if (!sessionSecret) {
     throw new Error('SESSION_SECRET environment variable not set');
@@ -61,6 +63,7 @@ function createApp({ sessionStore, beforeRoutes, library, dataStore, resolveTena
   setQuota(quota);
   setEvents(events);
   accessAccounts.pinSignIn = pinSignIn !== false;
+  accessAccounts.familyCode = familyCode === true;
 
   // Trust proxy if running behind reverse proxy
   app.set('trust proxy', 1);

@@ -11,10 +11,11 @@ These options are a public contract. Treat a change to a name, an argument or a 
 | `resolveTenant` | `async (req) => ({ id, plan })` or `null` | One `default` tenant | `server/context.js` |
 | `auth` | `{ requireAuth, requireGuest, requireViewer }` middleware, all optional | Admin password session | `server/middleware/auth.js` |
 | `quota` | `{ canAdd(bytes) => ({ ok, message }) }` for the current tenant | Unlimited | `server/services/quotaService.js` |
-| `events` | `{ devicePaired, devicesRemoved }`, may be async; if one throws, the action fails | None | `server/events.js` |
+| `events` | `{ devicePaired, devicesRemoved, familyCodeSet }`, may be async; if one throws, the action fails | None | `server/events.js` |
 | `keys` | `{ currentKey(), getKey(id) }`, may return promises | `PHOTO_ENCRYPTION_KEY`, or no encryption | `server/crypto/keys.js` |
 | `sessionStore` | `express-session` store | In memory | `server/app.js` |
 | `pinSignIn` | `false` turns off PIN sign-in for frames | On | `server/app.js` |
+| `familyCode` | `true`: a PIN sign-in also sends the family's code (shown on the Access page), so `resolveTenant` can find the family from it. `familyCodeSet({ code, previous, tenantId })` keeps the host's index | Off | `server/services/familyCodeService.js` |
 | `beforeRoutes` | `(app) => {}`, runs after core middleware and before core routes | None | `server/app.js` |
 
 ## Adding a hook

@@ -72,7 +72,11 @@
     "noImagesInAllFolders": "Aucune image dans le dossier : Tous les dossiers",
     "loadFirstImageFailed": "Impossible de charger la première image",
     "noImages": "Aucune image disponible",
-    "loadFoldersFailed": "Impossible de charger les dossiers"
+    "loadFoldersFailed": "Impossible de charger les dossiers",
+    "enter_code_pin": "Saisissez votre code famille et votre code PIN, ou scannez le code pour configurer ce cadre.",
+    "familyCodeLabel": "Code famille",
+    "familyCodeRequired": "Saisissez le code famille de 8 caractères affiché sur la page Accès.",
+    "familyOrPinWrong": "Ce code famille et ce PIN ne correspondent pas. Vérifiez les deux et réessayez."
   },
   "accessAccounts": {
     "frames_pins": "Cadres et codes PIN",
@@ -147,7 +151,15 @@
     "nameTooLong": "Le nom du compte ne doit pas dépasser 50 caractères",
     "pinRequired": "Le code PIN est obligatoire",
     "pinInvalid": "Le code PIN doit comporter 4 à 6 chiffres",
-    "saveAccount": "Enregistrer le compte"
+    "saveAccount": "Enregistrer le compte",
+    "familyCodeTitle": "Code famille",
+    "familyCodeHelp": "Pour connecter un cadre avec un PIN, saisissez ce code et le PIN du cadre sur son écran de connexion. Chaque cadre connecté compte comme l'un de vos écrans.",
+    "familyCodeRenew": "Nouveau code",
+    "familyCodeRenewConfirm": "Créer un nouveau code famille ? Les cadres déjà connectés continuent de fonctionner. Les nouvelles connexions demanderont le nouveau code.",
+    "familyCodeRenewed": "Nouveau code famille prêt",
+    "familyCodeRenewFailed": "Impossible de créer un nouveau code. Veuillez réessayer.",
+    "viaPin": "Connecté avec un PIN",
+    "viaQr": "Associé par code QR"
   },
   "pair": {
     "all_folders": "Tous les dossiers",

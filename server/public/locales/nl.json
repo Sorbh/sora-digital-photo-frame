@@ -72,7 +72,11 @@
     "noImagesInAllFolders": "Geen foto's gevonden in map: Alle mappen",
     "loadFirstImageFailed": "De eerste foto kon niet worden geladen",
     "noImages": "Geen foto's beschikbaar",
-    "loadFoldersFailed": "De mappen konden niet worden geladen"
+    "loadFoldersFailed": "De mappen konden niet worden geladen",
+    "enter_code_pin": "Voer je familiecode en pincode in, of scan de code om deze fotolijst in te stellen.",
+    "familyCodeLabel": "Familiecode",
+    "familyCodeRequired": "Voer de familiecode van 8 tekens in die op de pagina Toegang staat.",
+    "familyOrPinWrong": "Die familiecode en pincode horen niet bij elkaar. Controleer ze allebei en probeer het opnieuw."
   },
   "accessAccounts": {
     "frames_pins": "Fotolijsten en pincodes",
@@ -146,7 +150,15 @@
     "nameTooLong": "De accountnaam mag maximaal 50 tekens hebben",
     "pinRequired": "Een pincode is verplicht",
     "pinInvalid": "De pincode moet 4 tot 6 cijfers hebben",
-    "saveAccount": "Account opslaan"
+    "saveAccount": "Account opslaan",
+    "familyCodeTitle": "Familiecode",
+    "familyCodeHelp": "Om een fotolijst met een pincode aan te melden, voer je deze code en de pincode van de lijst in op het aanmeldscherm. Elke aangemelde lijst telt als een van je schermen.",
+    "familyCodeRenew": "Nieuwe code",
+    "familyCodeRenewConfirm": "Een nieuwe familiecode maken? Lijsten die al zijn aangemeld blijven werken. Nieuwe aanmeldingen hebben de nieuwe code nodig.",
+    "familyCodeRenewed": "Nieuwe familiecode klaar",
+    "familyCodeRenewFailed": "Kon geen nieuwe code maken. Probeer het opnieuw.",
+    "viaPin": "Aangemeld met pincode",
+    "viaQr": "Gekoppeld met QR-code"
   },
   "pair": {
     "all_folders": "Alle mappen",

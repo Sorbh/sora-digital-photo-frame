@@ -72,7 +72,11 @@
     "noImagesInAllFolders": "Keine Bilder im Ordner: Alle Ordner",
     "loadFirstImageFailed": "Das erste Bild konnte nicht geladen werden",
     "noImages": "Keine Bilder vorhanden",
-    "loadFoldersFailed": "Die Ordner konnten nicht geladen werden"
+    "loadFoldersFailed": "Die Ordner konnten nicht geladen werden",
+    "enter_code_pin": "Geben Sie Ihren Familiencode und Ihre PIN ein oder scannen Sie den Code, um diesen Rahmen einzurichten.",
+    "familyCodeLabel": "Familiencode",
+    "familyCodeRequired": "Geben Sie den 8-stelligen Familiencode von der Seite „Zugang“ ein.",
+    "familyOrPinWrong": "Familiencode und PIN passen nicht zusammen. Prüfen Sie beides und versuchen Sie es erneut."
   },
   "accessAccounts": {
     "frames_pins": "Rahmen & PINs",
@@ -146,7 +150,15 @@
     "nameTooLong": "Der Kontoname darf höchstens 50 Zeichen lang sein",
     "pinRequired": "Bitte geben Sie eine PIN ein",
     "pinInvalid": "Die PIN muss 4 bis 6 Ziffern haben",
-    "saveAccount": "Konto speichern"
+    "saveAccount": "Konto speichern",
+    "familyCodeTitle": "Familiencode",
+    "familyCodeHelp": "Um einen Rahmen mit einer PIN anzumelden, geben Sie diesen Code und die PIN des Rahmens auf seinem Anmeldebildschirm ein. Jeder angemeldete Rahmen zählt als einer Ihrer Bildschirme.",
+    "familyCodeRenew": "Neuer Code",
+    "familyCodeRenewConfirm": "Neuen Familiencode erstellen? Bereits angemeldete Rahmen funktionieren weiter. Neue Anmeldungen brauchen den neuen Code.",
+    "familyCodeRenewed": "Neuer Familiencode ist bereit",
+    "familyCodeRenewFailed": "Neuer Code konnte nicht erstellt werden. Bitte versuchen Sie es erneut.",
+    "viaPin": "Mit PIN angemeldet",
+    "viaQr": "Per QR-Code gekoppelt"
   },
   "pair": {
     "all_folders": "Alle Ordner",

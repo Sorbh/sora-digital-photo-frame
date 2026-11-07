@@ -757,6 +757,43 @@ body.note-showing .photo-caption {
     position: relative;
 }
 
+/* Hosted: the family code goes above the PIN */
+.family-field {
+    display: grid;
+    justify-items: center;
+    gap: 6px;
+    font-size: 0.8125rem;
+    color: rgba(255, 255, 255, 0.82);
+}
+
+.family-field.hidden {
+    display: none;
+}
+
+#familyCodeInput {
+    width: 15ch;
+    padding: 10px 12px;
+    border: 1.5px solid rgba(255, 255, 255, 0.35);
+    border-radius: var(--shape-sm);
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff4ef;
+    font-family: var(--font-mono);
+    font-size: 1.15rem;
+    letter-spacing: 0.14em;
+    text-align: center;
+    text-transform: uppercase;
+}
+
+#familyCodeInput::placeholder {
+    color: rgba(255, 255, 255, 0.4);
+}
+
+#familyCodeInput:focus {
+    outline: none;
+    border-color: #fff;
+    box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.18);
+}
+
 #pinInput {
     position: absolute;
     inset: 0;

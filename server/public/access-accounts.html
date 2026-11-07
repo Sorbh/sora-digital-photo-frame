@@ -59,7 +59,7 @@
                     <button id="backBtn" class="back-btn" title="Back to library" aria-label="Back to library" data-i18n-attr="title:accessAccounts.static_020; aria-label:accessAccounts.static_021">
                         <span class="material-symbols-outlined">arrow_back</span>
                     </button>
-                    <p class="sora-eyebrow" style="margin: 0;" data-i18n="accessAccounts.static_002">Frames &amp; PINs</p>
+                    <p class="sora-eyebrow" style="margin: 0;" data-i18n-html="accessAccounts.static_002">Frames &amp; PINs</p>
                 </div>
                 <h1 class="page-title sora-display no-transform" data-i18n-html="accessAccounts.who_visit">Who can <em>visit</em></h1>
                 <p id="accountsMeta" class="page-meta sora-mono"><span class="material-symbols-outlined" style="font-size:16px;font-variation-settings:'FILL' 1">favorite</span><span id="accountsMetaText" data-i18n="accessAccounts.static_003">Loading accounts</span></p>
@@ -77,6 +77,19 @@
                 <span class="material-symbols-outlined">hourglass_empty</span>
                 <p data-i18n="accessAccounts.static_004">Loading accounts</p>
             </div>
+
+            <!-- Hosted: the code a frame types with its PIN -->
+            <section id="familyCodeCard" class="family-code-card hidden" aria-labelledby="familyCodeTitle">
+                <div class="family-code-text">
+                    <p class="sora-eyebrow" id="familyCodeTitle" data-i18n="accessAccounts.familyCodeTitle">Family code</p>
+                    <p class="family-code sora-mono" id="familyCodeValue">····-····</p>
+                    <p class="family-code-help" data-i18n="accessAccounts.familyCodeHelp">To sign in a frame with a PIN, type this code and the frame's PIN on its sign-in screen. Each frame that signs in counts as one of your screens.</p>
+                </div>
+                <button id="renewFamilyCodeBtn" class="btn-outline" type="button">
+                    <span class="material-symbols-outlined">autorenew</span>
+                    <span data-i18n="accessAccounts.familyCodeRenew">New code</span>
+                </button>
+            </section>
 
             <div id="accountsList" class="accounts-grid hidden">
                 <!-- Accounts will be populated here -->

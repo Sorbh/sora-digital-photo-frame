@@ -370,3 +370,45 @@ body {
     #accountModal > article { max-height: calc(100dvh - 2rem); }
 }
 .toast-error .material-icons { color: #f6a189; }
+
+/* ---------- Family code (hosted) -------------------------------- */
+
+.family-code-card {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px 24px;
+    margin-bottom: clamp(1rem, 2vw, 1.5rem);
+    padding: 20px 22px;
+    border: 1px solid var(--rule);
+    border-radius: var(--shape-md);
+    background: var(--paper-raised);
+    box-shadow: var(--shadow-soft);
+}
+
+.family-code-card.hidden {
+    display: none;
+}
+
+.family-code-text {
+    display: grid;
+    gap: 6px;
+    max-width: 60ch;
+}
+
+.family-code-text p {
+    margin: 0;
+}
+
+.family-code {
+    font-size: 1.6rem;
+    font-weight: 500;
+    letter-spacing: 0.18em;
+    color: var(--ink);
+}
+
+.family-code-help {
+    font-size: 0.9rem;
+    color: var(--ink-soft, var(--muted-foreground));
+}

@@ -72,7 +72,11 @@
     "noImagesInAllFolders": "すべてのフォルダに写真がありません",
     "loadFirstImageFailed": "最初の写真を読み込めませんでした",
     "noImages": "表示できる写真がありません",
-    "loadFoldersFailed": "フォルダを読み込めませんでした"
+    "loadFoldersFailed": "フォルダを読み込めませんでした",
+    "enter_code_pin": "ファミリーコードとPINを入力するか、コードを読み取ってこのフレームを設定してください。",
+    "familyCodeLabel": "ファミリーコード",
+    "familyCodeRequired": "アクセスページにある8文字のファミリーコードを入力してください。",
+    "familyOrPinWrong": "ファミリーコードとPINが一致しません。両方を確認して、もう一度お試しください。"
   },
   "accessAccounts": {
     "frames_pins": "フレームとPIN",
@@ -146,7 +150,15 @@
     "nameTooLong": "アカウント名は50文字以内にしてください",
     "pinRequired": "PINを入力してください",
     "pinInvalid": "PINは4〜6桁の数字にしてください",
-    "saveAccount": "アカウントを保存"
+    "saveAccount": "アカウントを保存",
+    "familyCodeTitle": "ファミリーコード",
+    "familyCodeHelp": "PINでフレームにサインインするには、サインイン画面でこのコードとフレームのPINを入力します。サインインしたフレームはそれぞれ1台の画面として数えられます。",
+    "familyCodeRenew": "新しいコード",
+    "familyCodeRenewConfirm": "新しいファミリーコードを作成しますか？サインイン済みのフレームはそのまま使えます。新しくサインインするには新しいコードが必要です。",
+    "familyCodeRenewed": "新しいファミリーコードを用意しました",
+    "familyCodeRenewFailed": "新しいコードを作成できませんでした。もう一度お試しください。",
+    "viaPin": "PINでサインイン",
+    "viaQr": "QRコードでペアリング"
   },
   "pair": {
     "all_folders": "すべてのフォルダ",

@@ -17,7 +17,9 @@ const TOKEN_PATTERN = /^(dev_[0-9a-f]{12})\.[A-Za-z0-9_-]{43}$/;
 const deviceIdFromToken = token => (typeof token === 'string' && TOKEN_PATTERN.exec(token)?.[1]) || null;
 
 /**
- * Pairing a frame by QR code. The frame asks for a short code and shows it as
+ * Screens of a library. A frame joins by QR code or by PIN (see addDevice).
+ *
+ * Pairing by QR code: the frame asks for a short code and shows it as
  * a QR code; an admin scans it, approves, and the frame collects a device
  * token it keeps for good. Pairings live in memory for ten minutes; paired
  * frames are kept in data/devices.json with only a hash of their token.
@@ -73,17 +75,27 @@ class PairingService {
   async approve(code, { name, accountId }) {
     const pairing = this.find(code);
     if (!pairing || pairing.approved) return null;
+    const { device, token } = await this.addDevice({ name, accountId, via: 'qr' });
+    // The frame collects this without a session; it runs as the approving tenant
+    pairing.approved = { token, device, tenant: currentTenant() };
+    return device;
+  }
+
+  // Every way a screen joins (QR code or PIN) ends here, so the same screen
+  // limit applies to all of them. Returns the device and its token.
+  async addDevice({ name, accountId, via }) {
     const id = `dev_${crypto.randomBytes(6).toString('hex')}`;
     const token = `${id}.${crypto.randomBytes(32).toString('base64url')}`;
     const device = {
       id,
       name,
       accountId,
+      via,
       tokenHash: hash(token),
       pairedAt: new Date().toISOString(),
       lastSeen: null
     };
-    // MAX_SCREENS caps paired frames per library (0, the default, means no cap)
+    // MAX_SCREENS caps screens per library (0, the default, means no cap)
     const limit = parseInt(process.env.MAX_SCREENS, 10) || 0;
     await getDataStore().update('devices', [], devices => {
       if (limit && devices.length >= limit) {
@@ -92,16 +104,13 @@ class PairingService {
       }
       return [...devices, device];
     });
-    const tenant = currentTenant();
     try {
-      await emit('devicePaired', { deviceId: id, tenantId: tenant.id });
+      await emit('devicePaired', { deviceId: id, tenantId: currentTenant().id });
     } catch (error) {
       await getDataStore().update('devices', [], devices => devices.filter(d => d.id !== id));
       throw error;
     }
-    // The frame collects this without a session; it runs as the approving tenant
-    pairing.approved = { token, device, tenant };
-    return device;
+    return { device, token };
   }
 
   // What the waiting frame sees. An approved pairing is handed over once, then gone.

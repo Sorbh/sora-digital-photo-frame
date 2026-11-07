@@ -44,6 +44,11 @@
             <section class="auth-pin">
 
             <form id="pinForm" novalidate>
+                <label class="family-field hidden" id="familyField">
+                    <span data-i18n="slideshow.familyCodeLabel">Family code</span>
+                    <input type="text" id="familyCodeInput" maxlength="9" autocomplete="off" autocapitalize="characters"
+                        spellcheck="false" placeholder="ABCD-EFGH" enterkeyhint="next">
+                </label>
                 <div class="pin-field">
                     <input type="password" id="pinInput" maxlength="6" autocomplete="off" inputmode="numeric"
                         pattern="[0-9]*" aria-label="PIN, 4 to 6 digits" data-i18n-attr="aria-label:slideshow.static_005">

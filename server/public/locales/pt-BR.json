@@ -72,7 +72,11 @@
     "noImagesInAllFolders": "Nenhuma foto em Todas as pastas",
     "loadFirstImageFailed": "Não foi possível carregar a primeira foto",
     "noImages": "Nenhuma foto disponível",
-    "loadFoldersFailed": "Não foi possível carregar as pastas"
+    "loadFoldersFailed": "Não foi possível carregar as pastas",
+    "enter_code_pin": "Digite seu código da família e seu PIN, ou escaneie o código para configurar este porta-retratos.",
+    "familyCodeLabel": "Código da família",
+    "familyCodeRequired": "Digite o código da família de 8 caracteres que aparece na página Acesso.",
+    "familyOrPinWrong": "O código da família e o PIN não conferem. Verifique os dois e tente de novo."
   },
   "accessAccounts": {
     "frames_pins": "Porta-retratos e PINs",
@@ -147,7 +151,15 @@
     "nameTooLong": "O nome da conta pode ter no máximo 50 caracteres",
     "pinRequired": "Digite um PIN",
     "pinInvalid": "O PIN precisa ter de 4 a 6 dígitos",
-    "saveAccount": "Salvar conta"
+    "saveAccount": "Salvar conta",
+    "familyCodeTitle": "Código da família",
+    "familyCodeHelp": "Para entrar em um porta-retratos com um PIN, digite este código e o PIN do porta-retratos na tela de entrada. Cada porta-retratos que entra conta como uma das suas telas.",
+    "familyCodeRenew": "Novo código",
+    "familyCodeRenewConfirm": "Criar um novo código da família? Os porta-retratos que já entraram continuam funcionando. Novas entradas vão precisar do código novo.",
+    "familyCodeRenewed": "Novo código da família pronto",
+    "familyCodeRenewFailed": "Não foi possível criar um código novo. Tente de novo.",
+    "viaPin": "Entrou com um PIN",
+    "viaQr": "Pareado por QR code"
   },
   "pair": {
     "all_folders": "Todas as pastas",

@@ -72,7 +72,11 @@
     "noImagesInAllFolders": "No images found in folder: All Folders",
     "loadFirstImageFailed": "Failed to load first image",
     "noImages": "No images available",
-    "loadFoldersFailed": "Failed to load folders"
+    "loadFoldersFailed": "Failed to load folders",
+    "enter_code_pin": "Enter your family code and PIN, or scan the code to set up this frame.",
+    "familyCodeLabel": "Family code",
+    "familyCodeRequired": "Enter the 8-character family code from the Access page.",
+    "familyOrPinWrong": "That family code and PIN don't match. Check both and try again."
   },
   "accessAccounts": {
     "frames_pins": "Frames & PINs",
@@ -146,7 +150,15 @@
     "nameTooLong": "Account name must be 50 characters or less",
     "pinRequired": "PIN is required",
     "pinInvalid": "PIN must be 4-6 digits",
-    "saveAccount": "Save Account"
+    "saveAccount": "Save Account",
+    "familyCodeTitle": "Family code",
+    "familyCodeHelp": "To sign in a frame with a PIN, type this code and the frame's PIN on its sign-in screen. Each frame that signs in counts as one of your screens.",
+    "familyCodeRenew": "New code",
+    "familyCodeRenewConfirm": "Make a new family code? Frames already signed in keep working. New sign-ins will need the new code.",
+    "familyCodeRenewed": "New family code ready",
+    "familyCodeRenewFailed": "Couldn't make a new code. Please try again.",
+    "viaPin": "Signed in with a PIN",
+    "viaQr": "Paired by QR code"
   },
   "pair": {
     "all_folders": "All folders",

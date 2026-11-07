@@ -109,7 +109,7 @@ Settings live in `server/.env` (created on first `npm install`).
 | `UPLOAD_DIR` | `uploads` | Where photos are stored |
 | `DEFAULT_SLIDESHOW_INTERVAL` | `15000` | Time per photo, in ms |
 | `MAX_FILE_SIZE` | `26214400` | Upload limit per photo, in bytes (25 MB). Only the resized copy is stored |
-| `MAX_SCREENS` | `0` | Most frames one library can pair. `0` means no limit |
+| `MAX_SCREENS` | `0` | Most screens one library can have, paired by QR code or signed in with a PIN. `0` means no limit |
 | `ENABLE_GOOGLE_PHOTOS` | `false` | Turn on Google Photos import |
 
 Supported formats: JPEG, PNG, WebP, GIF and HEIC (iPhone photos).

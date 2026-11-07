@@ -72,7 +72,11 @@
     "noImagesInAllFolders": "Nessuna immagine nella cartella: Tutte le cartelle",
     "loadFirstImageFailed": "Impossibile caricare la prima immagine",
     "noImages": "Nessuna immagine disponibile",
-    "loadFoldersFailed": "Impossibile caricare le cartelle"
+    "loadFoldersFailed": "Impossibile caricare le cartelle",
+    "enter_code_pin": "Inserisci il codice famiglia e il PIN, oppure scansiona il codice per configurare questa cornice.",
+    "familyCodeLabel": "Codice famiglia",
+    "familyCodeRequired": "Inserisci il codice famiglia di 8 caratteri che trovi nella pagina Accesso.",
+    "familyOrPinWrong": "Codice famiglia e PIN non corrispondono. Controllali entrambi e riprova."
   },
   "accessAccounts": {
     "frames_pins": "Cornici e PIN",
@@ -147,7 +151,15 @@
     "nameTooLong": "Il nome dell'account può avere al massimo 50 caratteri",
     "pinRequired": "Il PIN è obbligatorio",
     "pinInvalid": "Il PIN deve avere da 4 a 6 cifre",
-    "saveAccount": "Salva account"
+    "saveAccount": "Salva account",
+    "familyCodeTitle": "Codice famiglia",
+    "familyCodeHelp": "Per collegare una cornice con un PIN, inserisci questo codice e il PIN della cornice nella sua schermata di accesso. Ogni cornice collegata conta come uno dei tuoi schermi.",
+    "familyCodeRenew": "Nuovo codice",
+    "familyCodeRenewConfirm": "Creare un nuovo codice famiglia? Le cornici già collegate continuano a funzionare. I nuovi accessi richiederanno il nuovo codice.",
+    "familyCodeRenewed": "Nuovo codice famiglia pronto",
+    "familyCodeRenewFailed": "Impossibile creare un nuovo codice. Riprova.",
+    "viaPin": "Accesso con PIN",
+    "viaQr": "Associata con codice QR"
   },
   "pair": {
     "all_folders": "Tutte le cartelle",

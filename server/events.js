@@ -3,8 +3,9 @@
  * `events`. Each handler may be async; it's awaited, and if it throws the
  * action fails (so an index kept by the host never misses a change).
  *
- *   devicePaired({ deviceId, tenantId })      a frame was paired
- *   devicesRemoved({ deviceIds, tenantId })   frames were unpaired
+ *   devicePaired({ deviceId, tenantId })      a screen joined (QR code or PIN)
+ *   devicesRemoved({ deviceIds, tenantId })   screens were removed or signed out
+ *   familyCodeSet({ code, previous, tenantId })  a family code was made or replaced
  */
 let handlers = {};
 

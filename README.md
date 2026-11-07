@@ -105,6 +105,7 @@ Settings live in `server/.env` (created on first `npm install`).
 | Variable | Default | What it does |
 |---|---|---|
 | `ADMIN_PASSWORD` | made up | Password for the library. Without it (or with the old default `admin123`) the server makes one up, keeps it in `data/admin-password` and prints it at start |
+| `SESSION_SECRET` | made up | Signs session cookies. Without it (or with an example value) the server makes one up and keeps it in `data/session-secret` |
 | `TRUST_PROXY` | `1` | Which `X-Forwarded-*` headers to believe, for the client address and https. `1` fits one reverse proxy; `false` if nothing sits in front, so nobody can pick their own address |
 | `PORT` | `3000` | Port the server listens on |
 | `UPLOAD_DIR` | `uploads` | Where photos are stored |

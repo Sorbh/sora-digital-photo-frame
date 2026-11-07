@@ -25,6 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removing a screen or a PIN account signs that frame out within 30 seconds, and changing an account's folders reaches frames already signed in. Before, both waited for the 24-hour session to end.
 - Google Photos sign-in checks a one-time `state`, so nobody can attach their own Google account to the admin's session, and each sign-in uses its own Google client. The Google profile is no longer written to the log.
 - The access-accounts page escapes quotes, so a folder name can't add HTML attributes.
+- **No example session secret.** Without `SESSION_SECRET`, or with one of the example values from `.env.example`, `docker-compose.yml` or DOCKER.md, the server makes up a secret and keeps it in `data/session-secret`. Before, `docker compose up` without one signed cookies with `your-secret-key-change-this`, so anyone could forge an admin session. If you used an example value, everyone signs in again once and Google Photos needs connecting again.
+- Pairing codes: each address keeps at most 5 waiting codes (an IPv6 /64 counts as one address), and when the queue is full the address holding the most gives up its oldest. Before, codes from a few hundred addresses could fill the queue so no frame could pair.
 
 ### Changed
 - Uploads can be up to 25 MB each (was 10 MB), so 48 MP phone photos fit. Only the resized copy is stored.

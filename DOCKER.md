@@ -14,7 +14,7 @@ This document explains how to run the Digital Photo Frame application using Dock
 2. **Edit the .env file with your settings:**
    ```bash
    # Essential settings - change these for security
-   SESSION_SECRET=your-secure-session-secret-here
+   SESSION_SECRET=   # openssl rand -base64 32 (left empty, the server makes one up)
    ADMIN_PASSWORD=your-secure-admin-password
    
    # Optional: Change port (default is 3000)
@@ -47,7 +47,7 @@ This document explains how to run the Digital Photo Frame application using Dock
    docker run -d \
      --name photo-frame \
      -p 3000:3000 \
-     -e SESSION_SECRET=your-secure-session-secret \
+     -e SESSION_SECRET="$(openssl rand -base64 32)" \
      -v photo-uploads:/app/uploads \
      -v photo-data:/app/data \
      digital-photo-frame
@@ -87,7 +87,7 @@ SESSION_SECRET=$(openssl rand -base64 32)
 | `HOST_PORT` | External port on host machine | No | 3000 |
 | `CONTAINER_PORT` | Internal container port | No | 3000 |
 | `NODE_ENV` | Node environment | No | production |
-| `SESSION_SECRET` | Session encryption key | **Yes** | - |
+| `SESSION_SECRET` | Signs session cookies and encrypts Google Photos tokens | **Recommended** | made up at first start, kept in the data volume |
 | `ADMIN_PASSWORD` | Admin login password | **Recommended** | made up at first start, printed in the logs |
 | `TRUST_PROXY` | Which `X-Forwarded-*` headers to believe. `false` if nothing sits in front of the server | No | 1 (one reverse proxy) |
 | `GOOGLE_CLIENT_ID` | Google Photos API client ID | No | - |

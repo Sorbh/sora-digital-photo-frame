@@ -7,7 +7,7 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=${CONTAINER_PORT:-3000}
-      - SESSION_SECRET=${SESSION_SECRET:-your-secret-key-change-this}
+      - SESSION_SECRET=${SESSION_SECRET:-}
       # Unset: the server makes up a password and prints it in `docker compose logs`
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}

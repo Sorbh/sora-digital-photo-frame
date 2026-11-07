@@ -1,34 +1,15 @@
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
-const fs = require('fs');
-const path = require('path');
 const { rotateSession } = require('../utils/session');
 const AttemptLimiter = require('../utils/attemptLimiter');
-const { DATA_DIR } = require('../config/paths');
+const storedSecret = require('../utils/storedSecret');
 
 // The admin password: ADMIN_PASSWORD, unless it's missing or the old default
 // (admin123). Then the server makes up one, keeps it in DATA_DIR/admin-password
 // and prints it at start, so no frame ever runs with a password anyone can guess.
 const WEAK_PASSWORDS = new Set(['admin123']);
-const GENERATED_FILE = path.join(DATA_DIR, 'admin-password');
-let generatedPassword = null;
-
-function generatedAdminPassword() {
-  if (generatedPassword) return generatedPassword;
-  try {
-    generatedPassword = fs.readFileSync(GENERATED_FILE, 'utf8').trim() || null;
-  } catch { /* not made yet */ }
-  if (!generatedPassword) {
-    generatedPassword = crypto.randomBytes(12).toString('base64url');
-    try {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-      fs.writeFileSync(GENERATED_FILE, generatedPassword + '\n', { mode: 0o600 });
-    } catch (error) {
-      console.warn(`⚠️  Could not save the admin password to ${GENERATED_FILE} (${error.message}); it changes on every restart.`);
-    }
-  }
-  return generatedPassword;
-}
+const GENERATED_NAME = 'admin-password';
+const generatedAdminPassword = () => storedSecret(GENERATED_NAME, 12);
 
 const adminPassword = () => {
   const set = process.env.ADMIN_PASSWORD;
@@ -41,7 +22,7 @@ const announceAdminPassword = () => {
   if (set && !WEAK_PASSWORDS.has(set)) return;
   const why = set ? 'ADMIN_PASSWORD is the old default (admin123), which anyone could guess' : 'ADMIN_PASSWORD is not set';
   console.warn(`⚠️  ${why}. Sign in to /admin with this password: ${generatedAdminPassword()}`);
-  console.warn(`   It is kept in ${GENERATED_FILE}. Set ADMIN_PASSWORD to choose your own.`);
+  console.warn(`   It is kept in ${storedSecret.file(GENERATED_NAME)}. Set ADMIN_PASSWORD to choose your own.`);
 };
 
 // Same length for both sides, so the comparison takes the same time whatever was typed

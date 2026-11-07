@@ -7,6 +7,7 @@ const sharp = require('sharp');
 const thumbnails = require('../services/thumbnailService');
 const { sharpInput } = require('../utils/heic');
 const { displayCopy } = require('../utils/displayCopy');
+const { canSee } = require('../utils/viewerAccess');
 const snaps = require('../services/snapService');
 const playOrder = require('../services/playOrderService');
 const photoInfo = require('../services/photoInfoService');
@@ -229,7 +230,9 @@ class ImageController {
       // Express already decoded the param; a second decode would mangle names containing '%'
       const imagePath = thumbnails.resolveInUploads(req.params.imageId);
 
-      if (!imagePath || !thumbnails.IMAGE_PATTERN.test(imagePath) || !await getLibrary().exists(toAdminPath(imagePath))) {
+      // Photos outside a frame's folders look like they don't exist
+      if (!imagePath || !thumbnails.IMAGE_PATTERN.test(imagePath) || !canSee(req, req.params.imageId) ||
+          !await getLibrary().exists(toAdminPath(imagePath))) {
         return res.status(404).json({
           success: false,
           error: 'Image not found',

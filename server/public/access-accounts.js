@@ -179,9 +179,8 @@ class AccessAccountsManager {
     }
 
     escapeHtml(value) {
-        const div = document.createElement('div');
-        div.textContent = String(value);
-        return div.innerHTML;
+        // Quotes too, so the result is also safe inside an attribute (data-folder="...")
+        return String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
     }
 
     renderAccountCard(account) {

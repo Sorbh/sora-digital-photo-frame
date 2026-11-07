@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const oauthManager = require('../utils/oauthManager');
 const jobManager = require('../utils/jobManager');
 const { passClientError } = require('../utils/httpError');
@@ -38,14 +39,18 @@ const googlePhotosController = {
   // Initiate OAuth flow
   initiateAuth: asyncHandler(async (req, res) => {
     try {
-      const { redirectUri } = req.body;
-      const authUrl = oauthManager.getAuthUrl(redirectUri);
+      const { redirectUri } = req.body || {};
+      // The callback must bring this back, so nobody can finish a sign-in
+      // they started themselves in the admin's browser (login CSRF)
+      const state = crypto.randomBytes(24).toString('base64url');
+      req.session.googleOAuthState = state;
+      const authUrl = oauthManager.getAuthUrl(redirectUri, state);
 
       res.json({
         success: true,
         data: {
           authUrl,
-          state: 'google-photos-auth'
+          state
         }
       });
     } catch (error) {
@@ -90,8 +95,14 @@ const googlePhotosController = {
         `);
       }
       
-      if (!code) {
-        return res.send(`
+      // Only the sign-in this browser's admin started, and only once
+      const expected = req.session?.googleOAuthState;
+      if (req.session) delete req.session.googleOAuthState;
+      const stateOk = typeof state === 'string' && typeof expected === 'string' &&
+        state.length === expected.length && crypto.timingSafeEqual(Buffer.from(state), Buffer.from(expected));
+
+      if (!code || !stateOk) {
+        return res.status(code ? 403 : 200).send(`
           <html>
             <head><title>Google Photos Authentication</title></head>
             <body>
@@ -100,7 +111,7 @@ const googlePhotosController = {
                   window.opener.postMessage({
                     type: 'google-photos-auth',
                     success: false,
-                    error: 'No authorization code received'
+                    error: ${JSON.stringify(code ? 'This sign-in was not started here. Try again from the library.' : 'No authorization code received')}
                   }, '*');
                   window.close();
                 } else {

@@ -9,6 +9,8 @@ const errorHandler = require('./middleware/errorHandler');
 const webpFallback = require('./middleware/webpFallback');
 const media = require('./middleware/media');
 const sameOrigin = require('./middleware/sameOrigin');
+const freshViewer = require('./middleware/freshViewer');
+const { requireVisiblePhoto } = require('./utils/viewerAccess');
 const EncryptedPhotoLibrary = require('./library/EncryptedPhotoLibrary');
 const EncryptedDataStore = require('./store/EncryptedDataStore');
 const { keysFromEnv } = require('./crypto/keys');
@@ -99,13 +101,15 @@ function createApp({ sessionStore, beforeRoutes, library, dataStore, resolveTena
   // Changes only from this site's own pages (see middleware/sameOrigin)
   app.use(sameOrigin);
   app.use(tenantMiddleware(resolveTenant));
+  // Removed screens and accounts stop working, and folder changes arrive, within 30 seconds
+  app.use(['/api', '/uploads'], freshViewer);
 
   // Static files
   if (photoLibrary.staticDir) {
-    app.use('/uploads', requirePhotoViewer, webpFallback(photoLibrary.staticDir), express.static(photoLibrary.staticDir));
+    app.use('/uploads', requirePhotoViewer, requireVisiblePhoto, webpFallback(photoLibrary.staticDir), express.static(photoLibrary.staticDir));
   } else {
     // Encrypted or remote storage: serve through the library (decrypts on the server)
-    app.use('/uploads', requirePhotoViewer, media());
+    app.use('/uploads', requirePhotoViewer, requireVisiblePhoto, media());
   }
   app.use('/js', express.static(path.join(__dirname, 'public/js')));
   app.use('/admin', express.static(path.join(__dirname, 'public')));

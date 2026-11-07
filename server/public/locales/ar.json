@@ -72,7 +72,11 @@
     "noImagesInAllFolders": "لا توجد صور في المجلد: كل المجلدات",
     "loadFirstImageFailed": "تعذّر تحميل الصورة الأولى",
     "noImages": "لا توجد صور متاحة",
-    "loadFoldersFailed": "تعذّر تحميل المجلدات"
+    "loadFoldersFailed": "تعذّر تحميل المجلدات",
+    "enter_code_pin": "أدخل رمز العائلة ورمز PIN، أو امسح الرمز لإعداد هذا الإطار.",
+    "familyCodeLabel": "رمز العائلة",
+    "familyCodeRequired": "أدخل رمز العائلة المكوَّن من 8 خانات من صفحة الوصول.",
+    "familyOrPinWrong": "رمز العائلة ورقم PIN غير متطابقين. تحقّق منهما وحاول مرة أخرى."
   },
   "accessAccounts": {
     "frames_pins": "الإطارات ورموز PIN",
@@ -150,7 +154,15 @@
     "nameTooLong": "يجب ألا يزيد اسم الحساب على 50 حرفًا",
     "pinRequired": "رمز PIN مطلوب",
     "pinInvalid": "يجب أن يتكوّن رمز PIN من 4 إلى 6 أرقام",
-    "saveAccount": "حفظ الحساب"
+    "saveAccount": "حفظ الحساب",
+    "familyCodeTitle": "رمز العائلة",
+    "familyCodeHelp": "لتسجيل دخول إطار برقم PIN، اكتب هذا الرمز ورقم PIN الخاص بالإطار على شاشة تسجيل الدخول. كل إطار يسجّل الدخول يُحسب شاشةً من شاشاتك.",
+    "familyCodeRenew": "رمز جديد",
+    "familyCodeRenewConfirm": "هل تريد إنشاء رمز عائلة جديد؟ تبقى الإطارات المسجَّل دخولها تعمل. وتحتاج عمليات تسجيل الدخول الجديدة إلى الرمز الجديد.",
+    "familyCodeRenewed": "رمز العائلة الجديد جاهز",
+    "familyCodeRenewFailed": "تعذّر إنشاء رمز جديد. حاول مرة أخرى.",
+    "viaPin": "سجّل الدخول برقم PIN",
+    "viaQr": "مقترن عبر رمز QR"
   },
   "pair": {
     "all_folders": "كل المجلدات",

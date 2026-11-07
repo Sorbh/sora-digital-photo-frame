@@ -72,7 +72,11 @@
     "noImagesInAllFolders": "No hay fotos en ninguna carpeta",
     "loadFirstImageFailed": "No se pudo cargar la primera foto",
     "noImages": "No hay fotos disponibles",
-    "loadFoldersFailed": "No se pudieron cargar las carpetas"
+    "loadFoldersFailed": "No se pudieron cargar las carpetas",
+    "enter_code_pin": "Introduce tu código familiar y tu PIN, o escanea el código para configurar este marco.",
+    "familyCodeLabel": "Código familiar",
+    "familyCodeRequired": "Introduce el código familiar de 8 caracteres que aparece en la página Acceso.",
+    "familyOrPinWrong": "El código familiar y el PIN no coinciden. Revisa ambos e inténtalo de nuevo."
   },
   "accessAccounts": {
     "frames_pins": "Marcos y PIN",
@@ -146,7 +150,15 @@
     "nameTooLong": "El nombre de la cuenta no puede tener más de 50 caracteres",
     "pinRequired": "Hace falta un PIN",
     "pinInvalid": "El PIN debe tener de 4 a 6 cifras",
-    "saveAccount": "Guardar cuenta"
+    "saveAccount": "Guardar cuenta",
+    "familyCodeTitle": "Código familiar",
+    "familyCodeHelp": "Para iniciar sesión en un marco con un PIN, escribe este código y el PIN del marco en su pantalla de inicio. Cada marco que inicia sesión cuenta como una de tus pantallas.",
+    "familyCodeRenew": "Nuevo código",
+    "familyCodeRenewConfirm": "¿Crear un nuevo código familiar? Los marcos que ya iniciaron sesión siguen funcionando. Los nuevos inicios de sesión necesitarán el código nuevo.",
+    "familyCodeRenewed": "Nuevo código familiar listo",
+    "familyCodeRenewFailed": "No se pudo crear un código nuevo. Inténtalo de nuevo.",
+    "viaPin": "Inició sesión con un PIN",
+    "viaQr": "Vinculado con código QR"
   },
   "pair": {
     "all_folders": "Todas las carpetas",

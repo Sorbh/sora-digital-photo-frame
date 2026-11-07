@@ -1,7 +1,7 @@
 class AccessAccountsManager {
     constructor() {
         this.accounts = [];
-        this.devices = []; // frames paired by QR code
+        this.devices = []; // screens: paired by QR code or signed in by PIN
         this.folders = [];
         this.currentEditingAccount = null;
         this.init();
@@ -17,6 +17,35 @@ class AccessAccountsManager {
         });
         this.loadAccounts();
         this.loadFolders();
+        this.loadFamilyCode();
+    }
+
+    // Hosted: show the family code frames type along with their PIN
+    async loadFamilyCode() {
+        try {
+            const data = await (await fetch('/api/admin/family-code')).json();
+            if (data.required) this.showFamilyCode(data.code);
+        } catch (error) {
+            console.error('Could not load the family code:', error);
+        }
+    }
+
+    showFamilyCode(code) {
+        document.getElementById('familyCodeValue').textContent = `${code.slice(0, 4)}-${code.slice(4)}`;
+        document.getElementById('familyCodeCard').classList.remove('hidden');
+    }
+
+    async renewFamilyCode() {
+        if (!confirm(t('accessAccounts.familyCodeRenewConfirm'))) return;
+        try {
+            const data = await (await fetch('/api/admin/family-code', { method: 'POST' })).json();
+            if (!data.success) throw new Error(data.error);
+            this.showFamilyCode(data.code);
+            this.showToast(t('accessAccounts.familyCodeRenewed'), 'success');
+        } catch (error) {
+            console.error('Could not make a new family code:', error);
+            this.showToast(t('accessAccounts.familyCodeRenewFailed'), 'error');
+        }
     }
 
     bindEvents() {
@@ -24,6 +53,8 @@ class AccessAccountsManager {
         document.getElementById('backBtn').addEventListener('click', () => {
             window.location.href = '/admin.html';
         });
+
+        document.getElementById('renewFamilyCodeBtn').addEventListener('click', () => this.renewFamilyCode());
 
         // Create new account button
         document.getElementById('createAccountBtn').addEventListener('click', () => {
@@ -200,7 +231,7 @@ class AccessAccountsManager {
         `;
     }
 
-    // Frames paired to this account by scanning their QR code
+    // Screens of this account, paired by QR code or signed in with its PIN
     renderDevices(account) {
         const esc = (value) => this.escapeHtml(value);
         const devices = this.devices.filter(device => device.accountId === account.id);
@@ -214,7 +245,7 @@ class AccessAccountsManager {
                 <span class="paired-label">${esc(t('accessAccounts.pairedFrames'))}</span>
                 ${devices.map(device => `
                     <div class="paired-frame">
-                        <span class="material-symbols-outlined">tv</span>
+                        <span class="material-symbols-outlined" title="${esc(t(device.via === 'pin' ? 'accessAccounts.viaPin' : 'accessAccounts.viaQr'))}">${device.via === 'pin' ? 'dialpad' : 'tv'}</span>
                         <span class="paired-text">
                             <span class="paired-name">${esc(device.name)}</span>
                             <span class="paired-seen">${esc(seen(device))}</span>

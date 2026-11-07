@@ -72,7 +72,11 @@
     "noImagesInAllFolders": "所有文件夹中都没有照片",
     "loadFirstImageFailed": "第一张照片加载失败",
     "noImages": "暂时没有照片",
-    "loadFoldersFailed": "文件夹加载失败"
+    "loadFoldersFailed": "文件夹加载失败",
+    "enter_code_pin": "请输入家庭代码和 PIN，或扫码设置这个相框。",
+    "familyCodeLabel": "家庭代码",
+    "familyCodeRequired": "请输入“访问权限”页面上的 8 位家庭代码。",
+    "familyOrPinWrong": "家庭代码和 PIN 不匹配。请检查后重试。"
   },
   "accessAccounts": {
     "frames_pins": "相框与 PIN",
@@ -146,7 +150,15 @@
     "nameTooLong": "账户名称不能超过 50 个字符",
     "pinRequired": "请填写 PIN",
     "pinInvalid": "PIN 须为 4 到 6 位数字",
-    "saveAccount": "保存账户"
+    "saveAccount": "保存账户",
+    "familyCodeTitle": "家庭代码",
+    "familyCodeHelp": "要用 PIN 登录相框，请在相框的登录界面输入此代码和相框的 PIN。每台登录的相框都算作您的一块屏幕。",
+    "familyCodeRenew": "新代码",
+    "familyCodeRenewConfirm": "要生成新的家庭代码吗？已登录的相框会继续使用。新的登录需要新代码。",
+    "familyCodeRenewed": "新的家庭代码已生成",
+    "familyCodeRenewFailed": "无法生成新代码，请重试。",
+    "viaPin": "通过 PIN 登录",
+    "viaQr": "通过二维码配对"
   },
   "pair": {
     "all_folders": "所有文件夹",

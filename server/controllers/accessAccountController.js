@@ -3,6 +3,8 @@ const { getDataStore } = require('../store');
 const { passClientError } = require('../utils/httpError');
 const { rotateSession } = require('../utils/session');
 const { currentTenant } = require('../context');
+const pairing = require('../services/pairingService');
+const familyCodes = require('../services/familyCodeService');
 
 // bcrypt cost for PINs: each sign-in compares against every account's hash, so keep it modest
 const PIN_ROUNDS = 10;
@@ -10,7 +12,8 @@ const PIN_ROUNDS = 10;
 class AccessAccountController {
     constructor() {
         // Rate limiting for PIN attempts
-        this.pinSignIn = true; // createApp({ pinSignIn: false }) turns it off (hosted: frames pair instead)
+        this.pinSignIn = true; // createApp({ pinSignIn: false }) turns it off
+        this.familyCode = false; // createApp({ familyCode: true }): PIN sign-in also needs the family code (hosted)
         this.rateLimiter = new Map(); // Map<IP, {attempts: number, lockoutUntil: number, firstAttempt: number}>
         this.maxAttempts = 5; // Maximum failed attempts
         this.lockoutDuration = 15 * 60 * 1000; // 15 minutes in milliseconds
@@ -302,12 +305,60 @@ class AccessAccountController {
         }
     }
 
+    // The accounts a PIN may match. Hosted, only with this family's code: a
+    // wrong code finds no family at all, and so no accounts.
+    async accountsForSignIn(familyCode) {
+        try {
+            if (this.familyCode && !(await familyCodes.matches(familyCode))) return [];
+            return await this.loadAccounts();
+        } catch (error) {
+            if (error.status >= 400 && error.status < 500) return []; // no family to look in
+            throw error;
+        }
+    }
+
+    // The screen for this sign-in: the one this browser already is (by its
+    // token, or by its session for a page from before PIN screens that renews
+    // with the PIN), or a new one
+    async screenFor(account, token, sessionDeviceId) {
+        const existing = token ? await pairing.signIn(token) : null;
+        if (existing && existing.accountId === account.id) return { device: existing, token };
+        if (sessionDeviceId) {
+            const current = (await pairing.listDevices()).find(d => d.id === sessionDeviceId && d.accountId === account.id);
+            if (current) return { device: current, token: undefined };
+        }
+        return pairing.addDevice({ name: account.name, accountId: account.id, via: 'pin' });
+    }
+
+    // Admin: the family code frames give with their PIN (hosted only)
+    async getFamilyCode(req, res) {
+        try {
+            if (!this.familyCode) return res.json({ success: true, required: false });
+            res.json({ success: true, required: true, code: await familyCodes.get() });
+        } catch (error) {
+            if (passClientError(res, error)) return;
+            console.error('Error reading the family code:', error);
+            res.status(500).json({ success: false, error: 'Could not load the family code' });
+        }
+    }
+
+    async renewFamilyCode(req, res) {
+        try {
+            if (!this.familyCode) return res.status(404).json({ success: false, error: 'Family codes are not used here' });
+            res.json({ success: true, required: true, code: await familyCodes.renew() });
+        } catch (error) {
+            if (passClientError(res, error)) return;
+            console.error('Error renewing the family code:', error);
+            res.status(500).json({ success: false, error: 'Could not make a new family code' });
+        }
+    }
+
     async authenticateWithPin(req, res) {
         if (!this.pinSignIn) {
             return res.status(404).json({ success: false, error: 'PIN sign-in is turned off', code: 'PIN_DISABLED' });
         }
         try {
-            const { pin } = req.body;
+            const { pin, token, familyCode } = req.body;
             const clientIP = req.ip || req.connection.remoteAddress || req.socket.remoteAddress;
 
             // Check rate limiting
@@ -329,12 +380,25 @@ class AccessAccountController {
                 });
             }
 
-            const accounts = await this.loadAccounts();
+            // Hosted: wrong tries count against the family too, so spreading them over many addresses doesn't help
+            const familyKey = this.familyCode && `family:${currentTenant().id}`;
+            const familyCheck = familyKey && this.checkRateLimit(familyKey);
+            if (familyCheck && !familyCheck.allowed) {
+                return res.status(429).json({
+                    success: false,
+                    error: familyCheck.message,
+                    code: 'RATE_LIMITED',
+                    remainingTime: familyCheck.remainingTime
+                });
+            }
+
+            const accounts = await this.accountsForSignIn(familyCode);
             const account = await this.findByPin(accounts, pin);
 
             if (!account) {
                 // Record failed attempt
                 this.recordFailedAttempt(clientIP);
+                if (familyKey && accounts.length) this.recordFailedAttempt(familyKey);
                 const newRateLimitCheck = this.checkRateLimit(clientIP);
                 
                 console.log(`❌ Failed PIN attempt from IP: ${clientIP}, attempts remaining: ${newRateLimitCheck.attemptsRemaining || 0}`);
@@ -347,8 +411,14 @@ class AccessAccountController {
                 });
             }
 
+            // A PIN sign-in makes this browser a screen, as pairing by QR code does,
+            // so it counts toward the same limit. A browser that already is one of
+            // this account's screens (it sends its token) stays that screen.
+            const screen = await this.screenFor(account, token, req.session.deviceId);
+
             // Record successful attempt (clears rate limiting)
             this.recordSuccessfulAttempt(clientIP);
+            if (familyKey) this.recordSuccessfulAttempt(familyKey);
             console.log(`✅ Successful PIN authentication from IP: ${clientIP} for account: ${account.name}`);
 
             // Update last accessed time
@@ -362,10 +432,13 @@ class AccessAccountController {
                 name: account.name,
                 assignedFolders: account.assignedFolders
             };
+            req.session.deviceId = screen.device.id;
             req.session.tenantId = currentTenant().id;
 
             res.json({
                 success: true,
+                token: screen.token,
+                device: { id: screen.device.id, name: screen.device.name, language: screen.device.language || null },
                 account: {
                     id: account.id,
                     name: account.name,
@@ -388,12 +461,14 @@ class AccessAccountController {
                 res.json({
                     authenticated: true,
                     account: req.session.accessAccount,
-                    pinSignIn: this.pinSignIn
+                    pinSignIn: this.pinSignIn,
+                    familyCode: this.familyCode
                 });
             } else {
                 res.json({
                     authenticated: false,
-                    pinSignIn: this.pinSignIn
+                    pinSignIn: this.pinSignIn,
+                    familyCode: this.familyCode
                 });
             }
         } catch (error) {
@@ -408,9 +483,18 @@ class AccessAccountController {
 
     async clearSession(req, res) {
         try {
+            // A screen that signs out frees its place, so it no longer counts toward the limit
+            if (req.session.deviceId) {
+                const deviceId = req.session.deviceId;
+                // Signing out still works if this fails; an admin can remove the screen in Access
+                await pairing.removeDevices(device => device.id === deviceId)
+                    .catch(error => console.error('Could not free the screen on sign-out:', error.message));
+            }
+
             // A frame signing out in the admin's browser keeps the admin signed in
             if (req.session.authenticated) {
                 delete req.session.accessAccount;
+                delete req.session.deviceId;
                 delete req.session.tenantId;
                 return res.json({ success: true, message: 'Session cleared' });
             }

@@ -8,7 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- `MAX_SCREENS` caps how many frames a library can pair (off by default); pairing past it explains how to free a spot.
+- `MAX_SCREENS` caps how many screens a library can have (off by default); adding one past it explains how to free a spot.
+- A browser that signs in with a PIN becomes one of the library's screens, as a QR-paired frame does: it's listed under its account in Access, keeps a token to come back with, and counts toward `MAX_SCREENS`. Signing out of the slideshow frees its place.
+- `createApp({ familyCode: true })`: hosted setups ask frames for a family code along with the PIN (see HOOKS.md).
 - HEIC uploads (iPhone photos), decoded with libheif in WebAssembly and stored as WebP like other photos.
 
 ### Changed

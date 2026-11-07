@@ -1,4 +1,5 @@
 const DEVICE_TOKEN_KEY = 'photoframe_device_token';
+const FAMILY_CODE_KEY = 'photoframe_family_code';
 const RENEW_MS = 6 * 60 * 60 * 1000; // sessions last a day; paired frames sign in again well before
 
 class AuthenticationManager {
@@ -7,6 +8,10 @@ class AuthenticationManager {
         this.authOverlay = document.getElementById('authOverlay');
         this.pinForm = document.getElementById('pinForm');
         this.pinInput = document.getElementById('pinInput');
+        this.familyField = document.getElementById('familyField');
+        this.familyInput = document.getElementById('familyCodeInput');
+        this.authSub = document.querySelector('.auth-sub');
+        this.familyCodeRequired = false; // hosted: a PIN also needs the family code
         this.authButton = document.getElementById('authButton');
         this.authErrorAlert = document.getElementById('authErrorAlert');
         this.authErrorMessage = document.getElementById('authErrorMessage');
@@ -44,13 +49,14 @@ class AuthenticationManager {
 
     init() {
         this.bindEvents();
-        // Frames with no keyboard can open /slideshow?pin=123456 and sign in by themselves
-        const urlPin = new URLSearchParams(location.search).get('pin');
+        // Frames with no keyboard can open /slideshow?pin=123456 (hosted: &family=ABCD-EFGH)
+        // and sign in by themselves. A browser that already is a screen uses its token first.
+        const urlPin = new URLSearchParams(location.search).get('pin')?.trim();
         const deviceToken = localStorage.getItem(DEVICE_TOKEN_KEY);
-        if (urlPin) {
-            this.signInFromUrl(urlPin.trim());
-        } else if (deviceToken) {
-            this.signInAsDevice(deviceToken);
+        if (deviceToken) {
+            this.signInAsDevice(deviceToken, urlPin);
+        } else if (urlPin) {
+            this.signInFromUrl(urlPin);
         } else {
             this.checkExistingSession();
         }
@@ -62,8 +68,8 @@ class AuthenticationManager {
         this.renewTimer = setInterval(() => signIn().catch(() => {}), RENEW_MS);
     }
 
-    // A frame paired by QR code signs in with the token it was given
-    async signInAsDevice(token) {
+    // A screen (paired by QR code or signed in by PIN) signs in with the token it was given
+    async signInAsDevice(token, fallbackPin) {
         try {
             const data = await this.requestDevice(token);
             if (data.success) {
@@ -76,7 +82,37 @@ class AuthenticationManager {
         } catch (error) {
             console.error('Signing in as a paired frame failed:', error);
         }
+        if (fallbackPin) return this.signInFromUrl(fallbackPin);
         this.checkExistingSession();
+    }
+
+    // A PIN sign-in made this browser a screen: keep its token, as a QR pairing does
+    keepScreen(data) {
+        if (data.token) {
+            localStorage.setItem(DEVICE_TOKEN_KEY, data.token);
+            this.keepSignedIn(() => this.requestDevice(data.token));
+        }
+        const familyCode = this.familyCodeValue().toUpperCase();
+        if (familyCode) localStorage.setItem(FAMILY_CODE_KEY, familyCode);
+        this.useScreenLanguage(data.device?.language);
+    }
+
+    // The family code typed in, from the address, or remembered from last time
+    familyCodeValue() {
+        const typed = this.familyInput?.value.trim();
+        return typed || new URLSearchParams(location.search).get('family')?.trim() || localStorage.getItem(FAMILY_CODE_KEY) || '';
+    }
+
+    // Hosted: show the family code field above the PIN
+    showFamilyField() {
+        this.familyCodeRequired = true;
+        if (!this.familyField) return;
+        this.familyField.classList.remove('hidden');
+        if (!this.familyInput.value) this.familyInput.value = this.familyCodeValue();
+        if (this.authSub) {
+            this.authSub.dataset.i18n = 'slideshow.enter_code_pin';
+            this.authSub.textContent = t('slideshow.enter_code_pin');
+        }
     }
 
     async requestDevice(token) {
@@ -169,11 +205,11 @@ class AuthenticationManager {
             const data = await this.requestPin(pin);
             if (!data.success) {
                 this.showAuthOverlay();
-                this.handleAuthError(data.error, data.code);
+                this.handleAuthError(data.error, data.code, data);
                 return;
             }
+            this.keepScreen(data);
             this.handleAuthSuccess(data.account);
-            this.keepSignedIn(() => this.requestPin(pin));
         } catch (error) {
             console.error('Sign-in from the address failed:', error);
             this.showAuthOverlay();
@@ -185,7 +221,12 @@ class AuthenticationManager {
         const response = await fetch('/api/auth/pin', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ pin })
+            body: JSON.stringify({
+                pin,
+                // Already a screen? Then this browser stays that screen instead of adding one
+                token: localStorage.getItem(DEVICE_TOKEN_KEY) || undefined,
+                familyCode: this.familyCodeValue() || undefined
+            })
         });
         return response.json();
     }
@@ -197,6 +238,17 @@ class AuthenticationManager {
         });
 
         this.pinInput.addEventListener('input', () => {
+            this.clearError();
+            this.clearErrorState();
+        });
+
+        // Enter in the family code moves on to the PIN instead of submitting a blank one
+        this.familyInput?.addEventListener('keydown', (e) => {
+            if (e.key !== 'Enter') return;
+            e.preventDefault();
+            this.pinInput.focus();
+        });
+        this.familyInput?.addEventListener('input', () => {
             this.clearError();
             this.clearErrorState();
         });
@@ -257,8 +309,8 @@ class AuthenticationManager {
             if (data.authenticated) {
                 this.handleAuthSuccess(data.account);
             } else {
-                // Hosted frames pair by QR code only
                 if (data.pinSignIn === false) this.pinForm.style.display = 'none';
+                else if (data.familyCode) this.showFamilyField();
                 this.showAuthOverlay();
             }
         } catch (error) {
@@ -280,15 +332,22 @@ class AuthenticationManager {
             return;
         }
 
+        if (this.familyCodeRequired && this.familyCodeValue().replace(/[^a-z0-9]/gi, '').length !== 8) {
+            this.showErrorKey('slideshow.familyCodeRequired');
+            this.familyInput?.focus();
+            return;
+        }
+
         this.setLoading(true);
 
         try {
             const data = await this.requestPin(pin);
 
             if (data.success) {
+                this.keepScreen(data);
                 this.handleAuthSuccess(data.account);
             } else {
-                this.handleAuthError(data.error, data.code);
+                this.handleAuthError(data.error, data.code, data);
             }
         } catch (error) {
             console.error('Authentication error:', error);
@@ -312,8 +371,10 @@ class AuthenticationManager {
         }));
     }
 
-    handleAuthError(error, errorCode) {
-        this.showError(i18n.error({ code: errorCode, message: error }, 'slideshow.invalidPin'));
+    handleAuthError(error, errorCode, data = {}) {
+        // Hosted, a wrong family code and a wrong PIN look the same on purpose
+        if (errorCode === 'INVALID_PIN' && this.familyCodeRequired) this.showErrorKey('slideshow.familyOrPinWrong');
+        else this.showError(i18n.error({ ...data, code: errorCode, message: error }, 'slideshow.invalidPin'));
 
         if (errorCode === 'RATE_LIMITED') {
             this.pinInput.disabled = true;
@@ -486,6 +547,8 @@ class PhotoFrameSlideshow {
         this.nextBtn.addEventListener('click', () => this.nextImage());
 
         document.addEventListener('keydown', (e) => {
+            // Typing in a field (the family code, say) is not a slideshow shortcut
+            if (e.target.closest?.('input, textarea, select')) return;
             switch (e.key) {
                 case ' ': // Space
                 case 'k':

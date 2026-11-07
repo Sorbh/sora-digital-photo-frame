@@ -47,6 +47,8 @@ router.get('/access-accounts', requireAuth, accessAccountController.getAllAccoun
 router.post('/access-accounts', requireAuth, accessAccountController.createAccount.bind(accessAccountController));
 router.put('/access-accounts/:id', requireAuth, accessAccountController.updateAccount.bind(accessAccountController));
 router.delete('/access-accounts/:id', requireAuth, accessAccountController.deleteAccount.bind(accessAccountController));
+router.get('/admin/family-code', requireAuth, accessAccountController.getFamilyCode.bind(accessAccountController));
+router.post('/admin/family-code', requireAuth, accessAccountController.renewFamilyCode.bind(accessAccountController));
 
 // Notes shown in the slideshow (admin manages, frames read their active ones)
 router.get('/notes', requireAuth, noteController.list.bind(noteController));

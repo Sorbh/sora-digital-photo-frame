@@ -26,9 +26,10 @@ function sameOrigin(req, res, next) {
 
   const origin = req.get('origin');
   if (!origin) return next();
+  // Only Host: X-Forwarded-Host could be sent by the page itself. (Behind a
+  // proxy that rewrites Host, such old browsers need the proxy to keep it.)
   const host = hostOf(origin);
-  const forwarded = (req.get('x-forwarded-host') || '').split(',')[0].trim();
-  if (host && (host === req.get('host') || host === forwarded)) return next();
+  if (host && host === req.get('host')) return next();
   return refuse(res);
 }
 

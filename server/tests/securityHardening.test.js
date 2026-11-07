@@ -141,6 +141,9 @@ describe('changes only from this site', () => {
     await admin.post('/api/notes').set('Sec-Fetch-Site', 'same-origin').send({ text: 'Hi' }).expect(res => expect(res.status).not.toBe(403));
     await admin.post('/api/notes').set('Origin', 'http://frame.local').set('Host', 'frame.local').send({ text: 'Hi' }).expect(res => expect(res.status).not.toBe(403));
     await admin.post('/api/notes').send({ text: 'Hi' }).expect(res => expect(res.status).not.toBe(403));
+    // A page can't vouch for itself with X-Forwarded-Host
+    await admin.post('/api/notes').set('Origin', 'http://192.168.1.1:8080').set('X-Forwarded-Host', '192.168.1.1:8080')
+      .send({ text: 'Hi' }).expect(403);
     // Reading is never blocked
     await admin.get('/api/notes').set('Sec-Fetch-Site', 'cross-site').expect(200);
   });

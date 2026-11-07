@@ -86,6 +86,21 @@ describe('a frame limited to family/kids', () => {
   });
 });
 
+describe('a frame given a folder and one inside it', () => {
+  test('counts each photo once', async () => {
+    await fs.ensureDir(path.join(testUploadsDir, 'family/kids/school'));
+    await fs.writeFile(path.join(testUploadsDir, 'family/kids/school', 'play.png'), await png('#cc3'));
+    try {
+      const { frame } = await frameFor(['family/kids', 'family/kids/school']);
+      // family itself isn't given, so its count is what's inside family/kids: park and play
+      const { body } = await frame.get('/api/folders/family').expect(200);
+      expect(body.folder.imageCount).toBe(2);
+    } finally {
+      await fs.remove(path.join(testUploadsDir, 'family/kids/school'));
+    }
+  });
+});
+
 describe('removing or changing a frame reaches it without waiting a day', () => {
   const later = (agentCall) => {
     const realNow = Date.now;

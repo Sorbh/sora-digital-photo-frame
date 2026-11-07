@@ -27,7 +27,9 @@ function canSee(req, relativePath) {
 function foldersBelow(req, relativePath) {
   const folders = assignedFolders(req) || [];
   const target = norm(relativePath);
-  return folders.filter(folder => target === '' || folder.startsWith(target + '/'));
+  // family and family/kids both assigned: family/kids is already inside family
+  const outermost = folders.filter(folder => !folders.some(other => other !== folder && folder.startsWith(other + '/')));
+  return [...new Set(outermost)].filter(folder => target === '' || folder.startsWith(target + '/'));
 }
 
 // A folder that can be opened: inside an assigned one, or on the way to one

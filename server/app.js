@@ -23,6 +23,7 @@ const { setDataStore } = require('./store');
 const { tenantMiddleware } = require('./context');
 const { setQuota } = require('./services/quotaService');
 const { setAuthProvider, setPublicPhotos, requirePhotoViewer, announceAdminPassword } = require('./middleware/auth');
+const { sessionSecret, announceSessionSecret } = require('./utils/sessionSecret');
 const { setEvents } = require('./events');
 const accessAccounts = require('./controllers/accessAccountController');
 
@@ -51,10 +52,8 @@ const accessAccounts = require('./controllers/accessAccountController');
  *                 e.g. to mount extra sign-in routes
  */
 function createApp({ sessionStore, beforeRoutes, library, dataStore, resolveTenant, auth, quota, events, pinSignIn = true, trustProxy = process.env.TRUST_PROXY, publicPhotos = process.env.PUBLIC_PHOTOS === 'true', familyCode = false, keys = keysFromEnv() } = {}) {
-  const sessionSecret = process.env.SESSION_SECRET;
-  if (!sessionSecret) {
-    throw new Error('SESSION_SECRET environment variable not set');
-  }
+  announceSessionSecret();
+  const secret = sessionSecret();
 
   const app = express();
   let photoLibrary = library || new LocalPhotoLibrary();
@@ -84,7 +83,7 @@ function createApp({ sessionStore, beforeRoutes, library, dataStore, resolveTena
   app.use(express.urlencoded({ extended: true }));
 
   app.use(session({
-    secret: sessionSecret,
+    secret,
     store: sessionStore,
     resave: false,
     saveUninitialized: false,

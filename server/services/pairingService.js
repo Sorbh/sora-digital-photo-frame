@@ -3,8 +3,11 @@ const { getDataStore } = require('../store');
 const { currentTenant } = require('../context');
 const { emit } = require('../events');
 const PAIRING_TTL_MS = 10 * 60 * 1000;
-// Shared by every tenant on a hosted server, so a few IPs can't fill it (20 starts per IP per 10 min)
-const MAX_PENDING = 2000; 
+// Shared by every tenant on a hosted server. Each address keeps at most
+// MAX_PER_ADDRESS waiting codes, and when the queue is full the address holding
+// the most gives up its oldest, so floods from many addresses can't lock frames out.
+const MAX_PENDING = 2000;
+const MAX_PER_ADDRESS = 5;
 const SEEN_WRITE_GAP_MS = 60 * 60 * 1000;
 // No 0/O, 1/I/L: the code is read off a frame across the room
 const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
@@ -45,16 +48,43 @@ class PairingService {
     }
   }
 
-  // A new pairing for a frame: the code goes in the QR, the secret stays on the frame
-  start() {
+  // Codes still waiting for an admin, oldest first (a Map keeps the order they were made in)
+  waitingFrom(address) {
+    return [...this.pairings.values()].filter(p => !p.approved && p.address === address);
+  }
+
+  // The queue is full: the address with the most waiting codes, if it has more
+  // than the one asking would, loses its oldest. False if nobody has more.
+  makeRoom(address) {
+    const waiting = new Map(); // address -> its codes, oldest first
+    for (const pairing of this.pairings.values()) {
+      if (pairing.approved) continue;
+      if (!waiting.has(pairing.address)) waiting.set(pairing.address, []);
+      waiting.get(pairing.address).push(pairing);
+    }
+    const asking = (waiting.get(address) || []).length + 1;
+    let busiest = null;
+    for (const codes of waiting.values()) if (!busiest || codes.length > busiest.length) busiest = codes;
+    if (!busiest || busiest.length <= asking) return false;
+    this.pairings.delete(busiest[0].code);
+    return true;
+  }
+
+  // A new pairing for a frame: the code goes in the QR, the secret stays on the frame.
+  // address is where the request came from (see addressGroup in the controller).
+  start(address = 'unknown') {
     this.dropExpired();
-    if (this.pairings.size >= MAX_PENDING) return null;
+    const mine = this.waitingFrom(address);
+    // A frame that keeps asking keeps only its newest few codes
+    if (mine.length >= MAX_PER_ADDRESS) this.pairings.delete(mine[0].code);
+    if (this.pairings.size >= MAX_PENDING && !this.makeRoom(address)) return null;
     let code = this.newCode();
     while (this.pairings.has(code)) code = this.newCode();
     const pairing = {
       code,
       secret: crypto.randomBytes(24).toString('hex'),
       expiresAt: Date.now() + PAIRING_TTL_MS,
+      address,
       approved: null
     };
     this.pairings.set(code, pairing);
@@ -203,3 +233,5 @@ class PairingService {
 module.exports = new PairingService();
 module.exports.deviceIdFromToken = deviceIdFromToken;
 module.exports.PAIRING_TTL_MS = PAIRING_TTL_MS;
+module.exports.MAX_PENDING = MAX_PENDING;
+module.exports.MAX_PER_ADDRESS = MAX_PER_ADDRESS;

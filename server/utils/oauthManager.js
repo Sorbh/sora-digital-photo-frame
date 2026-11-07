@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const { google } = require('googleapis');
+const { sessionSecret } = require('./sessionSecret');
 
 // For Node.js < 18, we would need: const fetch = require('node-fetch');
 // Node.js 18+ has built-in fetch
@@ -11,7 +12,6 @@ class OAuthManager {
     console.log('🔧 [DEBUG] GOOGLE_CLIENT_ID:', process.env.GOOGLE_CLIENT_ID ? 'SET' : 'MISSING');
     console.log('🔧 [DEBUG] GOOGLE_CLIENT_SECRET:', process.env.GOOGLE_CLIENT_SECRET ? 'SET' : 'MISSING');
     console.log('🔧 [DEBUG] GOOGLE_REDIRECT_URI:', process.env.GOOGLE_REDIRECT_URI ? 'SET' : 'MISSING');
-    console.log('🔧 [DEBUG] SESSION_SECRET:', process.env.SESSION_SECRET ? 'SET' : 'MISSING');
     
     this.algorithm = 'aes-256-gcm';
     
@@ -37,13 +37,8 @@ class OAuthManager {
   }
 
   getEncryptionKey() {
-    const sessionSecret = process.env.SESSION_SECRET;
-    if (!sessionSecret) {
-      throw new Error('SESSION_SECRET required for token encryption');
-    }
-
     // Create a 32-byte key from the session secret
-    return crypto.scryptSync(sessionSecret, 'google-photos-salt', 32);
+    return crypto.scryptSync(sessionSecret(), 'google-photos-salt', 32);
   }
 
   encrypt(text) {

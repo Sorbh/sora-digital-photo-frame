@@ -1,4 +1,5 @@
 const os = require('os');
+const net = require('net');
 const QRCode = require('qrcode');
 const { currentTenant, runWithTenant } = require('../context');
 const { rotateSession } = require('../utils/session');
@@ -10,6 +11,21 @@ const { passClientError } = require('../utils/httpError');
 const START_LIMIT = 20; // new codes per IP in START_WINDOW_MS
 const START_WINDOW_MS = 10 * 60 * 1000;
 const LOCAL_HOSTS = ['localhost', '127.0.0.1', '::1', '[::1]'];
+const MAX_TRACKED = 10000; // addresses remembered for the start limit
+
+// One key per household: an IPv4 address, or the /64 an IPv6 address is in,
+// since one connection usually gets a whole /64 and could rotate through it.
+function addressGroup(ip) {
+  const address = String(ip || 'unknown').split('%')[0];
+  const v4 = address.replace(/^::ffff:/i, '');
+  if (net.isIPv4(v4)) return v4;
+  if (!net.isIPv6(address)) return address;
+  const [head, tail] = address.split('::');
+  const front = head ? head.split(':') : [];
+  const back = tail ? tail.split(':') : [];
+  const groups = tail === undefined ? front : [...front, ...Array(8 - front.length - back.length).fill('0'), ...back];
+  return `${groups.slice(0, 4).map(g => parseInt(g, 16).toString(16)).join(':')}::/64`;
+}
 
 /**
  * Pairing a frame by QR code, and signing paired frames back in.
@@ -29,14 +45,28 @@ class PairingController {
     return req.ip || req.socket?.remoteAddress || 'unknown';
   }
 
-  tooManyStarts(ip) {
+  tooManyStarts(address) {
     const now = Date.now();
-    const recent = (this.starts.get(ip) || []).filter(t => now - t < START_WINDOW_MS);
+    const recent = (this.starts.get(address) || []).filter(t => now - t < START_WINDOW_MS);
     // Refused tries don't count, so a frame retrying every minute gets back in
     const refused = recent.length >= START_LIMIT;
     if (!refused) recent.push(now);
-    this.starts.set(ip, recent);
+    this.starts.delete(address); // re-added at the end, so the Map stays oldest first
+    this.starts.set(address, recent);
+    if (this.starts.size > MAX_TRACKED) this.forgetOldStarts(now);
     return refused;
+  }
+
+  // Keeps the start limit's memory bounded: drop addresses with no recent
+  // starts, then the longest quiet ones
+  forgetOldStarts(now) {
+    for (const [address, times] of this.starts) {
+      if (!times.some(t => now - t < START_WINDOW_MS)) this.starts.delete(address);
+    }
+    for (const address of this.starts.keys()) {
+      if (this.starts.size <= MAX_TRACKED) break;
+      this.starts.delete(address);
+    }
   }
 
   // The address a phone can open. A frame on the server itself uses
@@ -66,10 +96,11 @@ class PairingController {
 
   async start(req, res) {
     try {
-      if (this.tooManyStarts(this.clientIp(req))) {
+      const address = addressGroup(this.clientIp(req));
+      if (this.tooManyStarts(address)) {
         return res.status(429).json({ success: false, error: 'Too many codes. Try again in a few minutes.' });
       }
-      const created = pairing.start();
+      const created = pairing.start(address);
       if (!created) return res.status(503).json({ success: false, error: 'Too many frames are pairing. Try again shortly.' });
 
       const url = `${this.publicAddress(req)}/pair?code=${created.code}`;
@@ -222,3 +253,4 @@ class PairingController {
 }
 
 module.exports = new PairingController();
+module.exports.addressGroup = addressGroup;

@@ -8,6 +8,7 @@ const logger = require('./middleware/logger');
 const errorHandler = require('./middleware/errorHandler');
 const webpFallback = require('./middleware/webpFallback');
 const media = require('./middleware/media');
+const sameOrigin = require('./middleware/sameOrigin');
 const EncryptedPhotoLibrary = require('./library/EncryptedPhotoLibrary');
 const EncryptedDataStore = require('./store/EncryptedDataStore');
 const { keysFromEnv } = require('./crypto/keys');
@@ -19,7 +20,7 @@ const LocalDataStore = require('./store/LocalDataStore');
 const { setDataStore } = require('./store');
 const { tenantMiddleware } = require('./context');
 const { setQuota } = require('./services/quotaService');
-const { setAuthProvider, setPublicPhotos, requirePhotoViewer } = require('./middleware/auth');
+const { setAuthProvider, setPublicPhotos, requirePhotoViewer, announceAdminPassword } = require('./middleware/auth');
 const { setEvents } = require('./events');
 const accessAccounts = require('./controllers/accessAccountController');
 
@@ -37,6 +38,7 @@ const accessAccounts = require('./controllers/accessAccountController');
  *   quota         { canAdd(bytes) -> { ok, message } } for the current tenant (default: unlimited)
  *   events        { devicePaired, devicesRemoved, familyCodeSet } handlers (see events.js)
  *   pinSignIn     false turns off PIN sign-in for frames
+ *   trustProxy    Express 'trust proxy' setting (default: TRUST_PROXY, else 1 = one proxy in front)
  *   publicPhotos  true lets anyone who can reach the server load photos, thumbnails, folders
  *                 and notes without signing in, as before (default: PUBLIC_PHOTOS=true, else off)
  *   familyCode    true: a frame signing in with a PIN also gives its family code, so a
@@ -46,7 +48,7 @@ const accessAccounts = require('./controllers/accessAccountController');
  *   beforeRoutes  function(app) run after core middleware, before core routes,
  *                 e.g. to mount extra sign-in routes
  */
-function createApp({ sessionStore, beforeRoutes, library, dataStore, resolveTenant, auth, quota, events, pinSignIn = true, publicPhotos = process.env.PUBLIC_PHOTOS === 'true', familyCode = false, keys = keysFromEnv() } = {}) {
+function createApp({ sessionStore, beforeRoutes, library, dataStore, resolveTenant, auth, quota, events, pinSignIn = true, trustProxy = process.env.TRUST_PROXY, publicPhotos = process.env.PUBLIC_PHOTOS === 'true', familyCode = false, keys = keysFromEnv() } = {}) {
   const sessionSecret = process.env.SESSION_SECRET;
   if (!sessionSecret) {
     throw new Error('SESSION_SECRET environment variable not set');
@@ -62,6 +64,7 @@ function createApp({ sessionStore, beforeRoutes, library, dataStore, resolveTena
   setLibrary(photoLibrary);
   setDataStore(store);
   setAuthProvider(auth);
+  if (!auth?.requireAuth) announceAdminPassword();
   setPublicPhotos(publicPhotos);
   if (publicPhotos) console.warn('⚠️  PUBLIC_PHOTOS is on: anyone who can reach this server can see your photos and notes without signing in.');
   setQuota(quota);
@@ -69,8 +72,10 @@ function createApp({ sessionStore, beforeRoutes, library, dataStore, resolveTena
   accessAccounts.pinSignIn = pinSignIn !== false;
   accessAccounts.familyCode = familyCode === true;
 
-  // Trust proxy if running behind reverse proxy
-  app.set('trust proxy', 1);
+  // Which X-Forwarded-* headers to believe (client address, https). The default, 1,
+  // fits one reverse proxy in front. With nothing in front, set TRUST_PROXY=false,
+  // so nobody can pick their own address by sending the header.
+  app.set('trust proxy', trustProxySetting(trustProxy));
 
   app.use(cors());
   app.use(express.json());
@@ -91,6 +96,8 @@ function createApp({ sessionStore, beforeRoutes, library, dataStore, resolveTena
   }));
 
   app.use(logger);
+  // Changes only from this site's own pages (see middleware/sameOrigin)
+  app.use(sameOrigin);
   app.use(tenantMiddleware(resolveTenant));
 
   // Static files
@@ -118,6 +125,15 @@ function createApp({ sessionStore, beforeRoutes, library, dataStore, resolveTena
   app.use(errorHandler);
 
   return app;
+}
+
+// TRUST_PROXY: "false"/"true", a number of proxies, or addresses Express understands
+function trustProxySetting(value) {
+  if (value === undefined || value === null || value === '') return 1;
+  if (typeof value !== 'string') return value;
+  if (value === 'false') return false;
+  if (value === 'true') return true;
+  return /^\d+$/.test(value) ? Number(value) : value;
 }
 
 // Create the uploads folder and the default photo folders

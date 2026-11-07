@@ -165,10 +165,10 @@ class PairingController {
       const limit = accessAccounts.checkRateLimit(ip);
       if (!limit.allowed) return res.status(429).json({ success: false, error: limit.message, code: 'RATE_LIMITED' });
 
+      accessAccounts.recordFailedAttempt(ip); // counted before checking, cleared on success
       const device = await pairing.signIn(req.body?.token);
       const account = device && (await accessAccounts.loadAccounts()).find(a => a.id === device.accountId);
       if (!account) {
-        accessAccounts.recordFailedAttempt(ip);
         return res.status(401).json({ success: false, error: 'This frame is no longer paired', code: 'DEVICE_UNKNOWN' });
       }
       accessAccounts.recordSuccessfulAttempt(ip);

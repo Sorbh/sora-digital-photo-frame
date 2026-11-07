@@ -186,3 +186,8 @@ server/data/notes.json
 
 # Generated thumbnails
 server/cache/
+
+# Throwaway folders the tests make
+server/tests/*-cache/
+server/tests/*-data/
+server/tests/*-uploads/

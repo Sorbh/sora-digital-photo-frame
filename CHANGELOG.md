@@ -15,6 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 - Photos, thumbnails, folder listings and the frame's notes now need a signed-in viewer: the admin, a PIN account or a paired frame. Before, anyone who could reach the server could load them from `/uploads/…`, `/api/images/random` and the thumbnail and folder routes, even when frames used a PIN ([#30](https://github.com/Sorbh/sora-digital-photo-frame/issues/30)). Frames that sign in keep working. If something loads photos without signing in, such as a home dashboard, set `PUBLIC_PHOTOS=true` to keep the old behaviour.
+- **No default admin password.** Without `ADMIN_PASSWORD`, or with the old default `admin123`, the server makes up a password, keeps it in `data/admin-password` and prints it at start. If you signed in with `admin123`, look in the logs for the new one or set your own. `docker-compose.yml` no longer fills in `admin123`.
+- Wrong admin passwords are locked out (5 per address, 20 from everyone, for 15 minutes, doubling each time). Passwords are compared in constant time.
+- PIN guesses also count against the whole family, so faking `X-Forwarded-For` or spreading guesses over many addresses no longer gets around the limit. Each lockout in a row lasts twice as long (up to a day). A burst of PIN tries sent at once no longer slips past the limit. `TRUST_PROXY` sets which proxy headers to believe; set it to `false` if nothing sits in front of the server.
+- Changes (POST, PUT, PATCH, DELETE) are refused unless they come from the frame's own pages, so another site on the same network, such as a router page, can't send a form as the signed-in admin.
+- Google Photos: thumbnails and imports are only fetched from Google's photo addresses, so the admin's Google token can't be sent elsewhere; the thumbnail route only sends images. Imported photos are stored like uploads (WebP, a name of our own, no metadata), so a file named `x.html` can't end up on the site.
+- Dependencies: express 4.22, sharp 0.35 (libvips fixes), multer 2. The Docker image runs Node 22 (sharp needs 20+).
 
 ### Changed
 - Uploads can be up to 25 MB each (was 10 MB), so 48 MP phone photos fit. Only the resized copy is stored.

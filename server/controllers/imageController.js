@@ -6,6 +6,7 @@ const { assertCanAdd } = require('../services/quotaService');
 const sharp = require('sharp');
 const thumbnails = require('../services/thumbnailService');
 const { sharpInput } = require('../utils/heic');
+const { displayCopy } = require('../utils/displayCopy');
 const snaps = require('../services/snapService');
 const playOrder = require('../services/playOrderService');
 const photoInfo = require('../services/photoInfoService');
@@ -276,15 +277,7 @@ class ImageController {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
         const filename = `${file.fieldname}-${uniqueSuffix}.webp`;
         // A display copy sized for frames: upright, WebP, no metadata (GPS stays private)
-        const buffer = await sharp(...await sharpInput(file.buffer, { animated: file.mimetype === 'image/gif' }))
-          .rotate()
-          .resize(
-            parseInt(process.env.MAX_RESOLUTION_WIDTH) || 2560,
-            parseInt(process.env.MAX_RESOLUTION_HEIGHT) || 2560,
-            { fit: 'inside', withoutEnlargement: true }
-          )
-          .webp({ quality: parseInt(process.env.IMAGE_QUALITY) || 82 })
-          .toBuffer();
+        const buffer = await displayCopy(file.buffer, { animated: file.mimetype === 'image/gif' });
         await assertCanAdd(buffer.length);
         const added = await getLibrary().addPhoto(toAdminPath(targetDir), {
           buffer, originalName: filename, contentType: 'image/webp'

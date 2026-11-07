@@ -28,7 +28,7 @@ This document explains how to run the Digital Photo Frame application using Dock
 
 4. **Access the application:**
    - Open http://localhost:3000 in your browser (or your custom HOST_PORT)
-   - Default admin password: `admin123` (or your custom ADMIN_PASSWORD)
+   - Admin password: your ADMIN_PASSWORD. Without one, the server makes one up and prints it: `docker compose logs photo-frame | grep password`
 
 5. **Stop the application:**
    ```bash
@@ -88,7 +88,8 @@ SESSION_SECRET=$(openssl rand -base64 32)
 | `CONTAINER_PORT` | Internal container port | No | 3000 |
 | `NODE_ENV` | Node environment | No | production |
 | `SESSION_SECRET` | Session encryption key | **Yes** | - |
-| `ADMIN_PASSWORD` | Admin login password | **Recommended** | admin123 |
+| `ADMIN_PASSWORD` | Admin login password | **Recommended** | made up at first start, printed in the logs |
+| `TRUST_PROXY` | Which `X-Forwarded-*` headers to believe. `false` if nothing sits in front of the server | No | 1 (one reverse proxy) |
 | `GOOGLE_CLIENT_ID` | Google Photos API client ID | No | - |
 | `GOOGLE_CLIENT_SECRET` | Google Photos API secret | No | - |
 | `GOOGLE_REDIRECT_URI` | Google OAuth redirect URI | No | - |
@@ -118,7 +119,7 @@ node -e "const bcrypt=require('bcryptjs'); console.log(bcrypt.hashSync('MyPasswo
 ADMIN_PASSWORD=$2b$10$xyz...  # Your bcrypt hash
 ```
 
-⚠️ **Security Warning:** The default password `admin123` is used if no `ADMIN_PASSWORD` is set. Always change this in production!
+⚠️ **Security:** there is no default password. Without `ADMIN_PASSWORD` (or with the old default `admin123`), the server makes up a password, keeps it in the data volume and prints it in the logs at every start. Wrong passwords are locked out after 5 tries from one address, or 20 from everyone, for 15 minutes, doubling each time.
 
 ## Health Check
 

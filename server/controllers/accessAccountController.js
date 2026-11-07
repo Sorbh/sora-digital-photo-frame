@@ -5,6 +5,7 @@ const { rotateSession } = require('../utils/session');
 const { currentTenant } = require('../context');
 const pairing = require('../services/pairingService');
 const familyCodes = require('../services/familyCodeService');
+const AttemptLimiter = require('../utils/attemptLimiter');
 
 // bcrypt cost for PINs: each sign-in compares against every account's hash, so keep it modest
 const PIN_ROUNDS = 10;
@@ -14,10 +15,8 @@ class AccessAccountController {
         // Rate limiting for PIN attempts
         this.pinSignIn = true; // createApp({ pinSignIn: false }) turns it off
         this.familyCode = false; // createApp({ familyCode: true }): PIN sign-in also needs the family code (hosted)
-        this.rateLimiter = new Map(); // Map<IP, {attempts: number, lockoutUntil: number, firstAttempt: number}>
-        this.maxAttempts = 5; // Maximum failed attempts
-        this.lockoutDuration = 15 * 60 * 1000; // 15 minutes in milliseconds
-        this.attemptWindow = 5 * 60 * 1000; // 5 minutes window for attempts
+        // 5 wrong tries in 5 minutes locks for 15 minutes, then 30, 60... up to a day
+        this.limiter = new AttemptLimiter({ keep: key => key.startsWith('family:') });
     }
 
     async loadAccounts() {
@@ -60,73 +59,12 @@ class AccessAccountController {
         await getDataStore().set('access-accounts', accounts);
     }
 
-    // Rate limiting methods
-    checkRateLimit(ip) {
-        const now = Date.now();
-        const record = this.rateLimiter.get(ip);
-        
-        if (!record) {
-            return { allowed: true, attemptsRemaining: this.maxAttempts };
-        }
-        
-        // Check if lockout period has expired
-        if (record.lockoutUntil && now < record.lockoutUntil) {
-            const remainingTime = Math.ceil((record.lockoutUntil - now) / 1000 / 60); // minutes
-            return { 
-                allowed: false, 
-                locked: true, 
-                remainingTime,
-                message: `Too many failed attempts. Try again in ${remainingTime} minutes.`
-            };
-        }
-        
-        // Check if attempt window has expired (reset counter)
-        if (record.firstAttempt && (now - record.firstAttempt) > this.attemptWindow) {
-            this.rateLimiter.delete(ip);
-            return { allowed: true, attemptsRemaining: this.maxAttempts };
-        }
-        
-        // Check if max attempts reached
-        if (record.attempts >= this.maxAttempts) {
-            // Set lockout
-            record.lockoutUntil = now + this.lockoutDuration;
-            const remainingTime = Math.ceil(this.lockoutDuration / 1000 / 60);
-            return {
-                allowed: false,
-                locked: true,
-                remainingTime,
-                message: `Too many failed attempts. Account locked for ${remainingTime} minutes.`
-            };
-        }
-        
-        return { 
-            allowed: true, 
-            attemptsRemaining: this.maxAttempts - record.attempts 
-        };
-    }
-    
-    recordFailedAttempt(ip) {
-        const now = Date.now();
-        const record = this.rateLimiter.get(ip);
-        
-        if (!record) {
-            this.rateLimiter.set(ip, {
-                attempts: 1,
-                firstAttempt: now,
-                lockoutUntil: null
-            });
-        } else {
-            record.attempts += 1;
-            if (!record.firstAttempt) {
-                record.firstAttempt = now;
-            }
-        }
-    }
-    
-    recordSuccessfulAttempt(ip) {
-        // Clear rate limiting on successful authentication
-        this.rateLimiter.delete(ip);
-    }
+    // Rate limiting (see utils/attemptLimiter). A key is an address, or a whole
+    // family ("family:<tenant>"), so spreading guesses over many addresses doesn't help.
+    checkRateLimit(key) { return this.limiter.check(key); }
+    recordFailedAttempt(key) { this.limiter.fail(key); }
+    forgetAttempt(key) { this.limiter.forget(key); }
+    recordSuccessfulAttempt(key) { this.limiter.clear(key); }
 
     generateAccountId() {
         return 'acc_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
@@ -380,10 +318,11 @@ class AccessAccountController {
                 });
             }
 
-            // Hosted: wrong tries count against the family too, so spreading them over many addresses doesn't help
-            const familyKey = this.familyCode && `family:${currentTenant().id}`;
-            const familyCheck = familyKey && this.checkRateLimit(familyKey);
-            if (familyCheck && !familyCheck.allowed) {
+            // Wrong tries also count against the family, so spreading them over many
+            // addresses (or faking X-Forwarded-For) doesn't help
+            const familyKey = `family:${currentTenant().id}`;
+            const familyCheck = this.checkRateLimit(familyKey);
+            if (!familyCheck.allowed) {
                 return res.status(429).json({
                     success: false,
                     error: familyCheck.message,
@@ -392,17 +331,20 @@ class AccessAccountController {
                 });
             }
 
+            // Count the try before checking it (see recordFailedAttempt)
+            this.recordFailedAttempt(clientIP);
+            this.recordFailedAttempt(familyKey);
+
             const accounts = await this.accountsForSignIn(familyCode);
             const account = await this.findByPin(accounts, pin);
 
             if (!account) {
-                // Record failed attempt
-                this.recordFailedAttempt(clientIP);
-                if (familyKey && accounts.length) this.recordFailedAttempt(familyKey);
+                // No frames to guess at (e.g. a wrong family code): not the family's try
+                if (!accounts.length) this.forgetAttempt(familyKey);
                 const newRateLimitCheck = this.checkRateLimit(clientIP);
-                
+
                 console.log(`❌ Failed PIN attempt from IP: ${clientIP}, attempts remaining: ${newRateLimitCheck.attemptsRemaining || 0}`);
-                
+
                 return res.status(401).json({
                     success: false,
                     error: 'Invalid PIN',
@@ -418,7 +360,7 @@ class AccessAccountController {
 
             // Record successful attempt (clears rate limiting)
             this.recordSuccessfulAttempt(clientIP);
-            if (familyKey) this.recordSuccessfulAttempt(familyKey);
+            this.recordSuccessfulAttempt(familyKey);
             console.log(`✅ Successful PIN authentication from IP: ${clientIP} for account: ${account.name}`);
 
             // Update last accessed time

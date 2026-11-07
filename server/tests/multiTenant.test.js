@@ -11,6 +11,7 @@ process.env.UPLOAD_DIR = testUploadsDir;
 process.env.CACHE_DIR = testCacheDir;
 process.env.DATA_DIR = testDataDir;
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
+process.env.ADMIN_PASSWORD = 'tenant-admin-pass';
 
 const { createApp } = require('../app');
 const { currentTenant, runWithTenant } = require('../context');
@@ -77,7 +78,7 @@ describe('Hosted, many tenants in one process', () => {
   test('signing a frame out in an admin browser clears its tenant along with its account', async () => {
     // The admin is signed in in this browser and pairs it as a frame too
     const browser = request.agent(app);
-    await browser.post('/api/auth/login').send({ password: process.env.ADMIN_PASSWORD || 'admin123' }).expect(200);
+    await browser.post('/api/auth/login').send({ password: 'tenant-admin-pass' }).expect(200);
     const { body: started } = await browser.post('/api/pair/start').expect(200);
     await request(app).post(`/api/admin/pair/${started.code}/approve`).set('x-tenant', 'a')
       .send({ name: 'Admin browser', newAccount: { assignedFolders: [] } }).expect(200);
@@ -93,7 +94,7 @@ describe('Hosted, many tenants in one process', () => {
 
   test('frame sign-in gives the browser a new session id and keeps a signed-in admin', async () => {
     const browser = request.agent(app);
-    const login = await browser.post('/api/auth/login').send({ password: process.env.ADMIN_PASSWORD || 'admin123' }).expect(200);
+    const login = await browser.post('/api/auth/login').send({ password: 'tenant-admin-pass' }).expect(200);
     const { body: started } = await browser.post('/api/pair/start').expect(200);
     await request(app).post(`/api/admin/pair/${started.code}/approve`).set('x-tenant', 'a')
       .send({ name: 'Shared browser', newAccount: { assignedFolders: [] } }).expect(200);

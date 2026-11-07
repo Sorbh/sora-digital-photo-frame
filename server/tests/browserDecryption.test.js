@@ -87,7 +87,7 @@ describe('Browser-side decryption', () => {
     expect((await sharp(Buffer.from(plain)).metadata()).format).toBe('webp');
 
     // The server URL still works as the fallback
-    const viaServer = await request(app).get(new URL(body.image.url).pathname).set('Accept', 'image/webp').expect(200);
+    const viaServer = await agent.get(new URL(body.image.url).pathname).set('Accept', 'image/webp').expect(200);
     expect(viaServer.headers['content-type']).toBe('image/webp');
   });
 });

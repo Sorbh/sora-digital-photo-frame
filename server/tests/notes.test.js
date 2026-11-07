@@ -134,11 +134,11 @@ describe('Notes', () => {
       const listed = await agent.get('/api/notes').expect(200);
       expect(listed.body.notes.find(n => n.id === id)).toMatchObject({ status: 'active' });
 
-      const active = await request(app).get('/api/notes/active').expect(200);
+      const active = await agent.get('/api/notes/active').expect(200);
       expect(active.body.notes.map(n => n.id)).toContain(id);
 
       await agent.put(`/api/notes/${id}`).send({ enabled: false }).expect(200);
-      const afterPause = await request(app).get('/api/notes/active').expect(200);
+      const afterPause = await agent.get('/api/notes/active').expect(200);
       expect(afterPause.body.notes.map(n => n.id)).not.toContain(id);
 
       await agent.delete(`/api/notes/${id}`).expect(200);

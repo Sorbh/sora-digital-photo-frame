@@ -61,13 +61,13 @@ describe('Upload pipeline', () => {
   });
 
   test('browsers that accept WebP get the WebP file', async () => {
-    const res = await request(app).get('/' + stored.path).set('Accept', 'image/webp,*/*').expect(200);
+    const res = await agent.get('/' + stored.path).set('Accept', 'image/webp,*/*').expect(200);
     expect(res.headers['content-type']).toBe('image/webp');
     expect(res.headers.vary).toMatch(/Accept/);
   });
 
   test('old browsers without WebP get a JPEG copy', async () => {
-    const res = await request(app).get('/' + stored.path).set('Accept', 'image/png,image/*;q=0.8').expect(200);
+    const res = await agent.get('/' + stored.path).set('Accept', 'image/png,image/*;q=0.8').expect(200);
     expect(res.headers['content-type']).toMatch(/^image\/jpeg/);
     expect((await sharp(res.body).metadata()).format).toBe('jpeg');
   });

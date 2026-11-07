@@ -19,7 +19,7 @@ const LocalDataStore = require('./store/LocalDataStore');
 const { setDataStore } = require('./store');
 const { tenantMiddleware } = require('./context');
 const { setQuota } = require('./services/quotaService');
-const { setAuthProvider } = require('./middleware/auth');
+const { setAuthProvider, setPublicPhotos, requirePhotoViewer } = require('./middleware/auth');
 const { setEvents } = require('./events');
 const accessAccounts = require('./controllers/accessAccountController');
 
@@ -37,6 +37,8 @@ const accessAccounts = require('./controllers/accessAccountController');
  *   quota         { canAdd(bytes) -> { ok, message } } for the current tenant (default: unlimited)
  *   events        { devicePaired, devicesRemoved, familyCodeSet } handlers (see events.js)
  *   pinSignIn     false turns off PIN sign-in for frames
+ *   publicPhotos  true lets anyone who can reach the server load photos, thumbnails, folders
+ *                 and notes without signing in, as before (default: PUBLIC_PHOTOS=true, else off)
  *   familyCode    true: a frame signing in with a PIN also gives its family code, so a
  *                 hosted resolveTenant can tell whose frame it is (see familyCodeService)
  *   keys          key provider ({ currentKey, getKey }, see crypto/keys.js) to encrypt photos
@@ -44,7 +46,7 @@ const accessAccounts = require('./controllers/accessAccountController');
  *   beforeRoutes  function(app) run after core middleware, before core routes,
  *                 e.g. to mount extra sign-in routes
  */
-function createApp({ sessionStore, beforeRoutes, library, dataStore, resolveTenant, auth, quota, events, pinSignIn = true, familyCode = false, keys = keysFromEnv() } = {}) {
+function createApp({ sessionStore, beforeRoutes, library, dataStore, resolveTenant, auth, quota, events, pinSignIn = true, publicPhotos = process.env.PUBLIC_PHOTOS === 'true', familyCode = false, keys = keysFromEnv() } = {}) {
   const sessionSecret = process.env.SESSION_SECRET;
   if (!sessionSecret) {
     throw new Error('SESSION_SECRET environment variable not set');
@@ -60,6 +62,8 @@ function createApp({ sessionStore, beforeRoutes, library, dataStore, resolveTena
   setLibrary(photoLibrary);
   setDataStore(store);
   setAuthProvider(auth);
+  setPublicPhotos(publicPhotos);
+  if (publicPhotos) console.warn('⚠️  PUBLIC_PHOTOS is on: anyone who can reach this server can see your photos and notes without signing in.');
   setQuota(quota);
   setEvents(events);
   accessAccounts.pinSignIn = pinSignIn !== false;
@@ -91,10 +95,10 @@ function createApp({ sessionStore, beforeRoutes, library, dataStore, resolveTena
 
   // Static files
   if (photoLibrary.staticDir) {
-    app.use('/uploads', webpFallback(photoLibrary.staticDir), express.static(photoLibrary.staticDir));
+    app.use('/uploads', requirePhotoViewer, webpFallback(photoLibrary.staticDir), express.static(photoLibrary.staticDir));
   } else {
     // Encrypted or remote storage: serve through the library (decrypts on the server)
-    app.use('/uploads', media());
+    app.use('/uploads', requirePhotoViewer, media());
   }
   app.use('/js', express.static(path.join(__dirname, 'public/js')));
   app.use('/admin', express.static(path.join(__dirname, 'public')));

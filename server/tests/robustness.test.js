@@ -86,7 +86,7 @@ describe('Robustness', () => {
 
   describe('thumbnails', () => {
     test('are never stored by shared caches', async () => {
-      const res = await request(app).get('/api/folders/family/thumbnail').expect(200);
+      const res = await admin.get('/api/folders/family/thumbnail').expect(200);
       expect(res.headers['cache-control']).toMatch(/^private/);
     });
   });
@@ -216,9 +216,9 @@ describe('Robustness', () => {
       jest.spyOn(photoInfo, 'placeName').mockResolvedValue('Panaji, India');
     });
 
-    test('stay private from anyone who is not signed in', async () => {
-      const { body } = await request(app).get('/api/images/random').expect(200);
-      expect(body.image.info).toEqual({ takenAt: null, place: null });
+    test('stay private from anyone who is not signed in, along with the photo itself', async () => {
+      const res = await request(app).get('/api/images/random').expect(401);
+      expect(res.body.image).toBeUndefined();
     });
 
     test('reach a signed-in viewer', async () => {

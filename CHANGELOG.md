@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `createApp({ familyCode: true })`: hosted setups ask frames for a family code along with the PIN (see HOOKS.md).
 - HEIC uploads (iPhone photos), decoded with libheif in WebAssembly and stored as WebP like other photos.
 
+### Security
+- Photos, thumbnails, folder listings and the frame's notes now need a signed-in viewer: the admin, a PIN account or a paired frame. Before, anyone who could reach the server could load them from `/uploads/…`, `/api/images/random` and the thumbnail and folder routes, even when frames used a PIN ([#30](https://github.com/Sorbh/sora-digital-photo-frame/issues/30)). Frames that sign in keep working. If something loads photos without signing in, such as a home dashboard, set `PUBLIC_PHOTOS=true` to keep the old behaviour.
+
 ### Changed
 - Uploads can be up to 25 MB each (was 10 MB), so 48 MP phone photos fit. Only the resized copy is stored.
 - **License is now AGPL-3.0** (was ISC), with DCO sign-off and a contributor grant (see CONTRIBUTING).

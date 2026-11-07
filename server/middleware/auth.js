@@ -1,5 +1,60 @@
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
 const { rotateSession } = require('../utils/session');
+const AttemptLimiter = require('../utils/attemptLimiter');
+const { DATA_DIR } = require('../config/paths');
+
+// The admin password: ADMIN_PASSWORD, unless it's missing or the old default
+// (admin123). Then the server makes up one, keeps it in DATA_DIR/admin-password
+// and prints it at start, so no frame ever runs with a password anyone can guess.
+const WEAK_PASSWORDS = new Set(['admin123']);
+const GENERATED_FILE = path.join(DATA_DIR, 'admin-password');
+let generatedPassword = null;
+
+function generatedAdminPassword() {
+  if (generatedPassword) return generatedPassword;
+  try {
+    generatedPassword = fs.readFileSync(GENERATED_FILE, 'utf8').trim() || null;
+  } catch { /* not made yet */ }
+  if (!generatedPassword) {
+    generatedPassword = crypto.randomBytes(12).toString('base64url');
+    try {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+      fs.writeFileSync(GENERATED_FILE, generatedPassword + '\n', { mode: 0o600 });
+    } catch (error) {
+      console.warn(`⚠️  Could not save the admin password to ${GENERATED_FILE} (${error.message}); it changes on every restart.`);
+    }
+  }
+  return generatedPassword;
+}
+
+const adminPassword = () => {
+  const set = process.env.ADMIN_PASSWORD;
+  return set && !WEAK_PASSWORDS.has(set) ? set : generatedAdminPassword();
+};
+
+// Called once at start by a server that uses the admin password sign-in
+const announceAdminPassword = () => {
+  const set = process.env.ADMIN_PASSWORD;
+  if (set && !WEAK_PASSWORDS.has(set)) return;
+  const why = set ? 'ADMIN_PASSWORD is the old default (admin123), which anyone could guess' : 'ADMIN_PASSWORD is not set';
+  console.warn(`⚠️  ${why}. Sign in to /admin with this password: ${generatedAdminPassword()}`);
+  console.warn(`   It is kept in ${GENERATED_FILE}. Set ADMIN_PASSWORD to choose your own.`);
+};
+
+// Same length for both sides, so the comparison takes the same time whatever was typed
+const sameText = (a, b) => crypto.timingSafeEqual(
+  crypto.createHash('sha256').update(String(a)).digest(),
+  crypto.createHash('sha256').update(String(b)).digest()
+);
+
+// Wrong admin passwords: 5 per address, and 20 across everyone, before a lockout
+// that doubles each time, so the password can't be guessed by brute force
+const loginLimiter = new AttemptLimiter();
+const ADMIN_KEY = 'admin';
+const adminLimiter = new AttemptLimiter({ maxAttempts: 20, attemptWindow: 15 * 60 * 1000 });
 
 // Check if user is authenticated (default: the admin password session)
 const sessionRequireAuth = (req, res, next) => {
@@ -71,26 +126,30 @@ const sessionRequireGuest = (req, res, next) => {
 
 // Login handler
 const login = async (req, res) => {
-  const { password } = req.body;
+  const { password } = req.body || {};
 
   if (!password) {
     return res.status(400).json({ message: 'Password is required' });
   }
 
-  // Secure password comparison using bcrypt
-  const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
-
-  if (!process.env.ADMIN_PASSWORD) {
-    console.warn('⚠️  ADMIN_PASSWORD environment variable not set. Using default password "admin123". Please set ADMIN_PASSWORD environment variable for security!');
+  const ip = req.ip || req.socket?.remoteAddress || 'unknown';
+  const limit = [loginLimiter.check(ip), adminLimiter.check(ADMIN_KEY)].find(check => !check.allowed);
+  if (limit) {
+    return res.status(429).json({ message: limit.message, code: 'RATE_LIMITED', remainingTime: limit.remainingTime });
   }
+  // Counted before checking, cleared on success, so a burst can't all get in
+  loginLimiter.fail(ip);
+  adminLimiter.fail(ADMIN_KEY);
 
-  // For bcrypt hashed passwords, use bcrypt.compare()
-  // For plain text passwords (development only), use direct comparison
-  const isValidPassword = adminPassword.startsWith('$2')
-    ? await bcrypt.compare(password, adminPassword)
-    : password === adminPassword;
+  // A bcrypt hash ($2...) or the password itself
+  const expected = adminPassword();
+  const isValidPassword = expected.startsWith('$2')
+    ? await bcrypt.compare(String(password), expected)
+    : sameText(password, expected);
 
   if (isValidPassword) {
+    loginLimiter.clear(ip);
+    adminLimiter.clear(ADMIN_KEY);
     await rotateSession(req);
     req.session.authenticated = true;
     req.session.loginTime = new Date();
@@ -98,7 +157,7 @@ const login = async (req, res) => {
     console.log('🔓 Login successful');
 
     // If it's an API request, return JSON success
-    if (req.headers['content-type'] === 'application/json') {
+    if (req.is('application/json')) {
       return res.json({ message: 'Login successful', redirect: '/admin' });
     }
 
@@ -107,7 +166,7 @@ const login = async (req, res) => {
   }
 
   // Invalid password
-  if (req.headers['content-type'] === 'application/json') {
+  if (req.is('application/json')) {
     return res.status(401).json({ message: 'Invalid password' });
   }
 
@@ -163,6 +222,7 @@ module.exports = {
   requireGuest,
   requireViewer,
   requirePhotoViewer,
+  announceAdminPassword,
   setAuthProvider,
   setPublicPhotos,
   login,

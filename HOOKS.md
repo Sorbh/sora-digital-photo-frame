@@ -15,6 +15,7 @@ These options are a public contract. Treat a change to a name, an argument or a 
 | `keys` | `{ currentKey(), getKey(id) }`, may return promises | `PHOTO_ENCRYPTION_KEY`, or no encryption | `server/crypto/keys.js` |
 | `sessionStore` | `express-session` store | In memory | `server/app.js` |
 | `pinSignIn` | `false` turns off PIN sign-in for frames | On | `server/app.js` |
+| `trustProxy` | Express `trust proxy` setting | `TRUST_PROXY`, else `1` | `server/app.js` |
 | `publicPhotos` | `true` serves photos, thumbnails, folders and notes without a viewer check (`requireViewer`) | Off (`PUBLIC_PHOTOS=true` turns it on) | `server/app.js` |
 | `familyCode` | `true`: a PIN sign-in also sends the family's code (shown on the Access page), so `resolveTenant` can find the family from it. `familyCodeSet({ code, previous, tenantId })` keeps the host's index | Off | `server/services/familyCodeService.js` |
 | `beforeRoutes` | `(app) => {}`, runs after core middleware and before core routes | None | `server/app.js` |

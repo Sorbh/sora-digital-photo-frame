@@ -1,5 +1,11 @@
 const crypto = require('crypto');
+const path = require('path');
 const { currentTenant } = require('../context');
+const { isGooglePhotoUrl, fetchGooglePhoto } = require('./googleUrls');
+const { displayCopy } = require('./displayCopy');
+const { resolveAdminPath } = require('./safePath');
+const { UPLOADS_DIR } = require('../config/paths');
+const photoInfo = require('../services/photoInfoService');
 
 class JobManager {
   constructor() {
@@ -120,12 +126,13 @@ class JobManager {
           continue;
         }
 
-        // Fetch the image with authentication
-        const response = await fetch(downloadUrl, {
-          headers: {
-            'Authorization': `Bearer ${accessToken}`
-          }
-        });
+        // Fetch the image with authentication (only from Google, see utils/googleUrls)
+        if (!isGooglePhotoUrl(downloadUrl)) {
+          job.progress.failed++;
+          importResults.push({ id: item.id, success: false, error: 'Not a Google Photos address' });
+          continue;
+        }
+        const response = await fetchGooglePhoto(downloadUrl, accessToken);
 
         if (!response.ok) {
           console.error('❌ [DEBUG] Failed to download image:', response.status, response.statusText);
@@ -138,29 +145,30 @@ class JobManager {
           continue;
         }
 
-        // Get filename from mediaFile or generate one
-        let filename;
-        if (item.mediaFile && item.mediaFile.filename) {
-          filename = item.mediaFile.filename;
-        } else if (item.filename) {
-          filename = item.filename;
-        } else {
-          // Generate filename with timestamp to avoid conflicts
-          const ext = response.headers.get('content-type')?.includes('jpeg') ? 'jpg' : 'png';
-          filename = `google-photo-${Date.now()}-${i}.${ext}`;
+        // Stored like an upload: a WebP display copy with a name of our own, so a
+        // file called x.html (or one that isn't an image at all) can't end up on the site
+        const original = Buffer.from(await response.arrayBuffer());
+        let imageBuffer;
+        try {
+          imageBuffer = await displayCopy(original, { animated: /gif/i.test(response.headers.get('content-type') || '') });
+        } catch {
+          job.progress.failed++;
+          importResults.push({ id: item.id, success: false, error: 'Not a photo' });
+          continue;
         }
-
-        // Ensure filename is safe
-        filename = filename.replace(/[^a-zA-Z0-9.-]/g, '_');
-
-        // Save the file
-        const imageBuffer = Buffer.from(await response.arrayBuffer());
+        const filename = `google-${Date.now()}-${Math.round(Math.random() * 1E9)}.webp`;
         await assertCanAdd(imageBuffer.length);
         const added = await getLibrary().addPhoto(destinationPath, {
           buffer: imageBuffer,
           originalName: filename,
-          contentType: response.headers.get('content-type')
+          contentType: 'image/webp'
         });
+        // Keep when and where it was taken, read from the original before it is dropped
+        const storedPath = resolveAdminPath(added.path);
+        if (storedPath) {
+          await photoInfo.rememberUpload(storedPath, path.relative(UPLOADS_DIR, storedPath), original)
+            .catch(error => console.warn('Could not read photo info:', error.message));
+        }
 
         console.log('✅ [DEBUG] Successfully imported:', filename);
         job.progress.completed++;

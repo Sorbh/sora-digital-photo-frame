@@ -1,6 +1,7 @@
 const oauthManager = require('../utils/oauthManager');
 const jobManager = require('../utils/jobManager');
 const { passClientError } = require('../utils/httpError');
+const { isGooglePhotoUrl, fetchGooglePhoto } = require('../utils/googleUrls');
 
 // Simple async handler for error handling
 const asyncHandler = (fn) => (req, res, next) => {
@@ -370,12 +371,16 @@ const googlePhotosController = {
         });
       }
 
+      // Only Google's own photo addresses get the token (see utils/googleUrls)
+      if (!isGooglePhotoUrl(url)) {
+        return res.status(400).json({
+          success: false,
+          error: { code: 'INVALID_URL', message: 'Not a Google Photos address' }
+        });
+      }
+
       // Fetch image with authentication
-      const response = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${tokens.access_token}`
-        }
-      });
+      const response = await fetchGooglePhoto(url, tokens.access_token);
 
       if (!response.ok) {
         console.error('Failed to fetch thumbnail:', response.status, response.statusText);
@@ -388,14 +393,22 @@ const googlePhotosController = {
         });
       }
 
-      // Get content type and image data
-      const contentType = response.headers.get('content-type') || 'image/jpeg';
+      // Only ever an image, so nothing fetched can run as a page on this site
+      const contentType = (response.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
+      if (!/^image\/(jpeg|png|gif|webp|heic|heif|avif)$/.test(contentType)) {
+        return res.status(502).json({
+          success: false,
+          error: { code: 'THUMBNAIL_FETCH_FAILED', message: 'Google Photos did not send an image' }
+        });
+      }
       const imageBuffer = await response.arrayBuffer();
 
       // Set appropriate headers and send image
       res.set({
         'Content-Type': contentType,
-        'Cache-Control': 'public, max-age=3600', // Cache for 1 hour
+        'X-Content-Type-Options': 'nosniff',
+        'Content-Security-Policy': "default-src 'none'; sandbox",
+        'Cache-Control': 'private, max-age=3600', // Cache for 1 hour, in this browser only
         'Content-Length': imageBuffer.byteLength
       });
 

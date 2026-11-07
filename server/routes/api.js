@@ -17,13 +17,13 @@ router.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Public routes (no authentication required)
+// Slideshow routes: signed-in viewers only (admin, PIN account or paired frame) unless PUBLIC_PHOTOS is on
 router.get('/random-image', requirePhotoViewer, imageController.getRandomImage.bind(imageController));
 router.get('/images/random', requirePhotoViewer, imageController.getRandomImage.bind(imageController)); // New endpoint for consistency
 router.get('/images/next', requirePhotoViewer, imageController.getRandomImage.bind(imageController)); // follows the folder's play order
 router.get('/images/:imageId/thumbnail', requirePhotoViewer, imageController.getImageThumbnail.bind(imageController));
 
-// Public folder routes for slideshow
+// Folder routes for the slideshow
 router.get('/folders', requirePhotoViewer, folderController.getFolderStructure.bind(folderController));
 // Thumbnail route must come first: the (*) catch-all below would swallow it
 router.get('/folders/:folderPath(*)/thumbnail', requirePhotoViewer, folderController.getFolderThumbnail.bind(folderController));

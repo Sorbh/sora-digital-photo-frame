@@ -7,7 +7,7 @@
 **A self-hosted digital photo frame that runs in any browser.**<br>
 Put an old tablet, laptop or smart TV on the shelf and fill it with your photos.
 
-[Website](https://sora-frame.vercel.app/) · [Quick start](https://docs-sora-frame.vercel.app/quickstart/) · [Docs](https://docs-sora-frame.vercel.app/) · [API](https://docs-sora-frame.vercel.app/api-reference/introduction)
+[Website](https://soraframe.online/) · [Quick start](https://docs-sora-frame.vercel.app/quickstart/) · [Docs](https://docs-sora-frame.vercel.app/) · [API](https://docs-sora-frame.vercel.app/api-reference/introduction)
 
 ![Node 18+](https://img.shields.io/badge/node-18%2B-d6336a?style=flat-square)
 ![Docker](https://img.shields.io/badge/docker-ready-a61e6e?style=flat-square)

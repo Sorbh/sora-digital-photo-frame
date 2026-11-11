@@ -54,6 +54,7 @@ class PhotoFrameAdmin {
         window.addEventListener('sora:languagechange', () => this.onLanguageChange());
         this.updateURL(); // Ensure URL reflects current path
         this.loadFolderContents();
+        this.takeSharedPhotos();
         this.checkFeatureFlags();
     }
 
@@ -1038,33 +1039,48 @@ class PhotoFrameAdmin {
         return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
     }
 
-    // The server takes a limited number of files per request. Answers like a fetch
-    // response: null if the session expired, otherwise { ok, json() } for the whole upload.
-    async uploadInBatches(files, targetPath, batchSize = 10) {
+    // Sends the photos one at a time (js/photoUpload.js). Answers like a fetch response:
+    // null if the session expired, otherwise { ok, json() } for the whole upload.
+    async uploadInBatches(files, targetPath) {
         const list = Array.from(files);
-        const uploaded = [];
-        for (let i = 0; i < list.length; i += batchSize) {
-            // path goes first so multer sees it before the files arrive
-            const formData = new FormData();
-            formData.append('path', targetPath);
-            list.slice(i, i + batchSize).forEach(file => formData.append('images', file));
-
-            const response = await this.authenticatedFetch('/api/upload', { method: 'POST', body: formData });
-            if (!response) return null;
-            const data = await response.json().catch(() => ({}));
-            // A failed batch can still have saved some files (quota running out mid-way)
-            uploaded.push(...(data.files || []));
-            if (!response.ok) {
-                const message = i18n.error(data, 'admin.uploadFailed');
-                if (uploaded.length) this.loadFolderContents(); // show what did get saved
-                return { ok: false, json: async () => ({
-                    ...data,
-                    code: undefined, // already translated into message
-                    message: uploaded.length ? t('admin.uploadPartial', { done: uploaded.length, total: list.length, message }) : message
-                }) };
-            }
+        const result = await PhotoUpload.uploadAll(list, targetPath, { onProgress: progress => this.setUploadProgress(progress) });
+        if (result.sessionExpired) {
+            this.handleSessionExpired();
+            return null;
         }
-        return { ok: true, json: async () => ({ files: uploaded }) };
+        if (result.ok) {
+            PhotoUpload.offerInstall(t);
+            return { ok: true, json: async () => ({ files: result.files }) };
+        }
+        // Some photos can be saved before one fails (the account filling up mid-way)
+        const failed = result.status === 0 ? {} : result.data;
+        const message = i18n.error(failed, 'admin.uploadFailed');
+        if (result.files.length) this.loadFolderContents(); // show what did get saved
+        return { ok: false, json: async () => ({
+            ...failed,
+            code: undefined, // already translated into message
+            message: result.files.length ? t('admin.uploadPartial', { done: result.files.length, total: list.length, message }) : message
+        }) };
+    }
+
+    // The real state of an upload, on whichever progress bar is showing
+    setUploadProgress({ done, total, fraction }) {
+        const width = `${Math.round(fraction * 100)}%`;
+        const text = t('admin.uploadingCount', { done: Math.min(done + 1, total), total });
+        document.querySelectorAll('.progress-fill, .empty-state-progress-fill').forEach(bar => { bar.style.width = width; });
+        document.querySelectorAll('.progress-text, .empty-state-progress-text').forEach(label => { label.textContent = text; });
+    }
+
+    // Photos shared from the phone's gallery arrive here, ready to upload into the open folder
+    async takeSharedPhotos() {
+        PhotoUpload.registerShareWorker();
+        const shared = (await PhotoUpload.takeShared()).filter(isImageFile);
+        if (new URLSearchParams(location.search).has('shared')) history.replaceState(null, '', location.pathname + location.hash);
+        if (!shared.length) return;
+        this.showUploadModal();
+        this.selectedFiles = shared;
+        this.updateUploadButton();
+        this.updateSelectedFilesDisplay();
     }
 
     async uploadFiles() {
@@ -1100,18 +1116,6 @@ class PhotoFrameAdmin {
         document.getElementById('uploadProgress').classList.remove('hidden');
         const progressFill = document.querySelector('.progress-fill');
         progressFill.style.width = '0%';
-        
-        // Simulate progress
-        let progress = 0;
-        const interval = setInterval(() => {
-            progress += Math.random() * 20;
-            if (progress > 90) progress = 90;
-            progressFill.style.width = progress + '%';
-            
-            if (progress >= 90) {
-                clearInterval(interval);
-            }
-        }, 200);
     }
 
     hideUploadProgress() {
@@ -1946,18 +1950,6 @@ class PhotoFrameAdmin {
         document.getElementById('emptyStateUploadProgress').classList.remove('hidden');
         const progressFill = document.querySelector('.empty-state-progress-fill');
         progressFill.style.width = '0%';
-        
-        // Simulate progress
-        let progress = 0;
-        const interval = setInterval(() => {
-            progress += Math.random() * 20;
-            if (progress > 90) progress = 90;
-            progressFill.style.width = progress + '%';
-            
-            if (progress >= 90) {
-                clearInterval(interval);
-            }
-        }, 200);
     }
 
     hideEmptyStateUploadProgress() {

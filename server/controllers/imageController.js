@@ -276,7 +276,11 @@ class ImageController {
         return res.status(400).json({ message: 'Invalid upload folder' });
       }
 
-      for (const file of uploadedFiles) {
+      // A phone that shrank a photo before sending it says what the original knew (js/photoUpload.js)
+      let sentInfo = [];
+      try { sentInfo = [].concat(JSON.parse(req.body.info || '[]')); } catch { /* not ours: ignore */ }
+
+      for (const [index, file] of uploadedFiles.entries()) {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
         const filename = `${file.fieldname}-${uniqueSuffix}.webp`;
         // A display copy sized for frames: upright, WebP, no metadata (GPS stays private)
@@ -287,7 +291,7 @@ class ImageController {
         });
         // Keep when and where it was taken, read from the original before it is dropped
         const storedPath = resolveAdminPath(added.path);
-        await photoInfo.rememberUpload(storedPath, path.relative(this.uploadsDir, storedPath), file.buffer)
+        await photoInfo.rememberUpload(storedPath, path.relative(this.uploadsDir, storedPath), file.buffer, sentInfo[index])
           .catch(error => console.warn('Could not read photo info:', error.message));
         processedFiles.push({ filename, originalname: file.originalname, path: added.path, size: buffer.length });
       }

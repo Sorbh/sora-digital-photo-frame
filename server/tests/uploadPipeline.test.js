@@ -55,6 +55,29 @@ describe('Upload pipeline', () => {
     expect(Math.max(meta.width, meta.height)).toBe(2560);
   });
 
+  test('keeps the capture data a phone sends with a photo it shrank first', async () => {
+    // What js/photoUpload.js sends: a frame-sized JPEG with no EXIF, and what the original said
+    const shrunk = await sharp({ create: { width: 2560, height: 1920, channels: 3, background: '#3c6' } }).jpeg().toBuffer();
+    const res = await agent.post('/api/upload')
+      .field('path', 'uploads/family')
+      .field('info', JSON.stringify([{ takenAt: '2021-07-04T09:30:00', lat: 26.9124, lon: 75.7873 }]))
+      .attach('images', shrunk, 'IMG_0002.jpg')
+      .expect(200);
+    const file = path.join(testUploadsDir, 'family', path.basename(res.body.files[0].path));
+    expect(await photoInfo.get(file, path.relative(testUploadsDir, file)))
+      .toMatchObject({ takenAt: '2021-07-04T09:30:00', lat: 26.9124, lon: 75.7873 });
+
+    // Anything malformed is dropped, not stored
+    const bad = await agent.post('/api/upload')
+      .field('path', 'uploads/family')
+      .field('info', JSON.stringify([{ takenAt: '<script>', lat: 999, lon: 'x' }]))
+      .attach('images', shrunk, 'IMG_0003.jpg')
+      .expect(200);
+    const badFile = path.join(testUploadsDir, 'family', path.basename(bad.body.files[0].path));
+    expect(await photoInfo.get(badFile, path.relative(testUploadsDir, badFile)))
+      .toMatchObject({ takenAt: null, lat: null, lon: null });
+  });
+
   test('strips all metadata from the stored file', async () => {
     const buffer = await fs.readFile(path.join(testUploadsDir, 'family', path.basename(stored.path)));
     expect(await exifr.parse(buffer).catch(() => undefined)).toBeUndefined();

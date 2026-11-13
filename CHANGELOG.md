@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Uploads from a phone: camera photos are shrunk in the browser to the 2560px the server stores, so they travel far smaller; when and where a photo was taken is read first and sent along. Photos go one per request with real progress, are tried again when the connection drops, and the screen stays on while they upload. Formats the browser can't read (HEIC on Android) are sent as before.
+- The library can be added to a phone's home screen (offered after an upload), and on Android it then appears in the gallery's Share menu, so photos can be sent to it from there.
 - `MAX_SCREENS` caps how many screens a library can have (off by default); adding one past it explains how to free a spot.
 - A browser that signs in with a PIN becomes one of the library's screens, as a QR-paired frame does: it's listed under its account in Access, keeps a token to come back with, and counts toward `MAX_SCREENS`. Signing out of the slideshow frees its place.
 - `createApp({ familyCode: true })`: hosted setups ask frames for a family code along with the PIN (see HOOKS.md).

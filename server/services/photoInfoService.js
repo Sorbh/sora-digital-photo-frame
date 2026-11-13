@@ -94,11 +94,27 @@ class PhotoInfoService {
    * before re-encoding drops its EXIF data. Keyed to the stored file, so
    * get() uses it instead of reading the (metadata-free) stored copy.
    */
-  async rememberUpload(fullPath, relativePath, originalBuffer) {
+  async rememberUpload(fullPath, relativePath, originalBuffer, sent) {
     await this.loadCache();
     const stat = await getLibrary().stat(toAdminPath(fullPath));
-    this.info[relativePath] = { key: `${stat.size}:${Math.round(stat.mtimeMs)}`, ...await this.readExifBuffer(originalBuffer) };
+    const read = await this.readExifBuffer(originalBuffer);
+    // A photo shrunk in the browser has lost its EXIF data; the browser read it first and sent it along
+    const told = this.sentInfo(sent);
+    this.info[relativePath] = {
+      key: `${stat.size}:${Math.round(stat.mtimeMs)}`,
+      takenAt: read.takenAt || told.takenAt,
+      lat: read.lat ?? told.lat,
+      lon: read.lon ?? told.lon
+    };
     this.scheduleSave();
+  }
+
+  // Capture data a browser sent with an upload, kept only when it is well-formed
+  sentInfo(sent) {
+    const takenAt = typeof sent?.takenAt === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(sent.takenAt) ? sent.takenAt : null;
+    const hasGps = Number.isFinite(sent?.lat) && Number.isFinite(sent?.lon)
+      && Math.abs(sent.lat) <= 90 && Math.abs(sent.lon) <= 180 && !(sent.lat === 0 && sent.lon === 0);
+    return { takenAt, lat: hasGps ? sent.lat : null, lon: hasGps ? sent.lon : null };
   }
 
   // Carry the original upload's capture data when a photo moves (its WebP copy has no EXIF).

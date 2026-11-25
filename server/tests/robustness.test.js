@@ -89,6 +89,16 @@ describe('Robustness', () => {
       const res = await admin.get('/api/folders/family/thumbnail').expect(200);
       expect(res.headers['cache-control']).toMatch(/^private/);
     });
+
+    test('are checked with the server again before the browser reuses them', async () => {
+      for (const url of ['/api/folders/family/thumbnail?v=1', '/api/folders/family/thumbnail']) {
+        const res = await admin.get(url).expect(200);
+        expect(res.headers['cache-control']).toBe('private, no-cache');
+        expect(res.headers.etag).toBeTruthy();
+        // Still signed in and allowed: the browser can keep its copy
+        await admin.get(url).set('If-None-Match', res.headers.etag).expect(304);
+      }
+    });
   });
 
   describe('uploads', () => {

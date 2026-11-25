@@ -277,7 +277,7 @@ class FolderController {
         });
       }
 
-      thumbnails.send(res, await thumbnails.getThumbnail(firstImage), { versioned: Boolean(req.query.v) });
+      thumbnails.send(res, await thumbnails.getThumbnail(firstImage));
     } catch (error) {
       if (passClientError(res, error)) return;
       console.error('Error serving folder thumbnail:', error);

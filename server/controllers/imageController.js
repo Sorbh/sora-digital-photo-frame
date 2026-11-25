@@ -240,7 +240,7 @@ class ImageController {
         });
       }
 
-      thumbnails.send(res, await thumbnails.getThumbnail(imagePath), { versioned: Boolean(req.query.v) });
+      thumbnails.send(res, await thumbnails.getThumbnail(imagePath));
     } catch (error) {
       if (passClientError(res, error)) return;
       console.error('Error generating image thumbnail:', error);

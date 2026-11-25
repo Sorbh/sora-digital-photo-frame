@@ -127,12 +127,11 @@ class ThumbnailService {
   /**
    * Send a thumbnail; ETag/Last-Modified come from sendFile.
    */
-  send(res, thumbPath, { versioned = true } = {}) {
-    // Versioned URLs (?v=...) change with the source, so they can be cached for long
-    // private: tenants share these URLs, so a shared cache must never keep one
-    res.set('Cache-Control', versioned
-      ? 'private, max-age=604800, immutable'
-      : 'private, max-age=300, stale-while-revalidate=86400');
+  send(res, thumbPath) {
+    // private: tenants share these URLs, so a shared cache must never keep one.
+    // no-cache: the browser keeps its copy but asks first (a cheap 304 via the ETag),
+    // so it stops showing it after signing out or losing access to the folder.
+    res.set('Cache-Control', 'private, no-cache');
     res.vary('Accept');
     if (acceptsWebp(res.req)) {
       res.type('image/webp');

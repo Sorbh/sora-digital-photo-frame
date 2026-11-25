@@ -306,18 +306,16 @@ class FolderSelector {
                 flex-shrink: 0;
             }
 
-            /* 44px tap target that still draws the 22px chevron in the same spot:
-               the negative margin keeps the row layout, and the button sits
-               above the start of the thumbnail it overlaps */
+            /* 44px tap target around the 22px chevron. The negative end margin
+               cancels the row gap, so the button ends where the thumbnail starts
+               and the two never overlap. */
             .expand-btn {
-                position: relative;
-                z-index: 1;
                 display: grid;
-                place-items: center start;
+                place-items: center;
                 width: 44px;
                 height: 44px;
                 flex-shrink: 0;
-                margin-right: -28px;
+                margin-inline-end: -12px;
                 padding: 0;
                 border: 0;
                 background: transparent;
@@ -438,6 +436,7 @@ class FolderSelector {
             /* Phones: icon-only so the dock fits the screen */
             @media (max-width: 600px) {
                 .folder-selector-btn {
+                    flex-shrink: 0;
                     width: 44px;
                     height: 44px;
                     padding: 0;

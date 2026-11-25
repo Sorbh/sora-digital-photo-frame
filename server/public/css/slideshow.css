@@ -356,7 +356,12 @@ body.is-paused .paused-badge {
 
 .controls {
     position: absolute;
-    left: 50%;
+    /* Centred with auto margins rather than left: 50%, so the dock sizes to its
+       buttons instead of shrinking them to fit half the screen */
+    left: 0;
+    right: 0;
+    width: max-content;
+    margin: 0 auto;
     bottom: calc(clamp(1.25rem, 4vh, 2.5rem) + env(safe-area-inset-bottom, 0px));
     z-index: 10;
     display: flex;
@@ -364,7 +369,7 @@ body.is-paused .paused-badge {
     gap: 2px;
     padding: 6px;
     border-radius: var(--shape-lg);
-    transform: translate(-50%, 12px);
+    transform: translateY(12px);
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.35s ease, transform 0.45s var(--ease-out);
@@ -389,12 +394,13 @@ body.chrome-visible .controls,
 .controls:hover,
 .controls:has(.open) {
     opacity: 1;
-    transform: translate(-50%, 0);
+    transform: none;
     pointer-events: auto;
 }
 
 .dock-btn {
     display: grid;
+    flex-shrink: 0;
     place-items: center;
     width: 44px;
     height: 44px;

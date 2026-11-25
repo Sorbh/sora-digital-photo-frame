@@ -207,13 +207,15 @@ class FolderSelector {
             }
 
             .folder-dropdown {
+                /* Moves the panel off its centre; phones use it to centre on the safe area */
+                --folder-shift: 0px;
                 position: absolute;
                 bottom: calc(100% + 18px);
                 left: 50%;
                 width: 21rem;
                 max-width: calc(100vw - 2rem);
                 padding: 6px;
-                transform: translateX(-50%);
+                transform: translateX(calc(-50% + var(--folder-shift)));
                 transform-origin: 50% 100%;
                 border: 1px solid rgba(255, 255, 255, 0.08);
                 border-radius: var(--shape-lg);
@@ -227,8 +229,8 @@ class FolderSelector {
             }
 
             @keyframes folder-pop {
-                from { opacity: 0; transform: translateX(-50%) translateY(8px) scale(0.97); }
-                to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+                from { opacity: 0; transform: translateX(calc(-50% + var(--folder-shift))) translateY(8px) scale(0.97); }
+                to { opacity: 1; transform: translateX(calc(-50% + var(--folder-shift))) translateY(0) scale(1); }
             }
 
             .folder-dropdown.hidden {
@@ -435,6 +437,23 @@ class FolderSelector {
                 .dropdown-arrow {
                     display: none;
                 }
+
+                /* The button sits off-centre in the dock, so hang the panel from
+                   the dock instead, which is centred on the screen, and keep it
+                   inside the safe area (notches, rounded corners) */
+                .controls .folder-selector {
+                    position: static;
+                }
+
+                .folder-dropdown {
+                    --folder-shift: calc((env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)) / 2);
+                    bottom: calc(100% + 12px);
+                    max-width: calc(100vw - 1.5rem - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px));
+                }
+
+                .folder-options {
+                    max-height: min(56vh, 30rem, calc(100vh - 12rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
+                }
             }
         `;
         document.head.appendChild(styles);
@@ -457,6 +476,7 @@ class FolderSelector {
     openDropdown() {
         this.isOpen = true;
         this.container.classList.add('open');
+        this.container.closest('.controls')?.classList.add('picker-open');
         this.container.querySelector('.folder-dropdown').classList.remove('hidden');
         
         // Load folders if not already loaded
@@ -471,6 +491,7 @@ class FolderSelector {
     closeDropdown() {
         this.isOpen = false;
         this.container.classList.remove('open');
+        this.container.closest('.controls')?.classList.remove('picker-open');
         this.container.querySelector('.folder-dropdown').classList.add('hidden');
     }
 

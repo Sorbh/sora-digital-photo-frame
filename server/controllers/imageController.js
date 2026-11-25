@@ -74,8 +74,10 @@ class ImageController {
   async getRandomImage(req, res) {
     try {
       // Already decoded by Express: decoding again breaks folder names with %.
-      // ?folder[]=x still works as before (an array reads as its joined text).
-      const folderFilter = req.query.folder == null ? '' : String(req.query.folder);
+      // ?folder[]=x still works as before (an array reads as its joined text, and
+      // an empty ?folder[]= is still a filter that matches nothing).
+      const hasFolderFilter = Boolean(req.query.folder);
+      const folderFilter = hasFolderFilter ? String(req.query.folder) : '';
       const allImages = await this.getAllImages();
       
       if (allImages.length === 0) {
@@ -110,7 +112,7 @@ class ImageController {
       }
       
       // Apply folder filter if specified
-      if (folderFilter) {
+      if (hasFolderFilter) {
         const decodedFolder = folderFilter;
 
         availableImages = availableImages.filter(img => {
@@ -131,7 +133,7 @@ class ImageController {
       // The folder being played decides the order: shuffle, by date, or the
       // order set in the library. Ordered play is stateless: the frame sends
       // the last photo it showed (?after=) and gets the one after it.
-      const baseDir = folderFilter ? resolveAdminPath(path.join('uploads', folderFilter)) : this.uploadsDir;
+      const baseDir = hasFolderFilter ? resolveAdminPath(path.join('uploads', folderFilter)) : this.uploadsDir;
       const { order } = baseDir ? await playOrder.read(baseDir) : { order: 'shuffle' };
       const randomImage = order === 'shuffle'
         ? this.pickShuffled(availableImages)

@@ -19,6 +19,9 @@ const LocalPhotoLibrary = require('../library/LocalPhotoLibrary');
 // Folder and file names that are also URL syntax (and still valid on Windows)
 const FOLDER = '50% off #1';
 const FILE = 'a#b%c.png';
+const onWindows = process.platform === 'win32';
+const Q_FOLDER = 'Trip?';
+const Q_FILE = 'a?b.png';
 const png = color => sharp({ create: { width: 8, height: 8, channels: 3, background: color } }).png().toBuffer();
 
 describe('Photo URLs for names with # and %', () => {
@@ -33,6 +36,11 @@ describe('Photo URLs for names with # and %', () => {
     // Photos elsewhere, so a slideshow that ignored the folder would show them
     await fs.ensureDir(path.join(testUploadsDir, 'other'));
     for (let i = 0; i < 5; i += 1) await fs.writeFile(path.join(testUploadsDir, 'other', `o${i}.png`), await png('#2b6ec4'));
+    // ? is not allowed in Windows file names
+    if (!onWindows) {
+      await fs.ensureDir(path.join(testUploadsDir, Q_FOLDER));
+      await fs.writeFile(path.join(testUploadsDir, Q_FOLDER, Q_FILE), picture);
+    }
     await admin.post('/api/auth/login').send({ password: 'urls-admin-pass' }).expect(200);
   });
 
@@ -72,6 +80,21 @@ describe('Photo URLs for names with # and %', () => {
       const { body } = await admin.get(`/api/images/next?folder%5B%5D=${encodeURIComponent(FOLDER)}`).expect(200);
       expect(body.image.filename).toBe(FILE);
     }
+  });
+
+  test('an empty ?folder[]= still finds no photos, as before', async () => {
+    const res = await admin.get('/api/images/next?folder%5B%5D=').expect(404);
+    expect(res.body.code).toBe('FOLDER_EMPTY');
+  });
+
+  (onWindows ? test.skip : test)('a ? in folder and file names stays part of the path', async () => {
+    const { body } = await admin.get('/api/images/next').query({ folder: Q_FOLDER }).expect(200);
+    expect(body.image.filename).toBe(Q_FILE);
+    const url = new URL(body.image.url);
+    expect(url.pathname).toBe('/uploads/Trip%3F/a%3Fb.png');
+    expect(url.search).toBe('');
+    const res = await admin.get(url.pathname).expect(200);
+    expect(Buffer.compare(res.body, picture)).toBe(0);
   });
 
   test('the admin grid gets the same URL', async () => {

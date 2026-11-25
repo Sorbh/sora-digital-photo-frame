@@ -37,16 +37,27 @@ function canOpen(req, relativePath) {
   return canSee(req, relativePath) || foldersBelow(req, relativePath).length > 0;
 }
 
-// For /uploads: photos outside the account's folders look like they don't exist
-function requireVisiblePhoto(req, res, next) {
+// The photo an /uploads request asks for (relative to uploads), or null when it
+// can't be decoded, has "." or ".." segments, or a backslash. The check and the
+// file read both use this one path, so they can't disagree about which photo it is.
+function photoPath(req) {
   let relativePath;
   try {
     relativePath = decodeURIComponent(req.path);
   } catch {
-    return res.status(400).end();
+    return null;
   }
-  if (canSee(req, relativePath)) return next();
+  if (relativePath.includes('\\')) return null;
+  const parts = relativePath.split('/');
+  if (parts.some(part => part === '.' || part === '..')) return null;
+  return parts.filter(Boolean).join('/');
+}
+
+// For /uploads: photos outside the account's folders look like they don't exist
+function requireVisiblePhoto(req, res, next) {
+  const relativePath = photoPath(req);
+  if (relativePath !== null && canSee(req, relativePath)) return next();
   return res.status(404).json({ message: 'Not found', code: 'NOT_FOUND' });
 }
 
-module.exports = { assignedFolders, canSee, canOpen, foldersBelow, requireVisiblePhoto };
+module.exports = { assignedFolders, canSee, canOpen, foldersBelow, photoPath, requireVisiblePhoto };

@@ -312,7 +312,7 @@ class FolderSelector {
                 width: 22px;
                 height: 22px;
                 flex-shrink: 0;
-                margin-right: -6px;
+                margin-inline-end: -6px;
                 border: 0;
                 border-radius: var(--shape-xs);
                 background: transparent;
@@ -533,7 +533,7 @@ class FolderSelector {
             const indentPadding = level * 20; // 20px per level
             
             element.innerHTML = `
-                <div class="folder-option-content" style="padding-left: ${indentPadding}px;">
+                <div class="folder-option-content" style="padding-inline-start: ${indentPadding}px;">
                     ${hasSubfolders ? 
                         `<button class="expand-btn" data-expanded="${isExpanded}">
                             <span class="material-icons">${isExpanded ? 'keyboard_arrow_down' : 'keyboard_arrow_right'}</span>

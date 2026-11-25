@@ -55,7 +55,25 @@ describe('Request logging keeps secrets out of the logs', () => {
     expect(output.join('\n')).not.toContain(id);
   });
 
+  test('family code in a PIN sign-in is never logged', async () => {
+    await request(app).post('/api/auth/pin').send({ pin: '864213', familyCode: 'QWER-TYUI' });
+    expect(output.join('\n')).not.toMatch(/QWER-TYUI/);
+  });
+
+  test('a body that is not valid JSON is neither logged nor echoed back', async () => {
+    const res = await request(app).post('/api/auth/pin')
+      .set('Content-Type', 'application/json')
+      .send('{"pin": "975310", "familyCode": "ZXCV-BNMA"');
+    expect(res.status).toBe(400);
+    expect(JSON.stringify(res.body)).not.toMatch(/975310|ZXCV-BNMA/);
+    const logs = output.join('\n');
+    expect(logs).toMatch(/entity\.parse\.failed/);
+    expect(logs).not.toMatch(/975310/);
+    expect(logs).not.toMatch(/ZXCV-BNMA/);
+  });
+
   test('secrets in query strings and guest link paths are hidden', () => {
+    expect(redactUrl('/slideshow?pin=4321&family=ABCD-EFGH')).toBe('/slideshow?pin=[redacted]&family=[redacted]');
     expect(redactUrl('/slideshow?pin=4321&folder=family')).toBe('/slideshow?pin=[redacted]&folder=family');
     expect(redactUrl('/api/x?Token=abc')).toBe('/api/x?Token=[redacted]');
     expect(redactUrl('/g/AbCdEfGhIj.sometoken/upload')).toBe('/g/[redacted]/upload');
@@ -65,5 +83,6 @@ describe('Request logging keeps secrets out of the logs', () => {
   test('nested and differently-cased keys are redacted', () => {
     expect(redact({ user: { Password: 'x', name: 'Ann' }, items: [{ idToken: 'y' }], Authorization: 'Bearer z' }))
       .toEqual({ user: { Password: '[redacted]', name: 'Ann' }, items: [{ idToken: '[redacted]' }], Authorization: '[redacted]' });
+    expect(redact({ pin: '1234', familyCode: 'ABCD-EFGH' })).toEqual({ pin: '[redacted]', familyCode: '[redacted]' });
   });
 });

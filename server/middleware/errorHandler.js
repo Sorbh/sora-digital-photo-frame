@@ -1,5 +1,12 @@
 // Global error handling middleware
 const errorHandler = (err, req, res, next) => {
+  // A body that could not be read: the error holds the raw body and its message can
+  // quote it, so log only the kind of error and answer without echoing it back
+  if (err.type && 'body' in err) {
+    console.error(`Error: request body could not be read (${err.type})`);
+    return res.status(err.status || 400).json({ message: 'Invalid request body.' });
+  }
+
   console.error('Error:', err);
 
   // Multer errors

@@ -1,5 +1,7 @@
 // Fields whose values never reach the logs, matched case-insensitively at any depth
-const SENSITIVE_KEY = /^(password|pass|passwd|pin|token|idtoken|accesstoken|refreshtoken|secret|code|authorization|apikey|key|keys|cookie)$/i;
+const SENSITIVE_KEY = /^(password|pass|passwd|pin|token|idtoken|accesstoken|refreshtoken|secret|code|familycode|authorization|apikey|key|keys|cookie)$/i;
+// Also hidden in query strings: the slideshow's ?family= sign-in address
+const SENSITIVE_QUERY_KEY = /^family$/i;
 const REDACTED = '[redacted]';
 const MAX_DEPTH = 6;
 
@@ -24,7 +26,7 @@ const redactUrl = (url) => {
     const [key] = pair.split('=');
     let name = key;
     try { name = decodeURIComponent(key); } catch { /* keep as is */ }
-    return SENSITIVE_KEY.test(name) ? `${key}=${REDACTED}` : pair;
+    return SENSITIVE_KEY.test(name) || SENSITIVE_QUERY_KEY.test(name) ? `${key}=${REDACTED}` : pair;
   });
   return `${safePath}?${params.join('&')}`;
 };

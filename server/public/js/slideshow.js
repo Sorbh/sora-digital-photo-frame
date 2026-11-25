@@ -51,7 +51,7 @@ class AuthenticationManager {
         this.bindEvents();
         // Frames with no keyboard can open /slideshow?pin=123456 (hosted: &family=ABCD-EFGH)
         // and sign in by themselves. A browser that already is a screen uses its token first.
-        const urlPin = new URLSearchParams(location.search).get('pin')?.trim();
+        const urlPin = this.takeSignInFromUrl();
         const deviceToken = localStorage.getItem(DEVICE_TOKEN_KEY);
         if (deviceToken) {
             this.signInAsDevice(deviceToken, urlPin);
@@ -60,6 +60,20 @@ class AuthenticationManager {
         } else {
             this.checkExistingSession();
         }
+    }
+
+    // Read the PIN and family code from the address once, then take them out of it,
+    // so they stay out of the browser history and of later requests
+    takeSignInFromUrl() {
+        const url = new URL(location.href);
+        const pin = url.searchParams.get('pin')?.trim();
+        this.urlFamilyCode = url.searchParams.get('family')?.trim() || '';
+        if (url.searchParams.has('pin') || url.searchParams.has('family')) {
+            url.searchParams.delete('pin');
+            url.searchParams.delete('family');
+            history.replaceState(history.state, '', url.pathname + url.search + url.hash);
+        }
+        return pin;
     }
 
     // Keep a frame that is left running signed in to its account
@@ -100,7 +114,7 @@ class AuthenticationManager {
     // The family code typed in, from the address, or remembered from last time
     familyCodeValue() {
         const typed = this.familyInput?.value.trim();
-        return typed || new URLSearchParams(location.search).get('family')?.trim() || localStorage.getItem(FAMILY_CODE_KEY) || '';
+        return typed || this.urlFamilyCode || localStorage.getItem(FAMILY_CODE_KEY) || '';
     }
 
     // Hosted: show the family code field above the PIN

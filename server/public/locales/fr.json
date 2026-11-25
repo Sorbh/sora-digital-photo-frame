@@ -191,7 +191,12 @@
     "donePaired": "{name} est <em>associé</em>",
     "expiredHeading": "Ce code a <em>expiré</em>",
     "heading": "Afficher des photos sur <em>ce cadre</em>",
-    "codeMatchHint": "Vérifiez qu’il correspond à l’écran du cadre"
+    "codeMatchHint": "Vérifiez qu’il correspond à l’écran du cadre",
+    "enterHeading": "Saisissez le <em>code</em>",
+    "enterNote": "Le cadre l’affiche sous son code QR, par exemple <bdi class=\"code-example\">K7P-4QX</bdi>.",
+    "continue": "Continuer",
+    "codeInvalid": "Saisissez les 6 lettres et chiffres affichés sur le cadre.",
+    "typeCode": "Saisir un code"
   },
   "login": {
     "invalid_password": "Mot de passe incorrect. Veuillez réessayer.",

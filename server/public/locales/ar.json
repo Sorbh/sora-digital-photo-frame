@@ -194,7 +194,12 @@
     "donePaired": "تم <em>اقتران</em> {name}",
     "expiredHeading": "انتهت <em>صلاحية</em> هذا الرمز",
     "heading": "اعرض الصور على <em>هذا الإطار</em>",
-    "codeMatchHint": "تأكّد من أنه يطابق الرمز على شاشة الإطار"
+    "codeMatchHint": "تأكّد من أنه يطابق الرمز على شاشة الإطار",
+    "enterHeading": "اكتب <em>الرمز</em>",
+    "enterNote": "يظهر الرمز على الإطار أسفل رمز QR، مثل <bdi class=\"code-example\">K7P-4QX</bdi>.",
+    "continue": "متابعة",
+    "codeInvalid": "اكتب الأحرف والأرقام الستة الظاهرة على الإطار.",
+    "typeCode": "كتابة رمز"
   },
   "login": {
     "invalid_password": "كلمة المرور غير صحيحة. يُرجى المحاولة مرة أخرى.",

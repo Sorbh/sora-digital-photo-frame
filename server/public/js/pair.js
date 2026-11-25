@@ -1,9 +1,12 @@
-// Approving a frame that showed a QR code: /pair?code=K7P4QX
+// Approving a frame that showed a QR code: /pair?code=K7P4QX, or /pair to type the code
 (() => {
     const NEW = '__new__';
+    const CODE_LENGTH = 6;
     const $ = id => document.getElementById(id);
-    const code = new URLSearchParams(location.search).get('code') || '';
-    const states = ['stateLoading', 'stateExpired', 'pairForm', 'stateDone'];
+    // As shown on the frame (K7P-4QX), any case, with or without the hyphen or spaces
+    const normalize = value => String(value || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    let code = normalize(new URLSearchParams(location.search).get('code'));
+    const states = ['stateLoading', 'stateEnter', 'stateExpired', 'pairForm', 'stateDone'];
 
     const show = id => states.forEach(s => $(s).classList.toggle('hidden', s !== id));
     const pretty = c => `${c.slice(0, 3)}-${c.slice(3)}`;
@@ -76,8 +79,14 @@
         return { ok: response.ok, status: response.status, data: await response.json() };
     }
 
+    function showEnter() {
+        show('stateEnter');
+        if (matchMedia('(pointer: fine)').matches) $('codeInput').focus();
+    }
+
     async function load() {
-        if (!code) return show('stateExpired');
+        if (!code) return showEnter();
+        show('stateLoading');
         try {
             const pairing = await getJson(`/api/admin/pair/${encodeURIComponent(code)}`);
             if (!pairing.ok || pairing.data.approved) return show('stateExpired');
@@ -94,6 +103,24 @@
             show('stateExpired');
         }
     }
+
+    $('stateEnter').addEventListener('submit', event => {
+        event.preventDefault();
+        const typed = normalize($('codeInput').value);
+        if (typed.length !== CODE_LENGTH) {
+            $('codeError').textContent = t('pair.codeInvalid');
+            $('codeError').classList.remove('hidden');
+            $('codeInput').focus();
+            return;
+        }
+        $('codeError').classList.add('hidden');
+        code = typed;
+        // So a reload, or signing in again, comes back to this code
+        history.replaceState(null, '', `/pair?code=${encodeURIComponent(code)}`);
+        load();
+    });
+
+    $('codeInput').addEventListener('input', () => $('codeError').classList.add('hidden'));
 
     $('pairForm').addEventListener('submit', async event => {
         event.preventDefault();
@@ -144,6 +171,7 @@
     $('accountList').addEventListener('change', updateNewAccount);
     window.addEventListener('sora:languagechange', () => {
         renderDone();
+        if (!$('codeError').classList.contains('hidden')) $('codeError').textContent = t('pair.codeInvalid');
         if (loaded) {
             renderAccounts(loaded.accounts);
             renderFolders(loaded.folders);

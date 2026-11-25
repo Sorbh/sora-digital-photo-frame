@@ -190,7 +190,12 @@
     "donePaired": "{name} <em>已配对</em>",
     "expiredHeading": "此代码<em>已过期</em>",
     "heading": "在<em>这个相框</em>上显示照片",
-    "codeMatchHint": "请核对它与相框屏幕上的代码一致"
+    "codeMatchHint": "请核对它与相框屏幕上的代码一致",
+    "enterHeading": "输入<em>代码</em>",
+    "enterNote": "代码显示在相框的二维码下方，例如 <bdi class=\"code-example\">K7P-4QX</bdi>。",
+    "continue": "继续",
+    "codeInvalid": "请输入相框上显示的 6 位字母和数字。",
+    "typeCode": "输入代码"
   },
   "login": {
     "invalid_password": "密码错误，请重试。",

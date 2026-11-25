@@ -100,6 +100,13 @@ body {
     text-decoration: none;
 }
 
+.pair-links {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+}
+
 .pair-link .material-icons {
     font-size: 18px;
     color: var(--berry);
@@ -176,6 +183,22 @@ body {
 .field input[type="text"]:focus {
     border-color: var(--berry);
     box-shadow: 0 0 0 4px var(--safelight-soft);
+}
+
+/* Typed by hand from the frame's screen, so as big and plain as the code there */
+.field input.code-input {
+    font-family: var(--font-mono);
+    font-size: 1.5rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+}
+
+.code-example {
+    white-space: nowrap;
+}
+
+.field input.code-input::placeholder {
+    color: var(--ink-faint);
 }
 
 .choice-list,
@@ -283,4 +306,9 @@ body {
 .pair-submit:disabled {
     opacity: 0.6;
     cursor: progress;
+}
+
+/* The arrow points the way the page reads */
+html[dir="rtl"] #stateEnter .pair-submit .material-icons {
+    transform: scaleX(-1);
 }

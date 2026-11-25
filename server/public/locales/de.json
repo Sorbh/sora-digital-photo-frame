@@ -190,7 +190,12 @@
     "donePaired": "{name} ist <em>gekoppelt</em>",
     "expiredHeading": "Dieser Code ist <em>abgelaufen</em>",
     "heading": "Fotos auf <em>diesem Rahmen</em> zeigen",
-    "codeMatchHint": "Prüfen Sie, ob er mit dem Code auf dem Rahmen übereinstimmt"
+    "codeMatchHint": "Prüfen Sie, ob er mit dem Code auf dem Rahmen übereinstimmt",
+    "enterHeading": "Code <em>eingeben</em>",
+    "enterNote": "Der Rahmen zeigt ihn unter seinem QR-Code an, etwa <bdi class=\"code-example\">K7P-4QX</bdi>.",
+    "continue": "Weiter",
+    "codeInvalid": "Geben Sie die 6 Buchstaben und Ziffern vom Rahmen ein.",
+    "typeCode": "Code eingeben"
   },
   "login": {
     "invalid_password": "Falsches Passwort. Bitte versuchen Sie es noch einmal.",

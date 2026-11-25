@@ -190,7 +190,12 @@
     "donePaired": "{name} <em>जुड़ गया</em> है",
     "expiredHeading": "इस कोड की <em>समय-सीमा</em> खत्म हो गई है",
     "heading": "<em>इस फ़्रेम</em> पर फोटो दिखाएँ",
-    "codeMatchHint": "देख लें कि यह फ़्रेम की स्क्रीन वाले कोड से मिलता है"
+    "codeMatchHint": "देख लें कि यह फ़्रेम की स्क्रीन वाले कोड से मिलता है",
+    "enterHeading": "<em>कोड</em> लिखें",
+    "enterNote": "फ़्रेम इसे अपने QR कोड के नीचे दिखाता है, जैसे <bdi class=\"code-example\">K7P-4QX</bdi>।",
+    "continue": "आगे बढ़ें",
+    "codeInvalid": "फ़्रेम पर दिख रहे 6 अक्षर और अंक लिखें।",
+    "typeCode": "कोड लिखें"
   },
   "login": {
     "invalid_password": "पासवर्ड गलत है। कृपया फिर से कोशिश करें।",

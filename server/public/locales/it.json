@@ -191,7 +191,12 @@
     "donePaired": "{name} è <em>abbinata</em>",
     "expiredHeading": "Questo codice è <em>scaduto</em>",
     "heading": "Mostra le foto su <em>questa cornice</em>",
-    "codeMatchHint": "Controlla che sia uguale a quello sullo schermo della cornice"
+    "codeMatchHint": "Controlla che sia uguale a quello sullo schermo della cornice",
+    "enterHeading": "Scrivi il <em>codice</em>",
+    "enterNote": "La cornice lo mostra sotto il codice QR, ad esempio <bdi class=\"code-example\">K7P-4QX</bdi>.",
+    "continue": "Continua",
+    "codeInvalid": "Scrivi le 6 lettere e cifre mostrate sulla cornice.",
+    "typeCode": "Scrivi un codice"
   },
   "login": {
     "invalid_password": "Password non valida. Riprova.",

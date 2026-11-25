@@ -361,7 +361,10 @@ body.is-paused .paused-badge {
     left: 0;
     right: 0;
     width: max-content;
+    max-width: calc(100% - 8px); /* wraps to a second row rather than clipping */
     margin: 0 auto;
+    flex-wrap: wrap;
+    justify-content: center;
     bottom: calc(clamp(1.25rem, 4vh, 2.5rem) + env(safe-area-inset-bottom, 0px));
     z-index: 10;
     display: flex;
@@ -1033,6 +1036,17 @@ body.note-showing .photo-caption {
 
     body.is-paused .photo-caption {
         top: 3.75rem;
+    }
+}
+
+/* 320px phones: no dividers and a slimmer frame keep all seven 44px buttons on one row */
+@media (max-width: 339px) {
+    .controls {
+        padding: 4px 2px;
+    }
+
+    .dock-divider {
+        display: none;
     }
 }
 

@@ -246,11 +246,13 @@ class FolderSelector {
                 color: rgba(255, 244, 239, 0.55);
             }
 
+            /* 44px target; the negative margins keep the header as tall as before */
             .close-dropdown {
                 display: grid;
                 place-items: center;
-                width: 28px;
-                height: 28px;
+                width: 44px;
+                height: 44px;
+                margin: -8px -8px -8px 0;
                 border: 0;
                 border-radius: 50%;
                 background: transparent;

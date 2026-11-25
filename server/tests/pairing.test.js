@@ -134,6 +134,53 @@ describe('Pairing a frame by QR code', () => {
     expect(collected.body).toMatchObject({ status: 'approved', device: { name: 'Den frame' } });
   });
 
+  test('a malformed secret is just a wrong one', async () => {
+    const frame = request.agent(app);
+    const pairing = await start(frame);
+    // As many characters as the real secret, but more bytes
+    const odd = 'é'.repeat(pairing.secret.length);
+    expect((await status(frame, pairing, odd)).status).toBe('expired');
+    expect((await collect(frame, pairing, odd)).status).toBe('expired');
+    expect((await status(frame, pairing)).status).toBe('waiting');
+  });
+
+  test('starting a pairing keeps no session on the server', async () => {
+    const res = await request(app).post('/api/pair/start').expect(200);
+    const cookies = (res.headers['set-cookie'] || []).join(';');
+    expect(cookies).not.toContain('photoframe.sid');
+  });
+
+  test('each tab of a browser can collect its own pairing', async () => {
+    const browser = request.agent(app);
+    const first = await start(browser);
+    const second = await start(browser);
+    await admin.post(`/api/admin/pair/${first.code}/approve`).send({ name: 'First tab', newAccount: {} }).expect(200);
+    expect((await collect(browser, first)).status).toBe('approved');
+    await admin.post(`/api/admin/pair/${second.code}/approve`).send({ name: 'Second tab', newAccount: {} }).expect(200);
+    expect((await collect(browser, second)).status).toBe('approved');
+  });
+
+  test('an approval that finishes after the code expired is undone', async () => {
+    const before = (await admin.get('/api/admin/devices').expect(200)).body.devices.length;
+    const frame = request.agent(app);
+    const started = await start(frame);
+    const service = require('../services/pairingService');
+    const addDevice = service.addDevice;
+    service.addDevice = async function (...args) {
+      const made = await addDevice.apply(this, args);
+      service.pairings.get(started.code).expiresAt = Date.now() - 1; // took past the deadline
+      return made;
+    };
+    try {
+      const res = await admin.post(`/api/admin/pair/${started.code}/approve`).send({ name: 'Too late', newAccount: {} });
+      expect(res.body.code).toBe('PAIRING_EXPIRED');
+      expect(res.status).toBe(404);
+    } finally {
+      service.addDevice = addDevice;
+    }
+    expect((await admin.get('/api/admin/devices').expect(200)).body.devices).toHaveLength(before);
+  });
+
   test('two approvals at the same time pair the frame once', async () => {
     const devicesBefore = (await admin.get('/api/admin/devices').expect(200)).body.devices.length;
     const accountsBefore = (await admin.get('/api/access-accounts').expect(200)).body.accounts.length;

@@ -30,9 +30,20 @@ class FlakyStore extends LocalDataStore {
   }
 }
 
+// A session store that can fail to swap a session id, like a database going away
+const session = require('express-session');
+let sessionsDown = false;
+class FlakySessions extends session.MemoryStore {
+  destroy(sid, callback) {
+    if (sessionsDown) return callback(new Error('sessions are down'));
+    return super.destroy(sid, callback);
+  }
+}
+
 let failEvents = false;
 const app = createApp({
   dataStore: new FlakyStore(),
+  sessionStore: new FlakySessions(),
   events: {
     devicesRemoved() {
       if (failEvents) throw new Error('host index is down');
@@ -134,6 +145,25 @@ describe('Robustness', () => {
       storeDown = true;
       await poll().expect(500);
       storeDown = false;
+      const { body } = await poll().expect(200);
+      expect(body.status).toBe('approved');
+      expect(body.token).toBeTruthy();
+    });
+
+    test('a frame can still collect its pairing after the session store failed', async () => {
+      await dataStore.set('access-accounts', [{ id: 'acc_pair', name: 'Grandma', pinHash: 'x', assignedFolders: [] }]);
+      const frame = request.agent(app);
+      const { body: started } = await frame.post('/api/pair/start').expect(200);
+      await frame.get('/api/auth/session'); // the frame has a session whose id is swapped at sign-in
+      await pairing.approve(started.code, { name: 'Tablet', accountId: 'acc_pair' });
+      const poll = () => frame.post('/api/pair/collect').send({ code: started.code, secret: started.secret });
+
+      sessionsDown = true;
+      try {
+        await poll().expect(500);
+      } finally {
+        sessionsDown = false;
+      }
       const { body } = await poll().expect(200);
       expect(body.status).toBe('approved');
       expect(body.token).toBeTruthy();

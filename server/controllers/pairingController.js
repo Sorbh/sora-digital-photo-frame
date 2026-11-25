@@ -1,4 +1,5 @@
 const os = require('os');
+const crypto = require('crypto');
 const net = require('net');
 const QRCode = require('qrcode');
 const { currentTenant, runWithTenant } = require('../context');
@@ -12,6 +13,11 @@ const START_LIMIT = 20; // new codes per IP in START_WINDOW_MS
 const START_WINDOW_MS = 10 * 60 * 1000;
 const LOCAL_HOSTS = ['localhost', '127.0.0.1', '::1', '[::1]'];
 const MAX_TRACKED = 10000; // addresses remembered for the start limit
+// Marks the browser that started a pairing, so only it can collect. A cookie of
+// its own rather than the session, so a pairing that's never finished leaves
+// nothing behind on the server.
+const BROWSER_COOKIE = 'photoframe.pairing';
+const BROWSER_KEY = /^[A-Za-z0-9_-]{32}$/;
 
 // One key per household: an IPv4 address, or the /64 an IPv6 address is in,
 // since one connection usually gets a whole /64 and could rotate through it.
@@ -91,6 +97,15 @@ class PairingController {
     return home || addresses[0] || null;
   }
 
+  // This browser's pairing key, if it has one
+  browserKey(req) {
+    for (const part of String(req.headers.cookie || '').split(';')) {
+      const [name, ...value] = part.trim().split('=');
+      if (name === BROWSER_COOKIE && BROWSER_KEY.test(value.join('='))) return value.join('=');
+    }
+    return null;
+  }
+
   sessionAccount(account) {
     return { id: account.id, name: account.name, assignedFolders: account.assignedFolders || [] };
   }
@@ -101,11 +116,14 @@ class PairingController {
       if (this.tooManyStarts(address)) {
         return res.status(429).json({ success: false, error: 'Too many codes. Try again in a few minutes.' });
       }
-      const created = pairing.start(address);
+      // Kept if the browser has one, so each of its tabs can collect its own pairing
+      const browser = this.browserKey(req) || crypto.randomBytes(24).toString('base64url');
+      const created = pairing.start(address, browser);
       if (!created) return res.status(503).json({ success: false, error: 'Too many frames are pairing. Try again shortly.' });
 
-      // Only this browser can collect it (see collect)
-      req.session.pairingCode = created.code;
+      res.cookie(BROWSER_COOKIE, browser, {
+        httpOnly: true, sameSite: 'strict', secure: req.secure, path: '/api/pair', maxAge: pairing.PAIRING_TTL_MS
+      });
       const url = `${this.publicAddress(req)}/pair?code=${created.code}`;
       const qr = await QRCode.toString(url, { type: 'svg', margin: 1, errorCorrectionLevel: 'M', color: { dark: '#2a1020', light: '#ffffff' } });
       res.json({ success: true, code: created.code, secret: created.secret, expiresAt: created.expiresAt, url, qr });
@@ -117,7 +135,12 @@ class PairingController {
   }
 
   async status(req, res) {
-    res.json({ success: true, status: pairing.status(req.query.code, req.query.secret) });
+    try {
+      res.json({ success: true, status: pairing.status(req.query.code, req.query.secret) });
+    } catch (error) {
+      console.error('Error checking pairing:', error);
+      res.status(500).json({ success: false, error: 'Could not check pairing' });
+    }
   }
 
   // A POST, so only this site's own pages can send it (middleware/sameOrigin), and
@@ -125,10 +148,7 @@ class PairingController {
   async collect(req, res) {
     try {
       const { code, secret } = req.body || {};
-      if (!req.session?.pairingCode || req.session.pairingCode !== pairing.normalize(code)) {
-        return res.json({ success: true, status: 'expired' });
-      }
-      const result = pairing.collect(code, secret);
+      const result = pairing.collect(code, secret, this.browserKey(req));
       if (result.status !== 'approved') return res.json({ success: true, status: result.status });
 
       // The frame has no session yet; having the pairing secret lets it act as the approving tenant
@@ -139,13 +159,13 @@ class PairingController {
           if (found) await pairing.markSeen(result.device.id);
           return found;
         });
+        if (!account) return res.json({ success: true, status: 'expired' });
+        await rotateSession(req);
       } catch (error) {
+        // Not handed over: the frame can collect again on its next poll
         result.restore();
         throw error;
       }
-      if (!account) return res.json({ success: true, status: 'expired' });
-      delete req.session.pairingCode;
-      await rotateSession(req);
       req.session.accessAccount = this.sessionAccount(account);
       req.session.deviceId = result.device.id;
       req.session.tenantId = result.tenant.id;

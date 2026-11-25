@@ -14,8 +14,9 @@ function setup(options = {}) {
   const press = SoraLongPress.attach(tile, { onLongPress, ...options });
   tile.addEventListener('click', onClick);
   tile.addEventListener('contextmenu', onMenu);
-  const click = () => {
-    const event = new Event('click', { cancelable: true });
+  // detail is 1 for a click from a tap or a mouse, 0 for Enter or Space
+  const click = (detail = 1) => {
+    const event = Object.assign(new Event('click', { cancelable: true }), { detail });
     tile.dispatchEvent(event);
     return event;
   };
@@ -62,6 +63,35 @@ describe('library long press', () => {
     tile.dispatchEvent(pointer('pointerup')); // some browsers send no click after a hold
     tile.dispatchEvent(pointer('pointerdown'));
     tile.dispatchEvent(pointer('pointerup'));
+    click();
+    expect(onClick).toHaveBeenCalledTimes(1);
+  });
+
+  test('a keyboard click after a hold is never swallowed', () => {
+    const { tile, onClick, click } = setup();
+    tile.dispatchEvent(pointer('pointerdown'));
+    jest.advanceTimersByTime(SoraLongPress.DELAY);
+    tile.dispatchEvent(pointer('pointerup'));
+    expect(click(0).defaultPrevented).toBe(false); // Enter on the tile's View button
+    expect(onClick).toHaveBeenCalledTimes(1);
+  });
+
+  test('a hold the browser cancels (a scroll) leaves no click to swallow', () => {
+    const { tile, onLongPress, onClick, click } = setup();
+    tile.dispatchEvent(pointer('pointerdown'));
+    jest.advanceTimersByTime(SoraLongPress.DELAY);
+    expect(onLongPress).toHaveBeenCalledTimes(1);
+    tile.dispatchEvent(pointer('pointercancel'));
+    click();
+    expect(onClick).toHaveBeenCalledTimes(1);
+  });
+
+  test('a click long after the hold ended goes through', () => {
+    const { tile, onClick, click } = setup();
+    tile.dispatchEvent(pointer('pointerdown'));
+    jest.advanceTimersByTime(SoraLongPress.DELAY);
+    tile.dispatchEvent(pointer('pointerup')); // and the browser sends no click
+    jest.advanceTimersByTime(SoraLongPress.CLICK_WINDOW + 1);
     click();
     expect(onClick).toHaveBeenCalledTimes(1);
   });

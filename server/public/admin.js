@@ -217,7 +217,7 @@ class PhotoFrameAdmin {
         // Context menu. The popover is "manual" because the browser's light dismiss
         // closes it on the mouse-up of the same right-click that opened it.
         document.addEventListener('pointerdown', (e) => {
-            if (e.button === 0 && !e.target.closest('#contextMenuPopover, .folder-more')) {
+            if (e.button === 0 && !e.target.closest('#contextMenuPopover, .folder-more, .photo-more')) {
                 this.hideContextMenu();
             }
         });
@@ -735,6 +735,9 @@ class PhotoFrameAdmin {
                             <span class="sr-only">${escapeHtml(t('admin.selectPhoto'))}</span>
                         </label>
                     </div>
+                    <button type="button" class="btn-icon photo-more" data-action="more" aria-haspopup="menu" aria-label="${escapeHtml(t('admin.photoOptions'))}">
+                        <span class="material-symbols-outlined">more_vert</span>
+                    </button>
                 </div>
                 <div class="photo-grid-overlay-bottom">
                     <div class="photo-grid-actions">
@@ -775,13 +778,17 @@ class PhotoFrameAdmin {
                     else this.showPhotoModal(file.url, file.name);
                 } else if (action === 'delete') {
                     this.deleteItem({...file, type});
+                } else if (action === 'more') {
+                    // Same menu as right-click (rotate, move earlier/later): the way in on touch screens
+                    this.showContextMenu(e, {...file, type});
                 }
             });
         });
         
         // Drag onto a folder to move it; a selected photo brings the whole selection along
         div.draggable = true;
-        div.querySelector('img').draggable = false;
+        // A snap without photos has no <img>, only its drawn page
+        div.querySelectorAll('img').forEach(img => { img.draggable = false; });
         div.addEventListener('dragstart', (e) => {
             div.classList.remove('selecting');
             const paths = this.selectedItems.has(file.path) ? [...this.selectedItems] : [file.path];

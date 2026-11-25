@@ -295,8 +295,8 @@ body {
 
 .snap-badge {
     position: absolute;
-    top: 10px;
-    right: 10px;
+    top: 13px;
+    inset-inline-start: 46px; /* beside the select circle; the options button has the other corner */
     z-index: 6;
     display: inline-flex;
     align-items: center;
@@ -346,7 +346,7 @@ body {
     gap: 6px;
 }
 
-.photo-grid-actions .btn-icon {
+.photo-grid-overlay .btn-icon {
     display: inline-grid;
     place-items: center;
     width: 34px;
@@ -361,23 +361,25 @@ body {
     box-shadow: none;
 }
 
-.photo-grid-actions .btn-icon:hover {
+.photo-grid-overlay .btn-icon:hover {
     background: rgb(255 255 255 / 0.95);
     color: #14120f;
 }
 
-.photo-grid-actions .btn-icon[data-action="delete"]:hover {
+.photo-grid-overlay .btn-icon[data-action="delete"]:hover {
     background: var(--destructive);
     color: #fff;
 }
 
-.photo-grid-actions .btn-icon .material-symbols-outlined {
+.photo-grid-overlay .btn-icon .material-symbols-outlined {
     font-size: 18px;
     line-height: 1;
 }
 
 .photo-grid-overlay-top {
     display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
 }
 
 .photo-grid-checkbox .label {
@@ -442,10 +444,11 @@ body {
     box-shadow: 0 0 0 3px var(--background), 0 0 0 5px var(--safelight);
 }
 
-/* Touch screens have no hover: the select circle and the View and Delete
-   buttons stay in view, at finger size, and holding a photo selects it
-   instead of opening the browser's image callout */
-@media (hover: none), (pointer: coarse) {
+/* Touch screens have no hover: the select circle, the options button and
+   the View and Delete buttons stay in view, at finger size, and holding a
+   photo selects it instead of opening the browser's image callout. Laptops
+   with a touch screen as well as a trackpad count too (any-pointer). */
+@media (hover: none), (pointer: coarse), (any-pointer: coarse) {
     .file-item.image {
         -webkit-touch-callout: none;
         -webkit-user-select: none;
@@ -457,13 +460,13 @@ body {
         opacity: 1;
     }
 
-    .photo-grid-actions .btn-icon {
+    .photo-grid-overlay .btn-icon {
         width: 44px;
         height: 44px;
         background: rgb(0 0 0 / 0.38);
     }
 
-    .photo-grid-actions .btn-icon .material-symbols-outlined {
+    .photo-grid-overlay .btn-icon .material-symbols-outlined {
         font-size: 22px;
     }
 
@@ -473,6 +476,11 @@ body {
 
     .photo-grid-info {
         right: 106px;
+    }
+
+    .snap-badge {
+        top: 17px;
+        inset-inline-start: 48px;
     }
 }
 

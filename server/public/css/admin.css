@@ -839,7 +839,8 @@ html[dir="rtl"] .photo-modal-nav-btn .material-symbols-outlined {
     transform: scaleX(-1);
 }
 
-@media (max-width: 640px), (hover: none) {
+/* any-pointer: coarse also covers touch-screen laptops with a mouse attached */
+@media (max-width: 640px), (hover: none), (any-pointer: coarse) {
     .photo-modal-nav {
         display: flex;
     }

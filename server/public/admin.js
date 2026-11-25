@@ -48,6 +48,7 @@ class PhotoFrameAdmin {
         
         // Photo modal navigation state
         this.currentImageUrl = null; // the photo open in the viewer, kept by identity across refreshes
+        this.currentImageSlot = -1; // its last position, to land nearby if it disappears
         this.availableImages = [];
         
         this.initializeEventListeners();
@@ -271,14 +272,16 @@ class PhotoFrameAdmin {
                     case 'Escape':
                         this.hidePhotoModal();
                         break;
+                    // Arrows follow the reading direction, like the on-screen
+                    // buttons: in right-to-left languages Left is next
                     case 'ArrowLeft':
+                    case 'ArrowRight': {
                         e.preventDefault();
-                        this.navigateToPreviousImage();
+                        const rtl = document.documentElement.dir === 'rtl';
+                        if ((e.key === 'ArrowRight') !== rtl) this.navigateToNextImage();
+                        else this.navigateToPreviousImage();
                         break;
-                    case 'ArrowRight':
-                        e.preventDefault();
-                        this.navigateToNextImage();
-                        break;
+                    }
                 }
             }
         });
@@ -1506,6 +1509,7 @@ class PhotoFrameAdmin {
         const modalImage = document.getElementById('modalImage');
         
         this.currentImageUrl = imageUrl;
+        this.currentImageSlot = this.currentImagePosition();
         
         modalImage.src = imageUrl;
         modalImage.alt = imageName;
@@ -1527,6 +1531,7 @@ class PhotoFrameAdmin {
     hidePhotoModal() {
         const modal = document.getElementById('photoModal');
         modal.close();
+        this.currentImageUrl = null;
         
         // Clear the image and reset state
         const modalImage = document.getElementById('modalImage');
@@ -1978,9 +1983,18 @@ class PhotoFrameAdmin {
     // Previous / next only make sense with two or more photos; without them the
     // photo gets the room the buttons would take
     updatePhotoModalNav() {
-        const many = this.availableImages.length > 1;
+        const modal = document.getElementById('photoModal');
+        const count = this.availableImages.length;
+        const many = count > 1;
         document.querySelector('.photo-modal-nav').hidden = !many;
-        document.getElementById('photoModal').classList.toggle('has-nav', many);
+        modal.classList.toggle('has-nav', many);
+
+        // The open photo went away in a refresh (deleted, moved): show the
+        // photo now in its place, or close the viewer if none are left
+        if (modal.open && this.currentImageUrl && this.currentImagePosition() === -1) {
+            if (count === 0) this.hidePhotoModal();
+            else this.navigateToImageAtIndex(Math.min(Math.max(this.currentImageSlot, 0), count - 1));
+        }
     }
 
     navigateToNextImage() {
@@ -2004,6 +2018,7 @@ class PhotoFrameAdmin {
         const modalImage = document.getElementById('modalImage');
         
         this.currentImageUrl = image.url;
+        this.currentImageSlot = index;
         modalImage.src = image.url;
         modalImage.alt = image.name;
         document.getElementById('modalPhotoName').textContent = image.name;

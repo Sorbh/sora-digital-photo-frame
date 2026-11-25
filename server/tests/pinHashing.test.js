@@ -78,4 +78,50 @@ describe('PINs are stored hashed', () => {
     expect(old.pin).toBeUndefined();
     expect(old.pinHash).toMatch(/^\$2[aby]\$/);
   });
+
+  test('PINs must be 4 to 6 digits', async () => {
+    for (const pin of ['abcd', '123', '1234567', '12 34', '12a4', 482913, ['4829']]) {
+      const res = await admin.post('/api/access-accounts').send({ name: 'Bad PIN', pin });
+      expect({ pin, status: res.status, code: res.body.code }).toEqual({ pin, status: 400, code: 'INVALID_PIN_FORMAT' });
+    }
+    const [{ id }] = await stored();
+    const res = await admin.put(`/api/access-accounts/${id}`).send({ name: 'Grandma B', pin: '12a4' }).expect(400);
+    expect(res.body.code).toBe('INVALID_PIN_FORMAT');
+    await request(app).post('/api/auth/pin').send({ pin: '7351' }).expect(200);
+    expect((await stored()).some(a => a.name === 'Bad PIN')).toBe(false);
+  });
+});
+
+describe("the family's limit on wrong PINs", () => {
+  const app = createApp();
+  const accessAccounts = require('../controllers/accessAccountController');
+  // Each try from a different address, so only the family's limit is in play
+  let address = 0;
+  const tryPin = (pin) => request(app).post('/api/auth/pin').set('X-Forwarded-For', `198.51.100.${++address}`).send({ pin });
+
+  beforeAll(async () => {
+    await fs.ensureDir(testUploadsDir);
+    const admin = request.agent(app);
+    await admin.post('/api/auth/login').send({ password: 'pin-test-admin' }).expect(200);
+    await admin.post('/api/access-accounts').send({ name: 'Grandpa', pin: '7351' }).expect(201);
+  });
+  beforeEach(() => accessAccounts.limiter.entries.clear());
+  afterAll(async () => {
+    accessAccounts.limiter.entries.clear();
+    await Promise.all([testUploadsDir, testCacheDir, testDataDir].map(dir => fs.remove(dir)));
+  });
+
+  test('is not reset by someone signing in with a PIN they know', async () => {
+    for (let i = 0; i < 4; i++) await tryPin('000000').expect(401);
+    await tryPin('7351').expect(200);
+    await tryPin('000000').expect(401);
+    const res = await tryPin('7351').expect(429);
+    expect(res.body.code).toBe('RATE_LIMITED');
+  });
+
+  test('is not used up by right PINs', async () => {
+    for (let i = 0; i < 8; i++) await tryPin('7351').expect(200);
+    for (let i = 0; i < 4; i++) await tryPin('000000').expect(401);
+    await tryPin('7351').expect(200);
+  });
 });

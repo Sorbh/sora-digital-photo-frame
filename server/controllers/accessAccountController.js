@@ -9,6 +9,14 @@ const AttemptLimiter = require('../utils/attemptLimiter');
 
 // bcrypt cost for PINs: each sign-in compares against every account's hash, so keep it modest
 const PIN_ROUNDS = 10;
+// PINs are 4 to 6 digits, as the PIN pad and the Access page take them
+const PIN_PATTERN = /^\d{4,6}$/;
+const validPin = pin => typeof pin === 'string' && PIN_PATTERN.test(pin);
+const invalidPin = res => res.status(400).json({
+    success: false,
+    error: 'The PIN must be 4 to 6 digits',
+    code: 'INVALID_PIN_FORMAT'
+});
 
 class AccessAccountController {
     constructor() {
@@ -115,6 +123,7 @@ class AccessAccountController {
                     error: 'Name and PIN are required'
                 });
             }
+            if (!validPin(pin)) return invalidPin(res);
 
             let duplicate = false;
             let newAccount;
@@ -167,6 +176,7 @@ class AccessAccountController {
                     error: 'Name is required'
                 });
             }
+            if (pin && !validPin(pin)) return invalidPin(res);
 
             let notFound = false;
             let duplicate = false;
@@ -358,9 +368,11 @@ class AccessAccountController {
             // this account's screens (it sends its token) stays that screen.
             const screen = await this.screenFor(account, token, req.session.deviceId);
 
-            // Record successful attempt (clears rate limiting)
+            // A right PIN clears this address's wrong tries. The family only gets
+            // back this one try: someone who knows one PIN mustn't wipe the wrong
+            // tries made against the family's other PINs.
             this.recordSuccessfulAttempt(clientIP);
-            this.recordSuccessfulAttempt(familyKey);
+            this.forgetAttempt(familyKey);
             console.log(`✅ Successful PIN authentication from IP: ${clientIP} for account: ${account.name}`);
 
             // Update last accessed time

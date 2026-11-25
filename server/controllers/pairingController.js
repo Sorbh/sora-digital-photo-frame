@@ -4,6 +4,7 @@ const net = require('net');
 const QRCode = require('qrcode');
 const { currentTenant, runWithTenant } = require('../context');
 const { rotateSession } = require('../utils/session');
+const { getDataStore } = require('../store');
 
 const pairing = require('../services/pairingService');
 const accessAccounts = require('./accessAccountController');
@@ -13,10 +14,11 @@ const START_LIMIT = 20; // new codes per IP in START_WINDOW_MS
 const START_WINDOW_MS = 10 * 60 * 1000;
 const LOCAL_HOSTS = ['localhost', '127.0.0.1', '::1', '[::1]'];
 const MAX_TRACKED = 10000; // addresses remembered for the start limit
-// Marks the browser that started a pairing, so only it can collect. A cookie of
-// its own rather than the session, so a pairing that's never finished leaves
-// nothing behind on the server.
-const BROWSER_COOKIE = 'photoframe.pairing';
+// Marks the browser that started a pairing, so only it can collect: one cookie
+// per pairing (photoframe.pairing.<code>), so tabs starting at the same moment
+// don't overwrite each other's. Not the session, so a pairing that's never
+// finished leaves nothing behind on the server.
+const BROWSER_COOKIE = 'photoframe.pairing.';
 const BROWSER_KEY = /^[A-Za-z0-9_-]{32}$/;
 
 // One key per household: an IPv4 address, or the /64 an IPv6 address is in,
@@ -97,13 +99,18 @@ class PairingController {
     return home || addresses[0] || null;
   }
 
-  // This browser's pairing key, if it has one
-  browserKey(req) {
+  // This browser's key for a pairing, if it has one
+  browserKey(req, code) {
+    const cookie = BROWSER_COOKIE + pairing.normalize(code);
     for (const part of String(req.headers.cookie || '').split(';')) {
       const [name, ...value] = part.trim().split('=');
-      if (name === BROWSER_COOKIE && BROWSER_KEY.test(value.join('='))) return value.join('=');
+      if (name === cookie && BROWSER_KEY.test(value.join('='))) return value.join('=');
     }
     return null;
+  }
+
+  browserCookieOptions(req) {
+    return { httpOnly: true, sameSite: 'strict', secure: req.secure, path: '/api/pair' };
   }
 
   sessionAccount(account) {
@@ -116,14 +123,11 @@ class PairingController {
       if (this.tooManyStarts(address)) {
         return res.status(429).json({ success: false, error: 'Too many codes. Try again in a few minutes.' });
       }
-      // Kept if the browser has one, so each of its tabs can collect its own pairing
-      const browser = this.browserKey(req) || crypto.randomBytes(24).toString('base64url');
+      const browser = crypto.randomBytes(24).toString('base64url');
       const created = pairing.start(address, browser);
       if (!created) return res.status(503).json({ success: false, error: 'Too many frames are pairing. Try again shortly.' });
 
-      res.cookie(BROWSER_COOKIE, browser, {
-        httpOnly: true, sameSite: 'strict', secure: req.secure, path: '/api/pair', maxAge: pairing.PAIRING_TTL_MS
-      });
+      res.cookie(BROWSER_COOKIE + created.code, browser, { ...this.browserCookieOptions(req), maxAge: pairing.PAIRING_TTL_MS });
       const url = `${this.publicAddress(req)}/pair?code=${created.code}`;
       const qr = await QRCode.toString(url, { type: 'svg', margin: 1, errorCorrectionLevel: 'M', color: { dark: '#2a1020', light: '#ffffff' } });
       res.json({ success: true, code: created.code, secret: created.secret, expiresAt: created.expiresAt, url, qr });
@@ -136,7 +140,15 @@ class PairingController {
 
   async status(req, res) {
     try {
-      res.json({ success: true, status: pairing.status(req.query.code, req.query.secret) });
+      const { code, secret } = req.query;
+      const status = pairing.status(code, secret);
+      // Pages loaded before collection moved to a POST only poll here. A browser
+      // that says the request is from this site's own page, and that started this
+      // pairing, still gets it handed over. Can go once those pages are reloaded.
+      if (status === 'ready' && req.get('sec-fetch-site') === 'same-origin' && this.browserKey(req, code)) {
+        return this.handOver(req, res, code, secret);
+      }
+      res.json({ success: true, status });
     } catch (error) {
       console.error('Error checking pairing:', error);
       res.status(500).json({ success: false, error: 'Could not check pairing' });
@@ -146,9 +158,13 @@ class PairingController {
   // A POST, so only this site's own pages can send it (middleware/sameOrigin), and
   // only from the browser that started the pairing, since it signs that browser in
   async collect(req, res) {
+    const { code, secret } = req.body || {};
+    return this.handOver(req, res, code, secret);
+  }
+
+  async handOver(req, res, code, secret) {
     try {
-      const { code, secret } = req.body || {};
-      const result = pairing.collect(code, secret, this.browserKey(req));
+      const result = pairing.collect(code, secret, this.browserKey(req, code));
       if (result.status !== 'approved') return res.json({ success: true, status: result.status });
 
       // The frame has no session yet; having the pairing secret lets it act as the approving tenant
@@ -161,14 +177,17 @@ class PairingController {
         });
         if (!account) return res.json({ success: true, status: 'expired' });
         await rotateSession(req);
+        req.session.accessAccount = this.sessionAccount(account);
+        req.session.deviceId = result.device.id;
+        req.session.tenantId = result.tenant.id;
+        // Saved before answering, so a failure here still lets the frame try again
+        await new Promise((resolve, reject) => req.session.save(error => (error ? reject(error) : resolve())));
       } catch (error) {
         // Not handed over: the frame can collect again on its next poll
         result.restore();
         throw error;
       }
-      req.session.accessAccount = this.sessionAccount(account);
-      req.session.deviceId = result.device.id;
-      req.session.tenantId = result.tenant.id;
+      res.clearCookie(BROWSER_COOKIE + pairing.normalize(code), this.browserCookieOptions(req));
       res.json({
         success: true,
         status: 'approved',
@@ -199,8 +218,15 @@ class PairingController {
     if (!claimed) {
       return res.status(404).json({ success: false, error: 'This code has expired', code: 'PAIRING_EXPIRED' });
     }
+    let account;
+    let madeAccount = false;
+    // No frame was paired: the account made for it goes too, before answering
+    const undoAccount = async () => {
+      if (!madeAccount) return;
+      await getDataStore().update('access-accounts', [], accounts => accounts.filter(a => a.id !== account.id))
+        .catch(error => console.error('Could not remove the account made for a failed pairing:', error));
+    };
     try {
-      let account;
       if (req.body.accountId) {
         account = (await accessAccounts.loadAccounts()).find(a => a.id === req.body.accountId);
         if (!account) return res.status(400).json({ success: false, error: 'That account no longer exists' });
@@ -210,14 +236,19 @@ class PairingController {
           return res.status(400).json({ success: false, error: 'Folders must be a list of folder names' });
         }
         account = await accessAccounts.addAccountWithRandomPin({ name, assignedFolders: [...new Set(folders)] });
+        madeAccount = true;
       } else {
         return res.status(400).json({ success: false, error: 'Choose an account for the frame' });
       }
 
       const device = await pairing.approve(claimed, { name, accountId: account.id });
-      if (!device) return res.status(404).json({ success: false, error: 'This code has expired', code: 'PAIRING_EXPIRED' });
+      if (!device) {
+        await undoAccount();
+        return res.status(404).json({ success: false, error: 'This code has expired', code: 'PAIRING_EXPIRED' });
+      }
       res.json({ success: true, device: { id: device.id, name: device.name }, account: this.sessionAccount(account) });
     } catch (error) {
+      await undoAccount();
       if (passClientError(res, error)) return;
       console.error('Error approving pairing:', error);
       res.status(500).json({ success: false, error: 'Could not pair the frame' });

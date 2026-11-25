@@ -135,7 +135,7 @@ class PairingService {
       // The code ran out while the device was being made: the frame has moved on
       // to a new code and could never collect this one, so undo it
       if (pairing.expiresAt <= Date.now() || this.pairings.get(pairing.code) !== pairing) {
-        await this.removeDevices(d => d.id === device.id);
+        await this.discardDevice(device.id);
         return null;
       }
       // The frame collects this without a session; it runs as the approving tenant
@@ -256,6 +256,17 @@ class PairingService {
       return changed;
     }));
     return changed;
+  }
+
+  // Removes a device nobody ever got the token for. It goes even if the host's
+  // devicesRemoved hook fails, so it never counts toward the screen limit.
+  async discardDevice(id) {
+    await getDataStore().update('devices', [], devices => devices.filter(d => d.id !== id));
+    try {
+      await emit('devicesRemoved', { deviceIds: [id], tenantId: currentTenant().id });
+    } catch (error) {
+      console.error('Could not report a discarded device:', error);
+    }
   }
 
   async removeDevices(match) {

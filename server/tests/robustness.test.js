@@ -33,10 +33,15 @@ class FlakyStore extends LocalDataStore {
 // A session store that can fail to swap a session id, like a database going away
 const session = require('express-session');
 let sessionsDown = false;
+let sessionWritesDown = false;
 class FlakySessions extends session.MemoryStore {
   destroy(sid, callback) {
     if (sessionsDown) return callback(new Error('sessions are down'));
     return super.destroy(sid, callback);
+  }
+  set(sid, data, callback) {
+    if (sessionWritesDown) return callback(new Error('sessions are down'));
+    return super.set(sid, data, callback);
   }
 }
 
@@ -167,6 +172,26 @@ describe('Robustness', () => {
       const { body } = await poll().expect(200);
       expect(body.status).toBe('approved');
       expect(body.token).toBeTruthy();
+    });
+
+    test('a frame can still collect its pairing after the signed-in session failed to save', async () => {
+      await dataStore.set('access-accounts', [{ id: 'acc_pair', name: 'Grandma', pinHash: 'x', assignedFolders: [] }]);
+      const frame = request.agent(app);
+      const { body: started } = await frame.post('/api/pair/start').expect(200);
+      await pairing.approve(started.code, { name: 'Tablet', accountId: 'acc_pair' });
+      const poll = () => frame.post('/api/pair/collect').send({ code: started.code, secret: started.secret });
+
+      sessionWritesDown = true;
+      let failed;
+      try {
+        failed = await poll();
+      } finally {
+        sessionWritesDown = false;
+      }
+      expect(failed.status).toBe(500);
+      const { body } = await poll().expect(200);
+      expect(body.status).toBe('approved');
+      expect((await frame.get('/api/auth/session').expect(200)).body.authenticated).toBe(true);
     });
 
     test('saved photo info is not replaced after a failed read', async () => {

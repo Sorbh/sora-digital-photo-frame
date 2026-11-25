@@ -12,6 +12,7 @@ class AuthenticationManager {
         this.familyInput = document.getElementById('familyCodeInput');
         this.authSub = document.querySelector('.auth-sub');
         this.familyCodeRequired = false; // hosted: a PIN also needs the family code
+        this.signInGeneration = 0; // a sign-in typed by hand outranks one still retrying from the address
         this.authButton = document.getElementById('authButton');
         this.authErrorAlert = document.getElementById('authErrorAlert');
         this.authErrorMessage = document.getElementById('authErrorMessage');
@@ -49,7 +50,7 @@ class AuthenticationManager {
 
     init() {
         this.bindEvents();
-        // Frames with no keyboard can open /slideshow?pin=123456 (hosted: &family=ABCD-EFGH)
+        // Frames with no keyboard can open /slideshow#pin=123456 or ?pin=123456 (hosted: &family=ABCD-EFGH)
         // and sign in by themselves. A browser that already is a screen uses its token first.
         const urlPin = this.takeSignInFromUrl();
         const deviceToken = localStorage.getItem(DEVICE_TOKEN_KEY);
@@ -226,21 +227,27 @@ class AuthenticationManager {
     async signInFromUrl(pin, attempt = 0) {
         clearTimeout(this.urlRetryTimer);
         if (this.isAuthenticated) return;
+        const generation = this.signInGeneration;
+        const outdated = () => generation !== this.signInGeneration || this.isAuthenticated;
+        const retry = wait => { this.urlRetryTimer = setTimeout(() => this.signInFromUrl(pin, attempt + 1), wait); };
         try {
             const data = await this.requestPin(pin);
+            if (outdated()) return; // signed in, or a PIN was typed, meanwhile
             if (!data.success) {
                 this.showAuthOverlay();
                 this.handleAuthError(data.error, data.code, data);
+                // Too many tries for now: try again once the lock lifts (remainingTime is in minutes)
+                if (data.code === 'RATE_LIMITED') retry(Math.max(Number(data.remainingTime) || 1, 1) * 60000 + 5000);
                 return;
             }
             this.keepScreen(data);
             this.handleAuthSuccess(data.account);
         } catch (error) {
+            if (outdated()) return;
             console.error('Sign-in from the address failed:', error);
             this.showAuthOverlay();
             this.showErrorKey('errors.connection');
-            const wait = Math.min(5000 * 2 ** attempt, 60000);
-            this.urlRetryTimer = setTimeout(() => this.signInFromUrl(pin, attempt + 1), wait);
+            retry(Math.min(5000 * 2 ** attempt, 60000));
         }
     }
 
@@ -368,6 +375,9 @@ class AuthenticationManager {
         }
 
         this.setLoading(true);
+        // Typed by hand: this outranks a sign-in still retrying from the address
+        this.signInGeneration += 1;
+        clearTimeout(this.urlRetryTimer);
 
         try {
             const data = await this.requestPin(pin);

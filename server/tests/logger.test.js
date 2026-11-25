@@ -109,16 +109,54 @@ describe('Error handler', () => {
   };
 
   test("never logs an error's own fields, such as a body a library attached", async () => {
-    const err = Object.assign(new Error('Tenant lookup failed'), { requestBody: { pin: '246813', familyCode: 'PLMK-OIJN' } });
+    const err = Object.assign(new Error('Tenant lookup failed'), { code: 'LOOKUP', requestBody: { pin: '246813', familyCode: 'PLMK-OIJN' } });
     await request(appThrowing(err)).get('/x').expect(500);
     const logs = output.join('\n');
-    expect(logs).toMatch(/Tenant lookup failed/);
+    expect(logs).toMatch(/request failed \(Error LOOKUP\)/);
+    expect(logs).toMatch(/^\s+at /m); // where it was thrown
     expect(logs).not.toMatch(/246813|PLMK-OIJN/);
+  });
+
+  test('a server error message is neither logged nor returned', async () => {
+    const err = new Error('No family for code PLMK-OIJN');
+    const res = await request(appThrowing(err)).get('/x').expect(500);
+    expect(res.body.message).toBe('Internal server error');
+    expect(JSON.stringify(res.body)).not.toMatch(/PLMK-OIJN/);
+    expect(output.join('\n')).not.toMatch(/PLMK-OIJN/);
+  });
+
+  test('a hosted tenant lookup that fails during PIN sign-in leaks nothing', async () => {
+    const hosted = createApp({
+      resolveTenant: req => { if (req.body && req.body.familyCode) throw new Error(`Unknown family ${req.body.familyCode}`); return null; }
+    });
+    const res = await request(hosted).post('/api/auth/pin').send({ pin: '135790', familyCode: 'QAZW-SXED' });
+    expect(res.status).toBe(500);
+    expect(JSON.stringify(res.body)).not.toMatch(/QAZW-SXED|135790/);
+    expect(output.join('\n')).not.toMatch(/QAZW-SXED|135790/);
   });
 
   test('keeps the answer of other errors that carry a type and a body', async () => {
     const err = Object.assign(new Error('Name is required'), { status: 422, type: 'validation.failed', body: { name: '' } });
     const res = await request(appThrowing(err)).get('/x').expect(422);
     expect(res.body.message).toBe('Name is required');
+  });
+});
+
+describe('Google Photos token check', () => {
+  test('a failed check does not log the token from its address', async () => {
+    const oauth = require('../utils/oauthManager');
+    const realFetch = global.fetch;
+    const warnings = [];
+    const spies = ['log', 'warn', 'error'].map(m => jest.spyOn(console, m).mockImplementation((...args) => warnings.push(args.map(String).join(' '))));
+    global.fetch = jest.fn()
+      .mockRejectedValueOnce(Object.assign(new Error('request to https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=ya29.SECRETTOKEN failed'), { name: 'FetchError', code: 'ECONNRESET' }))
+      .mockResolvedValue({ ok: false, status: 500, statusText: 'Error', text: async () => '{}' });
+    try {
+      await oauth.createPickerSession('ya29.SECRETTOKEN', 'uploads').catch(() => {});
+      expect(warnings.join('\n')).not.toMatch(/SECRETTOKEN/);
+    } finally {
+      global.fetch = realFetch;
+      spies.forEach(spy => spy.mockRestore());
+    }
   });
 });

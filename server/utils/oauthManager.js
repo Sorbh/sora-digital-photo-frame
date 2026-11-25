@@ -225,7 +225,8 @@ class OAuthManager {
         const tokenInfo = await tokenInfoResponse.json();
         console.log('🔧 [DEBUG] Token info:', tokenInfo);
       } catch (tokenError) {
-        console.warn('⚠️ [DEBUG] Could not validate token:', tokenError.message);
+        // Not the message: a failed request's message holds its URL, with the token in it
+        console.warn('⚠️ [DEBUG] Could not validate token:', tokenError.code || tokenError.name);
       }
       
       // Generate a unique request ID (UUID v4 format)

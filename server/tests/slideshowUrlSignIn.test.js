@@ -69,7 +69,7 @@ function openSlideshow(href, { fetchPin = () => new Promise(() => {}) } = {}) {
   const source = fs.readFileSync(path.join(__dirname, '../public/js/slideshow.js'), 'utf8');
   const auth = source.slice(0, source.indexOf('class PhotoFrameSlideshow'));
   vm.runInContext(`${auth}\nthis.manager = new AuthenticationManager();`, context);
-  return { location: sandbox.location, addressAfterHead, requests, timers, manager: sandbox.manager };
+  return { location: sandbox.location, addressAfterHead, requests, timers, manager: sandbox.manager, localStorage: sandbox.localStorage };
 }
 
 const flush = () => new Promise(resolve => setImmediate(resolve));
@@ -122,6 +122,42 @@ describe('Slideshow sign-in from the address', () => {
     }
     await flush();
     expect(requests.map(r => r.body.pin)).toEqual(['123456', '123456', '123456']);
+    expect(manager.isAuthenticated).toBe(true);
+  });
+
+  test('takes the PIN from the #fragment, which never reaches the server', () => {
+    const { addressAfterHead, requests } = openSlideshow('https://frame.example/slideshow?lang=de#pin=246810&family=QWER-TYUI');
+    expect(addressAfterHead).toBe('https://frame.example/slideshow?lang=de');
+    expect(requests[0].body).toMatchObject({ pin: '246810', familyCode: 'QWER-TYUI' });
+  });
+
+  test('a PIN typed by hand wins over a sign-in from the address still under way', async () => {
+    let answerUrl;
+    const answers = [
+      () => new Promise(resolve => { answerUrl = resolve; }),
+      () => answer(200, { success: true, token: 'typed-token', account: { name: 'Typed' } })
+    ];
+    const { manager, localStorage } = openSlideshow('https://frame.example/slideshow?pin=123456', { fetchPin: () => answers.shift()() });
+    manager.pinInput.value = '654321';
+    await manager.authenticate();
+    expect(manager.userAccount.name).toBe('Typed');
+    answerUrl({ status: 200, json: async () => ({ success: true, token: 'url-token', account: { name: 'From address' } }) });
+    await flush();
+    expect(manager.userAccount.name).toBe('Typed');
+    expect(localStorage.getItem('photoframe_device_token')).toBe('typed-token');
+  });
+
+  test('keeps trying after a lockout, once it lifts', async () => {
+    const answers = [
+      () => answer(429, { success: false, code: 'RATE_LIMITED', error: 'Too many', remainingTime: 15 }),
+      () => answer(200, { success: true, account: { name: 'Grandma' } })
+    ];
+    const { timers, manager } = openSlideshow('https://frame.example/slideshow?pin=123456', { fetchPin: () => answers.shift()() });
+    await flush();
+    const retry = timers.filter(t => t.fn.toString().includes('signInFromUrl')).pop();
+    expect(retry.ms).toBeGreaterThanOrEqual(15 * 60000);
+    retry.fn();
+    await flush();
     expect(manager.isAuthenticated).toBe(true);
   });
 

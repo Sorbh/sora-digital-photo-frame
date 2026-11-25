@@ -329,6 +329,11 @@ class FolderSelector {
                 font-size: 18px;
             }
 
+            /* A collapsed folder's chevron points to where its text starts */
+            html[dir="rtl"] .expand-btn[data-expanded="false"] .material-icons {
+                transform: scaleX(-1);
+            }
+
             .folder-option .folder-icon,
             .folder-option .folder-thumb {
                 width: 44px;

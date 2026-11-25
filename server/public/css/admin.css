@@ -724,8 +724,10 @@ body {
 .photo-modal-dialog {
     width: 100vw;
     height: 100vh;
+    height: 100dvh;
     max-width: 100vw;
     max-height: 100vh;
+    max-height: 100dvh;
     margin: 0;
     padding: 0;
     border: none;
@@ -783,6 +785,7 @@ body {
 .modal-photo {
     max-width: calc(100vw - 4rem);
     max-height: calc(100vh - 8rem);
+    max-height: calc(100dvh - 8rem);
     object-fit: contain;
     border-radius: var(--shape-xs);
     box-shadow: 0 30px 80px rgb(0 0 0 / 0.6);
@@ -885,6 +888,7 @@ body {
     .modal-photo {
         max-width: calc(100vw - 2rem);
         max-height: calc(100vh - 6rem);
+        max-height: calc(100dvh - 6rem);
     }
 
     .photo-modal-hints {

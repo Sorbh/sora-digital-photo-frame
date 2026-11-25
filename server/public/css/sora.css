@@ -346,8 +346,9 @@ dialog::backdrop {
     align-items: center;
     justify-content: space-between;
     gap: 1rem;
-    height: 64px;
-    padding: 0 clamp(1rem, 3vw, 2.5rem);
+    /* Notched phones (viewport-fit=cover): keep clear of the notch and rounded corners */
+    height: calc(64px + env(safe-area-inset-top, 0px));
+    padding: env(safe-area-inset-top, 0px) max(clamp(1rem, 3vw, 2.5rem), env(safe-area-inset-right, 0px)) 0 max(clamp(1rem, 3vw, 2.5rem), env(safe-area-inset-left, 0px));
     border-bottom: 1px solid var(--rule);
     background: color-mix(in oklab, var(--background) 82%, transparent);
     backdrop-filter: blur(16px) saturate(1.4);
@@ -619,7 +620,7 @@ dialog::backdrop {
 
 @media (max-width: 640px) {
     .topbar {
-        height: 58px;
+        height: calc(58px + env(safe-area-inset-top, 0px));
     }
 
     .topbar .tb-desktop,

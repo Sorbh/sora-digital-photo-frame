@@ -306,27 +306,40 @@ class FolderSelector {
                 flex-shrink: 0;
             }
 
+            /* 44px tap target that still draws the 22px chevron in the same spot:
+               the negative margin keeps the row layout, and the button sits
+               above the start of the thumbnail it overlaps */
             .expand-btn {
+                position: relative;
+                z-index: 1;
                 display: grid;
-                place-items: center;
-                width: 22px;
-                height: 22px;
+                place-items: center start;
+                width: 44px;
+                height: 44px;
                 flex-shrink: 0;
-                margin-right: -6px;
+                margin-right: -28px;
+                padding: 0;
                 border: 0;
-                border-radius: var(--shape-xs);
                 background: transparent;
                 color: rgba(255, 244, 239, 0.6);
                 cursor: pointer;
             }
 
+            .expand-btn .material-icons {
+                display: grid;
+                place-items: center;
+                width: 22px;
+                height: 22px;
+                border-radius: var(--shape-xs);
+                font-size: 18px;
+            }
+
             .expand-btn:hover {
-                background: rgba(255, 255, 255, 0.1);
                 color: #fff4ef;
             }
 
-            .expand-btn .material-icons {
-                font-size: 18px;
+            .expand-btn:hover .material-icons {
+                background: rgba(255, 255, 255, 0.1);
             }
 
             .folder-option .folder-icon,
@@ -425,8 +438,8 @@ class FolderSelector {
             /* Phones: icon-only so the dock fits the screen */
             @media (max-width: 600px) {
                 .folder-selector-btn {
-                    width: 40px;
-                    height: 40px;
+                    width: 44px;
+                    height: 44px;
                     padding: 0;
                     justify-content: center;
                 }

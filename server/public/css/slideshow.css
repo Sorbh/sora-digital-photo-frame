@@ -357,7 +357,7 @@ body.is-paused .paused-badge {
 .controls {
     position: absolute;
     left: 50%;
-    bottom: clamp(1.25rem, 4vh, 2.5rem);
+    bottom: calc(clamp(1.25rem, 4vh, 2.5rem) + env(safe-area-inset-bottom, 0px));
     z-index: 10;
     display: flex;
     align-items: center;
@@ -1002,17 +1002,18 @@ body.note-showing .photo-caption {
         top: 3.75rem;
     }
 
+    /* 44px buttons: tighter gaps and dividers so the dock still fits a 360px phone */
     .controls {
-        bottom: 1rem;
+        bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+        gap: 0;
     }
 
-    .dock-btn {
-        width: 40px;
-        height: 40px;
+    .dock-divider {
+        margin: 0 4px;
     }
 
     .weather-widget {
-        bottom: 5.5rem;
+        bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
     }
 
     .photo-caption {

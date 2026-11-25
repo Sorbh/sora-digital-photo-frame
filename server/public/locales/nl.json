@@ -76,7 +76,12 @@
     "enter_code_pin": "Voer je familiecode en pincode in, of scan de code om deze fotolijst in te stellen.",
     "familyCodeLabel": "Familiecode",
     "familyCodeRequired": "Voer de familiecode van 8 tekens in die op de pagina Toegang staat.",
-    "familyOrPinWrong": "Die familiecode en pincode horen niet bij elkaar. Controleer ze allebei en probeer het opnieuw."
+    "familyOrPinWrong": "Die familiecode en pincode horen niet bij elkaar. Controleer ze allebei en probeer het opnieuw.",
+    "keepAwake": "Scherm aan laten",
+    "keepAwakeNeedsTap": "Dit scherm kan in slaap vallen. Tik om het aan te laten.",
+    "keepAwakeUnavailable": "Deze browser kan het scherm niet aan laten. Zet de slaapstand uit in de scherminstellingen van het apparaat.",
+    "fullscreenUnavailable": "Deze browser kan niet schermvullend tonen. Gebruik het eigen menu, of zet de fotolijst op het beginscherm.",
+    "fullscreenRefused": "De browser stond volledig scherm niet toe. Probeer de knop nog eens."
   },
   "accessAccounts": {
     "frames_pins": "Fotolijsten en pincodes",

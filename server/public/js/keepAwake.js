@@ -8,6 +8,13 @@
  * Browsers only grant either one after a user gesture and only while the page is
  * visible, and they drop the lock on tab switch, battery saver, or fullscreen
  * changes, so we re-acquire on every one of those events.
+ *
+ * `status` says how it went, for the frame to tell the user, and `onchange`
+ * is called whenever it changes:
+ *   'pending'      not tried yet
+ *   'active'       the screen is kept on
+ *   'needs-tap'    the browser wants a tap (or a key press) on the device first
+ *   'unavailable'  refused even after a tap: the device's own sleep setting decides
  */
 class KeepAwake {
     constructor(videoSrc = '/media/keep-awake.mp4') {
@@ -18,6 +25,8 @@ class KeepAwake {
         this.useVideo = !('wakeLock' in navigator) || KeepAwake.isLegacyIosStandalone();
 
         this.hadGesture = false;
+        this.status = 'pending';
+        this.onchange = null;
 
         this.reacquire = this.reacquire.bind(this);
         this.onGesture = this.onGesture.bind(this);
@@ -67,6 +76,12 @@ class KeepAwake {
             Boolean(this.video && !this.video.paused);
     }
 
+    setStatus(status) {
+        if (status === this.status) return;
+        this.status = status;
+        if (this.onchange) this.onchange(status);
+    }
+
     onGesture() {
         this.hadGesture = true;
         this.reacquire();
@@ -82,6 +97,7 @@ class KeepAwake {
         if (!this.useVideo) {
             try {
                 this.sentinel = await navigator.wakeLock.request('screen');
+                this.setStatus('active');
                 this.sentinel.addEventListener('release', () => {
                     this.sentinel = null;
                     // The system released it (not us) - try again straight away
@@ -92,7 +108,7 @@ class KeepAwake {
                 // Before the first gesture a refusal is expected and the gesture listeners
                 // retry. Refused after a gesture (permission policy, power saving), or any
                 // other error, means the API won't help here - switch to the video.
-                if (err.name === 'NotAllowedError' && !this.hadGesture) return;
+                if (err.name === 'NotAllowedError' && !this.hadGesture) return this.setStatus('needs-tap');
                 this.useVideo = true;
             }
         }
@@ -115,8 +131,13 @@ class KeepAwake {
             this.video = video;
         }
         // Rejected without a gesture; the gesture listeners will retry
-        this.video.play().catch(() => {});
+        const playing = this.video.play();
+        if (!playing || !playing.then) return this.setStatus('active'); // older browsers return nothing
+        playing
+            .then(() => this.setStatus('active'))
+            .catch(() => this.setStatus(this.hadGesture ? 'unavailable' : 'needs-tap'));
     }
 }
 
-window.KeepAwake = KeepAwake;
+if (typeof module !== 'undefined' && module.exports) module.exports = KeepAwake;
+else window.KeepAwake = KeepAwake;

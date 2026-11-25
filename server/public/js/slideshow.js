@@ -498,6 +498,10 @@ class PhotoFrameSlideshow {
         this.currentDuration = this.interval;
         this.noteScheduler = window.NoteScheduler ? new NoteScheduler() : null;
         this.noteHideTimer = null;
+        this.noticeTimer = null;
+        this.notice = null; // [key, icon] of the message at the top, so it follows a language change
+        this.started = false;
+        this.screenShift = window.ScreenShift ? new ScreenShift(document.documentElement) : null;
 
         // Ken Burns drift spans the slide plus its crossfade
         document.documentElement.style.setProperty('--slide-duration', `${this.interval + 2000}ms`);
@@ -534,6 +538,10 @@ class PhotoFrameSlideshow {
         this.captionPlace = document.getElementById('captionPlace');
         this.captionDate = document.getElementById('captionDate');
         this.noteLayer = document.getElementById('noteLayer');
+        this.frameNotice = document.getElementById('frameNotice');
+        this.frameNoticeIcon = document.getElementById('frameNoticeIcon');
+        this.frameNoticeText = document.getElementById('frameNoticeText');
+        this.keepAwakeBtn = document.getElementById('keepAwakeBtn');
 
         this.errorState.classList.add('hidden');
         this.images.forEach(img => img.removeAttribute('src'));
@@ -545,6 +553,8 @@ class PhotoFrameSlideshow {
         this.logoutBtn.addEventListener('click', () => this.logout());
         this.playPauseBtn.addEventListener('click', () => this.togglePlayPause());
         this.nextBtn.addEventListener('click', () => this.nextImage());
+        // The tap itself is what lets the browser keep the screen on
+        this.keepAwakeBtn.addEventListener('click', () => this.wakeLock?.onGesture());
 
         document.addEventListener('keydown', (e) => {
             // Typing in a field (the family code, say) is not a slideshow shortcut
@@ -899,6 +909,7 @@ class PhotoFrameSlideshow {
                     this.showControlsTemporarily();
                 }).catch((err) => {
                     console.error('Error attempting to enable fullscreen:', err);
+                    this.showNotice('slideshow.fullscreenRefused', 'fullscreen_exit', 10000);
                 });
             } else if (element.webkitRequestFullscreen) {
                 element.webkitRequestFullscreen();
@@ -908,6 +919,9 @@ class PhotoFrameSlideshow {
                 element.msRequestFullscreen();
                 document.body.classList.add('fullscreen');
                 this.showControlsTemporarily();
+            } else {
+                // iPhone Safari, some TV browsers: only the browser's own menu can do it
+                this.showNotice('slideshow.fullscreenUnavailable', 'fullscreen_exit', 12000);
             }
         } else {
             // Exit fullscreen
@@ -958,6 +972,42 @@ class PhotoFrameSlideshow {
         this.renderPlayPause();
         if (this.currentImageData) this.folder.textContent = this.currentImageData.folder || t('common.library');
         if (this.errorText && !this.errorState.classList.contains('hidden')) this.errorMessage.textContent = t(...this.errorText);
+        if (this.notice) this.frameNoticeText.textContent = t(this.notice[0]);
+    }
+
+    // A short message at the top of the frame, gone after `forMs`
+    showNotice(key, icon, forMs, { button = false } = {}) {
+        this.notice = [key, icon];
+        this.frameNoticeIcon.textContent = icon;
+        this.frameNoticeText.textContent = t(key);
+        this.keepAwakeBtn.classList.toggle('hidden', !button);
+        this.frameNotice.classList.remove('hidden');
+        document.body.classList.add('notice-showing');
+        clearTimeout(this.noticeTimer);
+        this.noticeTimer = setTimeout(() => this.hideNotice(), forMs);
+    }
+
+    hideNotice(key) {
+        if (key && this.notice?.[0] !== key) return; // only that message
+        clearTimeout(this.noticeTimer);
+        this.notice = null;
+        this.frameNotice.classList.add('hidden');
+        document.body.classList.remove('notice-showing');
+    }
+
+    // Says so when the screen may go to sleep on its own. Shown once the photos
+    // are up, not over the sign-in screen, and not for hours (it would burn in too).
+    renderWakeNotice() {
+        if (!this.started || !this.wakeLock) return;
+        const status = this.wakeLock.status;
+        if (status === 'active') {
+            this.hideNotice('slideshow.keepAwakeNeedsTap');
+        } else if (status === 'needs-tap') {
+            this.showNotice('slideshow.keepAwakeNeedsTap', 'bedtime', 60000, { button: true });
+        } else if (status === 'unavailable' && !this.toldUnavailable) {
+            this.toldUnavailable = true;
+            this.showNotice('slideshow.keepAwakeUnavailable', 'bedtime', 20000);
+        }
     }
 
     logout() {
@@ -1000,7 +1050,10 @@ class PhotoFrameSlideshow {
 
     requestWakeLock() {
         // Keep phones and tablets awake for as long as the frame is open
-        if (!this.wakeLock) this.wakeLock = new KeepAwake();
+        if (!this.wakeLock) {
+            this.wakeLock = new KeepAwake();
+            this.wakeLock.onchange = () => this.renderWakeNotice();
+        }
         this.wakeLock.enable();
     }
 
@@ -1073,12 +1126,18 @@ class PhotoFrameSlideshow {
             this.wakeLock.disable();
         }
 
+        this.screenShift?.stop();
+        clearTimeout(this.noticeTimer);
+
         this.noteScheduler?.stop();
     }
 
     async startSlideshow() {
         this.hideError();
         this.noteScheduler?.start();
+        this.screenShift?.start();
+        this.started = true;
+        this.renderWakeNotice();
 
         const imageData = await this.fetchRandomImage();
         if (imageData) {

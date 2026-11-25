@@ -149,6 +149,16 @@
 
         <div class="paused-badge" aria-hidden="true" data-i18n="slideshow.paused">Paused</div>
 
+        <!-- When fullscreen or keeping the screen on doesn't work here -->
+        <div class="frame-notice hidden" id="frameNotice" role="status" aria-live="polite">
+            <span class="material-icons" id="frameNoticeIcon" aria-hidden="true">info</span>
+            <span class="frame-notice-text" id="frameNoticeText"></span>
+            <button type="button" class="frame-notice-btn hidden" id="keepAwakeBtn">
+                <span class="material-icons" aria-hidden="true">light_mode</span>
+                <span data-i18n="slideshow.keepAwake">Keep screen awake</span>
+            </button>
+        </div>
+
         <!-- Controls -->
         <div class="controls" id="controls">
             <button class="dock-btn primary" id="playPauseBtn" aria-label="Pause slideshow" title="Pause (Space)" data-i18n-attr="aria-label:slideshow.static_009; title:slideshow.static_010">
@@ -219,6 +229,7 @@
     <script src="/js/folderStorage.js"></script>
     <script src="/js/folderSelector.js"></script>
     <script src="/js/keepAwake.js"></script>
+    <script src="/js/screenShift.js"></script>
 
     <script src="/js/notePage.js"></script>
     <script src="/js/noteScheduler.js"></script>

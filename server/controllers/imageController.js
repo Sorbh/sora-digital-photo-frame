@@ -73,8 +73,9 @@ class ImageController {
   // Get random image endpoint with anti-repeat logic and folder filtering
   async getRandomImage(req, res) {
     try {
-      // Already decoded by Express: decoding again breaks folder names with %
-      const folderFilter = typeof req.query.folder === 'string' ? req.query.folder : '';
+      // Already decoded by Express: decoding again breaks folder names with %.
+      // ?folder[]=x still works as before (an array reads as its joined text).
+      const folderFilter = req.query.folder == null ? '' : String(req.query.folder);
       const allImages = await this.getAllImages();
       
       if (allImages.length === 0) {

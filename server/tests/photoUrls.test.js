@@ -16,19 +16,23 @@ delete process.env.PHOTO_ENCRYPTION_KEY;
 const { createApp } = require('../app');
 const LocalPhotoLibrary = require('../library/LocalPhotoLibrary');
 
-// Folder and file names that are also URL syntax
-const FOLDER = '50% off #1?';
-const FILE = 'a#b?c%d.png';
+// Folder and file names that are also URL syntax (and still valid on Windows)
+const FOLDER = '50% off #1';
+const FILE = 'a#b%c.png';
+const png = color => sharp({ create: { width: 8, height: 8, channels: 3, background: color } }).png().toBuffer();
 
-describe('Photo URLs for names with # ? and %', () => {
+describe('Photo URLs for names with # and %', () => {
   const app = createApp();
   const admin = request.agent(app);
   let picture;
 
   beforeAll(async () => {
-    picture = await sharp({ create: { width: 8, height: 8, channels: 3, background: '#c42b6e' } }).png().toBuffer();
+    picture = await png('#c42b6e');
     await fs.ensureDir(path.join(testUploadsDir, FOLDER));
     await fs.writeFile(path.join(testUploadsDir, FOLDER, FILE), picture);
+    // Photos elsewhere, so a slideshow that ignored the folder would show them
+    await fs.ensureDir(path.join(testUploadsDir, 'other'));
+    for (let i = 0; i < 5; i += 1) await fs.writeFile(path.join(testUploadsDir, 'other', `o${i}.png`), await png('#2b6ec4'));
     await admin.post('/api/auth/login').send({ password: 'urls-admin-pass' }).expect(200);
   });
 
@@ -38,16 +42,36 @@ describe('Photo URLs for names with # ? and %', () => {
 
   test('the library encodes each path segment', () => {
     expect(new LocalPhotoLibrary().photoUrl(`uploads/${FOLDER}/${FILE}`))
-      .toBe('/uploads/50%25%20off%20%231%3F/a%23b%3Fc%25d.png');
+      .toBe('/uploads/50%25%20off%20%231/a%23b%25c.png');
   });
 
-  test('the slideshow gets a URL that loads the photo', async () => {
-    const { body } = await admin.get('/api/images/next').query({ folder: FOLDER }).expect(200);
-    const url = new URL(body.image.url);
-    expect(url.search).toBe('');
-    expect(url.hash).toBe('');
-    const res = await admin.get(url.pathname).expect(200);
-    expect(Buffer.compare(res.body, picture)).toBe(0);
+  test('the URL builder splits on / on every platform', () => {
+    jest.isolateModules(() => {
+      jest.doMock('path', () => jest.requireActual('path').win32);
+      const { uploadsUrl } = require('../utils/safePath');
+      expect(uploadsUrl('uploads/Family/a#1.jpg')).toBe('/uploads/Family/a%231.jpg');
+      expect(uploadsUrl('uploads\\Family\\a#1.jpg')).toBe('/uploads/Family/a%231.jpg');
+    });
+    jest.dontMock('path');
+  });
+
+  test('the slideshow plays only that folder, with URLs that load', async () => {
+    for (let i = 0; i < 6; i += 1) {
+      const { body } = await admin.get('/api/images/next').query({ folder: FOLDER }).expect(200);
+      expect(body.image.filename).toBe(FILE);
+      const url = new URL(body.image.url);
+      expect(url.search).toBe('');
+      expect(url.hash).toBe('');
+      const res = await admin.get(url.pathname).expect(200);
+      expect(Buffer.compare(res.body, picture)).toBe(0);
+    }
+  });
+
+  test('?folder[]= still picks the folder', async () => {
+    for (let i = 0; i < 6; i += 1) {
+      const { body } = await admin.get(`/api/images/next?folder%5B%5D=${encodeURIComponent(FOLDER)}`).expect(200);
+      expect(body.image.filename).toBe(FILE);
+    }
   });
 
   test('the admin grid gets the same URL', async () => {

@@ -34,7 +34,9 @@ function toAdminPath(fullPath) {
  * Each segment is percent-encoded, so names with # ? % or spaces stay part of the path.
  */
 function uploadsUrl(adminPath) {
-  return '/' + adminPath.split(path.sep).map(encodeURIComponent).join('/');
+  // "/" separates folders everywhere; on Windows "\\" does too
+  const segments = path.sep === '/' ? adminPath.split('/') : adminPath.split(/[\\/]/);
+  return '/' + segments.map(encodeURIComponent).join('/');
 }
 
 module.exports = { resolveAdminPath, toAdminPath, uploadsUrl, UPLOADS_DIR };

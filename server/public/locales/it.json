@@ -78,7 +78,8 @@
     "familyCodeRequired": "Inserisci il codice famiglia di 8 caratteri che trovi nella pagina Accesso.",
     "familyOrPinWrong": "Codice famiglia e PIN non corrispondono. Controllali entrambi e riprova.",
     "retry": "Riprova",
-    "retryingNote": "La cornice continua a riprovare da sola."
+    "retryingNote": "La cornice continua a riprovare da sola.",
+    "connectionTitle": "Impossibile raggiungere le tue foto"
   },
   "accessAccounts": {
     "frames_pins": "Cornici e PIN",

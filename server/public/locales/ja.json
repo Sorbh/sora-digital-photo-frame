@@ -78,7 +78,8 @@
     "familyCodeRequired": "アクセスページにある8文字のファミリーコードを入力してください。",
     "familyOrPinWrong": "ファミリーコードとPINが一致しません。両方を確認して、もう一度お試しください。",
     "retry": "再試行",
-    "retryingNote": "フレームは自動で再試行を続けます。"
+    "retryingNote": "フレームは自動で再試行を続けます。",
+    "connectionTitle": "写真に接続できません"
   },
   "accessAccounts": {
     "frames_pins": "フレームとPIN",

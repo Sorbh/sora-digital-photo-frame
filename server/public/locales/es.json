@@ -78,7 +78,8 @@
     "familyCodeRequired": "Introduce el código familiar de 8 caracteres que aparece en la página Acceso.",
     "familyOrPinWrong": "El código familiar y el PIN no coinciden. Revisa ambos e inténtalo de nuevo.",
     "retry": "Reintentar",
-    "retryingNote": "El marco sigue intentándolo por sí solo."
+    "retryingNote": "El marco sigue intentándolo por sí solo.",
+    "connectionTitle": "No se puede acceder a tus fotos"
   },
   "accessAccounts": {
     "frames_pins": "Marcos y PIN",

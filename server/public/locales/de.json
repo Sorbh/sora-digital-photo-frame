@@ -78,7 +78,8 @@
     "familyCodeRequired": "Geben Sie den 8-stelligen Familiencode von der Seite „Zugang“ ein.",
     "familyOrPinWrong": "Familiencode und PIN passen nicht zusammen. Prüfen Sie beides und versuchen Sie es erneut.",
     "retry": "Erneut versuchen",
-    "retryingNote": "Der Rahmen versucht es von selbst weiter."
+    "retryingNote": "Der Rahmen versucht es von selbst weiter.",
+    "connectionTitle": "Ihre Fotos sind nicht erreichbar"
   },
   "accessAccounts": {
     "frames_pins": "Rahmen & PINs",

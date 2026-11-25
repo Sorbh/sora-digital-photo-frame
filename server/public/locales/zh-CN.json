@@ -78,7 +78,8 @@
     "familyCodeRequired": "请输入“访问权限”页面上的 8 位家庭代码。",
     "familyOrPinWrong": "家庭代码和 PIN 不匹配。请检查后重试。",
     "retry": "重试",
-    "retryingNote": "相框会自动继续重试。"
+    "retryingNote": "相框会自动继续重试。",
+    "connectionTitle": "无法连接到你的照片"
   },
   "accessAccounts": {
     "frames_pins": "相框与 PIN",

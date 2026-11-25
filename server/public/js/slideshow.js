@@ -469,6 +469,15 @@ class AuthenticationManager {
 }
 
 const LAST_SHOWN_KEY = 'photoframe_last_shown';
+const REQUEST_TIMEOUT_MS = 30 * 1000; // a photo request that takes longer counts as failed
+
+// Aborted after `ms`, so a request the server never answers can't stall the slideshow
+function timeoutSignal(ms) {
+    if (typeof AbortController !== 'function') return undefined;
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(), ms);
+    return controller.signal;
+}
 
 // "12 March 2019" in the frame's language. Camera times carry no zone and
 // a date-time without one is read as local time, so the day never shifts.
@@ -500,9 +509,13 @@ class PhotoFrameSlideshow {
         this.noteHideTimer = null;
         // Until a photo shows, a failure leaves the error card up and tries again later
         this.hasShownPhoto = false;
-        this.retry = new RetrySchedule();
-        this.retryTimer = null;
-        this.tryingAgain = false;
+        this.recovery = new PhotoRecovery({
+            attempt: (signal, isCurrent) => this.showFirstPhoto(signal, isCurrent),
+            failed: error => this.showFailure(error),
+            photoOnScreen: () => this.hasShownPhoto,
+            schedule: new RetrySchedule(),
+            timeoutMs: REQUEST_TIMEOUT_MS
+        });
 
         // Ken Burns drift spans the slide plus its crossfade
         document.documentElement.style.setProperty('--slide-duration', `${this.interval + 2000}ms`);
@@ -525,6 +538,8 @@ class PhotoFrameSlideshow {
         this.loadingState = document.getElementById('loadingState');
         this.errorState = document.getElementById('errorState');
         this.errorMessage = document.getElementById('errorMessage');
+        this.errorTitle = document.getElementById('errorTitle');
+        this.errorIcon = document.getElementById('errorIcon');
         this.progressBar = document.getElementById('progressBar');
         this.fullscreenBtn = document.getElementById('fullscreenBtn');
         this.infoBtn = document.getElementById('infoBtn');
@@ -551,16 +566,14 @@ class PhotoFrameSlideshow {
         this.logoutBtn.addEventListener('click', () => this.logout());
         this.playPauseBtn.addEventListener('click', () => this.togglePlayPause());
         this.nextBtn.addEventListener('click', () => this.nextImage());
-        this.retryBtn.addEventListener('click', () => this.tryAgain());
-
-        // Back online: don't wait out the rest of the retry delay
-        window.addEventListener('online', () => {
-            if (this.retryTimer) this.tryAgain();
-        });
+        // Retry, and back online: try again now, without waiting out the delay
+        this.recovery.listen(window, this.retryBtn);
 
         document.addEventListener('keydown', (e) => {
             // Typing in a field (the family code, say) is not a slideshow shortcut
             if (e.target.closest?.('input, textarea, select')) return;
+            // Space on a focused button (Retry, say) presses that button
+            if (e.key === ' ' && e.target.closest?.('button, a[href]')) return;
             switch (e.key) {
                 case ' ': // Space
                 case 'k':
@@ -617,15 +630,12 @@ class PhotoFrameSlideshow {
                 document.body.classList.remove('fullscreen');
             }
         });
-
-        this.images.forEach(img => {
-            img.addEventListener('error', () => this.reportFailure('slideshow.loadImageFailed'));
-        });
     }
 
     // The next picture for the chosen folder. Ordered folders continue from
     // the last one shown, even after the frame restarts.
-    async fetchRandomImage() {
+    // Resolves { image }, or { error } to show on the error card
+    async fetchRandomImage(signal) {
         try {
             const selectedFolderPath = this.folderStorage.getCurrentFolderPath();
             const params = new URLSearchParams();
@@ -633,7 +643,7 @@ class PhotoFrameSlideshow {
             const last = this.lastShown();
             if (last && last.folder === (selectedFolderPath || '')) params.set('after', last.id);
 
-            const response = await fetch(`/api/images/next?${params}`);
+            const response = await fetch(`/api/images/next?${params}`, { signal });
             if (!response.ok) throw new Error(t('slideshow.fetchImageFailed'));
             const data = await response.json();
 
@@ -641,14 +651,14 @@ class PhotoFrameSlideshow {
                 throw new Error(i18n.error(data, 'slideshow.fetchImageFailed'));
             }
 
-            this.fetchFailedOffline = false;
             localStorage.setItem(LAST_SHOWN_KEY, JSON.stringify({ folder: selectedFolderPath || '', id: data.image.id }));
-            return data.image;
+            return { image: data.image };
         } catch (error) {
             console.error('Error fetching random image:', error);
-            this.fetchFailedOffline = error instanceof TypeError; // fetch() itself failed: no network or no server
-            this.reportFailure('slideshow.loadImageFailedDetail', { detail: error.message });
-            return null;
+            // fetch() itself failed (no network, no server) or took too long
+            if (error instanceof TypeError || error.name === 'AbortError') return { error: { offline: true } };
+            const folder = this.folderStorage.getCurrentFolderPath() && this.folderStorage.getCurrentFolderName();
+            return { error: folder ? { key: 'slideshow.noImagesInFolder', vars: { folder } } : { key: 'slideshow.noImages' } };
         }
     }
 
@@ -693,7 +703,8 @@ class PhotoFrameSlideshow {
         return imageData.url;
     }
 
-    async loadImage(imageData) {
+    // Loads the photo into the hidden slide; false if it failed or `signal` gave up on it
+    async loadImage(imageData, signal) {
         if (!imageData) return false;
 
         const src = await this.imageSource(imageData);
@@ -703,29 +714,40 @@ class PhotoFrameSlideshow {
             const nextSlide = (this.currentSlide + 1) % 2;
             const img = this.images[nextSlide];
 
-            const onLoad = () => {
+            const stop = () => {
                 img.removeEventListener('load', onLoad);
                 img.removeEventListener('error', onError);
-                this.hideError();
+                signal?.removeEventListener('abort', onAbort);
+            };
+
+            const onLoad = () => {
+                stop();
                 this.ambients[nextSlide].style.backgroundImage = `url(${JSON.stringify(src)})`;
                 // The slide's previous photo is gone from screen; free its decrypted copy
                 if (this.objectUrls[nextSlide]) URL.revokeObjectURL(this.objectUrls[nextSlide]);
                 this.objectUrls[nextSlide] = isObjectUrl ? src : null;
-                this.currentImageData = imageData;
                 resolve(true);
             };
 
-            const onError = (event) => {
-                img.removeEventListener('load', onLoad);
-                img.removeEventListener('error', onError);
+            const onError = () => {
+                stop();
                 if (isObjectUrl) URL.revokeObjectURL(src);
                 console.error('Failed to load image:', imageData.url);
-                this.reportFailure('slideshow.loadImageFailedDetail', { detail: imageData.filename });
                 resolve(false);
             };
 
+            // Taking too long, or replaced by a newer try: stop downloading it
+            const onAbort = () => {
+                stop();
+                img.removeAttribute('src');
+                if (isObjectUrl) URL.revokeObjectURL(src);
+                resolve(false);
+            };
+
+            if (signal?.aborted) return onAbort();
             img.addEventListener('load', onLoad);
             img.addEventListener('error', onError);
+            signal?.addEventListener('abort', onAbort);
             img.src = src;
         });
     }
@@ -804,22 +826,26 @@ class PhotoFrameSlideshow {
             return;
         }
 
-        const imageData = await this.fetchRandomImage();
-        if (imageData) await this.present(imageData);
+        // A photo that fails to come is skipped: the last good one stays on screen
+        const signal = timeoutSignal(REQUEST_TIMEOUT_MS);
+        const next = await this.fetchRandomImage(signal);
+        if (next.image) await this.present(next.image, { signal });
 
         if (this.isPlaying) {
             this.scheduleNext();
         }
     }
 
-    // Show the next picture: a photo, or a snap (a saved page) drawn on the note layer
-    async present(imageData) {
+    // Show the next picture: a photo, or a snap (a saved page) drawn on the note layer.
+    // `isCurrent` says whether whoever asked still wants it (see PhotoRecovery).
+    async present(imageData, { signal, isCurrent = () => true } = {}) {
         if (imageData.type !== 'snap') {
-            if (!await this.loadImage(imageData)) return false;
+            if (!await this.loadImage(imageData, signal) || !isCurrent()) return false;
+            this.currentImageData = imageData;
             this.showImage();
             return true;
         }
-        if (!await this.showNote(imageData.snap, { scheduled: false })) return false;
+        if (!isCurrent() || !await this.showNote(imageData.snap, { scheduled: false })) return false;
         this.currentImageData = imageData;
         this.photoShown();
         this.noteScheduler?.photoShown();
@@ -968,6 +994,7 @@ class PhotoFrameSlideshow {
         this.renderPlayPause();
         if (this.currentImageData) this.folder.textContent = this.currentImageData.folder || t('common.library');
         if (this.errorText && !this.errorState.classList.contains('hidden')) this.errorMessage.textContent = t(...this.errorText);
+        if (this.errorTitleKey && !this.errorState.classList.contains('hidden')) this.errorTitle.textContent = t(this.errorTitleKey);
     }
 
     logout() {
@@ -990,17 +1017,21 @@ class PhotoFrameSlideshow {
         }, 3000);
     }
 
-    showError(message) {
+    showError(message, titleKey = 'slideshow.nothing') {
         this.errorText = null;
-        this.errorMessage.removeAttribute('data-i18n'); // the message is set here from now on
+        this.errorTitleKey = titleKey;
+        this.errorTitle.removeAttribute('data-i18n'); // the heading and message are set here from now on
+        this.errorTitle.textContent = t(titleKey);
+        this.errorIcon.textContent = titleKey === 'slideshow.connectionTitle' ? 'wifi_off' : 'photo_library';
+        this.errorMessage.removeAttribute('data-i18n');
         this.errorMessage.textContent = message;
         this.errorState.classList.remove('hidden');
         this.loadingState.classList.add('hidden');
     }
 
     // Same, but kept as a key so it follows a language change
-    showErrorKey(key, vars) {
-        this.showError(t(key, vars));
+    showErrorKey(key, vars, titleKey) {
+        this.showError(t(key, vars), titleKey);
         this.errorText = [key, vars];
     }
 
@@ -1008,50 +1039,32 @@ class PhotoFrameSlideshow {
         this.errorState.classList.add('hidden');
     }
 
-    // Once photos are playing, a photo that fails to come is skipped and the
-    // last good one stays on screen; the next one is tried on the usual timer
-    reportFailure(key, vars) {
-        if (this.hasShownPhoto) {
-            console.warn('Keeping the last photo on screen:', t(key, vars));
-            return;
-        }
-        if (this.errorState.classList.contains('hidden')) this.showErrorKey(key, vars);
-    }
-
     photoShown() {
         this.hasShownPhoto = true;
-        this.retry.reset();
-        clearTimeout(this.retryTimer);
-        this.retryTimer = null;
+        this.recovery.done(); // a photo is up (the Next button can get there first)
     }
 
-    // Try again on its own, waiting longer each time (see RetrySchedule)
-    scheduleRetry() {
-        clearTimeout(this.retryTimer);
-        const delay = this.retry.next();
-        console.log(`Trying again in ${Math.round(delay / 1000)}s`);
-        this.retryTimer = setTimeout(() => this.tryAgain(), delay);
-    }
-
-    // The first photo, and every retry (timer, Retry button, back online) until one shows
-    async tryAgain() {
-        if (this.tryingAgain) return;
-        this.tryingAgain = true;
-        clearTimeout(this.retryTimer);
-        this.retryTimer = null;
+    // The first photo after starting or picking a folder, and every retry
+    // (see PhotoRecovery for when it runs, and when its result is dropped)
+    async showFirstPhoto(signal, isCurrent) {
         this.clearTimers();
         this.resetProgress();
-        try {
-            const imageData = await this.fetchRandomImage();
-            if (imageData && await this.present(imageData)) {
-                if (this.isPlaying) this.scheduleNext();
-                return;
-            }
-            if (imageData) this.showErrorKey('slideshow.loadFirstImageFailed');
-            else this.showErrorKey(this.fetchFailedOffline ? 'slideshow.unable_images' : 'slideshow.noImages');
-            this.scheduleRetry();
-        } finally {
-            this.tryingAgain = false;
+        const next = await this.fetchRandomImage(signal);
+        if (!isCurrent()) return { ok: false };
+        if (next.error) return { ok: false, error: next.error };
+        if (!await this.present(next.image, { signal, isCurrent })) {
+            return { ok: false, error: signal?.aborted ? { offline: true } : { key: 'slideshow.loadFirstImageFailed' } };
+        }
+        if (this.isPlaying) this.scheduleNext();
+        return { ok: true };
+    }
+
+    // The error card, for an empty screen (PhotoRecovery keeps a photo already up)
+    showFailure(error) {
+        if (!error || error.offline || error.timeout) {
+            this.showErrorKey('slideshow.unable_images', undefined, 'slideshow.connectionTitle');
+        } else {
+            this.showErrorKey(error.key, error.vars);
         }
     }
 
@@ -1095,29 +1108,15 @@ class PhotoFrameSlideshow {
         }
     }
 
-    async onFolderChanged(folderPath, folderName) {
-        this.clearTimers();
-        this.resetProgress();
-
-        const imageData = await this.fetchRandomImage();
-        if (imageData) {
-            const loaded = await this.present(imageData);
-            if (loaded) {
-                this.scheduleNext();
-            } else {
-                this.showErrorKey('slideshow.loadFolderImageFailed');
-                this.scheduleRetry();
-            }
-        } else {
-            if (folderName) this.showErrorKey('slideshow.noImagesInFolder', { folder: folderName });
-            else this.showErrorKey('slideshow.noImagesInAllFolders');
-            this.scheduleRetry();
-        }
+    // The new folder's first photo, tried again until it shows. A retry still
+    // pending for the old folder is dropped; a photo on screen stays up meanwhile.
+    onFolderChanged() {
+        return this.recovery.start();
     }
 
     cleanup() {
         this.clearTimers();
-        clearTimeout(this.retryTimer);
+        this.recovery.stop(); // a try still running for this session is dropped
 
         if (this.cursorHideTimer) {
             clearTimeout(this.cursorHideTimer);
@@ -1139,7 +1138,8 @@ class PhotoFrameSlideshow {
     async startSlideshow() {
         this.hideError();
         this.noteScheduler?.start();
-        await this.tryAgain();
+        this.hasShownPhoto = false; // a new session: until its photo shows, say what's wrong
+        await this.recovery.start();
     }
 }
 

@@ -78,7 +78,8 @@
     "familyCodeRequired": "Enter the 8-character family code from the Access page.",
     "familyOrPinWrong": "That family code and PIN don't match. Check both and try again.",
     "retry": "Retry",
-    "retryingNote": "The frame keeps trying by itself."
+    "retryingNote": "The frame keeps trying by itself.",
+    "connectionTitle": "Can't reach your photos"
   },
   "accessAccounts": {
     "frames_pins": "Frames & PINs",

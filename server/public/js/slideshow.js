@@ -498,6 +498,11 @@ class PhotoFrameSlideshow {
         this.currentDuration = this.interval;
         this.noteScheduler = window.NoteScheduler ? new NoteScheduler() : null;
         this.noteHideTimer = null;
+        // Until a photo shows, a failure leaves the error card up and tries again later
+        this.hasShownPhoto = false;
+        this.retry = new RetrySchedule();
+        this.retryTimer = null;
+        this.tryingAgain = false;
 
         // Ken Burns drift spans the slide plus its crossfade
         document.documentElement.style.setProperty('--slide-duration', `${this.interval + 2000}ms`);
@@ -534,6 +539,7 @@ class PhotoFrameSlideshow {
         this.captionPlace = document.getElementById('captionPlace');
         this.captionDate = document.getElementById('captionDate');
         this.noteLayer = document.getElementById('noteLayer');
+        this.retryBtn = document.getElementById('retryBtn');
 
         this.errorState.classList.add('hidden');
         this.images.forEach(img => img.removeAttribute('src'));
@@ -545,6 +551,12 @@ class PhotoFrameSlideshow {
         this.logoutBtn.addEventListener('click', () => this.logout());
         this.playPauseBtn.addEventListener('click', () => this.togglePlayPause());
         this.nextBtn.addEventListener('click', () => this.nextImage());
+        this.retryBtn.addEventListener('click', () => this.tryAgain());
+
+        // Back online: don't wait out the rest of the retry delay
+        window.addEventListener('online', () => {
+            if (this.retryTimer) this.tryAgain();
+        });
 
         document.addEventListener('keydown', (e) => {
             // Typing in a field (the family code, say) is not a slideshow shortcut
@@ -607,11 +619,7 @@ class PhotoFrameSlideshow {
         });
 
         this.images.forEach(img => {
-            img.addEventListener('error', () => {
-                if (this.errorState.classList.contains('hidden')) {
-                    this.showErrorKey('slideshow.loadImageFailed');
-                }
-            });
+            img.addEventListener('error', () => this.reportFailure('slideshow.loadImageFailed'));
         });
     }
 
@@ -633,11 +641,13 @@ class PhotoFrameSlideshow {
                 throw new Error(i18n.error(data, 'slideshow.fetchImageFailed'));
             }
 
+            this.fetchFailedOffline = false;
             localStorage.setItem(LAST_SHOWN_KEY, JSON.stringify({ folder: selectedFolderPath || '', id: data.image.id }));
             return data.image;
         } catch (error) {
             console.error('Error fetching random image:', error);
-            this.showErrorKey('slideshow.loadImageFailedDetail', { detail: error.message });
+            this.fetchFailedOffline = error instanceof TypeError; // fetch() itself failed: no network or no server
+            this.reportFailure('slideshow.loadImageFailedDetail', { detail: error.message });
             return null;
         }
     }
@@ -710,9 +720,7 @@ class PhotoFrameSlideshow {
                 img.removeEventListener('error', onError);
                 if (isObjectUrl) URL.revokeObjectURL(src);
                 console.error('Failed to load image:', imageData.url);
-                if (this.errorState.classList.contains('hidden')) {
-                    this.showErrorKey('slideshow.loadImageFailedDetail', { detail: imageData.filename });
-                }
+                this.reportFailure('slideshow.loadImageFailedDetail', { detail: imageData.filename });
                 resolve(false);
             };
 
@@ -741,6 +749,7 @@ class PhotoFrameSlideshow {
         nextSlideEl.classList.add('active');
 
         this.currentSlide = (this.currentSlide + 1) % 2;
+        this.photoShown();
         this.hideNote();
         this.noteScheduler?.photoShown();
         this.updateInfo();
@@ -812,6 +821,7 @@ class PhotoFrameSlideshow {
         }
         if (!await this.showNote(imageData.snap, { scheduled: false })) return false;
         this.currentImageData = imageData;
+        this.photoShown();
         this.noteScheduler?.photoShown();
         this.updateInfo();
         this.loadingState.classList.add('hidden');
@@ -998,6 +1008,53 @@ class PhotoFrameSlideshow {
         this.errorState.classList.add('hidden');
     }
 
+    // Once photos are playing, a photo that fails to come is skipped and the
+    // last good one stays on screen; the next one is tried on the usual timer
+    reportFailure(key, vars) {
+        if (this.hasShownPhoto) {
+            console.warn('Keeping the last photo on screen:', t(key, vars));
+            return;
+        }
+        if (this.errorState.classList.contains('hidden')) this.showErrorKey(key, vars);
+    }
+
+    photoShown() {
+        this.hasShownPhoto = true;
+        this.retry.reset();
+        clearTimeout(this.retryTimer);
+        this.retryTimer = null;
+    }
+
+    // Try again on its own, waiting longer each time (see RetrySchedule)
+    scheduleRetry() {
+        clearTimeout(this.retryTimer);
+        const delay = this.retry.next();
+        console.log(`Trying again in ${Math.round(delay / 1000)}s`);
+        this.retryTimer = setTimeout(() => this.tryAgain(), delay);
+    }
+
+    // The first photo, and every retry (timer, Retry button, back online) until one shows
+    async tryAgain() {
+        if (this.tryingAgain) return;
+        this.tryingAgain = true;
+        clearTimeout(this.retryTimer);
+        this.retryTimer = null;
+        this.clearTimers();
+        this.resetProgress();
+        try {
+            const imageData = await this.fetchRandomImage();
+            if (imageData && await this.present(imageData)) {
+                if (this.isPlaying) this.scheduleNext();
+                return;
+            }
+            if (imageData) this.showErrorKey('slideshow.loadFirstImageFailed');
+            else this.showErrorKey(this.fetchFailedOffline ? 'slideshow.unable_images' : 'slideshow.noImages');
+            this.scheduleRetry();
+        } finally {
+            this.tryingAgain = false;
+        }
+    }
+
     requestWakeLock() {
         // Keep phones and tablets awake for as long as the frame is open
         if (!this.wakeLock) this.wakeLock = new KeepAwake();
@@ -1049,15 +1106,18 @@ class PhotoFrameSlideshow {
                 this.scheduleNext();
             } else {
                 this.showErrorKey('slideshow.loadFolderImageFailed');
+                this.scheduleRetry();
             }
         } else {
             if (folderName) this.showErrorKey('slideshow.noImagesInFolder', { folder: folderName });
             else this.showErrorKey('slideshow.noImagesInAllFolders');
+            this.scheduleRetry();
         }
     }
 
     cleanup() {
         this.clearTimers();
+        clearTimeout(this.retryTimer);
 
         if (this.cursorHideTimer) {
             clearTimeout(this.cursorHideTimer);
@@ -1079,18 +1139,7 @@ class PhotoFrameSlideshow {
     async startSlideshow() {
         this.hideError();
         this.noteScheduler?.start();
-
-        const imageData = await this.fetchRandomImage();
-        if (imageData) {
-            const loaded = await this.present(imageData);
-            if (loaded) {
-                this.scheduleNext();
-            } else {
-                this.showErrorKey('slideshow.loadFirstImageFailed');
-            }
-        } else {
-            this.showErrorKey('slideshow.noImages');
-        }
+        await this.tryAgain();
     }
 }
 

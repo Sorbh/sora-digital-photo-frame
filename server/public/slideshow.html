@@ -140,6 +140,11 @@
                 <span class="material-icons">photo_library</span>
                 <h2 data-i18n="slideshow.nothing">Nothing to show yet</h2>
                 <p id="errorMessage" data-i18n="slideshow.unable_images">Unable to load images. Please check your connection.</p>
+                <p class="error-retry-note" data-i18n="slideshow.retryingNote">The frame keeps trying by itself.</p>
+                <button type="button" class="error-retry" id="retryBtn">
+                    <span class="material-icons" aria-hidden="true">refresh</span>
+                    <span data-i18n="slideshow.retry">Retry</span>
+                </button>
                 <a href="/login" data-i18n="slideshow.open_library">Open the library &rarr;</a>
             </div>
         </div>
@@ -223,6 +228,7 @@
     <script src="/js/notePage.js"></script>
     <script src="/js/noteScheduler.js"></script>
     <script src="/js/photoCipher.js"></script>
+    <script src="/js/retrySchedule.js"></script>
     <script src="/js/slideshow.js"></script>
     <script>
       document.addEventListener('DOMContentLoaded', () => {

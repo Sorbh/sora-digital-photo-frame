@@ -76,7 +76,9 @@
     "enter_code_pin": "ファミリーコードとPINを入力するか、コードを読み取ってこのフレームを設定してください。",
     "familyCodeLabel": "ファミリーコード",
     "familyCodeRequired": "アクセスページにある8文字のファミリーコードを入力してください。",
-    "familyOrPinWrong": "ファミリーコードとPINが一致しません。両方を確認して、もう一度お試しください。"
+    "familyOrPinWrong": "ファミリーコードとPINが一致しません。両方を確認して、もう一度お試しください。",
+    "retry": "再試行",
+    "retryingNote": "フレームは自動で再試行を続けます。"
   },
   "accessAccounts": {
     "frames_pins": "フレームとPIN",

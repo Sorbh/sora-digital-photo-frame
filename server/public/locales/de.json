@@ -76,7 +76,9 @@
     "enter_code_pin": "Geben Sie Ihren Familiencode und Ihre PIN ein oder scannen Sie den Code, um diesen Rahmen einzurichten.",
     "familyCodeLabel": "Familiencode",
     "familyCodeRequired": "Geben Sie den 8-stelligen Familiencode von der Seite „Zugang“ ein.",
-    "familyOrPinWrong": "Familiencode und PIN passen nicht zusammen. Prüfen Sie beides und versuchen Sie es erneut."
+    "familyOrPinWrong": "Familiencode und PIN passen nicht zusammen. Prüfen Sie beides und versuchen Sie es erneut.",
+    "retry": "Erneut versuchen",
+    "retryingNote": "Der Rahmen versucht es von selbst weiter."
   },
   "accessAccounts": {
     "frames_pins": "Rahmen & PINs",

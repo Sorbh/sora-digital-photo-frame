@@ -76,7 +76,9 @@
     "enter_code_pin": "Saisissez votre code famille et votre code PIN, ou scannez le code pour configurer ce cadre.",
     "familyCodeLabel": "Code famille",
     "familyCodeRequired": "Saisissez le code famille de 8 caractères affiché sur la page Accès.",
-    "familyOrPinWrong": "Ce code famille et ce PIN ne correspondent pas. Vérifiez les deux et réessayez."
+    "familyOrPinWrong": "Ce code famille et ce PIN ne correspondent pas. Vérifiez les deux et réessayez.",
+    "retry": "Réessayer",
+    "retryingNote": "Le cadre continue d’essayer tout seul."
   },
   "accessAccounts": {
     "frames_pins": "Cadres et codes PIN",

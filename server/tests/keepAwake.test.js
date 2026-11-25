@@ -4,7 +4,17 @@ global.document = {
   visibilityState: 'visible',
   addEventListener: (type, fn) => { listeners[type] = fn; },
   removeEventListener: () => {},
-  createElement: () => ({ style: {}, setAttribute: () => {}, play: () => global.playVideo(), pause: () => {} }),
+  createElement: () => {
+    const handlers = {};
+    const video = {
+      style: {}, paused: true, setAttribute: () => {}, pause() { video.paused = true; },
+      addEventListener: (type, fn) => { handlers[type] = fn; },
+      emit: type => handlers[type](),
+      play: () => global.playVideo(video)
+    };
+    global.lastVideo = video;
+    return video;
+  },
   body: { appendChild: () => {} }
 };
 global.window = { navigator: {} };
@@ -47,6 +57,54 @@ describe('Keeping the screen awake', () => {
     listeners.click();
     await flush();
     expect(awake.status).toBe('unavailable');
+  });
+
+  test('a video this device cannot play is unavailable, not a reason to ask for a tap', async () => {
+    global.playVideo = () => Promise.reject(Object.assign(new Error('no decoder'), { name: 'NotSupportedError' }));
+    const awake = new KeepAwake();
+    awake.enable();
+    await flush();
+    expect(awake.status).toBe('unavailable');
+  });
+
+  test('on browsers where play() answers nothing, only real playback counts as on', async () => {
+    jest.useFakeTimers();
+    try {
+      global.playVideo = () => undefined;
+      const awake = new KeepAwake();
+      awake.enable();
+      expect(awake.status).toBe('pending');
+      global.lastVideo.paused = false;
+      global.lastVideo.emit('playing');
+      expect(awake.status).toBe('active');
+
+      const broken = new KeepAwake();
+      broken.enable();
+      global.lastVideo.emit('error'); // the file can't be decoded
+      expect(broken.status).toBe('unavailable');
+
+      const blocked = new KeepAwake();
+      blocked.enable();
+      jest.advanceTimersByTime(3000); // still paused: autoplay needs a tap
+      expect(blocked.status).toBe('needs-tap');
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  test('turned off on sign-out and on again on sign-in, it takes the lock again', async () => {
+    const requests = [];
+    global.navigator.wakeLock = { request: () => { requests.push(1); return Promise.resolve(sentinel()); } };
+    const awake = new KeepAwake();
+    awake.enable();
+    await flush();
+    expect(awake.status).toBe('active');
+    awake.disable();
+    expect(awake.status).toBe('pending');
+    awake.enable();
+    await flush();
+    expect(requests).toHaveLength(2);
+    expect(awake.status).toBe('active');
   });
 
   test('without the wake lock API, the looping video keeps the screen on', async () => {

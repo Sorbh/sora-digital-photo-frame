@@ -69,6 +69,7 @@ class KeepAwake {
             this.sentinel = null;
         }
         if (this.video) this.video.pause();
+        this.setStatus('pending'); // enable() again tries afresh
     }
 
     get active() {
@@ -127,15 +128,30 @@ class KeepAwake {
             video.setAttribute('muted', '');
             video.setAttribute('aria-hidden', 'true');
             video.style.cssText = 'position:fixed;width:1px;height:1px;opacity:0.01;pointer-events:none;left:0;top:0;';
+            // Playback is what keeps the screen on, so trust these over play()'s answer
+            video.addEventListener('playing', () => { if (this.enabled) this.setStatus('active'); });
+            video.addEventListener('error', () => this.setStatus('unavailable')); // can't decode it: a tap won't help
             document.body.appendChild(video);
             this.video = video;
         }
         // Rejected without a gesture; the gesture listeners will retry
         const playing = this.video.play();
-        if (!playing || !playing.then) return this.setStatus('active'); // older browsers return nothing
+        if (!playing || !playing.then) {
+            // Older browsers return nothing: the 'playing' event says it worked, and
+            // still paused a moment later means it didn't
+            clearTimeout(this.playCheck);
+            this.playCheck = setTimeout(() => {
+                if (this.enabled && this.video.paused) this.setStatus(this.hadGesture ? 'unavailable' : 'needs-tap');
+            }, 3000);
+            return;
+        }
         playing
             .then(() => this.setStatus('active'))
-            .catch(() => this.setStatus(this.hadGesture ? 'unavailable' : 'needs-tap'));
+            .catch(err => {
+                // NotSupportedError: this device can't play the video at all, so a tap won't help
+                const hopeless = this.hadGesture || (err && err.name === 'NotSupportedError');
+                this.setStatus(hopeless ? 'unavailable' : 'needs-tap');
+            });
     }
 }
 

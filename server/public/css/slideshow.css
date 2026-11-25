@@ -363,17 +363,31 @@ body.is-paused .paused-badge {
 
 /* ---------- Notice: fullscreen or keep-awake not available ------ */
 
-.frame-notice {
+/* Keep-awake on top, fullscreen under it; they move with the clock against burn-in */
+.frame-notices {
     position: absolute;
     top: clamp(1rem, 3vw, 2rem);
     left: 50%;
     z-index: 7;
     display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
     width: max-content;
     max-width: calc(100% - 2.5rem);
+    margin-top: calc(var(--shift-y, 0) * var(--shift-range));
+    transform: translateX(calc(-50% + var(--shift-x, 0) * var(--shift-range)));
+    transition: margin 3s ease-in-out, transform 3s ease-in-out;
+    pointer-events: none;
+}
+
+.frame-notice {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    max-width: 100%;
     padding: 10px 12px 10px 16px;
+    pointer-events: auto;
     border-radius: var(--shape-lg);
     background: rgba(30, 16, 26, 0.78);
     backdrop-filter: blur(20px);
@@ -382,8 +396,18 @@ body.is-paused .paused-badge {
     color: #f4efe6;
     font-size: clamp(0.9rem, 2vmin, 1.35rem);
     line-height: 1.35;
-    transform: translateX(-50%);
     animation: notice-in 0.5s var(--ease-out) both;
+}
+
+/* After a minute only the button stays, small, until the tap it needs */
+.frame-notice.is-compact {
+    padding: 6px;
+    background: rgba(30, 16, 26, 0.55);
+}
+
+.frame-notice.is-compact > .material-icons,
+.frame-notice.is-compact .frame-notice-text {
+    display: none;
 }
 
 .frame-notice > .material-icons {
@@ -419,8 +443,8 @@ body.is-paused .paused-badge {
 }
 
 @keyframes notice-in {
-    from { opacity: 0; transform: translate(-50%, -8px); }
-    to { opacity: 1; transform: translateX(-50%); }
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: none; }
 }
 
 /* ---------- Dock ------------------------------------------------- */
@@ -1100,12 +1124,16 @@ body.note-showing .photo-caption {
         top: 3.75rem;
     }
 
-    /* Narrow screens: the notice takes the top, under the paused badge */
-    .frame-notice {
+    /* Narrow screens: the notices take the top, under the paused badge */
+    .frame-notices {
         top: 1.25rem;
+        width: calc(100% - 2.5rem);
+    }
+
+    .frame-notice:not(.is-compact) {
         display: grid;
         grid-template-columns: auto 1fr;
-        width: calc(100% - 2.5rem);
+        width: 100%;
     }
 
     .frame-notice-btn {
@@ -1113,7 +1141,7 @@ body.note-showing .photo-caption {
         justify-self: start;
     }
 
-    body.is-paused .frame-notice {
+    body.is-paused .frame-notices {
         top: 3.75rem;
     }
 

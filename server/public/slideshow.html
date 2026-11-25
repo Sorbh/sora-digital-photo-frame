@@ -150,13 +150,19 @@
         <div class="paused-badge" aria-hidden="true" data-i18n="slideshow.paused">Paused</div>
 
         <!-- When fullscreen or keeping the screen on doesn't work here -->
-        <div class="frame-notice hidden" id="frameNotice" role="status" aria-live="polite">
-            <span class="material-icons" id="frameNoticeIcon" aria-hidden="true">info</span>
-            <span class="frame-notice-text" id="frameNoticeText"></span>
-            <button type="button" class="frame-notice-btn hidden" id="keepAwakeBtn">
-                <span class="material-icons" aria-hidden="true">light_mode</span>
-                <span data-i18n="slideshow.keepAwake">Keep screen awake</span>
-            </button>
+        <div class="frame-notices" aria-live="polite">
+            <div class="frame-notice hidden" id="wakeNotice" role="status">
+                <span class="material-icons" aria-hidden="true">bedtime</span>
+                <span class="frame-notice-text"></span>
+                <button type="button" class="frame-notice-btn hidden" id="keepAwakeBtn">
+                    <span class="material-icons" aria-hidden="true">light_mode</span>
+                    <span data-i18n="slideshow.keepAwake">Keep screen awake</span>
+                </button>
+            </div>
+            <div class="frame-notice hidden" id="infoNotice" role="status">
+                <span class="material-icons" aria-hidden="true">info</span>
+                <span class="frame-notice-text"></span>
+            </div>
         </div>
 
         <!-- Controls -->
@@ -230,6 +236,7 @@
     <script src="/js/folderSelector.js"></script>
     <script src="/js/keepAwake.js"></script>
     <script src="/js/screenShift.js"></script>
+    <script src="/js/frameNotices.js"></script>
 
     <script src="/js/notePage.js"></script>
     <script src="/js/noteScheduler.js"></script>

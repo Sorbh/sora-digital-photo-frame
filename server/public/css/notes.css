@@ -171,7 +171,7 @@
     transform: rotate(-1.5deg);
 }
 
-.notes-empty h3 {
+.notes-empty h2 {
     margin: 0 0 0.6rem;
     font-family: var(--font-display);
     font-variation-settings: 'SOFT' 100, 'opsz' 144;

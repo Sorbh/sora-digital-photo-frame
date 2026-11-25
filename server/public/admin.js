@@ -256,6 +256,8 @@ class PhotoFrameAdmin {
 
         // Photo modal
         document.getElementById('closePhotoModal').addEventListener('click', () => this.hidePhotoModal());
+        document.getElementById('photoModalPrev').addEventListener('click', () => this.navigateToPreviousImage());
+        document.getElementById('photoModalNext').addEventListener('click', () => this.navigateToNextImage());
         document.getElementById('photoModal').addEventListener('click', (e) => {
             if (e.target === e.currentTarget) {
                 this.hidePhotoModal();
@@ -1507,6 +1509,8 @@ class PhotoFrameAdmin {
         
         modalImage.src = imageUrl;
         modalImage.alt = imageName;
+        document.getElementById('modalPhotoName').textContent = imageName;
+        document.querySelector('.photo-modal-nav').hidden = this.availableImages.length < 2;
         
         // Reset zoom state
         modalImage.classList.remove('zoomed');
@@ -1990,6 +1994,7 @@ class PhotoFrameAdmin {
         this.currentImageIndex = index;
         modalImage.src = image.url;
         modalImage.alt = image.name;
+        document.getElementById('modalPhotoName').textContent = image.name;
         
         // Reset zoom state when navigating
         modalImage.classList.remove('zoomed');

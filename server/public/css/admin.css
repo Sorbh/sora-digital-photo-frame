@@ -796,6 +796,51 @@ body {
     transform: scale(1.5);
 }
 
+/* Previous / next buttons: shown on phones and touch screens, where the
+   arrow keys and the hover hints aren't available */
+.photo-modal-nav {
+    display: none;
+    gap: 1rem;
+    margin-top: 1rem;
+    z-index: 1001;
+}
+
+.photo-modal-nav[hidden] {
+    display: none !important;
+}
+
+.photo-modal-nav-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    border: 1px solid rgb(255 255 255 / 0.14);
+    border-radius: 50%;
+    background: rgb(255 255 255 / 0.08);
+    color: #fff;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.photo-modal-nav-btn:hover {
+    background: rgb(255 255 255 / 0.16);
+}
+
+.photo-modal-nav-btn .material-symbols-outlined {
+    font-size: 28px;
+}
+
+html[dir="rtl"] .photo-modal-nav-btn .material-symbols-outlined {
+    transform: scaleX(-1);
+}
+
+@media (max-width: 640px), (hover: none) {
+    .photo-modal-nav {
+        display: flex;
+    }
+}
+
 .photo-modal-hints {
     position: absolute;
     left: 1.5rem;
@@ -884,7 +929,7 @@ body {
 
     .modal-photo {
         max-width: calc(100vw - 2rem);
-        max-height: calc(100vh - 6rem);
+        max-height: calc(100vh - 10rem); /* room for the previous / next buttons */
     }
 
     .photo-modal-hints {

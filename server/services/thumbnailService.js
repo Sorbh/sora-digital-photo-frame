@@ -146,7 +146,8 @@ class ThumbnailService {
     const stat = await fs.stat(file);
     const tag = crypto.createHash('sha1').update(`${file}:${stat.size}:${stat.mtimeMs}`).digest('base64url');
     res.set('ETag', `"${tag}"`);
-    res.type(type).sendFile(file);
+    // No Last-Modified: a date can match another family's thumbnail, the ETag can't
+    res.type(type).sendFile(file, { lastModified: false });
   }
 }
 

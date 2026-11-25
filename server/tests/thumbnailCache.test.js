@@ -63,6 +63,21 @@ describe('Protected thumbnails', () => {
     expect(folder.thumbnail).toMatch(/\/thumbnail\?rev=/);
   });
 
+  test.each(ENDPOINTS)('%s is confirmed only by its ETag, never by a date', async (url) => {
+    const res = await admin.get(url).expect(200);
+    expect(res.headers['last-modified']).toBeUndefined();
+    const future = new Date(Date.now() + 24 * 60 * 60 * 1000).toUTCString();
+    await admin.get(url).set('If-Modified-Since', future).expect(200);
+  });
+
+  test('note and snap photos use addresses not cached before thumbnails were always checked', async () => {
+    const notes = require('../services/noteService');
+    const [photo] = notes.photoUrls(['private/secret.png']);
+    expect(photo.thumbnail).toBe('/api/images/private%2Fsecret.png/thumbnail?revalidate=1');
+    const snapPage = await fs.readFile(path.join(__dirname, '../public/js/snap.js'), 'utf8');
+    expect(snapPage).toContain('/thumbnail?revalidate=1`');
+  });
+
   test('after signing out, a kept copy is not confirmed', async () => {
     const agent = request.agent(app);
     await agent.post('/api/auth/login').send({ password: 'thumbcache-admin-pass' }).expect(200);

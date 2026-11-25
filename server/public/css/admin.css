@@ -923,7 +923,7 @@ body {
     margin-top: 1.5rem;
     padding: 2rem 1rem;
     background: radial-gradient(ellipse 50% 60% at 50% 50%, color-mix(in oklab, var(--berry) 7%, transparent), transparent 75%);
-    color: color-mix(in oklab, var(--muted-foreground) 55%, transparent);
+    color: var(--muted-foreground); /* full strength: help text needs 4.5:1 */
     text-align: center;
     pointer-events: none;
     transition: color 0.25s ease;
@@ -946,7 +946,6 @@ body {
 
 .drop-hint .drop-hint-sub {
     font-size: 0.8125rem;
-    opacity: 0.8;
 }
 
 .app.file-dragging .drop-hint {

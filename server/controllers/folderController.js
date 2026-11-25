@@ -21,7 +21,8 @@ class FolderController {
   }
 
   // Cover URL for a folder (first image, searching subfolders), or null when empty.
-  // The ?v= token changes when the cover image changes, so browsers can cache it.
+  // The ?rev= token changes when the cover image changes. (It was ?v= when these were
+  // cached for 7 days without asking; a new name means those old copies are never used.)
   async generateFolderThumbnail(folderPath) {
     try {
       const fullPath = thumbnails.resolveInUploads(folderPath);
@@ -33,7 +34,7 @@ class FolderController {
       const stat = await getLibrary().stat(toAdminPath(firstImage));
       const version = `${path.basename(firstImage)}:${Math.round(stat.mtimeMs)}`;
       const encoded = path.relative(this.uploadsDir, fullPath).split(path.sep).map(encodeURIComponent).join('/');
-      return `/api/folders/${encoded}/thumbnail?v=${encodeURIComponent(version)}`;
+      return `/api/folders/${encoded}/thumbnail?rev=${encodeURIComponent(version)}`;
     } catch (error) {
       console.error('Error generating folder thumbnail:', error);
       return null;
@@ -50,7 +51,7 @@ class FolderController {
       return await Promise.all(images.map(async image => {
         const stat = await getLibrary().stat(toAdminPath(image));
         const relativePath = path.relative(this.uploadsDir, image);
-        return `/api/images/${encodeURIComponent(relativePath)}/thumbnail?v=${Math.round(stat.mtimeMs)}`;
+        return `/api/images/${encodeURIComponent(relativePath)}/thumbnail?rev=${Math.round(stat.mtimeMs)}`;
       }));
     } catch (error) {
       console.error('Error generating folder prints:', error);
@@ -328,8 +329,8 @@ class FolderController {
             type: 'image',
             path: path.join(folderPath, item.name),
             url: `/uploads/${urlPath}`,
-            // Grid tiles use the small cached version; ?v= busts it after a rotate
-            thumbnail: `/api/images/${encodeURIComponent(relativePath)}/thumbnail?v=${Math.round(stat.mtimeMs)}`
+            // Grid tiles use the small cached version; ?rev= changes after a rotate
+            thumbnail: `/api/images/${encodeURIComponent(relativePath)}/thumbnail?rev=${Math.round(stat.mtimeMs)}`
           })));
         } else if (item.isFile() && snaps.isSnap(item.name)) {
           // Snaps carry their page, so the grid can draw them like the frame does

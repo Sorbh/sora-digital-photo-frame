@@ -21,11 +21,31 @@ describe('left-to-right codes in right-to-left pages', () => {
     expect(tag).toMatch(/\sdir="ltr"/);
   });
 
+  test('the PIN cells fill left to right, like the PIN input', () => {
+    expect(read('slideshow.html')).toMatch(/<div class="pin-cells"[^>]*\sdir="ltr"/);
+  });
+
   test('the pairing address in the hint is an ltr span', () => {
     const source = read('js/slideshow.js');
     const renderPairHint = source.slice(source.indexOf('renderPairHint() {'), source.indexOf('renderLanguage() {'));
     expect(renderPairHint).toMatch(/url\.id = 'pairUrl'/);
     expect(renderPairHint).toMatch(/url\.dir = 'ltr'/);
+  });
+
+  // Rules (selector -> declarations) of a stylesheet, outside media queries
+  const rulesOf = css => [...css.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/(?<=^|\})\s*([^{}@]+?)\s*\{([^{}]*)\}/g)]
+    .map(m => ({ selector: m[1].trim(), body: m[2] }));
+
+  test('the note spine is placed from the inline start, so it follows the mirrored columns', () => {
+    const rules = rulesOf(read('css/notePage.css'));
+    const spine = rules.filter(r => /\.note-page[^,]*::before/.test(r.selector) && /inset-inline-start|left|right/.test(r.body));
+    expect(spine.length).toBeGreaterThan(0);
+    for (const rule of spine) {
+      expect(rule.body).not.toMatch(/(^|[\s;])(left|right)\s*:/);
+      expect(rule.body).not.toMatch(/translateX/);
+    }
+    const base = rules.find(r => r.selector === '.note-page:not(.layout-cover)::before');
+    expect(base.body).toMatch(/inset-inline-start:\s*40%/);
   });
 
   test('nested folders indent from the inline start', () => {

@@ -948,7 +948,12 @@ body {
     font-size: 0.8125rem;
 }
 
+/* Deep berry on cream, bright berry on the night album: 4.5:1 or more as text */
 .app.file-dragging .drop-hint {
+    color: var(--berry-deep);
+}
+
+html.dark .app.file-dragging .drop-hint {
     color: var(--berry);
 }
 

@@ -39,7 +39,6 @@ class PhotoFrameAdmin {
         this.emptyStateSelectedFiles = []; // For empty state upload
         this.selectedItems = new Set(); // For multi-select
         this.contextMenuTarget = null;
-        this.longPressTimeout = null;
         this.longPressDelay = 500; // 500ms for long press
         
         // Photo modal zoom/pan state
@@ -784,7 +783,6 @@ class PhotoFrameAdmin {
         div.draggable = true;
         div.querySelector('img').draggable = false;
         div.addEventListener('dragstart', (e) => {
-            this.cancelLongPress();
             div.classList.remove('selecting');
             const paths = this.selectedItems.has(file.path) ? [...this.selectedItems] : [file.path];
             e.dataTransfer.setData(PHOTO_DRAG_TYPE, JSON.stringify(paths));
@@ -802,23 +800,33 @@ class PhotoFrameAdmin {
             document.querySelectorAll('.drop-target').forEach(el => el.classList.remove('drop-target'));
         });
 
-        // Add long press for mobile
-        div.addEventListener('mousedown', (e) => this.handlePointerDown(e, file, div));
-        div.addEventListener('touchstart', (e) => this.handlePointerDown(e, file, div), { passive: false });
-        div.addEventListener('mouseup', (e) => this.handlePointerUp(e, file, div));
-        div.addEventListener('touchend', (e) => this.handlePointerUp(e, file, div));
-        div.addEventListener('mouseleave', () => this.cancelLongPress());
+        // Hold a photo to select it. A tap still opens it, and the click that ends
+        // a finished hold is swallowed (js/longPress.js).
+        const longPress = SoraLongPress.attach(div, {
+            delay: this.longPressDelay,
+            ignore: '.photo-grid-checkbox, .btn-icon',
+            onStart: (e) => {
+                // Fingers scroll and hold; only a mouse picks the tile up to drag it
+                div.draggable = e.pointerType === 'mouse';
+                div.classList.add('selecting');
+            },
+            onLongPress: () => {
+                div.classList.remove('selecting');
+                this.toggleSelection(file);
+                if (navigator.vibrate) navigator.vibrate(50);
+            },
+            onEnd: () => div.classList.remove('selecting')
+        });
+        div.addEventListener('dragstart', () => longPress.cancel());
         div.addEventListener('contextmenu', (e) => this.showContextMenu(e, {...file, type}));
         
         // Regular click handler for photo modal
         div.addEventListener('click', (e) => {
             // Don't open modal if clicking on checkbox or action buttons
             if (e.target.closest('.photo-grid-checkbox') || e.target.closest('.btn-icon')) return;
-            if (!this.longPressTriggered) {
-                e.preventDefault();
-                if (isSnap) this.openSnap(file);
-                else this.showPhotoModal(file.url, file.name);
-            }
+            e.preventDefault();
+            if (isSnap) this.openSnap(file);
+            else this.showPhotoModal(file.url, file.name);
         });
         
         return div;
@@ -1635,38 +1643,6 @@ class PhotoFrameAdmin {
             }
         }
     }
-
-    // Long Press Detection Methods
-    handlePointerDown(e, file, element) {
-        this.longPressTriggered = false;
-        element.classList.add('selecting');
-        
-        this.longPressTimeout = setTimeout(() => {
-            this.longPressTriggered = true;
-            element.classList.remove('selecting');
-            this.toggleSelection(file);
-            // Add haptic feedback on mobile
-            if (navigator.vibrate) {
-                navigator.vibrate(50);
-            }
-        }, this.longPressDelay);
-        
-        // Mouse presses must stay default so the tile can be dragged
-        if (e.type === 'touchstart') e.preventDefault();
-    }
-
-    handlePointerUp(_e, _file, element) {
-        this.cancelLongPress();
-        element.classList.remove('selecting');
-    }
-
-    cancelLongPress() {
-        if (this.longPressTimeout) {
-            clearTimeout(this.longPressTimeout);
-            this.longPressTimeout = null;
-        }
-    }
-
 
     // Selection Management Methods
     toggleSelection(file) {

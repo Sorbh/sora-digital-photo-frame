@@ -442,6 +442,40 @@ body {
     box-shadow: 0 0 0 3px var(--background), 0 0 0 5px var(--safelight);
 }
 
+/* Touch screens have no hover: the select circle and the View and Delete
+   buttons stay in view, at finger size, and holding a photo selects it
+   instead of opening the browser's image callout */
+@media (hover: none), (pointer: coarse) {
+    .file-item.image {
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        user-select: none;
+    }
+
+    .photo-grid-overlay {
+        padding: 6px;
+        opacity: 1;
+    }
+
+    .photo-grid-actions .btn-icon {
+        width: 44px;
+        height: 44px;
+        background: rgb(0 0 0 / 0.38);
+    }
+
+    .photo-grid-actions .btn-icon .material-symbols-outlined {
+        font-size: 22px;
+    }
+
+    .photo-grid-checkbox .label {
+        padding: 10px;
+    }
+
+    .photo-grid-info {
+        right: 106px;
+    }
+}
+
 .file-item.image.selected .admin-photo-image img {
     transform: none;
     filter: saturate(0.85) brightness(0.92);

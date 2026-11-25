@@ -196,7 +196,10 @@
     "enterNote": "Le cadre l’affiche sous son code QR, par exemple <bdi class=\"code-example\">K7P-4QX</bdi>.",
     "continue": "Continuer",
     "codeInvalid": "Saisissez les 6 lettres et chiffres affichés sur le cadre.",
-    "typeCode": "Saisir un code"
+    "typeCode": "Saisir un code",
+    "unreachableHeading": "Impossible de <em>vérifier</em> le code",
+    "unreachableNote": "La bibliothèque n’a pas répondu. Vérifiez la connexion de votre téléphone, puis réessayez.",
+    "tryAgain": "Réessayer"
   },
   "login": {
     "invalid_password": "Mot de passe incorrect. Veuillez réessayer.",

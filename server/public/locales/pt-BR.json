@@ -196,7 +196,10 @@
     "enterNote": "O porta-retrato mostra o código abaixo do QR code, como <bdi class=\"code-example\">K7P-4QX</bdi>.",
     "continue": "Continuar",
     "codeInvalid": "Digite as 6 letras e números que aparecem no porta-retrato.",
-    "typeCode": "Digitar um código"
+    "typeCode": "Digitar um código",
+    "unreachableHeading": "Não foi possível <em>verificar</em> o código",
+    "unreachableNote": "A biblioteca não respondeu. Confira a conexão do celular e tente de novo.",
+    "tryAgain": "Tentar de novo"
   },
   "login": {
     "invalid_password": "Senha incorreta. Tente de novo.",

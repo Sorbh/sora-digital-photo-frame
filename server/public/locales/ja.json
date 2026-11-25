@@ -195,7 +195,10 @@
     "enterNote": "フレームのQRコードの下に、<bdi class=\"code-example\">K7P-4QX</bdi> のように表示されています。",
     "continue": "続ける",
     "codeInvalid": "フレームに表示された6文字の英数字を入力してください。",
-    "typeCode": "コードを入力"
+    "typeCode": "コードを入力",
+    "unreachableHeading": "コードを<em>確認</em>できませんでした",
+    "unreachableNote": "ライブラリから応答がありません。スマートフォンの接続を確認してから、もう一度お試しください。",
+    "tryAgain": "もう一度試す"
   },
   "login": {
     "invalid_password": "パスワードが正しくありません。もう一度お試しください。",

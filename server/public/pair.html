@@ -47,7 +47,7 @@
 
             <label class="field">
                 <span class="field-label" data-i18n="pair.static_007">Code on the frame</span>
-                <input type="text" id="codeInput" class="code-input" dir="ltr" maxlength="9" placeholder="K7P-4QX" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" enterkeyhint="go" aria-describedby="codeError" required>
+                <input type="text" id="codeInput" class="code-input" dir="ltr" maxlength="24" placeholder="K7P-4QX" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" enterkeyhint="go" aria-describedby="codeError" required>
             </label>
 
             <p class="pair-error hidden" id="codeError" role="alert"></p>
@@ -69,6 +69,17 @@
             </div>
         </section>
 
+        <!-- The code couldn't be checked: no connection, or the server didn't answer -->
+        <section class="pair-state hidden" id="stateUnreachable">
+            <span class="material-icons pair-big-icon">wifi_off</span>
+            <h1 class="sora-display" data-i18n-html="pair.unreachableHeading">Couldn't <em>check</em> the code</h1>
+            <p class="pair-note" data-i18n="pair.unreachableNote">The library didn't answer. Check your phone's connection, then try again.</p>
+            <div class="pair-links">
+                <button type="button" class="pair-link" id="retryCheck"><span class="material-icons">refresh</span><span data-i18n="pair.tryAgain">Try again</span></button>
+                <a class="pair-link" href="/pair"><span class="material-icons">keyboard</span><span data-i18n="pair.typeCode">Type a code</span></a>
+            </div>
+        </section>
+
         <!-- Approve -->
         <form class="pair-state hidden" id="pairForm" novalidate>
             <p class="sora-eyebrow" data-i18n="pair.static_005">New frame</p>
@@ -76,7 +87,7 @@
 
             <div class="code-check">
                 <span class="code-check-label" data-i18n="pair.static_007">Code on the frame</span>
-                <span class="code-check-code" id="codeShown">······</span>
+                <span class="code-check-code"><span id="codeShown" dir="ltr">······</span></span>
                 <span class="code-check-hint"><span class="material-icons">visibility</span><span data-i18n="pair.codeMatchHint">Check it matches the frame's screen</span></span>
             </div>
 

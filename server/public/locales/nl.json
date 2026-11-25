@@ -195,7 +195,10 @@
     "enterNote": "De fotolijst toont hem onder de QR-code, bijvoorbeeld <bdi class=\"code-example\">K7P-4QX</bdi>.",
     "continue": "Doorgaan",
     "codeInvalid": "Typ de 6 letters en cijfers die op de fotolijst staan.",
-    "typeCode": "Code typen"
+    "typeCode": "Code typen",
+    "unreachableHeading": "Code kon niet worden <em>gecontroleerd</em>",
+    "unreachableNote": "De bibliotheek gaf geen antwoord. Controleer de verbinding van je telefoon en probeer het opnieuw.",
+    "tryAgain": "Opnieuw proberen"
   },
   "login": {
     "invalid_password": "Onjuist wachtwoord. Probeer het opnieuw.",

@@ -195,7 +195,10 @@
     "enterNote": "The frame shows it under its QR code, like <bdi class=\"code-example\">K7P-4QX</bdi>.",
     "continue": "Continue",
     "codeInvalid": "Type the 6 letters and numbers shown on the frame.",
-    "typeCode": "Type a code"
+    "typeCode": "Type a code",
+    "unreachableHeading": "Couldn't <em>check</em> the code",
+    "unreachableNote": "The library didn't answer. Check your phone's connection, then try again.",
+    "tryAgain": "Try again"
   },
   "login": {
     "invalid_password": "Invalid password. Please try again.",

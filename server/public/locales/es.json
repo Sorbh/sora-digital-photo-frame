@@ -195,7 +195,10 @@
     "enterNote": "El marco lo muestra debajo de su código QR, por ejemplo <bdi class=\"code-example\">K7P-4QX</bdi>.",
     "continue": "Continuar",
     "codeInvalid": "Escribe las 6 letras y números que aparecen en el marco.",
-    "typeCode": "Escribir un código"
+    "typeCode": "Escribir un código",
+    "unreachableHeading": "No se pudo <em>comprobar</em> el código",
+    "unreachableNote": "La biblioteca no respondió. Revisa la conexión de tu teléfono y vuelve a intentarlo.",
+    "tryAgain": "Reintentar"
   },
   "login": {
     "invalid_password": "Contraseña incorrecta. Inténtalo de nuevo.",

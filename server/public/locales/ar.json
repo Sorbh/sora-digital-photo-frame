@@ -199,7 +199,10 @@
     "enterNote": "يظهر الرمز على الإطار أسفل رمز QR، مثل <bdi class=\"code-example\">K7P-4QX</bdi>.",
     "continue": "متابعة",
     "codeInvalid": "اكتب الأحرف والأرقام الستة الظاهرة على الإطار.",
-    "typeCode": "كتابة رمز"
+    "typeCode": "كتابة رمز",
+    "unreachableHeading": "تعذّر <em>التحقق</em> من الرمز",
+    "unreachableNote": "لم تستجب المكتبة. تحقّق من اتصال هاتفك، ثم حاول مرة أخرى.",
+    "tryAgain": "حاول مرة أخرى"
   },
   "login": {
     "invalid_password": "كلمة المرور غير صحيحة. يُرجى المحاولة مرة أخرى.",

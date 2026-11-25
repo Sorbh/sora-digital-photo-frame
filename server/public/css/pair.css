@@ -50,6 +50,7 @@ body {
 
 #stateLoading,
 #stateExpired,
+#stateUnreachable,
 #stateDone {
     align-items: center;
     padding-top: 12vh;
@@ -98,6 +99,11 @@ body {
     font-weight: 600;
     font-size: 0.875rem;
     text-decoration: none;
+}
+
+button.pair-link {
+    font-family: inherit;
+    cursor: pointer;
 }
 
 .pair-links {

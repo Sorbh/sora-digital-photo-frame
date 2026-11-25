@@ -6,7 +6,7 @@
     // As shown on the frame (K7P-4QX), any case, with or without the hyphen or spaces
     const normalize = value => String(value || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
     let code = normalize(new URLSearchParams(location.search).get('code'));
-    const states = ['stateLoading', 'stateEnter', 'stateExpired', 'pairForm', 'stateDone'];
+    const states = ['stateLoading', 'stateEnter', 'stateExpired', 'stateUnreachable', 'pairForm', 'stateDone'];
 
     const show = id => states.forEach(s => $(s).classList.toggle('hidden', s !== id));
     const pretty = c => `${c.slice(0, 3)}-${c.slice(3)}`;
@@ -74,9 +74,10 @@
         const response = await fetch(url, options);
         if (response.status === 401) {
             location.href = `/login?next=${encodeURIComponent(location.pathname + location.search)}`;
-            throw new Error('Signed out');
+            throw Object.assign(new Error('Signed out'), { signedOut: true });
         }
-        return { ok: response.ok, status: response.status, data: await response.json() };
+        // A proxy's error page is not JSON; the status still says what happened
+        return { ok: response.ok, status: response.status, data: await response.json().catch(() => ({})) };
     }
 
     function showEnter() {
@@ -89,9 +90,13 @@
         show('stateLoading');
         try {
             const pairing = await getJson(`/api/admin/pair/${encodeURIComponent(code)}`);
-            if (!pairing.ok || pairing.data.approved) return show('stateExpired');
+            // Only a definite "no such code" means expired; anything else (a 503, a
+            // restarting server) is worth another try with the same code
+            if (pairing.status === 404 || pairing.status === 410 || (pairing.ok && pairing.data.approved)) return show('stateExpired');
+            if (!pairing.ok) return show('stateUnreachable');
 
             const [accounts, folders] = await Promise.all([getJson('/api/access-accounts'), getJson('/api/folders')]);
+            if (!accounts.ok || !folders.ok) return show('stateUnreachable');
             $('codeShown').textContent = pretty(pairing.data.code);
             loaded = { accounts: accounts.data.accounts || [], folders: folders.data.folders || [] };
             renderAccounts(loaded.accounts);
@@ -99,8 +104,9 @@
             show('pairForm');
             if (matchMedia('(pointer: fine)').matches) $('frameName').focus();
         } catch (error) {
+            if (error.signedOut) return; // on the way to the sign-in page
             console.error('Could not load the pairing:', error);
-            show('stateExpired');
+            show('stateUnreachable');
         }
     }
 
@@ -121,6 +127,7 @@
     });
 
     $('codeInput').addEventListener('input', () => $('codeError').classList.add('hidden'));
+    $('retryCheck').addEventListener('click', () => load());
 
     $('pairForm').addEventListener('submit', async event => {
         event.preventDefault();

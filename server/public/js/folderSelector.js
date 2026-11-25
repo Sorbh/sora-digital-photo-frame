@@ -269,8 +269,13 @@ class FolderSelector {
                 font-size: 18px;
             }
 
+            /* Fit between the top of the screen and the dock, but always show at
+               least one row. dvh is the height actually visible (phone toolbars
+               shown); older browsers keep the vh line, and very old ones the first. */
             .folder-options {
-                max-height: min(56vh, 30rem);
+                max-height: 56vh;
+                max-height: max(3.75rem, min(56vh, 30rem, calc(100vh - 12rem)));
+                max-height: max(3.75rem, min(56dvh, 30rem, calc(100dvh - 12rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))));
                 overflow-y: auto;
                 overscroll-behavior: contain;
             }
@@ -437,10 +442,13 @@ class FolderSelector {
                 .dropdown-arrow {
                     display: none;
                 }
+            }
 
-                /* The button sits off-centre in the dock, so hang the panel from
-                   the dock instead, which is centred on the screen, and keep it
-                   inside the safe area (notches, rounded corners) */
+            /* Small screens, narrow or short (a phone on its side): the button sits
+               off-centre in the dock, so hang the panel from the dock instead,
+               which is centred on the screen, and keep it inside the safe area
+               (notches, rounded corners) */
+            @media (max-width: 600px), (max-height: 520px) {
                 .controls .folder-selector {
                     position: static;
                 }
@@ -450,9 +458,17 @@ class FolderSelector {
                     bottom: calc(100% + 12px);
                     max-width: calc(100vw - 1.5rem - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px));
                 }
+            }
 
-                .folder-options {
-                    max-height: min(56vh, 30rem, calc(100vh - 12rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
+            /* Short screens: a tighter header and gap leave room for the folders */
+            @media (max-height: 520px) {
+                .folder-dropdown {
+                    bottom: calc(100% + 8px);
+                }
+
+                .folder-dropdown-header {
+                    padding-top: 4px;
+                    padding-bottom: 4px;
                 }
             }
         `;

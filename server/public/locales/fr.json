@@ -223,6 +223,10 @@
     "connection": "Erreur de connexion. Veuillez réessayer.",
     "unknown": "Un problème est survenu. Veuillez réessayer.",
     "FILE_TOO_LARGE": "Chaque photo peut faire au maximum {size} Mo",
+    "IMAGE_TOO_LARGE": "Cette photo est trop grande pour être traitée. Essayez une photo plus petite ou une animation plus courte.",
+    "UPLOAD_TOO_LARGE": "Chaque envoi peut faire au maximum {size} Mo.",
+    "BUSY": "Beaucoup de photos sont en cours d'envoi. Veuillez réessayer dans un instant.",
+    "LENGTH_REQUIRED": "Cet envoi n'a pas pu être lu. Veuillez réessayer.",
     "UNSUPPORTED_TYPE": "Seules les photos JPEG, PNG, GIF, WebP et HEIC peuvent être importées",
     "SCREEN_LIMIT": "Cette famille a déjà {limit} écrans. Retirez-en un que vous n’utilisez plus pour ajouter celui-ci."
   },

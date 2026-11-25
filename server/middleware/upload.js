@@ -1,5 +1,8 @@
 const path = require('path');
 const multer = require('multer');
+const slots = require('../utils/workSlots');
+const { runWithTenant } = require('../context');
+const { assertCanAdd } = require('../services/quotaService');
 // Multer configuration for file uploads. Files stay in memory (never in plain
 // text on disk), so the number per request is capped; the admin page sends
 // larger selections in batches.
@@ -10,9 +13,6 @@ const storage = multer.memoryStorage();
 const MAX_FILE_SIZE = parseInt(process.env.MAX_FILE_SIZE) || 25 * 1024 * 1024;
 // Whole request: the admin page sends one photo per request (js/photoUpload.js)
 const MAX_UPLOAD_SIZE = parseInt(process.env.MAX_UPLOAD_SIZE) || 4 * MAX_FILE_SIZE;
-// Uploads held in memory and converted at the same time: all families, and one family
-const UPLOADS_AT_ONCE = parseInt(process.env.UPLOADS_AT_ONCE) || 4;
-const UPLOADS_AT_ONCE_PER_FAMILY = 2;
 
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/heic', 'image/heif'];
 // Some browsers send HEIC files without a type
@@ -41,12 +41,12 @@ const upload = multer({
 
 /**
  * Runs before multer reads anything: refuses a request bigger than
- * MAX_UPLOAD_SIZE, and one that would go over the number of uploads
- * buffered and converted at once (503, which the admin page retries).
+ * MAX_UPLOAD_SIZE, one from a family whose library is already full, and one
+ * that would go over the uploads held and converted at once (503, which the
+ * admin page retries). The slot is kept until the upload is processed:
+ * the route's handler calls req.uploadSlot.finish() when it is done.
  */
-const running = { total: 0, byFamily: new Map() };
-
-function uploadLimits(req, res, next) {
+async function uploadLimits(req, res, next) {
   const length = Number(req.headers['content-length']);
   if (!req.headers['content-length'] || !Number.isFinite(length)) {
     return res.status(411).json({ code: 'LENGTH_REQUIRED', message: 'Uploads need a Content-Length.' });
@@ -57,26 +57,24 @@ function uploadLimits(req, res, next) {
       .json({ code: 'UPLOAD_TOO_LARGE', size, message: `Upload too large. Maximum is ${size}MB per request.` });
   }
 
-  const family = (req.tenant && req.tenant.id) || 'default';
-  const forFamily = running.byFamily.get(family) || 0;
-  if (running.total >= UPLOADS_AT_ONCE || forFamily >= UPLOADS_AT_ONCE_PER_FAMILY) {
+  // No room left at all? Then don't even read the photos
+  try {
+    await runWithTenant(req.tenant, () => assertCanAdd(1));
+  } catch (error) {
+    if (error.code !== 'QUOTA_EXCEEDED') return next(error);
+    return res.status(413).set('Connection', 'close').json({ code: error.code, message: error.message, files: [] });
+  }
+
+  const release = slots.tryAcquire((req.tenant && req.tenant.id) || 'default');
+  if (!release) {
     return res.status(503).set({ 'Retry-After': '2', Connection: 'close' })
       .json({ code: 'BUSY', message: 'Too many uploads at once. Try again in a moment.' });
   }
 
-  running.total += 1;
-  running.byFamily.set(family, forFamily + 1);
-  let released = false;
-  const release = () => {
-    if (released) return;
-    released = true;
-    running.total -= 1;
-    const left = running.byFamily.get(family) - 1;
-    if (left > 0) running.byFamily.set(family, left);
-    else running.byFamily.delete(family);
-  };
-  res.once('finish', release);
-  res.once('close', release);
+  // Given back when the handler finishes, or when the request ends before it starts
+  const slot = { started: false, finish: release };
+  req.uploadSlot = slot;
+  res.once('close', () => { if (!slot.started) release(); });
   next();
 }
 

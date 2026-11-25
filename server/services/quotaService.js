@@ -9,6 +9,8 @@ const unlimited = {
   }
 };
 
+const { currentTenant } = require('../context');
+
 let quota = unlimited;
 
 function setQuota(next) {
@@ -32,4 +34,28 @@ async function assertCanAdd(bytes) {
   }
 }
 
-module.exports = { setQuota, getQuota, assertCanAdd };
+/**
+ * Check there is room for `bytes` more and run write(), one at a time per
+ * tenant, so two uploads can't both pass the check before either is stored.
+ * (Within this process; the quota hook itself is unchanged.)
+ */
+const queues = new Map();
+
+async function addWithinQuota(bytes, write) {
+  const id = currentTenant().id;
+  const previous = queues.get(id) || Promise.resolve();
+  let done;
+  const mine = new Promise(resolve => { done = resolve; });
+  const turn = previous.then(() => mine);
+  queues.set(id, turn);
+  await previous;
+  try {
+    await assertCanAdd(bytes);
+    return await write();
+  } finally {
+    done();
+    if (queues.get(id) === turn) queues.delete(id);
+  }
+}
+
+module.exports = { setQuota, getQuota, assertCanAdd, addWithinQuota };

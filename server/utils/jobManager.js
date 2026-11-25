@@ -81,7 +81,9 @@ class JobManager {
   async executeGooglePhotosImport(job) {
     const { mediaItems, destinationPath, accessToken } = job.data;
     const { getLibrary } = require('../library');
-    const { assertCanAdd } = require('../services/quotaService');
+    const { assertCanAdd, addWithinQuota } = require('../services/quotaService');
+    const { currentTenant } = require('../context');
+    const slots = require('./workSlots');
 
     console.log('🔧 [DEBUG] Executing Google Photos import job:', job.id);
     console.log('🔧 [DEBUG] Importing', mediaItems.length, 'photos to', destinationPath);
@@ -104,8 +106,12 @@ class JobManager {
         continue;
       }
 
+      let release = null;
       try {
         console.log('🔧 [DEBUG] Processing item', i + 1, 'of', mediaItems.length, ':', item.id);
+        // Room left, and a turn among the photos being converted, before downloading it
+        await assertCanAdd(1);
+        release = await slots.acquire(currentTenant().id);
 
         // Get download URL
         let downloadUrl = '';
@@ -157,12 +163,11 @@ class JobManager {
           continue;
         }
         const filename = `google-${Date.now()}-${Math.round(Math.random() * 1E9)}.webp`;
-        await assertCanAdd(imageBuffer.length);
-        const added = await getLibrary().addPhoto(destinationPath, {
+        const added = await addWithinQuota(imageBuffer.length, () => getLibrary().addPhoto(destinationPath, {
           buffer: imageBuffer,
           originalName: filename,
           contentType: 'image/webp'
-        });
+        }));
         // Keep when and where it was taken, read from the original before it is dropped
         const storedPath = resolveAdminPath(added.path);
         if (storedPath) {
@@ -188,6 +193,8 @@ class JobManager {
           success: false,
           error: error.message
         });
+      } finally {
+        if (release) release();
       }
 
       // Small delay to prevent overwhelming the server

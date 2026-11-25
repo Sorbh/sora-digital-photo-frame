@@ -1,4 +1,4 @@
-const decode = require('heic-decode');
+const libheif = require('libheif-js/wasm-bundle');
 
 // HEVC-coded HEIF (iPhone photos). AVIF uses the same container but sharp
 // reads it itself; the bundled libvips has no HEVC decoder, so these go
@@ -15,22 +15,41 @@ function isHeic(buffer) {
   return false;
 }
 
-// Arguments for sharp(): raw RGBA pixels for HEIC, the file itself otherwise.
-// libheif applies the photo's rotation while decoding. With maxPixels, a bigger
-// HEIC throws tooLarge() before its pixels are decoded.
-async function sharpInput(buffer, options = {}, { maxPixels = Infinity, tooLarge = () => new Error('Image too large') } = {}) {
-  if (!isHeic(buffer)) return [buffer, options];
-  const images = await decode.all({ buffer });
+// The first image's RGBA pixels. Measured before decoding: a bigger one than
+// maxPixels throws tooLarge(). libheif's memory is given back on every path,
+// a file it cannot read included.
+async function decodeHeic(buffer, maxPixels, tooLarge) {
+  await libheif.ready;
+  const decoder = new libheif.HeifDecoder();
+  let images = [];
   try {
+    images = decoder.decode(buffer) || [];
     const [image] = images;
-    if (image.width * image.height > maxPixels) throw tooLarge();
-    const { width, height, data } = await image.decode();
-    const raw = { raw: { width, height, channels: 4 } };
-    if (options.limitInputPixels) raw.limitInputPixels = options.limitInputPixels;
-    return [Buffer.from(data.buffer, data.byteOffset, data.byteLength), raw];
+    if (!image) throw new Error('HEIF image not found');
+    const width = image.get_width();
+    const height = image.get_height();
+    if (width * height > maxPixels) throw tooLarge();
+    const data = await new Promise((resolve, reject) => {
+      image.display({ data: new Uint8ClampedArray(width * height * 4), width, height }, (shown) => {
+        if (shown) resolve(shown.data);
+        else reject(new Error('HEIF processing error'));
+      });
+    });
+    return { width, height, data };
   } finally {
-    images.dispose();
+    for (const image of images) image.free();
+    if (decoder.decoder) decoder.decoder.delete();
   }
 }
 
-module.exports = { isHeic, sharpInput };
+// Arguments for sharp(): raw RGBA pixels for HEIC, the file itself otherwise.
+// libheif applies the photo's rotation while decoding.
+async function sharpInput(buffer, options = {}, { maxPixels = Infinity, tooLarge = () => new Error('Image too large') } = {}) {
+  if (!isHeic(buffer)) return [buffer, options];
+  const { width, height, data } = await decodeHeic(buffer, maxPixels, tooLarge);
+  const raw = { raw: { width, height, channels: 4 } };
+  if (options.limitInputPixels) raw.limitInputPixels = options.limitInputPixels;
+  return [Buffer.from(data.buffer, data.byteOffset, data.byteLength), raw];
+}
+
+module.exports = { isHeic, sharpInput, libheif };

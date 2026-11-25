@@ -19,7 +19,9 @@ const { createApp } = require('../app');
 const { currentTenant } = require('../context');
 const { uploadLimits } = require('../middleware/upload');
 const { displayCopy, MAX_FRAMES } = require('../utils/displayCopy');
-const { sharpInput } = require('../utils/heic');
+const { sharpInput, libheif } = require('../utils/heic');
+const quotaService = require('../services/quotaService');
+const slots = require('../utils/workSlots');
 
 const png = (width, height) => sharp({ create: { width, height, channels: 3, background: '#c33' } }).png().toBuffer();
 
@@ -99,52 +101,144 @@ describe('Upload limits', () => {
     expect(res.body.code).toBe('LIMIT_FIELD_COUNT');
   });
 
+  test('photos saved before one that is refused are listed', async () => {
+    const res = await request(app)
+      .post('/api/upload')
+      .field('path', 'uploads/family')
+      .attach('images', await png(10, 10), 'small.png')
+      .attach('images', await png(1200, 1000), 'wide.png')
+      .expect(400);
+    expect(res.body.code).toBe('IMAGE_TOO_LARGE');
+    expect(res.body.files).toHaveLength(1);
+    expect(await fs.pathExists(path.join(testUploadsDir, 'family', path.basename(res.body.files[0].path)))).toBe(true);
+  });
+
+  test('a full library cannot add a snap', async () => {
+    const res = await request(app).post('/api/snaps').set('x-tenant', 'full')
+      .send({ folder: 'uploads/family', title: 'Hello' });
+    expect(res.status).toBe(413);
+    expect(res.body.code).toBe('QUOTA_EXCEEDED');
+  });
+
+  test('libheif is given its memory back when a HEIC file cannot be read', async () => {
+    const realAlloc = libheif.heif_context_alloc;
+    const freed = [];
+    libheif.heif_context_alloc = (...args) => {
+      const context = realAlloc(...args);
+      const remove = context.delete.bind(context);
+      context.delete = () => { freed.push(true); remove(); };
+      return context;
+    };
+    try {
+      const heic = await fs.readFile(path.join(__dirname, 'fixtures', 'tiny.heic'));
+      // A real HEIC header with the picture cut off
+      const broken = Buffer.concat([heic.subarray(0, 40), Buffer.alloc(64)]);
+      await expect(sharpInput(broken)).rejects.toThrow();
+      expect(freed).toHaveLength(1);
+    } finally {
+      libheif.heif_context_alloc = realAlloc;
+    }
+  });
+
+  test('two uploads at once cannot both use the last free space', async () => {
+    let used = 0;
+    const limit = 100;
+    const writes = [];
+    const appQuota = quotaService.getQuota();
+    quotaService.setQuota({ canAdd: async bytes => ({ ok: used + bytes <= limit, message: 'Storage limit reached' }) });
+    try {
+      const add = () => quotaService.addWithinQuota(80, async () => {
+        await new Promise(resolve => setTimeout(resolve, 20));
+        used += 80;
+        writes.push(80);
+      });
+      const results = await Promise.allSettled([add(), add()]);
+      expect(results.map(r => r.status).sort()).toEqual(['fulfilled', 'rejected']);
+      expect(writes).toEqual([80]);
+      expect(used).toBe(80);
+    } finally {
+      quotaService.setQuota(appQuota);
+    }
+  });
+
   describe('before the body is read', () => {
-    const call = (headers, tenant = { id: 'a' }) => {
+    const call = async (headers, tenant = { id: 'a' }) => {
       const res = new EventEmitter();
       res.statusCode = 200;
       res.status = code => { res.statusCode = code; return res; };
       res.set = () => res;
       res.json = body => { res.body = body; return res; };
       const next = jest.fn();
-      uploadLimits({ headers, tenant }, res, next);
-      return { res, next };
+      const req = { headers, tenant };
+      await uploadLimits(req, res, next);
+      return { req, res, next };
     };
+    const ok = { 'content-length': '100' };
 
-    test('a request over the total size is refused', () => {
-      const { res, next } = call({ 'content-length': String(1024 * 1024 + 1) });
+    test('a request over the total size is refused', async () => {
+      const { res, next } = await call({ 'content-length': String(1024 * 1024 + 1) });
       expect(next).not.toHaveBeenCalled();
       expect(res.statusCode).toBe(413);
       expect(res.body.code).toBe('UPLOAD_TOO_LARGE');
     });
 
-    test('a request without a length is refused', () => {
-      const { res, next } = call({});
+    test('a request without a length is refused', async () => {
+      const { res, next } = await call({});
       expect(next).not.toHaveBeenCalled();
       expect(res.statusCode).toBe(411);
     });
 
-    test('only a few uploads run at once, per family and overall', () => {
-      const a1 = call({ 'content-length': '100' }, { id: 'a' });
-      const a2 = call({ 'content-length': '100' }, { id: 'a' });
-      const a3 = call({ 'content-length': '100' }, { id: 'a' });
+    test('a full library is refused before its photos are read', async () => {
+      const { res, next } = await call(ok, { id: 'full', plan: 'free' });
+      expect(next).not.toHaveBeenCalled();
+      expect(res.statusCode).toBe(413);
+      expect(res.body.code).toBe('QUOTA_EXCEEDED');
+    });
+
+    test('only a few uploads run at once, per family and overall', async () => {
+      const a1 = await call(ok, { id: 'a' });
+      const a2 = await call(ok, { id: 'a' });
+      const a3 = await call(ok, { id: 'a' });
       expect([a1, a2].every(c => c.next.mock.calls.length === 1)).toBe(true);
       expect(a3.res.statusCode).toBe(503);
 
-      const b1 = call({ 'content-length': '100' }, { id: 'b' });
-      const b2 = call({ 'content-length': '100' }, { id: 'b' });
-      const c1 = call({ 'content-length': '100' }, { id: 'c' });
+      const b1 = await call(ok, { id: 'b' });
+      const b2 = await call(ok, { id: 'b' });
+      const c1 = await call(ok, { id: 'c' });
       expect(b1.next).toHaveBeenCalled();
       expect(b2.next).toHaveBeenCalled();
       expect(c1.res.statusCode).toBe(503); // four running in all
 
-      // A finished (or dropped) upload frees its place
-      a1.res.emit('finish');
+      // A request that ends before it is processed frees its place
       a1.res.emit('close');
-      const c2 = call({ 'content-length': '100' }, { id: 'c' });
+      const c2 = await call(ok, { id: 'c' });
       expect(c2.next).toHaveBeenCalled();
       [a2, b1, b2, c2].forEach(c => c.res.emit('close'));
-      expect(call({ 'content-length': '100' }, { id: 'a' }).next).toHaveBeenCalled();
+      expect(slots.running.total).toBe(0);
+    });
+
+    test('a browser that leaves during processing keeps the place taken until the work is done', async () => {
+      const { req, res, next } = await call(ok, { id: 'd' });
+      expect(next).toHaveBeenCalled();
+      req.uploadSlot.started = true; // the upload handler is converting the photos
+      res.emit('close');
+      expect(slots.running.total).toBe(1);
+      req.uploadSlot.finish();
+      expect(slots.running.total).toBe(0);
+    });
+
+    test('imports wait for a free place', async () => {
+      const held = [await call(ok, { id: 'e' }), await call(ok, { id: 'e' })];
+      let started = false;
+      const waiting = slots.acquire('e').then(release => { started = true; return release; });
+      await new Promise(resolve => setImmediate(resolve));
+      expect(started).toBe(false);
+      held[0].res.emit('close');
+      const release = await waiting;
+      expect(started).toBe(true);
+      release();
+      held[1].res.emit('close');
+      expect(slots.running.total).toBe(0);
     });
   });
 });

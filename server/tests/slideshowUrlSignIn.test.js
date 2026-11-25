@@ -1,9 +1,14 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const request = require('supertest');
 
-// Runs the slideshow's sign-in class in a bare sandbox opened at the given address
-function openSlideshow(href) {
+const html = fs.readFileSync(path.join(__dirname, '../public/slideshow.html'), 'utf8');
+const headScript = /<head>[\s\S]*?<script>([\s\S]*?)<\/script>/.exec(html)[1];
+
+// Runs slideshow.html's first script, then the slideshow's sign-in class, in a bare
+// sandbox opened at the given address. fetchPin answers each PIN request.
+function openSlideshow(href, { fetchPin = () => new Promise(() => {}) } = {}) {
   const element = () => new Proxy({}, {
     get: (target, prop) => {
       if (prop in target) return target[prop];
@@ -15,26 +20,36 @@ function openSlideshow(href) {
     set: (target, prop, value) => { target[prop] = value; return true; }
   });
   const requests = [];
+  const timers = [];
+  const history = [];
+  const store = () => { const m = new Map(); return { getItem: k => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: k => m.delete(k) }; };
   const sandbox = {
     URL,
     URLSearchParams,
-    console: { log() {}, error() {}, warn() {} },
-    setTimeout: () => 0,
+    console: { log() {}, error: (...a) => process.env.DEBUG_VM && process.stderr.write(a.map(String).join(' ') + '\n'), warn() {} },
+    setTimeout: (fn, ms) => { timers.push({ fn, ms }); return timers.length; },
     clearTimeout() {},
     setInterval: () => 0,
     clearInterval() {},
     location: { href, search: new URL(href).search },
-    localStorage: { getItem: () => null, setItem() {}, removeItem() {} },
+    localStorage: store(),
+    sessionStorage: store(),
+    CustomEvent: class { constructor(type, init) { this.type = type; this.detail = init?.detail; } },
+    i18n: { error: (data, key) => key },
     document: {
       getElementById: element,
       querySelector: element,
       querySelectorAll: () => [],
       addEventListener() {},
+      dispatchEvent() {},
       documentElement: { dataset: {} }
     },
+    matchMedia: () => ({ matches: false, addEventListener() {}, addListener() {} }),
     fetch: (url, options) => {
-      requests.push({ url, body: options?.body ? JSON.parse(options.body) : null });
-      return new Promise(() => {}); // never answers: only the request is checked
+      if (url !== '/api/auth/pin') return new Promise(() => {}); // pairing etc.: never answers
+      const body = options?.body ? JSON.parse(options.body) : null;
+      requests.push({ url, body });
+      return fetchPin(body);
     },
     t: key => key
   };
@@ -43,19 +58,37 @@ function openSlideshow(href) {
     state: null,
     replaceState(state, title, url) {
       const next = new URL(url, sandbox.location.href);
+      history.push(next.href);
       sandbox.location.href = next.href;
       sandbox.location.search = next.search;
     }
   };
   const context = vm.createContext(sandbox);
+  vm.runInContext(headScript, context);
+  const addressAfterHead = sandbox.location.href;
   const source = fs.readFileSync(path.join(__dirname, '../public/js/slideshow.js'), 'utf8');
   const auth = source.slice(0, source.indexOf('class PhotoFrameSlideshow'));
   vm.runInContext(`${auth}\nthis.manager = new AuthenticationManager();`, context);
-  return { location: sandbox.location, requests, manager: sandbox.manager };
+  return { location: sandbox.location, addressAfterHead, requests, timers, manager: sandbox.manager };
 }
 
+const flush = () => new Promise(resolve => setImmediate(resolve));
+const answer = (status, body) => Promise.resolve({ status, json: async () => body });
+
 describe('Slideshow sign-in from the address', () => {
-  test('signs in with the PIN and family code, then takes them out of the address', () => {
+  test('the address is cleaned before any stylesheet or script loads', () => {
+    const head = html.slice(html.indexOf('<head>'), html.indexOf('</head>'));
+    const cleanup = head.indexOf('<script>');
+    expect(cleanup).toBeGreaterThan(-1);
+    expect(cleanup).toBeLessThan(head.indexOf('<link'));
+    expect(head.indexOf('<meta name="referrer" content="no-referrer">')).toBeGreaterThan(-1);
+    expect(head.indexOf('<meta name="referrer"')).toBeLessThan(head.indexOf('<link'));
+
+    const { addressAfterHead } = openSlideshow('https://frame.example/slideshow?pin=123456&family=ABCD-EFGH&lang=de#x');
+    expect(addressAfterHead).toBe('https://frame.example/slideshow?lang=de#x');
+  });
+
+  test('signs in with the PIN and family code kept in memory', () => {
     const { location, requests } = openSlideshow('https://frame.example/slideshow?pin=123456&family=ABCD-EFGH&lang=de#x');
     expect(requests).toHaveLength(1);
     expect(requests[0].url).toBe('/api/auth/pin');
@@ -71,5 +104,42 @@ describe('Slideshow sign-in from the address', () => {
   test('leaves an address without sign-in details as it is', () => {
     const { location } = openSlideshow('https://frame.example/slideshow?lang=de');
     expect(location.href).toBe('https://frame.example/slideshow?lang=de');
+  });
+
+  test('tries again after a network or server failure, with the PIN from memory', async () => {
+    const answers = [
+      () => Promise.reject(new Error('offline')),
+      () => answer(502, {}),
+      () => answer(200, { success: true, account: { name: 'Grandma' } })
+    ];
+    const { requests, timers, manager } = openSlideshow('https://frame.example/slideshow?pin=123456', { fetchPin: () => answers.shift()() });
+    for (let i = 0; i < 2; i += 1) {
+      await flush();
+      const retry = timers.filter(t => t.fn.toString().includes('signInFromUrl')).pop();
+      expect(retry).toBeTruthy();
+      timers.length = 0;
+      retry.fn();
+    }
+    await flush();
+    expect(requests.map(r => r.body.pin)).toEqual(['123456', '123456', '123456']);
+    expect(manager.isAuthenticated).toBe(true);
+  });
+
+  test('does not try again when the PIN is refused', async () => {
+    const { requests, timers } = openSlideshow('https://frame.example/slideshow?pin=123456', {
+      fetchPin: () => answer(401, { success: false, code: 'INVALID_PIN', error: 'Invalid PIN' })
+    });
+    await flush();
+    expect(timers.filter(t => t.fn.toString().includes('signInFromUrl'))).toHaveLength(0);
+    expect(requests).toHaveLength(1);
+  });
+});
+
+describe('The slideshow page', () => {
+  test('tells the browser never to send its address on', async () => {
+    process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
+    const { createApp } = require('../app');
+    const res = await request(createApp()).get('/slideshow?pin=123456').expect(200);
+    expect(res.headers['referrer-policy']).toBe('no-referrer');
   });
 });

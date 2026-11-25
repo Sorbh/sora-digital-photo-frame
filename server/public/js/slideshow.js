@@ -62,9 +62,16 @@ class AuthenticationManager {
         }
     }
 
-    // Read the PIN and family code from the address once, then take them out of it,
-    // so they stay out of the browser history and of later requests
+    // The PIN and family code from the address, kept in memory only. slideshow.html
+    // takes them out of the address before anything loads; this also covers pages
+    // that open the script without that.
     takeSignInFromUrl() {
+        const early = window.soraUrlSignIn;
+        if (early) {
+            window.soraUrlSignIn = null;
+            this.urlFamilyCode = early.family || '';
+            return early.pin || undefined;
+        }
         const url = new URL(location.href);
         const pin = url.searchParams.get('pin')?.trim();
         this.urlFamilyCode = url.searchParams.get('family')?.trim() || '';
@@ -214,7 +221,11 @@ class AuthenticationManager {
         this.pairing = null;
     }
 
-    async signInFromUrl(pin) {
+    // The address is clean by now, so a frame with no keyboard keeps trying with the
+    // PIN in memory until the network or server is back, or the PIN is refused
+    async signInFromUrl(pin, attempt = 0) {
+        clearTimeout(this.urlRetryTimer);
+        if (this.isAuthenticated) return;
         try {
             const data = await this.requestPin(pin);
             if (!data.success) {
@@ -228,6 +239,8 @@ class AuthenticationManager {
             console.error('Sign-in from the address failed:', error);
             this.showAuthOverlay();
             this.showErrorKey('errors.connection');
+            const wait = Math.min(5000 * 2 ** attempt, 60000);
+            this.urlRetryTimer = setTimeout(() => this.signInFromUrl(pin, attempt + 1), wait);
         }
     }
 
@@ -242,6 +255,8 @@ class AuthenticationManager {
                 familyCode: this.familyCodeValue() || undefined
             })
         });
+        // A server error is not an answer about the PIN: try again later
+        if (response.status >= 500) throw new Error(`HTTP ${response.status}`);
         return response.json();
     }
 
@@ -372,6 +387,7 @@ class AuthenticationManager {
     }
 
     handleAuthSuccess(account) {
+        clearTimeout(this.urlRetryTimer);
         this.isAuthenticated = true;
         this.userAccount = account;
 

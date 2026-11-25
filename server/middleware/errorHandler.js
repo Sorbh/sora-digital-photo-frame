@@ -1,13 +1,33 @@
+// Errors from express.json()/urlencoded() (body-parser). A parse or verify failure
+// holds the raw body, and its message can quote it.
+const BODY_PARSER_ERRORS = new Set([
+  'entity.parse.failed', 'entity.verify.failed', 'entity.too.large', 'encoding.unsupported',
+  'charset.unsupported', 'parameters.too.many', 'request.aborted', 'request.size.invalid',
+  'stream.encoding.set', 'stream.not.readable'
+]);
+const UNREADABLE_BODY = new Set(['entity.parse.failed', 'entity.verify.failed']);
+
+const isBodyParserError = err => typeof err.type === 'string' && BODY_PARSER_ERRORS.has(err.type) &&
+  Number.isInteger(err.status) && err.status >= 400 && err.status < 500;
+
+// Only what helps find the bug: never the error's own fields (a request or response
+// body a library attached), and for body-parser errors not even the message
+function logError(err) {
+  if (!err || typeof err !== 'object') return console.error('Error:', String(err));
+  if (isBodyParserError(err)) return console.error(`Error: request body could not be read (${err.type}, ${err.status})`);
+  const label = [err.name || 'Error', err.code, err.status].filter(Boolean).join(' ');
+  const frames = typeof err.stack === 'string' ? err.stack.split('\n').filter(line => /^\s+at /.test(line)) : [];
+  console.error([`Error: ${label}: ${err.message}`, ...frames].join('\n'));
+}
+
 // Global error handling middleware
 const errorHandler = (err, req, res, next) => {
-  // A body that could not be read: the error holds the raw body and its message can
-  // quote it, so log only the kind of error and answer without echoing it back
-  if (err.type && 'body' in err) {
-    console.error(`Error: request body could not be read (${err.type})`);
-    return res.status(err.status || 400).json({ message: 'Invalid request body.' });
-  }
+  logError(err);
 
-  console.error('Error:', err);
+  // A body that could not be read: answer without echoing it back
+  if (isBodyParserError(err) && UNREADABLE_BODY.has(err.type)) {
+    return res.status(err.status).json({ message: 'Invalid request body.' });
+  }
 
   // Multer errors
   if (err.code === 'LIMIT_FILE_SIZE') {
@@ -66,3 +86,4 @@ const errorHandler = (err, req, res, next) => {
 };
 
 module.exports = errorHandler;
+module.exports.isBodyParserError = isBodyParserError;

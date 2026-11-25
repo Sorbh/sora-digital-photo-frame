@@ -13,7 +13,9 @@ process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
 process.env.ADMIN_PASSWORD = 'correct-horse-battery';
 
 const { createApp } = require('../app');
-const { redact, redactUrl } = require('../middleware/logger');
+const express = require('express');
+const { safePath } = require('../middleware/logger');
+const errorHandler = require('../middleware/errorHandler');
 
 describe('Request logging keeps secrets out of the logs', () => {
   const app = createApp();
@@ -72,17 +74,51 @@ describe('Request logging keeps secrets out of the logs', () => {
     expect(logs).not.toMatch(/ZXCV-BNMA/);
   });
 
-  test('secrets in query strings and guest link paths are hidden', () => {
-    expect(redactUrl('/slideshow?pin=4321&family=ABCD-EFGH')).toBe('/slideshow?pin=[redacted]&family=[redacted]');
-    expect(redactUrl('/slideshow?pin=4321&folder=family')).toBe('/slideshow?pin=[redacted]&folder=family');
-    expect(redactUrl('/api/x?Token=abc')).toBe('/api/x?Token=[redacted]');
-    expect(redactUrl('/g/AbCdEfGhIj.sometoken/upload')).toBe('/g/[redacted]/upload');
-    expect(redactUrl('/api/folders')).toBe('/api/folders');
+  test('query strings and bodies never reach the logs', async () => {
+    const agent = request.agent(app);
+    await agent.post('/api/auth/login').send({ password: 'correct-horse-battery' }).expect(200);
+    await agent.get('/api/admin/folders?path=uploads/private-folder-name');
+    await agent.post('/api/notes').send({ title: 'Secret note title', message: 'A very private message' });
+    const logs = output.join('\n');
+    expect(logs).toMatch(/GET \/api\/admin\/folders \d{3} \d+ms/);
+    expect(logs).toMatch(/POST \/api\/notes \d{3} \d+ms/);
+    expect(logs).not.toMatch(/private-folder-name|Secret note title|very private message/);
   });
 
-  test('nested and differently-cased keys are redacted', () => {
-    expect(redact({ user: { Password: 'x', name: 'Ann' }, items: [{ idToken: 'y' }], Authorization: 'Bearer z' }))
-      .toEqual({ user: { Password: '[redacted]', name: 'Ann' }, items: [{ idToken: '[redacted]' }], Authorization: '[redacted]' });
-    expect(redact({ pin: '1234', familyCode: 'ABCD-EFGH' })).toEqual({ pin: '[redacted]', familyCode: '[redacted]' });
+  test('paths are logged without their query, and guest link tokens are hidden', () => {
+    expect(safePath('/slideshow?pin=4321&family=ABCD-EFGH')).toBe('/slideshow');
+    expect(safePath('/g/AbCdEfGhIj.sometoken/upload')).toBe('/g/[redacted]/upload');
+    expect(safePath('/api/folders')).toBe('/api/folders');
+  });
+});
+
+describe('Error handler', () => {
+  let output;
+  let spy;
+  beforeEach(() => {
+    output = [];
+    spy = jest.spyOn(console, 'error').mockImplementation((...args) => output.push(args.map(String).join(' ')));
+  });
+  afterEach(() => spy.mockRestore());
+
+  const appThrowing = (err) => {
+    const app = express();
+    app.get('/x', (req, res, next) => next(err));
+    app.use(errorHandler);
+    return app;
+  };
+
+  test("never logs an error's own fields, such as a body a library attached", async () => {
+    const err = Object.assign(new Error('Tenant lookup failed'), { requestBody: { pin: '246813', familyCode: 'PLMK-OIJN' } });
+    await request(appThrowing(err)).get('/x').expect(500);
+    const logs = output.join('\n');
+    expect(logs).toMatch(/Tenant lookup failed/);
+    expect(logs).not.toMatch(/246813|PLMK-OIJN/);
+  });
+
+  test('keeps the answer of other errors that carry a type and a body', async () => {
+    const err = Object.assign(new Error('Name is required'), { status: 422, type: 'validation.failed', body: { name: '' } });
+    const res = await request(appThrowing(err)).get('/x').expect(422);
+    expect(res.body.message).toBe('Name is required');
   });
 });

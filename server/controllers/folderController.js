@@ -5,7 +5,7 @@ const thumbnails = require('../services/thumbnailService');
 const snaps = require('../services/snapService');
 const playOrder = require('../services/playOrderService');
 const imageController = require('./imageController');
-const { resolveAdminPath, toAdminPath } = require('../utils/safePath');
+const { resolveAdminPath, toAdminPath, uploadsUrl } = require('../utils/safePath');
 const { passClientError } = require('../utils/httpError');
 const { canSee, canOpen, foldersBelow } = require('../utils/viewerAccess');
 
@@ -321,13 +321,12 @@ class FolderController {
         } else if (item.isFile() && thumbnails.IMAGE_PATTERN.test(item.name)) {
           const imageFullPath = path.join(fullPath, item.name);
           const relativePath = path.relative(this.uploadsDir, imageFullPath);
-          const urlPath = relativePath.split(path.sep).map(encodeURIComponent).join('/');
 
           fileJobs.push(getLibrary().stat(toAdminPath(imageFullPath)).then(stat => ({
             name: item.name,
             type: 'image',
             path: path.join(folderPath, item.name),
-            url: `/uploads/${urlPath}`,
+            url: uploadsUrl(toAdminPath(imageFullPath)),
             // Grid tiles use the small cached version; ?v= busts it after a rotate
             thumbnail: `/api/images/${encodeURIComponent(relativePath)}/thumbnail?v=${Math.round(stat.mtimeMs)}`
           })));

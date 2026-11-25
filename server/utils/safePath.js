@@ -29,4 +29,12 @@ function toAdminPath(fullPath) {
   return path.join('uploads', path.relative(UPLOADS_DIR, fullPath));
 }
 
-module.exports = { resolveAdminPath, toAdminPath, UPLOADS_DIR };
+/**
+ * The browser URL of a file inside uploads, from its admin path ("uploads/...").
+ * Each segment is percent-encoded, so names with # ? % or spaces stay part of the path.
+ */
+function uploadsUrl(adminPath) {
+  return '/' + adminPath.split(path.sep).map(encodeURIComponent).join('/');
+}
+
+module.exports = { resolveAdminPath, toAdminPath, uploadsUrl, UPLOADS_DIR };

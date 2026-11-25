@@ -104,13 +104,22 @@ describe("the family's limit on wrong PINs", () => {
   let address = 0;
   const tryPin = (pin) => request(app).post('/api/auth/pin').set('X-Forwarded-For', `198.51.100.${++address}`).send({ pin });
 
+  const admin = request.agent(app);
+  // As if the server restarted: everything kept in memory is gone
+  const restart = () => {
+    accessAccounts.limiter.entries.clear();
+    accessAccounts.restoredLockouts.clear();
+  };
+
   beforeAll(async () => {
     await fs.ensureDir(testUploadsDir);
-    const admin = request.agent(app);
     await admin.post('/api/auth/login').send({ password: 'pin-test-admin' }).expect(200);
     await admin.post('/api/access-accounts').send({ name: 'Grandpa', pin: '7351' }).expect(201);
   });
-  beforeEach(() => accessAccounts.limiter.entries.clear());
+  beforeEach(async () => {
+    restart();
+    await fs.remove(path.join(testDataDir, 'pin-lockout.json'));
+  });
   afterAll(async () => {
     accessAccounts.limiter.entries.clear();
     await Promise.all([testUploadsDir, testCacheDir, testDataDir].map(dir => fs.remove(dir)));
@@ -139,12 +148,28 @@ describe("the family's limit on wrong PINs", () => {
 
   test('is not locked by right PINs that arrive at the same time', async () => {
     const results = await Promise.all(Array.from({ length: 8 }, () => tryPin('7351')));
-    expect(results.filter(r => r.status === 200).length).toBeGreaterThan(0);
+    expect(results.map(r => r.status)).toEqual(Array(8).fill(200));
     await tryPin('7351').expect(200);
   });
 
+  test('still stops wrong PINs sent all at once', async () => {
+    const results = await Promise.all(Array.from({ length: 12 }, () => tryPin('000000')));
+    const statuses = results.map(r => r.status);
+    expect(statuses.filter(s => s === 401)).toHaveLength(5);
+    expect(statuses.filter(s => s === 429)).toHaveLength(7);
+  });
+
+  test('a lockout lasts through a restart', async () => {
+    for (let i = 0; i < 5; i++) await tryPin('000000').expect(401);
+    await tryPin('7351').expect(429);
+    restart();
+    await tryPin('7351').expect(429);
+  });
+
   test('is not used up by right PINs refused for the screen limit', async () => {
-    process.env.MAX_SCREENS = '1';
+    await tryPin('7351').expect(200); // at least one screen
+    const { devices } = (await admin.get('/api/admin/devices').expect(200)).body;
+    process.env.MAX_SCREENS = String(devices.length);
     try {
       for (let i = 0; i < 6; i++) {
         const res = await tryPin('7351');

@@ -81,28 +81,40 @@ describe('the attempt limiter', () => {
     }
   });
 
-  test('tries taken back undo a lockout they caused, but never touch a later window', () => {
+  test('tries still being checked hold back new ones without locking anyone out', async () => {
+    const limiter = new AttemptLimiter({ maxAttempts: 2 });
+    expect((await limiter.begin('k')).allowed).toBe(true);
+    expect((await limiter.begin('k')).allowed).toBe(true);
+    // A third waits for one of them to finish
+    let third = null;
+    const waiting = limiter.begin('k').then(result => { third = result; });
+    await Promise.resolve();
+    expect(third).toBeNull();
+    limiter.end('k', false); // that one was right
+    await waiting;
+    expect(third.allowed).toBe(true);
+    limiter.end('k', false);
+    limiter.end('k', false);
+    expect(limiter.entries.has('k')).toBe(false);
+
+    // Wrong ones count once they're known to be wrong
+    await limiter.begin('k'); limiter.end('k', true);
+    await limiter.begin('k'); limiter.end('k', true);
+    expect((await limiter.begin('k')).allowed).toBe(false);
+  });
+
+  test('a right try leaves the clock of wrong tries alone', async () => {
     let now = 0;
     const realNow = Date.now;
     Date.now = () => now;
     try {
-      const limiter = new AttemptLimiter({ maxAttempts: 2, attemptWindow: 1000, lockoutDuration: 5000 });
-      // Two tries still being checked when a third arrives: it is locked out
-      const tries = [limiter.fail('k'), limiter.fail('k')];
-      expect(limiter.check('k').allowed).toBe(false);
-      // Both turn out right: the lockout goes, and the next lockout isn't longer for it
-      tries.forEach(t => limiter.forget('k', t));
-      expect(limiter.check('k').allowed).toBe(true);
-      expect(limiter.entries.get('k')?.lockouts || 0).toBe(0);
-
-      // A try taken back after its window ended doesn't cancel a wrong try in the next one
-      const late = limiter.fail('k');
-      now += 2000;
-      expect(limiter.check('k').allowed).toBe(true);
-      limiter.fail('k');
-      limiter.forget('k', late);
-      limiter.fail('k');
-      expect(limiter.check('k').allowed).toBe(false);
+      const limiter = new AttemptLimiter({ maxAttempts: 2, attemptWindow: 1000 });
+      await limiter.begin('k'); limiter.end('k', false);
+      now = 999;
+      await limiter.begin('k'); limiter.end('k', true);
+      now = 1001;
+      // The wrong try is still counted: its window started when it was made
+      expect(limiter.check('k').attemptsRemaining).toBe(1);
     } finally {
       Date.now = realNow;
     }

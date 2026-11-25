@@ -2,6 +2,11 @@
 // within attemptWindow lock the key; each lockout in a row lasts twice as long
 // as the one before, up to maxLockout, so a secret can't be worked through a
 // few tries at a time. Success clears the key.
+//
+// Tries can be counted before checking them (fail, then clear or forget), or,
+// with begin/end, held as "being checked" and counted only once known to be
+// wrong: then right tries never use anything up, and a burst still can't get
+// more than the tries left checked at once.
 class AttemptLimiter {
     constructor({
         maxAttempts = 5,
@@ -10,11 +15,14 @@ class AttemptLimiter {
         maxLockout = 24 * 60 * 60 * 1000,
         strikeMemory = 24 * 60 * 60 * 1000, // how long a past lockout makes the next one longer
         maxTracked = 10000, // keys remembered at once, so made-up addresses can't grow memory forever
-        keep = () => false // keys never dropped to make room
+        keep = () => false, // keys never dropped to make room
+        maxWait = 10 * 1000, // how long begin() waits for tries being checked
+        onLockout = () => {} // (key, { lockoutUntil, lockouts, lastLockout }) when a lockout starts
     } = {}) {
-        Object.assign(this, { maxAttempts, attemptWindow, lockoutDuration, maxLockout, strikeMemory, maxTracked, keep });
+        Object.assign(this, { maxAttempts, attemptWindow, lockoutDuration, maxLockout, strikeMemory, maxTracked, keep, maxWait, onLockout });
         this.entries = new Map();
-        this.windows = 0; // numbers each run of tries, so a late forget() can't reach a newer one
+        this.pending = new Map(); // key -> tries being checked
+        this.waiting = new Map(); // key -> callbacks for when one finishes
     }
 
     check(key) {
@@ -34,14 +42,12 @@ class AttemptLimiter {
             record.attempts = 0;
             record.firstAttempt = null;
             record.lockoutUntil = null;
-            record.window = ++this.windows;
         }
 
         // Tries spread out over a long time don't add up
         if (record.firstAttempt != null && (now - record.firstAttempt) > this.attemptWindow) {
             record.attempts = 0;
             record.firstAttempt = null;
-            record.window = ++this.windows;
         }
         if (!record.attempts && (record.lastLockout == null || now - record.lastLockout > this.strikeMemory)) {
             this.entries.delete(key);
@@ -52,8 +58,8 @@ class AttemptLimiter {
             const duration = Math.min(this.lockoutDuration * 2 ** (record.lockouts || 0), this.maxLockout);
             record.lockouts = (record.lockouts || 0) + 1;
             record.lockoutUntil = now + duration;
-            record.lastLockoutBefore = record.lastLockout; // in case forget() undoes this one
             record.lastLockout = now;
+            this.onLockout(key, { lockoutUntil: record.lockoutUntil, lockouts: record.lockouts, lastLockout: now });
             return this.locked(duration);
         }
 
@@ -75,39 +81,66 @@ class AttemptLimiter {
 
     // Count a try before checking it, and clear it on success, so a burst of
     // requests sent at once can't all get in before the first answer.
-    // Returns which run of tries it went into, for forget().
     fail(key) {
         const now = Date.now();
-        let record = this.entries.get(key);
+        const record = this.entries.get(key);
 
         if (!record) {
             if (this.entries.size >= this.maxTracked) this.prune(now);
-            record = { attempts: 1, firstAttempt: now, lockoutUntil: null, lockouts: 0, lastLockout: null, window: ++this.windows };
-            this.entries.set(key, record);
+            this.entries.set(key, { attempts: 1, firstAttempt: now, lockoutUntil: null, lockouts: 0, lastLockout: null });
         } else {
             record.attempts += 1;
             if (record.firstAttempt == null) record.firstAttempt = now;
         }
-        return record.window;
     }
 
-    // Take back a try that turned out not to count. Given what fail() returned,
-    // only while that run of tries lasts. A lockout that only happened because
-    // this try was still being checked is undone.
-    forget(key, window) {
+    // Take back a try that turned out not to count
+    forget(key) {
         const record = this.entries.get(key);
-        if (!record || record.attempts <= 0) return;
-        if (window !== undefined && record.window !== window) return;
-        record.attempts -= 1;
-        if (record.lockoutUntil != null && record.attempts < this.maxAttempts) {
-            record.lockoutUntil = null;
-            record.lockouts -= 1;
-            record.lastLockout = record.lastLockoutBefore ?? null;
-        }
+        if (record && record.attempts > 0) record.attempts -= 1;
     }
 
     clear(key) {
         this.entries.delete(key);
+    }
+
+    // Starts checking a try. Allowed while the wrong tries so far plus those
+    // being checked leave room; otherwise waits (up to maxWait) for one to finish.
+    async begin(key) {
+        const until = Date.now() + this.maxWait;
+        for (;;) {
+            const status = this.check(key);
+            if (!status.allowed) return status;
+            const pending = this.pending.get(key) || 0;
+            if (this.maxAttempts - status.attemptsRemaining + pending < this.maxAttempts) {
+                this.pending.set(key, pending + 1);
+                return status;
+            }
+            const left = until - Date.now();
+            if (left <= 0) return this.locked(60 * 1000);
+            await new Promise(resolve => {
+                const timer = setTimeout(resolve, left);
+                if (!this.waiting.has(key)) this.waiting.set(key, []);
+                this.waiting.get(key).push(() => { clearTimeout(timer); resolve(); });
+            });
+        }
+    }
+
+    // Finishes a try from begin(): counted only if it was wrong
+    end(key, wrong) {
+        if (wrong) this.fail(key);
+        const pending = (this.pending.get(key) || 1) - 1;
+        if (pending) this.pending.set(key, pending);
+        else this.pending.delete(key);
+        const waiting = this.waiting.get(key);
+        this.waiting.delete(key);
+        if (waiting) waiting.forEach(wake => wake());
+    }
+
+    // A lockout kept from before a restart
+    restore(key, { lockoutUntil, lockouts, lastLockout }) {
+        if (this.entries.has(key)) return;
+        this.entries.set(key, { attempts: this.maxAttempts, firstAttempt: lastLockout, lockoutUntil, lockouts, lastLockout });
     }
 
     // Many made-up addresses must not grow memory without end

@@ -23,8 +23,25 @@ class AccessAccountController {
         // Rate limiting for PIN attempts
         this.pinSignIn = true; // createApp({ pinSignIn: false }) turns it off
         this.familyCode = false; // createApp({ familyCode: true }): PIN sign-in also needs the family code (hosted)
-        // 5 wrong tries in 5 minutes locks for 15 minutes, then 30, 60... up to a day
-        this.limiter = new AttemptLimiter({ keep: key => key.startsWith('family:') });
+        // 5 wrong tries in 5 minutes locks for 15 minutes, then 30, 60... up to a day.
+        // A family's lockout is saved with its data, so a restart doesn't lift it.
+        this.limiter = new AttemptLimiter({
+            keep: key => key.startsWith('family:'),
+            onLockout: (key, lockout) => {
+                if (!key.startsWith('family:')) return;
+                getDataStore().set('pin-lockout', lockout)
+                    .catch(error => console.error('Could not save the PIN lockout:', error.message));
+            }
+        });
+        this.restoredLockouts = new Set(); // families whose saved lockout was read since starting
+    }
+
+    // Reads a family's saved lockout once after a restart
+    async restoreLockout(familyKey) {
+        if (this.restoredLockouts.has(familyKey)) return;
+        this.restoredLockouts.add(familyKey);
+        const lockout = await getDataStore().get('pin-lockout', null).catch(() => null);
+        if (lockout && Number.isFinite(lockout.lockoutUntil)) this.limiter.restore(familyKey, lockout);
     }
 
     async loadAccounts() {
@@ -73,8 +90,8 @@ class AccessAccountController {
     // being taken for a family.
     addressKey(ip) { return `ip:${ip}`; }
     checkRateLimit(key) { return this.limiter.check(key); }
-    recordFailedAttempt(key) { return this.limiter.fail(key); }
-    forgetAttempt(key, attempt) { this.limiter.forget(key, attempt); }
+    recordFailedAttempt(key) { this.limiter.fail(key); }
+    forgetAttempt(key) { this.limiter.forget(key); }
     recordSuccessfulAttempt(key) { this.limiter.clear(key); }
 
     generateAccountId() {
@@ -334,9 +351,12 @@ class AccessAccountController {
             }
 
             // Wrong tries also count against the family, so spreading them over many
-            // addresses (or faking X-Forwarded-For) doesn't help
+            // addresses (or faking X-Forwarded-For) doesn't help. Only wrong PINs are
+            // counted for the family, once known: a right one, from someone who knows
+            // one PIN, uses nothing up and clears nothing (see AttemptLimiter.begin).
             const familyKey = `family:${currentTenant().id}`;
-            const familyCheck = this.checkRateLimit(familyKey);
+            await this.restoreLockout(familyKey);
+            const familyCheck = await this.limiter.begin(familyKey);
             if (!familyCheck.allowed) {
                 return res.status(429).json({
                     success: false,
@@ -346,16 +366,20 @@ class AccessAccountController {
                 });
             }
 
-            // Count the try before checking it (see recordFailedAttempt)
+            // Count the address's try before checking it (see recordFailedAttempt)
             this.recordFailedAttempt(addressKey);
-            const familyAttempt = this.recordFailedAttempt(familyKey);
 
-            const accounts = await this.accountsForSignIn(familyCode);
-            const account = await this.findByPin(accounts, pin);
+            let accounts = [];
+            let account = null;
+            try {
+                accounts = await this.accountsForSignIn(familyCode);
+                account = await this.findByPin(accounts, pin);
+            } finally {
+                // No frames to guess at (e.g. a wrong family code): not the family's try
+                this.limiter.end(familyKey, !account && accounts.length > 0);
+            }
 
             if (!account) {
-                // No frames to guess at (e.g. a wrong family code): not the family's try
-                if (!accounts.length) this.forgetAttempt(familyKey, familyAttempt);
                 const newRateLimitCheck = this.checkRateLimit(addressKey);
 
                 console.log(`❌ Failed PIN attempt from IP: ${clientIP}, attempts remaining: ${newRateLimitCheck.attemptsRemaining || 0}`);
@@ -368,11 +392,8 @@ class AccessAccountController {
                 });
             }
 
-            // A right PIN clears this address's wrong tries. The family only gets
-            // back this one try: someone who knows one PIN mustn't wipe the wrong
-            // tries made against the family's other PINs.
+            // A right PIN clears this address's wrong tries
             this.recordSuccessfulAttempt(addressKey);
-            this.forgetAttempt(familyKey, familyAttempt);
 
             // A PIN sign-in makes this browser a screen, as pairing by QR code does,
             // so it counts toward the same limit. A browser that already is one of

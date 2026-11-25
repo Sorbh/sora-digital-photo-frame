@@ -126,9 +126,10 @@ describe('Robustness', () => {
 
     test('a frame can still collect its pairing on the next poll', async () => {
       await dataStore.set('access-accounts', [{ id: 'acc_pair', name: 'Grandma', pinHash: 'x', assignedFolders: [] }]);
-      const { body: started } = await request(app).post('/api/pair/start').expect(200);
+      const frame = request.agent(app);
+      const { body: started } = await frame.post('/api/pair/start').expect(200);
       await pairing.approve(started.code, { name: 'Tablet', accountId: 'acc_pair' });
-      const poll = () => request(app).get('/api/pair/status').query({ code: started.code, secret: started.secret });
+      const poll = () => frame.post('/api/pair/collect').send({ code: started.code, secret: started.secret });
 
       storeDown = true;
       await poll().expect(500);

@@ -29,7 +29,7 @@ const deviceIdFromToken = token => (typeof token === 'string' && TOKEN_PATTERN.e
  */
 class PairingService {
   constructor() {
-    this.pairings = new Map(); // code -> { code, secret, expiresAt, approved }
+    this.pairings = new Map(); // code -> { code, secret, expiresAt, address, claimed, approved }
   }
 
   normalize(code) {
@@ -50,7 +50,7 @@ class PairingService {
 
   // Codes still waiting for an admin, oldest first (a Map keeps the order they were made in)
   waitingFrom(address) {
-    return [...this.pairings.values()].filter(p => !p.approved && p.address === address);
+    return [...this.pairings.values()].filter(p => !p.approved && !p.claimed && p.address === address);
   }
 
   // The queue is full: the address with the most waiting codes, if it has more
@@ -58,7 +58,7 @@ class PairingService {
   makeRoom(address) {
     const waiting = new Map(); // address -> its codes, oldest first
     for (const pairing of this.pairings.values()) {
-      if (pairing.approved) continue;
+      if (pairing.approved || pairing.claimed) continue;
       if (!waiting.has(pairing.address)) waiting.set(pairing.address, []);
       waiting.get(pairing.address).push(pairing);
     }
@@ -85,6 +85,7 @@ class PairingService {
       secret: crypto.randomBytes(24).toString('hex'),
       expiresAt: Date.now() + PAIRING_TTL_MS,
       address,
+      claimed: false, // an admin is approving it (see claim)
       approved: null
     };
     this.pairings.set(code, pairing);
@@ -101,14 +102,33 @@ class PairingService {
     return pairing;
   }
 
-  // The admin said yes: make the device and hold its token for the frame to collect
-  async approve(code, { name, accountId }) {
+  // Takes a waiting pairing for one approval, before anything is created, so two
+  // approvals at the same time can't both go ahead. The pairing, or null when it's
+  // gone or already taken. Give it back with release() if the approval fails.
+  claim(code) {
     const pairing = this.find(code);
-    if (!pairing || pairing.approved) return null;
-    const { device, token } = await this.addDevice({ name, accountId, via: 'qr' });
-    // The frame collects this without a session; it runs as the approving tenant
-    pairing.approved = { token, device, tenant: currentTenant() };
-    return device;
+    if (!pairing || pairing.claimed) return null;
+    pairing.claimed = true;
+    return pairing;
+  }
+
+  release(pairing) {
+    if (!pairing.approved) pairing.claimed = false;
+  }
+
+  // The admin said yes: make the device and hold its token for the frame to collect.
+  // Pass a pairing from claim(), or a code to claim it here.
+  async approve(codeOrPairing, { name, accountId }) {
+    const pairing = typeof codeOrPairing === 'object' ? codeOrPairing : this.claim(codeOrPairing);
+    if (!pairing || pairing.approved || this.pairings.get(pairing.code) !== pairing) return null;
+    try {
+      const { device, token } = await this.addDevice({ name, accountId, via: 'qr' });
+      // The frame collects this without a session; it runs as the approving tenant
+      pairing.approved = { token, device, tenant: currentTenant() };
+      return device;
+    } finally {
+      this.release(pairing);
+    }
   }
 
   // Every way a screen joins (QR code or PIN) ends here, so the same screen
@@ -143,13 +163,27 @@ class PairingService {
     return { device, token };
   }
 
-  // What the waiting frame sees. An approved pairing is handed over once, then gone.
-  collect(code, secret) {
+  // The pairing for a code, when the secret is its own
+  withSecret(code, secret) {
     const pairing = this.find(code);
     if (!pairing || typeof secret !== 'string' || secret.length !== pairing.secret.length
       || !crypto.timingSafeEqual(Buffer.from(secret), Buffer.from(pairing.secret))) {
-      return { status: 'expired' };
+      return null;
     }
+    return pairing;
+  }
+
+  // What the waiting frame sees while it polls: waiting, ready (approved, to collect) or expired
+  status(code, secret) {
+    const pairing = this.withSecret(code, secret);
+    if (!pairing) return 'expired';
+    return pairing.approved ? 'ready' : 'waiting';
+  }
+
+  // The frame takes its approved pairing. Handed over once, then gone.
+  collect(code, secret) {
+    const pairing = this.withSecret(code, secret);
+    if (!pairing) return { status: 'expired' };
     if (!pairing.approved) return { status: 'waiting' };
     this.pairings.delete(pairing.code);
     return {

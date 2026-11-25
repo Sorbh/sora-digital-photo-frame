@@ -31,7 +31,8 @@ function addressGroup(ip) {
  * Pairing a frame by QR code, and signing paired frames back in.
  *
  *   frame   POST /api/pair/start         a code, a secret and the QR code
- *   frame   GET  /api/pair/status        waiting | approved (+ device token) | expired
+ *   frame   GET  /api/pair/status        waiting | ready | expired, changes nothing
+ *   frame   POST /api/pair/collect       a ready pairing: the device token, and signs in
  *   admin   GET  /api/admin/pair/:code   the code exists and is waiting
  *   admin   POST /api/admin/pair/:code/approve
  *   frame   POST /api/auth/device        sign in with the device token
@@ -103,6 +104,8 @@ class PairingController {
       const created = pairing.start(address);
       if (!created) return res.status(503).json({ success: false, error: 'Too many frames are pairing. Try again shortly.' });
 
+      // Only this browser can collect it (see collect)
+      req.session.pairingCode = created.code;
       const url = `${this.publicAddress(req)}/pair?code=${created.code}`;
       const qr = await QRCode.toString(url, { type: 'svg', margin: 1, errorCorrectionLevel: 'M', color: { dark: '#2a1020', light: '#ffffff' } });
       res.json({ success: true, code: created.code, secret: created.secret, expiresAt: created.expiresAt, url, qr });
@@ -114,8 +117,18 @@ class PairingController {
   }
 
   async status(req, res) {
+    res.json({ success: true, status: pairing.status(req.query.code, req.query.secret) });
+  }
+
+  // A POST, so only this site's own pages can send it (middleware/sameOrigin), and
+  // only from the browser that started the pairing, since it signs that browser in
+  async collect(req, res) {
     try {
-      const result = pairing.collect(req.query.code, req.query.secret);
+      const { code, secret } = req.body || {};
+      if (!req.session?.pairingCode || req.session.pairingCode !== pairing.normalize(code)) {
+        return res.json({ success: true, status: 'expired' });
+      }
+      const result = pairing.collect(code, secret);
       if (result.status !== 'approved') return res.json({ success: true, status: result.status });
 
       // The frame has no session yet; having the pairing secret lets it act as the approving tenant
@@ -131,6 +144,7 @@ class PairingController {
         throw error;
       }
       if (!account) return res.json({ success: true, status: 'expired' });
+      delete req.session.pairingCode;
       await rotateSession(req);
       req.session.accessAccount = this.sessionAccount(account);
       req.session.deviceId = result.device.id;
@@ -144,8 +158,8 @@ class PairingController {
       });
     } catch (error) {
       if (passClientError(res, error)) return;
-      console.error('Error checking pairing:', error);
-      res.status(500).json({ success: false, error: 'Could not check pairing' });
+      console.error('Error collecting pairing:', error);
+      res.status(500).json({ success: false, error: 'Could not finish pairing' });
     }
   }
 
@@ -156,16 +170,16 @@ class PairingController {
   }
 
   async approve(req, res) {
+    const name = typeof req.body.name === 'string' ? req.body.name.trim() : '';
+    if (!name || name.length > 60) {
+      return res.status(400).json({ success: false, error: 'Give the frame a name (up to 60 characters)' });
+    }
+    // Taken before the account or device is made, so a second approval at the same time stops here
+    const claimed = pairing.claim(req.params.code);
+    if (!claimed) {
+      return res.status(404).json({ success: false, error: 'This code has expired', code: 'PAIRING_EXPIRED' });
+    }
     try {
-      const name = typeof req.body.name === 'string' ? req.body.name.trim() : '';
-      if (!name || name.length > 60) {
-        return res.status(400).json({ success: false, error: 'Give the frame a name (up to 60 characters)' });
-      }
-      const found = pairing.find(req.params.code);
-      if (!found || found.approved) {
-        return res.status(404).json({ success: false, error: 'This code has expired', code: 'PAIRING_EXPIRED' });
-      }
-
       let account;
       if (req.body.accountId) {
         account = (await accessAccounts.loadAccounts()).find(a => a.id === req.body.accountId);
@@ -180,13 +194,15 @@ class PairingController {
         return res.status(400).json({ success: false, error: 'Choose an account for the frame' });
       }
 
-      const device = await pairing.approve(found.code, { name, accountId: account.id });
+      const device = await pairing.approve(claimed, { name, accountId: account.id });
       if (!device) return res.status(404).json({ success: false, error: 'This code has expired', code: 'PAIRING_EXPIRED' });
       res.json({ success: true, device: { id: device.id, name: device.name }, account: this.sessionAccount(account) });
     } catch (error) {
       if (passClientError(res, error)) return;
       console.error('Error approving pairing:', error);
       res.status(500).json({ success: false, error: 'Could not pair the frame' });
+    } finally {
+      pairing.release(claimed);
     }
   }
 

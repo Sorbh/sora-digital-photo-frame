@@ -154,15 +154,23 @@ class FolderSelector {
             }
         });
 
-        // Up and down move between the picker's buttons, for TV remotes without Tab
+        // Arrow keys move between the picker's buttons, for TV remotes without Tab
+        // (js/arrowFocus.js); the slideshow doesn't see them
         this.container.querySelector('.folder-dropdown').addEventListener('keydown', (e) => {
-            if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
-            const buttons = [...this.container.querySelectorAll('.folder-dropdown button')]
-                .filter(button => button.offsetParent !== null);
-            const index = buttons.indexOf(document.activeElement);
-            const next = buttons[index + (e.key === 'ArrowDown' ? 1 : -1)];
+            if (!window.SoraArrowFocus || !SoraArrowFocus.DIRECTIONS[e.key]) return;
             e.preventDefault();
-            if (next) next.focus();
+            e.stopPropagation();
+            const buttons = this.container.querySelectorAll('.folder-dropdown button');
+            SoraArrowFocus.next(buttons, document.activeElement, e.key)?.focus();
+        });
+
+        // Up from the folder button opens the panel above it, or steps into it
+        selectorBtn.addEventListener('keydown', (e) => {
+            if (e.key !== 'ArrowUp') return;
+            e.preventDefault();
+            e.stopPropagation();
+            if (this.isOpen) this.focusSelected();
+            else this.openDropdown();
         });
     }
 
@@ -516,6 +524,9 @@ class FolderSelector {
      */
     focusSelected() {
         if (!this.isOpen) return;
+        // Not when the person has moved on while the folders were loading
+        const active = document.activeElement;
+        if (active && active !== document.body && !this.container.contains(active)) return;
         const choices = this.container.querySelector('.folder-options');
         (choices.querySelector('.folder-option.selected .folder-choice') || choices.querySelector('.folder-choice'))?.focus();
     }

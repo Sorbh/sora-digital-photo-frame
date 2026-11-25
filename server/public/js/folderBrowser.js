@@ -20,6 +20,7 @@ class FolderBrowser {
         this.currentPath = '';
         this.currentFolder = null;
         this.isLoading = false;
+        this.loadRequest = 0; // only the latest load may draw
         
         this.initializeComponent();
         this.loadCurrentFolder();
@@ -119,6 +120,25 @@ class FolderBrowser {
                 e.preventDefault();
                 this.loadCurrentFolder();
             }
+        });
+
+        // Arrow keys move between folders, for TV remotes without Tab (js/arrowFocus.js).
+        // With nothing focused yet, the first arrow lands on the folder playing now.
+        document.addEventListener('keydown', (e) => {
+            if (!window.SoraArrowFocus || !SoraArrowFocus.DIRECTIONS[e.key]) return;
+            const active = document.activeElement;
+            const buttons = this.container.querySelectorAll('.folder-choice, .folder-nav, .breadcrumb-item');
+            let target = null;
+            if (!active || active === document.body) {
+                target = this.container.querySelector('.folder-option.selected .folder-choice')
+                    || this.container.querySelector('.folder-choice');
+            } else if (this.container.contains(active)) {
+                target = SoraArrowFocus.next(buttons, active, e.key);
+            }
+            // Nothing that way: leave the key to the page (scrolling)
+            if (!target) return;
+            e.preventDefault();
+            target.focus();
         });
     }
 
@@ -282,6 +302,11 @@ class FolderBrowser {
             .folder-option:nth-child(3n + 2) .folder-icon { background: var(--teal-soft); color: #4f7f86; }
             .folder-option:nth-child(3n) .folder-icon { background: var(--blush); color: var(--berry); }
 
+            /* No browse arrow here: the button takes the whole card */
+            .folder-option.all-folders-btn {
+                padding-inline-end: 0;
+            }
+
             .all-folders-btn .folder-icon {
                 background: var(--berry-gradient);
                 color: #fff;
@@ -404,8 +429,11 @@ class FolderBrowser {
         // The button that was pressed goes away with the old cards: start the keyboard on the new ones
         const hadFocus = this.container.contains(document.activeElement);
         this.currentPath = folderPath;
-        await this.loadCurrentFolder();
-        if (hadFocus && !this.container.contains(document.activeElement)) {
+        const shown = await this.loadCurrentFolder();
+        // Only if this is still the folder shown and focus went with the old cards,
+        // not if the person moved on (another folder, another part of the page)
+        const lost = !document.activeElement || document.activeElement === document.body;
+        if (shown && hadFocus && lost) {
             (this.container.querySelector('.folder-grid .folder-choice')
                 || this.container.querySelector('.breadcrumb-item:last-child'))?.focus();
         }
@@ -437,22 +465,29 @@ class FolderBrowser {
      * Load current folder data from API
      */
     async loadCurrentFolder() {
-        if (this.isLoading) return;
+        // A newer load (browsing again before this one arrived) wins: older answers are dropped.
+        // Resolves true when this load is the one drawn.
+        const request = ++this.loadRequest;
+        const latest = () => request === this.loadRequest;
         
         this.showLoading(true);
         this.hideError();
         
         try {
             const data = await this.folderService.getFolderStructure(this.currentPath);
+            if (!latest()) return false;
             this.currentFolder = data;
             this.renderFolderContent();
             this.updateBreadcrumb();
             this.updateSelectedState();
+            return true;
         } catch (error) {
+            if (!latest()) return false;
             console.error('Error loading folder:', error);
             this.showError(error.message);
+            return false;
         } finally {
-            this.showLoading(false);
+            if (latest()) this.showLoading(false);
         }
     }
 

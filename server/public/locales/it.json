@@ -570,6 +570,8 @@
     "fetchRandomFailed": "Impossibile recuperare un'immagine casuale",
     "everyPhoto": "Tutte le foto della libreria",
     "browseFolder": "Apri la cartella",
+    "browseNamed": "Apri {name}",
+    "subfoldersOf": "Cartelle in {name}",
     "photoCount_one": "{count} foto",
     "photoCount_other": "{count} foto",
     "photoCount_many": "{count} foto"

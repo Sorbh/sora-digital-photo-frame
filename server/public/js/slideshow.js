@@ -549,6 +549,8 @@ class PhotoFrameSlideshow {
         document.addEventListener('keydown', (e) => {
             // Typing in a field (the family code, say) is not a slideshow shortcut
             if (e.target.closest?.('input, textarea, select')) return;
+            // Nor are keys in the folder picker: Space and Enter press its buttons there
+            if (e.target.closest?.('.folder-selector')) return;
             switch (e.key) {
                 case ' ': // Space
                 case 'k':

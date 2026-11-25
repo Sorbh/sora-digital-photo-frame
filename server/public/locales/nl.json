@@ -550,6 +550,8 @@
     "fetchRandomFailed": "Er kon geen willekeurige foto worden opgehaald",
     "everyPhoto": "Elke foto in de bibliotheek",
     "browseFolder": "Map bekijken",
+    "browseNamed": "{name} openen",
+    "subfoldersOf": "Mappen in {name}",
     "photoCount_one": "{count} foto",
     "photoCount_other": "{count} foto's"
   },

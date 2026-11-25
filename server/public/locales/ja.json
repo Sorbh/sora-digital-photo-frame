@@ -550,6 +550,8 @@
     "fetchRandomFailed": "写真を取得できませんでした",
     "everyPhoto": "ライブラリのすべての写真",
     "browseFolder": "フォルダを見る",
+    "browseNamed": "{name} を開く",
+    "subfoldersOf": "{name} 内のフォルダ",
     "photoCount_one": "{count}枚の写真",
     "photoCount_other": "{count}枚の写真"
   },

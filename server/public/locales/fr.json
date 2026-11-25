@@ -570,6 +570,8 @@
     "fetchRandomFailed": "Impossible de récupérer une image au hasard",
     "everyPhoto": "Toutes les photos de la photothèque",
     "browseFolder": "Parcourir le dossier",
+    "browseNamed": "Ouvrir {name}",
+    "subfoldersOf": "Dossiers de {name}",
     "photoCount_one": "{count} photo",
     "photoCount_other": "{count} photos",
     "photoCount_many": "{count} photos"

@@ -33,7 +33,7 @@ class FolderSelector {
     initializeComponent() {
         this.container.innerHTML = `
             <div class="folder-selector">
-                <button class="folder-selector-btn" title="${t('folders.selectForSlideshow')}" data-i18n-attr="title:folders.selectForSlideshow">
+                <button type="button" class="folder-selector-btn" aria-expanded="false" title="${t('folders.selectForSlideshow')}" data-i18n-attr="title:folders.selectForSlideshow">
                     <span class="material-icons">folder</span>
                     <span class="selected-folder-name">${t('folders.allFoldersTitle')}</span>
                     <span class="material-icons dropdown-arrow">keyboard_arrow_down</span>
@@ -42,7 +42,7 @@ class FolderSelector {
                 <div class="folder-dropdown hidden">
                     <div class="folder-dropdown-header">
                         <span data-i18n="folders.selectFolder">${t('folders.selectFolder')}</span>
-                        <button class="close-dropdown">
+                        <button type="button" class="close-dropdown" aria-label="${t('common.close')}" data-i18n-attr="aria-label:common.close">
                             <span class="material-icons">close</span>
                         </button>
                     </div>
@@ -51,11 +51,13 @@ class FolderSelector {
                         <div class="folder-option all-folders" data-path="">
                             <div class="folder-option-content">
                                 <div class="folder-spacer"></div>
-                                <span class="material-icons folder-icon">photo_library</span>
-                                <div class="folder-details">
-                                    <div class="folder-name" data-i18n="folders.allFoldersTitle">${t('folders.allFoldersTitle')}</div>
-                                    <div class="folder-count" data-i18n="folders.allImages">${t('folders.allImages')}</div>
-                                </div>
+                                <button type="button" class="folder-choice">
+                                    <span class="material-icons folder-icon" aria-hidden="true">photo_library</span>
+                                    <span class="folder-details">
+                                        <span class="folder-name" data-i18n="folders.allFoldersTitle">${t('folders.allFoldersTitle')}</span>
+                                        <span class="folder-count" data-i18n="folders.allImages">${t('folders.allImages')}</span>
+                                    </span>
+                                </button>
                             </div>
                         </div>
                         
@@ -119,13 +121,15 @@ class FolderSelector {
                 return;
             }
 
-            // Handle folder selection
-            const folderOption = e.target.closest('.folder-option');
-            if (folderOption && !e.target.closest('.close-dropdown')) {
+            // Handle folder selection: each choice is a button of its own
+            const choice = e.target.closest('.folder-choice');
+            if (choice) {
                 e.preventDefault();
+                const folderOption = choice.closest('.folder-option');
                 const folderPath = folderOption.dataset.path;
                 const folderName = folderOption.querySelector('.folder-name')?.textContent || '';
                 this.selectFolder(folderPath, folderName);
+                return;
             }
 
             // Retry button
@@ -148,6 +152,17 @@ class FolderSelector {
             if (e.key === 'Escape' && this.isOpen) {
                 this.closeDropdown();
             }
+        });
+
+        // Up and down move between the picker's buttons, for TV remotes without Tab
+        this.container.querySelector('.folder-dropdown').addEventListener('keydown', (e) => {
+            if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+            const buttons = [...this.container.querySelectorAll('.folder-dropdown button')]
+                .filter(button => button.offsetParent !== null);
+            const index = buttons.indexOf(document.activeElement);
+            const next = buttons[index + (e.key === 'ArrowDown' ? 1 : -1)];
+            e.preventDefault();
+            if (next) next.focus();
         });
     }
 
@@ -273,10 +288,6 @@ class FolderSelector {
                 overscroll-behavior: contain;
             }
 
-            .folder-option {
-                cursor: pointer;
-            }
-
             .folder-option-content {
                 display: flex;
                 align-items: center;
@@ -284,6 +295,30 @@ class FolderSelector {
                 padding: 7px 10px 7px 8px;
                 border-radius: var(--shape-sm);
                 transition: background-color 0.15s ease;
+            }
+
+            .folder-choice {
+                display: flex;
+                flex: 1;
+                align-items: center;
+                gap: 12px;
+                min-width: 0;
+                padding: 0;
+                border: 0;
+                border-radius: var(--shape-xs);
+                background: transparent;
+                color: inherit;
+                font: inherit;
+                text-align: start;
+                cursor: pointer;
+            }
+
+            .folder-choice:focus-visible,
+            .expand-btn:focus-visible,
+            .close-dropdown:focus-visible,
+            .folder-selector-btn:focus-visible {
+                outline: 2px solid #ff5c8d;
+                outline-offset: 2px;
             }
 
             .folder-option:hover .folder-option-content {
@@ -309,10 +344,10 @@ class FolderSelector {
             .expand-btn {
                 display: grid;
                 place-items: center;
-                width: 22px;
-                height: 22px;
+                width: 28px;
+                height: 28px;
                 flex-shrink: 0;
-                margin-right: -6px;
+                margin-inline-end: -6px;
                 border: 0;
                 border-radius: var(--shape-xs);
                 background: transparent;
@@ -327,6 +362,11 @@ class FolderSelector {
 
             .expand-btn .material-icons {
                 font-size: 18px;
+            }
+
+            /* The closed arrow points the way the text reads */
+            [dir="rtl"] .expand-btn[aria-expanded="false"] .material-icons {
+                transform: scaleX(-1);
             }
 
             .folder-option .folder-icon,
@@ -357,11 +397,13 @@ class FolderSelector {
 
             .folder-details {
                 display: grid;
+                flex: 1;
                 gap: 3px;
                 min-width: 0;
             }
 
             .folder-option .folder-name {
+                display: block;
                 overflow: hidden;
                 font: 500 0.95rem/1.2 var(--font-sans, sans-serif);
                 white-space: nowrap;
@@ -369,6 +411,7 @@ class FolderSelector {
             }
 
             .folder-count {
+                display: block;
                 font: 400 0.6875rem/1 var(--font-sans, sans-serif);
                 letter-spacing: 0.04em;
                 color: rgba(255, 244, 239, 0.5);
@@ -458,11 +501,23 @@ class FolderSelector {
         this.isOpen = true;
         this.container.classList.add('open');
         this.container.querySelector('.folder-dropdown').classList.remove('hidden');
+        this.container.querySelector('.folder-selector-btn').setAttribute('aria-expanded', 'true');
         
         // Load folders if not already loaded
         if (this.folders.length === 0 && !this.isLoading) {
-            this.loadFolders();
+            this.loadFolders().then(() => this.focusSelected());
+        } else {
+            this.focusSelected();
         }
+    }
+
+    /**
+     * Put focus on the chosen folder, so a keyboard or remote starts there
+     */
+    focusSelected() {
+        if (!this.isOpen) return;
+        const choices = this.container.querySelector('.folder-options');
+        (choices.querySelector('.folder-option.selected .folder-choice') || choices.querySelector('.folder-choice'))?.focus();
     }
 
     /**
@@ -470,8 +525,14 @@ class FolderSelector {
      */
     closeDropdown() {
         this.isOpen = false;
+        const dropdown = this.container.querySelector('.folder-dropdown');
+        const hadFocus = dropdown.contains(document.activeElement);
         this.container.classList.remove('open');
-        this.container.querySelector('.folder-dropdown').classList.add('hidden');
+        dropdown.classList.add('hidden');
+        const toggle = this.container.querySelector('.folder-selector-btn');
+        toggle.setAttribute('aria-expanded', 'false');
+        // Hand focus back to the button rather than losing it with the hidden panel
+        if (hadFocus) toggle.focus();
     }
 
     /**
@@ -511,8 +572,17 @@ class FolderSelector {
         const list = this.container.querySelector('.folder-list');
         if (!list) return;
 
+        // Redrawing replaces the buttons: keep focus on the same one
+        const active = list.contains(document.activeElement) ? document.activeElement : null;
+        const focusPath = active?.closest('.folder-option')?.dataset.path;
+        const focusPart = active?.classList.contains('expand-btn') ? '.expand-btn' : '.folder-choice';
+
         list.innerHTML = '';
         this.renderFolderLevel(this.folders, list, 0);
+
+        if (focusPath !== undefined) {
+            list.querySelector(`.folder-option[data-path="${CSS.escape(focusPath)}"] ${focusPart}`)?.focus();
+        }
     }
 
     /**
@@ -532,24 +602,32 @@ class FolderSelector {
             const hasSubfolders = folder.hasSubfolders;
             const indentPadding = level * 20; // 20px per level
             
+            // Expanding and choosing are separate buttons, so both work from a keyboard or remote
             element.innerHTML = `
-                <div class="folder-option-content" style="padding-left: ${indentPadding}px;">
+                <div class="folder-option-content" style="padding-inline-start: ${indentPadding}px;">
                     ${hasSubfolders ? 
-                        `<button class="expand-btn" data-expanded="${isExpanded}">
-                            <span class="material-icons">${isExpanded ? 'keyboard_arrow_down' : 'keyboard_arrow_right'}</span>
+                        `<button type="button" class="expand-btn" aria-expanded="${isExpanded}">
+                            <span class="material-icons" aria-hidden="true">${isExpanded ? 'keyboard_arrow_down' : 'keyboard_arrow_right'}</span>
                         </button>` : 
                         `<div class="folder-spacer"></div>`
                     }
-                    ${folder.thumbnail
-                        ? `<img class="folder-thumb" src="${folder.thumbnail}" alt="">`
-                        : `<span class="material-icons folder-icon">folder</span>`}
-                    <div class="folder-details">
-                        <div class="folder-name"></div>
-                        ${this.options.showFolderCount ? `<div class="folder-count">${t('folders.imageCount', { count: folder.imageCount })}</div>` : ''}
-                    </div>
+                    <button type="button" class="folder-choice">
+                        ${folder.thumbnail
+                            ? `<img class="folder-thumb" src="${folder.thumbnail}" alt="">`
+                            : `<span class="material-icons folder-icon" aria-hidden="true">folder</span>`}
+                        <span class="folder-details">
+                            <span class="folder-name"></span>
+                            ${this.options.showFolderCount ? `<span class="folder-count">${t('folders.imageCount', { count: folder.imageCount })}</span>` : ''}
+                        </span>
+                    </button>
                 </div>
             `;
             element.querySelector('.folder-name').textContent = folder.name;
+            element.querySelector('.expand-btn')?.setAttribute('aria-label', t('folders.subfoldersOf', { name: folder.name }));
+            if (folder.path === this.folderStorage.getCurrentFolderPath()) {
+                element.classList.add('selected');
+                element.querySelector('.folder-choice').setAttribute('aria-current', 'true');
+            }
 
             container.appendChild(element);
             
@@ -613,12 +691,14 @@ class FolderSelector {
         // Remove previous selection
         this.container.querySelectorAll('.folder-option.selected').forEach(el => {
             el.classList.remove('selected');
+            el.querySelector('.folder-choice')?.removeAttribute('aria-current');
         });
         
         // Add selection to current folder
-        const selectedElement = this.container.querySelector(`[data-path="${selectedPath}"]`);
+        const selectedElement = this.container.querySelector(`.folder-option[data-path="${CSS.escape(selectedPath)}"]`);
         if (selectedElement) {
             selectedElement.classList.add('selected');
+            selectedElement.querySelector('.folder-choice')?.setAttribute('aria-current', 'true');
             
             // Auto-expand parent folders if needed
             this.expandParentFolders(selectedPath);

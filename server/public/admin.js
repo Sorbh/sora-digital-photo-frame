@@ -47,7 +47,7 @@ class PhotoFrameAdmin {
         this.dragState = { isDragging: false, startX: 0, startY: 0, translateX: 0, translateY: 0 };
         
         // Photo modal navigation state
-        this.currentImageIndex = -1;
+        this.currentImageUrl = null; // the photo open in the viewer, kept by identity across refreshes
         this.availableImages = [];
         
         this.initializeEventListeners();
@@ -563,7 +563,7 @@ class PhotoFrameAdmin {
             ...file,
             index: index
         }));
-        this.currentImageIndex = -1;
+        this.updatePhotoModalNav();
 
         this.updateLibraryHeading(data);
         this.playOrder = data.order || 'shuffle';
@@ -1350,6 +1350,7 @@ class PhotoFrameAdmin {
             .slice()
             .sort((a, b) => this.fileNames.indexOf(a.name) - this.fileNames.indexOf(b.name))
             .map((file, index) => ({ ...file, index }));
+        this.updatePhotoModalNav();
     }
 
     createSnap(photoPath = null) {
@@ -1504,13 +1505,12 @@ class PhotoFrameAdmin {
         const modal = document.getElementById('photoModal');
         const modalImage = document.getElementById('modalImage');
         
-        // Find current image index
-        this.currentImageIndex = this.availableImages.findIndex(img => img.url === imageUrl);
+        this.currentImageUrl = imageUrl;
         
         modalImage.src = imageUrl;
         modalImage.alt = imageName;
         document.getElementById('modalPhotoName').textContent = imageName;
-        document.querySelector('.photo-modal-nav').hidden = this.availableImages.length < 2;
+        this.updatePhotoModalNav();
         
         // Reset zoom state
         modalImage.classList.remove('zoomed');
@@ -1968,21 +1968,33 @@ class PhotoFrameAdmin {
         this.hideEmptyStateUploadProgress();
     }
 
-    // Photo modal navigation methods
+    // Photo modal navigation methods. The position is looked up from the open
+    // photo each time, so a folder refresh while the viewer is open (new
+    // uploads, reordering) doesn't break Previous / Next.
+    currentImagePosition() {
+        return this.availableImages.findIndex(img => img.url === this.currentImageUrl);
+    }
+
+    // Previous / next only make sense with two or more photos; without them the
+    // photo gets the room the buttons would take
+    updatePhotoModalNav() {
+        const many = this.availableImages.length > 1;
+        document.querySelector('.photo-modal-nav').hidden = !many;
+        document.getElementById('photoModal').classList.toggle('has-nav', many);
+    }
+
     navigateToNextImage() {
-        if (this.availableImages.length === 0 || this.currentImageIndex === -1) return;
-        
-        const nextIndex = (this.currentImageIndex + 1) % this.availableImages.length;
-        this.navigateToImageAtIndex(nextIndex);
+        const count = this.availableImages.length;
+        if (count === 0 || !this.currentImageUrl) return;
+        const position = this.currentImagePosition();
+        this.navigateToImageAtIndex(position === -1 ? 0 : (position + 1) % count);
     }
 
     navigateToPreviousImage() {
-        if (this.availableImages.length === 0 || this.currentImageIndex === -1) return;
-        
-        const prevIndex = this.currentImageIndex === 0 
-            ? this.availableImages.length - 1 
-            : this.currentImageIndex - 1;
-        this.navigateToImageAtIndex(prevIndex);
+        const count = this.availableImages.length;
+        if (count === 0 || !this.currentImageUrl) return;
+        const position = this.currentImagePosition();
+        this.navigateToImageAtIndex(position <= 0 ? count - 1 : position - 1);
     }
 
     navigateToImageAtIndex(index) {
@@ -1991,7 +2003,7 @@ class PhotoFrameAdmin {
         const image = this.availableImages[index];
         const modalImage = document.getElementById('modalImage');
         
-        this.currentImageIndex = index;
+        this.currentImageUrl = image.url;
         modalImage.src = image.url;
         modalImage.alt = image.name;
         document.getElementById('modalPhotoName').textContent = image.name;

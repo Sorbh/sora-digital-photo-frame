@@ -57,17 +57,32 @@ function photoPath(req) {
 }
 
 // For /uploads: photos outside the account's folders look like they don't exist.
-// The request then goes on with the path that was checked (req.photoPath, and
-// the URL rewritten to it), so whatever reads the file reads that same photo.
+// The request goes on with the path that was checked in req.photoPath, for
+// whatever reads the file (see atPhotoPath).
 function requireVisiblePhoto(req, res, next) {
   const relativePath = photoPath(req);
   if (relativePath === null || !canSee(req, relativePath)) {
     return res.status(404).json({ message: 'Not found', code: 'NOT_FOUND' });
   }
-  const query = req.url.indexOf('?');
-  req.url = '/' + relativePath.split('/').map(encodeURIComponent).join('/') + (query === -1 ? '' : req.url.slice(query));
   req.photoPath = relativePath;
   return next();
 }
 
-module.exports = { assignedFolders, canSee, canOpen, foldersBelow, photoPath, requireVisiblePhoto };
+// Runs a file reader that goes by the URL (express.static, webpFallback) on the
+// path requireVisiblePhoto checked, so it reads that same photo. The URL is put
+// back before anything after it runs, such as routes added with beforeRoutes.
+function atPhotoPath(reader) {
+  return (req, res, next) => {
+    const original = req.url;
+    const query = original.indexOf('?');
+    const folder = req.photoPath && req.path.endsWith('/') ? '/' : ''; // a folder URL keeps its slash
+    req.url = '/' + req.photoPath.split('/').map(encodeURIComponent).join('/') + folder
+      + (query === -1 ? '' : original.slice(query));
+    reader(req, res, (error) => {
+      req.url = original;
+      next(error);
+    });
+  };
+}
+
+module.exports = { assignedFolders, canSee, canOpen, foldersBelow, photoPath, requireVisiblePhoto, atPhotoPath };

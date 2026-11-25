@@ -60,9 +60,12 @@ const outsideUrls = [
   '/uploads/uploads%2f%2e%2e%2f%2e%2e%2fuploads%2fprivate%2fsecret.png'
 ];
 
+// A deployment's own route under /uploads, for photos the library doesn't have
+const beforeRoutes = (app) => app.get('/uploads/@cover.jpg', (req, res) => res.send('cover from the host'));
+
 for (const [storage, options] of [
-  ['photos on disk', () => ({})],
-  ['encrypted photos', () => ({ keys: new StaticKeyProvider({ k1: crypto.randomBytes(32) }, 'k1') })]
+  ['photos on disk', () => ({ beforeRoutes })],
+  ['encrypted photos', () => ({ beforeRoutes, keys: new StaticKeyProvider({ k1: crypto.randomBytes(32) }, 'k1') })]
 ]) {
   describe(`a frame limited to a folder named uploads, ${storage}`, () => {
     let app, admin, frame;
@@ -105,6 +108,23 @@ for (const [storage, options] of [
       await outer.get('/api/images/a%5Cb%5Cloose.png/thumbnail').expect(404);
       await outer.get('/uploads/a%5Cb/own.png').expect(404);
       await outer.get('/api/images/a%5Cb%2Fown.png/thumbnail').expect(404);
+    });
+
+    posixOnly('the slideshow gets a URL that loads a photo with a backslash in its folder name', async () => {
+      const own = await frameLimitedTo(app, admin, ['a\\b']);
+      const { body } = await own.get('/api/images/random').expect(200);
+      expect(body.image.filename).toBe('own.png');
+      await own.get(new URL(body.image.url).pathname).expect(200);
+    });
+
+    test("routes a deployment adds under /uploads still get the request as it was sent", async () => {
+      const res = await admin.get('/uploads/@cover.jpg').expect(200);
+      expect(res.text).toBe('cover from the host');
+    });
+
+    test('a folder URL with a trailing slash is not redirected', async () => {
+      const res = await admin.get('/uploads/private/').redirects(0);
+      expect(res.status).toBe(404);
     });
 
     posixOnly('the admin can still open photos with a backslash in their name', async () => {

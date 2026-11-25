@@ -67,11 +67,14 @@ class AccessAccountController {
         await getDataStore().set('access-accounts', accounts);
     }
 
-    // Rate limiting (see utils/attemptLimiter). A key is an address, or a whole
-    // family ("family:<tenant>"), so spreading guesses over many addresses doesn't help.
+    // Rate limiting (see utils/attemptLimiter). A key is an address ("ip:<address>",
+    // from addressKey), or a whole family ("family:<tenant>"), so spreading guesses
+    // over many addresses doesn't help. The prefixes keep an address from ever
+    // being taken for a family.
+    addressKey(ip) { return `ip:${ip}`; }
     checkRateLimit(key) { return this.limiter.check(key); }
-    recordFailedAttempt(key) { this.limiter.fail(key); }
-    forgetAttempt(key) { this.limiter.forget(key); }
+    recordFailedAttempt(key) { return this.limiter.fail(key); }
+    forgetAttempt(key, attempt) { this.limiter.forget(key, attempt); }
     recordSuccessfulAttempt(key) { this.limiter.clear(key); }
 
     generateAccountId() {
@@ -176,7 +179,8 @@ class AccessAccountController {
                     error: 'Name is required'
                 });
             }
-            if (pin && !validPin(pin)) return invalidPin(res);
+            // A blank PIN keeps the current one; anything else must be a valid PIN
+            if (pin !== undefined && pin !== '' && !validPin(pin)) return invalidPin(res);
 
             let notFound = false;
             let duplicate = false;
@@ -308,9 +312,10 @@ class AccessAccountController {
         try {
             const { pin, token, familyCode } = req.body;
             const clientIP = req.ip || req.connection.remoteAddress || req.socket.remoteAddress;
+            const addressKey = this.addressKey(clientIP);
 
             // Check rate limiting
-            const rateLimitCheck = this.checkRateLimit(clientIP);
+            const rateLimitCheck = this.checkRateLimit(addressKey);
             if (!rateLimitCheck.allowed) {
                 console.log(`🚫 Rate limit exceeded for IP: ${clientIP}`);
                 return res.status(429).json({
@@ -342,16 +347,16 @@ class AccessAccountController {
             }
 
             // Count the try before checking it (see recordFailedAttempt)
-            this.recordFailedAttempt(clientIP);
-            this.recordFailedAttempt(familyKey);
+            this.recordFailedAttempt(addressKey);
+            const familyAttempt = this.recordFailedAttempt(familyKey);
 
             const accounts = await this.accountsForSignIn(familyCode);
             const account = await this.findByPin(accounts, pin);
 
             if (!account) {
                 // No frames to guess at (e.g. a wrong family code): not the family's try
-                if (!accounts.length) this.forgetAttempt(familyKey);
-                const newRateLimitCheck = this.checkRateLimit(clientIP);
+                if (!accounts.length) this.forgetAttempt(familyKey, familyAttempt);
+                const newRateLimitCheck = this.checkRateLimit(addressKey);
 
                 console.log(`❌ Failed PIN attempt from IP: ${clientIP}, attempts remaining: ${newRateLimitCheck.attemptsRemaining || 0}`);
 
@@ -363,16 +368,16 @@ class AccessAccountController {
                 });
             }
 
+            // A right PIN clears this address's wrong tries. The family only gets
+            // back this one try: someone who knows one PIN mustn't wipe the wrong
+            // tries made against the family's other PINs.
+            this.recordSuccessfulAttempt(addressKey);
+            this.forgetAttempt(familyKey, familyAttempt);
+
             // A PIN sign-in makes this browser a screen, as pairing by QR code does,
             // so it counts toward the same limit. A browser that already is one of
             // this account's screens (it sends its token) stays that screen.
             const screen = await this.screenFor(account, token, req.session.deviceId);
-
-            // A right PIN clears this address's wrong tries. The family only gets
-            // back this one try: someone who knows one PIN mustn't wipe the wrong
-            // tries made against the family's other PINs.
-            this.recordSuccessfulAttempt(clientIP);
-            this.forgetAttempt(familyKey);
             console.log(`✅ Successful PIN authentication from IP: ${clientIP} for account: ${account.name}`);
 
             // Update last accessed time

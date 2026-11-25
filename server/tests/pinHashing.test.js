@@ -87,6 +87,11 @@ describe('PINs are stored hashed', () => {
     const [{ id }] = await stored();
     const res = await admin.put(`/api/access-accounts/${id}`).send({ name: 'Grandma B', pin: '12a4' }).expect(400);
     expect(res.body.code).toBe('INVALID_PIN_FORMAT');
+    for (const pin of [0, false, null, 7351]) {
+      const bad = await admin.put(`/api/access-accounts/${id}`).send({ name: 'Renamed anyway', pin });
+      expect({ pin, status: bad.status, code: bad.body.code }).toEqual({ pin, status: 400, code: 'INVALID_PIN_FORMAT' });
+    }
+    expect((await stored()).find(a => a.id === id).name).toBe('Grandma B');
     await request(app).post('/api/auth/pin').send({ pin: '7351' }).expect(200);
     expect((await stored()).some(a => a.name === 'Bad PIN')).toBe(false);
   });
@@ -122,6 +127,32 @@ describe("the family's limit on wrong PINs", () => {
   test('is not used up by right PINs', async () => {
     for (let i = 0; i < 8; i++) await tryPin('7351').expect(200);
     for (let i = 0; i < 4; i++) await tryPin('000000').expect(401);
+    await tryPin('7351').expect(200);
+  });
+
+  test("can't be reset by an address that looks like the family's key", async () => {
+    for (let i = 0; i < 4; i++) await tryPin('000000').expect(401);
+    await request(app).post('/api/auth/pin').set('X-Forwarded-For', 'family:default').send({ pin: '7351' }).expect(200);
+    await tryPin('000000').expect(401);
+    await tryPin('7351').expect(429);
+  });
+
+  test('is not locked by right PINs that arrive at the same time', async () => {
+    const results = await Promise.all(Array.from({ length: 8 }, () => tryPin('7351')));
+    expect(results.filter(r => r.status === 200).length).toBeGreaterThan(0);
+    await tryPin('7351').expect(200);
+  });
+
+  test('is not used up by right PINs refused for the screen limit', async () => {
+    process.env.MAX_SCREENS = '1';
+    try {
+      for (let i = 0; i < 6; i++) {
+        const res = await tryPin('7351');
+        expect({ status: res.status, code: res.body.code }).toEqual({ status: 403, code: 'SCREEN_LIMIT' });
+      }
+    } finally {
+      delete process.env.MAX_SCREENS;
+    }
     await tryPin('7351').expect(200);
   });
 });

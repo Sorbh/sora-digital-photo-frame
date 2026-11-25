@@ -14,6 +14,7 @@ class AttemptLimiter {
     } = {}) {
         Object.assign(this, { maxAttempts, attemptWindow, lockoutDuration, maxLockout, strikeMemory, maxTracked, keep });
         this.entries = new Map();
+        this.windows = 0; // numbers each run of tries, so a late forget() can't reach a newer one
     }
 
     check(key) {
@@ -33,12 +34,14 @@ class AttemptLimiter {
             record.attempts = 0;
             record.firstAttempt = null;
             record.lockoutUntil = null;
+            record.window = ++this.windows;
         }
 
         // Tries spread out over a long time don't add up
         if (record.firstAttempt != null && (now - record.firstAttempt) > this.attemptWindow) {
             record.attempts = 0;
             record.firstAttempt = null;
+            record.window = ++this.windows;
         }
         if (!record.attempts && (record.lastLockout == null || now - record.lastLockout > this.strikeMemory)) {
             this.entries.delete(key);
@@ -49,6 +52,7 @@ class AttemptLimiter {
             const duration = Math.min(this.lockoutDuration * 2 ** (record.lockouts || 0), this.maxLockout);
             record.lockouts = (record.lockouts || 0) + 1;
             record.lockoutUntil = now + duration;
+            record.lastLockoutBefore = record.lastLockout; // in case forget() undoes this one
             record.lastLockout = now;
             return this.locked(duration);
         }
@@ -71,23 +75,35 @@ class AttemptLimiter {
 
     // Count a try before checking it, and clear it on success, so a burst of
     // requests sent at once can't all get in before the first answer.
+    // Returns which run of tries it went into, for forget().
     fail(key) {
         const now = Date.now();
-        const record = this.entries.get(key);
+        let record = this.entries.get(key);
 
         if (!record) {
             if (this.entries.size >= this.maxTracked) this.prune(now);
-            this.entries.set(key, { attempts: 1, firstAttempt: now, lockoutUntil: null, lockouts: 0, lastLockout: null });
+            record = { attempts: 1, firstAttempt: now, lockoutUntil: null, lockouts: 0, lastLockout: null, window: ++this.windows };
+            this.entries.set(key, record);
         } else {
             record.attempts += 1;
             if (record.firstAttempt == null) record.firstAttempt = now;
         }
+        return record.window;
     }
 
-    // Take back a try that turned out not to count
-    forget(key) {
+    // Take back a try that turned out not to count. Given what fail() returned,
+    // only while that run of tries lasts. A lockout that only happened because
+    // this try was still being checked is undone.
+    forget(key, window) {
         const record = this.entries.get(key);
-        if (record && record.attempts > 0) record.attempts -= 1;
+        if (!record || record.attempts <= 0) return;
+        if (window !== undefined && record.window !== window) return;
+        record.attempts -= 1;
+        if (record.lockoutUntil != null && record.attempts < this.maxAttempts) {
+            record.lockoutUntil = null;
+            record.lockouts -= 1;
+            record.lastLockout = record.lastLockoutBefore ?? null;
+        }
     }
 
     clear(key) {

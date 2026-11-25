@@ -81,6 +81,33 @@ describe('the attempt limiter', () => {
     }
   });
 
+  test('tries taken back undo a lockout they caused, but never touch a later window', () => {
+    let now = 0;
+    const realNow = Date.now;
+    Date.now = () => now;
+    try {
+      const limiter = new AttemptLimiter({ maxAttempts: 2, attemptWindow: 1000, lockoutDuration: 5000 });
+      // Two tries still being checked when a third arrives: it is locked out
+      const tries = [limiter.fail('k'), limiter.fail('k')];
+      expect(limiter.check('k').allowed).toBe(false);
+      // Both turn out right: the lockout goes, and the next lockout isn't longer for it
+      tries.forEach(t => limiter.forget('k', t));
+      expect(limiter.check('k').allowed).toBe(true);
+      expect(limiter.entries.get('k')?.lockouts || 0).toBe(0);
+
+      // A try taken back after its window ended doesn't cancel a wrong try in the next one
+      const late = limiter.fail('k');
+      now += 2000;
+      expect(limiter.check('k').allowed).toBe(true);
+      limiter.fail('k');
+      limiter.forget('k', late);
+      limiter.fail('k');
+      expect(limiter.check('k').allowed).toBe(false);
+    } finally {
+      Date.now = realNow;
+    }
+  });
+
   test('made-up addresses cannot grow memory without end', () => {
     const limiter = new AttemptLimiter({ maxTracked: 100, keep: key => key.startsWith('family:') });
     limiter.fail('family:default');

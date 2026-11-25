@@ -28,6 +28,11 @@ const errorHandler = (err, req, res, next) => {
     });
   }
 
+  // Other upload form limits (too many fields or parts, a field too long)
+  if (err.name === 'MulterError') {
+    return res.status(400).json({ code: err.code, message: err.message });
+  }
+
   // Custom multer file type error
   if (err.message && err.message.includes('Invalid file type')) {
     return res.status(400).json({

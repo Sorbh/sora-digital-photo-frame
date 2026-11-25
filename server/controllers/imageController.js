@@ -283,6 +283,8 @@ class ImageController {
       for (const [index, file] of uploadedFiles.entries()) {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
         const filename = `${file.fieldname}-${uniqueSuffix}.webp`;
+        // No room left at all? Then don't spend the work converting it
+        await assertCanAdd(1);
         // A display copy sized for frames: upright, WebP, no metadata (GPS stays private)
         const buffer = await displayCopy(file.buffer, { animated: file.mimetype === 'image/gif' });
         await assertCanAdd(buffer.length);

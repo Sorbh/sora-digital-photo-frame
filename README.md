@@ -111,6 +111,9 @@ Settings live in `server/.env` (created on first `npm install`).
 | `UPLOAD_DIR` | `uploads` | Where photos are stored |
 | `DEFAULT_SLIDESHOW_INTERVAL` | `15000` | Time per photo, in ms |
 | `MAX_FILE_SIZE` | `26214400` | Upload limit per photo, in bytes (25 MB). Only the resized copy is stored |
+| `MAX_UPLOAD_SIZE` | 4 × `MAX_FILE_SIZE` | Upload limit per request, in bytes (100 MB). The library page sends one photo per request |
+| `UPLOADS_AT_ONCE` | `4` | Most uploads held in memory and converted at the same time (two per family) |
+| `MAX_IMAGE_PIXELS` | `100000000` | Largest photo accepted, in pixels (100 MP), counting all frames of an animation |
 | `MAX_SCREENS` | `0` | Most screens one library can have, paired by QR code or signed in with a PIN. `0` means no limit |
 | `ENABLE_GOOGLE_PHOTOS` | `false` | Turn on Google Photos import |
 | `PUBLIC_PHOTOS` | `false` | `true` lets anyone who can reach the server see photos, thumbnails, folders and notes without signing in, as before 2026-11. Only for setups that load photos outside the slideshow, such as a home dashboard |

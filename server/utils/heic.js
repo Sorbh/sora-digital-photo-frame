@@ -16,11 +16,21 @@ function isHeic(buffer) {
 }
 
 // Arguments for sharp(): raw RGBA pixels for HEIC, the file itself otherwise.
-// libheif applies the photo's rotation while decoding.
-async function sharpInput(buffer, options = {}) {
+// libheif applies the photo's rotation while decoding. With maxPixels, a bigger
+// HEIC throws tooLarge() before its pixels are decoded.
+async function sharpInput(buffer, options = {}, { maxPixels = Infinity, tooLarge = () => new Error('Image too large') } = {}) {
   if (!isHeic(buffer)) return [buffer, options];
-  const { width, height, data } = await decode({ buffer });
-  return [Buffer.from(data.buffer, data.byteOffset, data.byteLength), { raw: { width, height, channels: 4 } }];
+  const images = await decode.all({ buffer });
+  try {
+    const [image] = images;
+    if (image.width * image.height > maxPixels) throw tooLarge();
+    const { width, height, data } = await image.decode();
+    const raw = { raw: { width, height, channels: 4 } };
+    if (options.limitInputPixels) raw.limitInputPixels = options.limitInputPixels;
+    return [Buffer.from(data.buffer, data.byteOffset, data.byteLength), raw];
+  } finally {
+    images.dispose();
+  }
 }
 
 module.exports = { isHeic, sharpInput };

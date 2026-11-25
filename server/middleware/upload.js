@@ -57,6 +57,15 @@ async function uploadLimits(req, res, next) {
       .json({ code: 'UPLOAD_TOO_LARGE', size, message: `Upload too large. Maximum is ${size}MB per request.` });
   }
 
+  // Listen first: the browser may leave while the quota hook is still answering
+  let closed = false;
+  let release = null;
+  const slot = { started: false, finish: () => { if (release) release(); } };
+  res.once('close', () => {
+    closed = true;
+    if (!slot.started) slot.finish();
+  });
+
   // No room left at all? Then don't even read the photos
   try {
     await runWithTenant(req.tenant, () => assertCanAdd(1));
@@ -65,16 +74,15 @@ async function uploadLimits(req, res, next) {
     return res.status(413).set('Connection', 'close').json({ code: error.code, message: error.message, files: [] });
   }
 
-  const release = slots.tryAcquire((req.tenant && req.tenant.id) || 'default');
+  if (closed) return; // gone already: nothing to read or answer
+  release = slots.tryAcquire((req.tenant && req.tenant.id) || 'default');
   if (!release) {
     return res.status(503).set({ 'Retry-After': '2', Connection: 'close' })
       .json({ code: 'BUSY', message: 'Too many uploads at once. Try again in a moment.' });
   }
 
   // Given back when the handler finishes, or when the request ends before it starts
-  const slot = { started: false, finish: release };
   req.uploadSlot = slot;
-  res.once('close', () => { if (!slot.started) release(); });
   next();
 }
 

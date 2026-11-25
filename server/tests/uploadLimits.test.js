@@ -22,6 +22,8 @@ const { displayCopy, MAX_FRAMES } = require('../utils/displayCopy');
 const { sharpInput, libheif } = require('../utils/heic');
 const quotaService = require('../services/quotaService');
 const slots = require('../utils/workSlots');
+const { getLibrary } = require('../library');
+const { readLimited } = require('../utils/jobManager');
 
 const png = (width, height) => sharp({ create: { width, height, channels: 3, background: '#c33' } }).png().toBuffer();
 
@@ -140,6 +142,76 @@ describe('Upload limits', () => {
     }
   });
 
+  test("a hook's error details reach the browser with the saved photos", async () => {
+    const spy = jest.spyOn(getLibrary(), 'addPhoto')
+      .mockRejectedValueOnce(Object.assign(new Error('Limit {limit}'), { status: 403, code: 'PLAN_LIMIT', vars: { limit: 3 } }));
+    try {
+      const res = await request(app).post('/api/upload').field('path', 'uploads/family')
+        .attach('images', await png(8, 8), 'p.png').expect(403);
+      expect(res.body).toMatchObject({ code: 'PLAN_LIMIT', limit: 3, files: [] });
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  test('a snap that grows needs room; one that shrinks does not', async () => {
+    const created = await request(app).post('/api/snaps').send({ folder: 'uploads/family', title: 'A title for now' }).expect(201);
+    const snapPath = created.body.path || created.body.snap?.path || created.body.fullPath;
+    expect(snapPath).toBeTruthy();
+    await request(app).put('/api/snaps').query({ path: snapPath }).set('x-tenant', 'full')
+      .send({ title: 'A much, much longer title than before, which needs more room' }).expect(413);
+    await request(app).put('/api/snaps').query({ path: snapPath }).set('x-tenant', 'full').send({ title: 'Short' }).expect(200);
+  });
+
+  test('growth is measured in the family\'s turn, after the writes before it', async () => {
+    let size = 300;
+    const measured = [];
+    const appQuota = quotaService.getQuota();
+    quotaService.setQuota({ canAdd: async () => ({ ok: true }) });
+    try {
+      await Promise.all([
+        quotaService.addWithinQuota(async () => 200 - size, async () => {
+          await new Promise(resolve => setTimeout(resolve, 10));
+          size = 200;
+        }),
+        quotaService.addWithinQuota(async () => { measured.push(300 - size); return 300 - size; }, async () => { size = 300; })
+      ]);
+      expect(measured).toEqual([100]);
+    } finally {
+      quotaService.setQuota(appQuota);
+    }
+  });
+
+  test('rotating a photo with too many pixels is refused', async () => {
+    await fs.writeFile(path.join(testUploadsDir, 'family', 'huge.png'), await png(1200, 1000));
+    const res = await request(app).post('/api/images/rotate').send({ path: 'uploads/family/huge.png', angle: 90 }).expect(400);
+    expect(res.body.code).toBe('IMAGE_TOO_LARGE');
+  });
+
+  test('rotation waits its turn among the photos being converted', async () => {
+    await fs.writeFile(path.join(testUploadsDir, 'family', 'turn.png'), await png(20, 10));
+    const held = [slots.tryAcquire('default'), slots.tryAcquire('default')];
+    let done = false;
+    const rotating = request(app).post('/api/images/rotate').send({ path: 'uploads/family/turn.png', angle: 90 })
+      .then(res => { done = true; return res; });
+    await new Promise(resolve => setTimeout(resolve, 150));
+    expect(done).toBe(false);
+    held.forEach(release => release());
+    expect((await rotating).status).toBe(200);
+    expect(slots.running.total).toBe(0);
+  });
+
+  test('imports read a download only up to the size limit', async () => {
+    const response = (chunks, length) => ({
+      headers: { get: name => (name === 'content-length' ? length : null) },
+      body: (async function* () { for (const chunk of chunks) yield chunk; })()
+    });
+    const max = 10;
+    expect(await readLimited(response([Buffer.alloc(4)], '11'), max)).toBeNull();
+    expect(await readLimited(response([Buffer.alloc(6), Buffer.alloc(6)], null), max)).toBeNull();
+    expect((await readLimited(response([Buffer.alloc(4), Buffer.alloc(6)], '10'), max)).length).toBe(10);
+  });
+
   test('two uploads at once cannot both use the last free space', async () => {
     let used = 0;
     const limit = 100;
@@ -215,6 +287,23 @@ describe('Upload limits', () => {
       expect(c2.next).toHaveBeenCalled();
       [a2, b1, b2, c2].forEach(c => c.res.emit('close'));
       expect(slots.running.total).toBe(0);
+    });
+
+    test('a browser that leaves while the quota is checked takes no place', async () => {
+      const appQuota = quotaService.getQuota();
+      quotaService.setQuota({ canAdd: () => new Promise(resolve => setTimeout(() => resolve({ ok: true }), 20)) });
+      try {
+        const res = new EventEmitter();
+        res.status = () => res; res.set = () => res; res.json = () => res;
+        const next = jest.fn();
+        const pending = uploadLimits({ headers: ok, tenant: { id: 'f' } }, res, next);
+        res.emit('close');
+        await pending;
+        expect(next).not.toHaveBeenCalled();
+        expect(slots.running.total).toBe(0);
+      } finally {
+        quotaService.setQuota(appQuota);
+      }
     });
 
     test('a browser that leaves during processing keeps the place taken until the work is done', async () => {

@@ -43,4 +43,9 @@ async function displayCopy(buffer, { animated = false } = {}) {
     .toBuffer();
 }
 
-module.exports = { displayCopy, MAX_PIXELS, MAX_FRAMES };
+// The same size check for a photo already in the library, before decoding it again
+async function assertImageSize(buffer) {
+  await checkSize(buffer, {});
+}
+
+module.exports = { displayCopy, assertImageSize, MAX_PIXELS, MAX_FRAMES };

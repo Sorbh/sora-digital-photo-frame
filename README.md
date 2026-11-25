@@ -112,7 +112,7 @@ Settings live in `server/.env` (created on first `npm install`).
 | `DEFAULT_SLIDESHOW_INTERVAL` | `15000` | Time per photo, in ms |
 | `MAX_FILE_SIZE` | `26214400` | Upload limit per photo, in bytes (25 MB). Only the resized copy is stored |
 | `MAX_UPLOAD_SIZE` | 4 × `MAX_FILE_SIZE` | Upload limit per request, in bytes (100 MB). The library page sends one photo per request |
-| `UPLOADS_AT_ONCE` | `4` | Most photos held in memory and converted at the same time, uploads and Google Photos imports together (two per family) |
+| `UPLOADS_AT_ONCE` | `4` | Most photos held in memory and converted at the same time, uploads, rotations and Google Photos imports together (two per family) |
 | `MAX_IMAGE_PIXELS` | `100000000` | Largest photo accepted, in pixels (100 MP), counting all frames of an animation |
 | `MAX_SCREENS` | `0` | Most screens one library can have, paired by QR code or signed in with a PIN. `0` means no limit |
 | `ENABLE_GOOGLE_PHOTOS` | `false` | Turn on Google Photos import |

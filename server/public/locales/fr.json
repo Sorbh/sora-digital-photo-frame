@@ -227,6 +227,7 @@
     "UPLOAD_TOO_LARGE": "Chaque envoi peut faire au maximum {size} Mo.",
     "BUSY": "Beaucoup de photos sont en cours d'envoi. Veuillez réessayer dans un instant.",
     "LENGTH_REQUIRED": "Cet envoi n'a pas pu être lu. Veuillez réessayer.",
+    "PHOTO_CHANGED": "Cette photo a changé pendant sa rotation. Veuillez réessayer.",
     "UNSUPPORTED_TYPE": "Seules les photos JPEG, PNG, GIF, WebP et HEIC peuvent être importées",
     "SCREEN_LIMIT": "Cette famille a déjà {limit} écrans. Retirez-en un que vous n’utilisez plus pour ajouter celui-ci."
   },

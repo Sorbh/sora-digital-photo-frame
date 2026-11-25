@@ -95,9 +95,13 @@ class SnapService {
     const buffer = Buffer.from(JSON.stringify(snap, null, 2));
     const write = () => getLibrary().writeItem(toAdminPath(fullPath), buffer);
     if (!checkQuota) return write();
-    const current = await getLibrary().stat(toAdminPath(fullPath)).catch(() => null);
-    const growth = buffer.length - (current ? current.size : 0);
-    await (growth > 0 ? addWithinQuota(growth, write) : write());
+    // Measured in the family's turn, against the snap as it is now (its content, so
+    // an encrypted library compares like with like)
+    const growth = async () => {
+      const current = await getLibrary().readItem(toAdminPath(fullPath)).catch(() => null);
+      return buffer.length - (current ? current.length : 0);
+    };
+    await addWithinQuota(growth, write);
   }
 
   slug(title) {

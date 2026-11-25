@@ -37,7 +37,9 @@ async function assertCanAdd(bytes) {
 /**
  * Check there is room for `bytes` more and run write(), one at a time per
  * tenant, so two uploads can't both pass the check before either is stored.
- * (Within this process; the quota hook itself is unchanged.)
+ * (Within this process; the quota hook itself is unchanged.) `bytes` may be a
+ * function, measured in the tenant's turn: how much a replaced file grows.
+ * Nothing is checked when it doesn't grow.
  */
 const queues = new Map();
 
@@ -50,7 +52,8 @@ async function addWithinQuota(bytes, write) {
   queues.set(id, turn);
   await previous;
   try {
-    await assertCanAdd(bytes);
+    const growth = typeof bytes === 'function' ? await bytes() : bytes;
+    if (typeof bytes !== 'function' || growth > 0) await assertCanAdd(growth);
     return await write();
   } finally {
     done();

@@ -227,6 +227,7 @@
     "UPLOAD_TOO_LARGE": "Cada envio pode ter no máximo {size} MB.",
     "BUSY": "Muitas fotos estão sendo enviadas agora. Tente de novo em instantes.",
     "LENGTH_REQUIRED": "Não foi possível ler este envio. Tente de novo.",
+    "PHOTO_CHANGED": "Esta foto mudou enquanto era girada. Tente de novo.",
     "UNSUPPORTED_TYPE": "Só é possível enviar fotos JPEG, PNG, GIF, WebP e HEIC",
     "SCREEN_LIMIT": "Esta família já tem {limit} telas. Remova uma que você não usa mais para adicionar esta."
   },

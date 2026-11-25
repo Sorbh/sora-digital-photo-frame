@@ -6,7 +6,8 @@ const { assertCanAdd, addWithinQuota } = require('../services/quotaService');
 const sharp = require('sharp');
 const thumbnails = require('../services/thumbnailService');
 const { sharpInput } = require('../utils/heic');
-const { displayCopy } = require('../utils/displayCopy');
+const { displayCopy, assertImageSize, MAX_PIXELS } = require('../utils/displayCopy');
+const slots = require('../utils/workSlots');
 const { canSee } = require('../utils/viewerAccess');
 const snaps = require('../services/snapService');
 const playOrder = require('../services/playOrderService');
@@ -317,6 +318,7 @@ class ImageController {
         return res.status(status).json({
           message: error.expose === false ? 'Request failed' : error.message,
           ...(error.code && { code: error.code }),
+          ...(error.vars && { ...error.vars }),
           files: processedFiles
         });
       }
@@ -480,15 +482,29 @@ class ImageController {
       await photoInfo.get(fullPath, path.relative(this.uploadsDir, fullPath))
         .catch(error => console.warn('Could not read photo info:', error.message));
 
-      const original = await getLibrary().readPhoto(toAdminPath(fullPath));
-      const buffer = await sharp(original)
-        .rotate(angle)
-        .toFormat(this.formatFor(fullPath), { quality: parseInt(process.env.IMAGE_QUALITY) || 85 })
-        .toBuffer();
-      // A re-encoded photo can come out bigger: that growth needs room too
-      const write = () => getLibrary().writeItem(toAdminPath(fullPath), buffer);
-      const growth = buffer.length - original.length;
-      await (growth > 0 ? addWithinQuota(growth, write) : write());
+      // Converted like an upload: in turn with the others, and only if not too large
+      const release = await slots.acquire(currentTenant().id);
+      try {
+        const before = await getLibrary().stat(toAdminPath(fullPath));
+        const original = await getLibrary().readPhoto(toAdminPath(fullPath));
+        await assertImageSize(original);
+        const buffer = await sharp(original, { limitInputPixels: MAX_PIXELS })
+          .rotate(angle)
+          .toFormat(this.formatFor(fullPath), { quality: parseInt(process.env.IMAGE_QUALITY) || 85 })
+          .toBuffer();
+        // A re-encoded photo can come out bigger: that growth needs room too. Checked in
+        // the family's turn, against the photo as it is now: gone or changed meanwhile, it stays so.
+        const growth = async () => {
+          const now = await getLibrary().stat(toAdminPath(fullPath));
+          if (!now || now.size !== before.size || now.mtimeMs !== before.mtimeMs) {
+            throw Object.assign(new Error('The photo changed while it was being rotated'), { status: 409, code: 'PHOTO_CHANGED' });
+          }
+          return buffer.length - original.length;
+        };
+        await addWithinQuota(growth, () => getLibrary().writeItem(toAdminPath(fullPath), buffer));
+      } finally {
+        release();
+      }
       await photoInfo.moveUpload(fullPath, fullPath)
         .catch(error => console.warn('Could not keep photo info:', error.message));
 

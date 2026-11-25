@@ -227,6 +227,7 @@
     "UPLOAD_TOO_LARGE": "Ogni caricamento può pesare al massimo {size} MB.",
     "BUSY": "In questo momento si stanno caricando molte foto. Riprova tra un attimo.",
     "LENGTH_REQUIRED": "Non è stato possibile leggere questo caricamento. Riprova.",
+    "PHOTO_CHANGED": "Questa foto è cambiata mentre veniva ruotata. Riprova.",
     "UNSUPPORTED_TYPE": "Puoi caricare solo foto JPEG, PNG, GIF, WebP e HEIC",
     "SCREEN_LIMIT": "Questa famiglia ha già {limit} schermi. Rimuovine uno che non usi più per aggiungere questo."
   },

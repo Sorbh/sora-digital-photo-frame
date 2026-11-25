@@ -17,7 +17,7 @@ function media() {
     if (req.method !== 'GET' && req.method !== 'HEAD') return next();
 
     // The same path requireVisiblePhoto checked
-    const relativePath = photoPath(req);
+    const relativePath = req.photoPath ?? photoPath(req);
     if (!relativePath) return next();
     const adminPath = `uploads/${relativePath}`;
 

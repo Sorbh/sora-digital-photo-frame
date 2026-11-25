@@ -4,8 +4,13 @@
 // there, but show only what leads to the assigned ones.
 const path = require('path');
 
-// family\\x/../y -> family/y, so ".." can't step out of an assigned folder
-const norm = (value) => path.posix.normalize('/' + String(value || '').replace(/\\/g, '/')).replace(/^\/+|\/+$/g, '');
+// Folders are split where the photo storage splits them: on Windows at a
+// backslash too, elsewhere a backslash is just part of a name
+const SEPARATORS = path.sep === '\\' ? /[\\/]/ : /\//;
+const segments = (value) => String(value || '').split(SEPARATORS);
+
+// family/x/../y -> family/y, so ".." can't step out of an assigned folder
+const norm = (value) => path.posix.normalize('/' + segments(value).join('/')).replace(/^\/+|\/+$/g, '');
 
 // The assigned folders, or null for no limit
 function assignedFolders(req) {
@@ -38,8 +43,7 @@ function canOpen(req, relativePath) {
 }
 
 // The photo an /uploads request asks for (relative to uploads), or null when it
-// can't be decoded, has "." or ".." segments, or a backslash. The check and the
-// file read both use this one path, so they can't disagree about which photo it is.
+// can't be decoded or has "." or ".." segments
 function photoPath(req) {
   let relativePath;
   try {
@@ -47,17 +51,23 @@ function photoPath(req) {
   } catch {
     return null;
   }
-  if (relativePath.includes('\\')) return null;
-  const parts = relativePath.split('/');
+  const parts = segments(relativePath);
   if (parts.some(part => part === '.' || part === '..')) return null;
   return parts.filter(Boolean).join('/');
 }
 
-// For /uploads: photos outside the account's folders look like they don't exist
+// For /uploads: photos outside the account's folders look like they don't exist.
+// The request then goes on with the path that was checked (req.photoPath, and
+// the URL rewritten to it), so whatever reads the file reads that same photo.
 function requireVisiblePhoto(req, res, next) {
   const relativePath = photoPath(req);
-  if (relativePath !== null && canSee(req, relativePath)) return next();
-  return res.status(404).json({ message: 'Not found', code: 'NOT_FOUND' });
+  if (relativePath === null || !canSee(req, relativePath)) {
+    return res.status(404).json({ message: 'Not found', code: 'NOT_FOUND' });
+  }
+  const query = req.url.indexOf('?');
+  req.url = '/' + relativePath.split('/').map(encodeURIComponent).join('/') + (query === -1 ? '' : req.url.slice(query));
+  req.photoPath = relativePath;
+  return next();
 }
 
 module.exports = { assignedFolders, canSee, canOpen, foldersBelow, photoPath, requireVisiblePhoto };

@@ -409,6 +409,24 @@ dialog::backdrop {
     font-size: 20px;
 }
 
+/* The page you're on (Access, in the shared header) */
+.tb-btn[aria-current="page"] {
+    background: var(--paper-sunk);
+    color: var(--berry);
+}
+
+/* Beside the brand: the page's name, or what the host puts there (a library switcher) */
+.topbar-slot {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+}
+
+.topbar-slot:empty,
+.topbar-divider:has(+ .topbar-slot:empty) {
+    display: none;
+}
+
 /* ---------- Library heading: a berry hero card ------------------ */
 
 .library-head {
@@ -640,6 +658,10 @@ dialog::backdrop {
     .topbar-brand .sora-eyebrow,
     .topbar-brand .topbar-divider {
         display: none;
+    }
+
+    .topbar-brand .sora-wordmark {
+        font-size: 1.35rem;
     }
 
     .library-head {

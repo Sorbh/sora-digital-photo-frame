@@ -8,6 +8,10 @@
  *
  *   /notes?folder=uploads/Family                 new notes go into Family
  *   /notes?folder=uploads/Family&edit=<path>     opens that note's editor
+ *   /notes?folder=uploads/Family&new=1           opens the editor for a new note in Family
+ *
+ * Opened for one note from the library (edit= or new=1, its "New note" button),
+ * the page goes back to that library folder once the note is saved or closed.
  */
 const TOP_FOLDER = 'uploads';
 const STATUS_ORDER = ['active', 'upcoming', 'paused', 'ended'];
@@ -20,6 +24,8 @@ class NotesManager extends PageEditor {
         this.folders = [TOP_FOLDER];
         this.cameFrom = params.get('folder') || TOP_FOLDER;  // the library folder this page was opened from
         this.pendingEdit = params.get('edit');                // a note to open once the list is in
+        this.pendingNew = params.get('new') === '1';          // a new note to start once the list is in
+        this.backToLibrary = Boolean(this.pendingEdit || this.pendingNew);
         this.editing = null;      // note being edited, or null for a new one
         this.deleting = null;
         this.init();
@@ -43,6 +49,10 @@ class NotesManager extends PageEditor {
         document.getElementById('createNoteBtn').addEventListener('click', () => this.openEditor());
         document.getElementById('closeNoteModal').addEventListener('click', () => this.closeEditor());
         document.getElementById('cancelNoteBtn').addEventListener('click', () => this.closeEditor());
+        // However the editor closes (Save, Cancel, Escape): back to the library when it came from there
+        document.getElementById('noteModal').addEventListener('close', () => {
+            if (this.backToLibrary) window.location.href = document.getElementById('backLink').href;
+        });
 
         this.form.addEventListener('submit', (e) => {
             e.preventDefault();
@@ -89,12 +99,18 @@ class NotesManager extends PageEditor {
         }
     }
 
-    // Opened from a note's tile in the library: its editor, once
+    // Opened from the library: a note's editor (its tile), or a new one ("New note"), once
     openPendingEdit() {
+        if (this.pendingNew) {
+            this.pendingNew = false;
+            this.openEditor();
+            return;
+        }
         if (!this.pendingEdit) return;
         const note = this.notes.find(n => n.path === this.pendingEdit);
         this.pendingEdit = null;
         if (note) this.openEditor(note);
+        else this.backToLibrary = false; // gone meanwhile: this is the Notes page as usual
     }
 
     // ---------- Folders ---------------------------------------------

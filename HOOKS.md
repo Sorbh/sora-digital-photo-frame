@@ -19,6 +19,8 @@ These options are a public contract. Treat a change to a name, an argument or a 
 | `publicPhotos` | `true` serves photos, thumbnails, folders and notes without a viewer check (`requireViewer`) | Off (`PUBLIC_PHOTOS=true` turns it on) | `server/app.js` |
 | `familyCode` | `true`: a PIN sign-in also sends the family's code (shown on the Access page), so `resolveTenant` can find the family from it. `familyCodeSet({ code, previous, tenantId })` keeps the host's index | Off | `server/services/familyCodeService.js` |
 | `beforeRoutes` | `(app) => {}`, runs after core middleware and before core routes. Routes it adds under `/api` answer `Cache-Control: no-store` with no ETag, like the core's own, unless they set their own `Cache-Control` | None | `server/app.js` |
+| `brand` | `{ name }`: the product's name in the header's wordmark, page titles and labels, on every page (see [Header](#header)) | `{ name: 'Sora Frame' }` | `server/views/pages.js` |
+| `accountUrl` | A path on this site (`/account`) or an http(s) address: the host's page about the person's account. The header shows an Account icon linking to it, and Access leaves the header and phone tab bar (see [Header](#header)) | None: Access stays in the header for the owner | `server/views/pages.js` |
 
 ## Quota
 
@@ -168,6 +170,30 @@ To show the owner which screens are paused, give the auth provider `isScreenPaus
 - Without the hook no screen is ever `paused`, as self-hosted.
 
 It only changes what Access shows. Refusing the paused frame itself is still the host's 403 `SCREEN_PAUSED` above.
+
+## Header
+
+Every page that looks after a library (`/admin`, `/access-accounts`, `/notes`, `/snap`, `/pair` and the "only for the owner" page) has the same top bar and phone tab bar. The page's HTML in `server/public` only marks where they go (`<!-- sora:header -->`, `<!-- sora:tabbar -->`); the server draws them when it sends the page (`server/views/pages.js`), so every page has the same brand, the same actions in the same order, and the page you're on marked (`aria-current="page"`). `js/appHeader.js` runs the theme and Log out buttons on every page.
+
+The top bar, in order:
+
+| Part | When |
+|---|---|
+| Brand (`.sora-wordmark[data-brand]`), linking to `/admin` | Always |
+| Host slot: `<div class="topbar-slot" data-host-slot>` | Always. Holds the page's name (`.sora-eyebrow`) until the host replaces what's in it, e.g. with a library switcher |
+| Library | Not on the library |
+| Access (`data-owner-only`, hidden by `js/scope.js` for anyone but the owner) | Without `accountUrl` |
+| Slideshow | Always |
+| Settings (`#settingsBtn`) | The library |
+| Theme (`#themeToggle`) | Always |
+| Account (`[data-header-item="account"]`) | With `accountUrl` |
+| Log out (`#logoutBtn`) | Always |
+
+The phone tab bar has Library, Access (same rule), the page's own round button (the library's +, Access's Add a screen, Notes' New note), Slideshow and, on the library, Settings. Each item is marked `data-header-item` (top bar) or `data-tab` (tab bar), so a host's script can find it without depending on its place.
+
+- **`brand: { name }`** goes in the wordmark, in `<html data-brand>`, and in the title as the page arrives. Translations that name the product say `{brand}`, which `js/i18n.js` fills in from `<html data-brand>`. The sign-in page and the frame's slideshow get the brand too. A `name` that isn't a non-empty string throws when `createApp` runs.
+- **`accountUrl`** must be a path on this site (`/account`, not `//host`) or an `http(s)://` address; anything else throws when `createApp` runs. The `/access-accounts` page itself is still there, for the host to link to.
+- **A host that changes a page** (adds its own scripts, say) must start from the rendered page, not the file: `require('<core>/server/views/pages').renderPage('admin.html')` returns it with the header, tab bar and brand, for the options `createApp` was given. Call it per request, after `createApp`. `renderHeader(pageId)` and `renderTabbar(pageId)` return the two parts alone. To put something beside the brand, replace the children of `[data-host-slot]`; to add a button, insert it into `.topbar-actions` (before `#logoutBtn` keeps Log out last).
 
 ## Adding a hook
 

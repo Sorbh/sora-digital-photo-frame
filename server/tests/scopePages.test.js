@@ -7,6 +7,8 @@ const vm = require('vm');
 
 const publicDir = path.join(__dirname, '..', 'public');
 const read = (file) => fs.readFileSync(path.join(publicDir, file), 'utf8');
+// A page as the browser gets it, with the shared header and tab bar (views/pages.js)
+const { renderPage } = require('../views/pages');
 
 // The opening tag of the element with this id, or of the first match of a pattern
 const tag = (html, idOrPattern) => {
@@ -66,14 +68,13 @@ describe('what each page hides', () => {
   });
 
   test('the library: edit controls for viewers, Access for the owner', () => {
-    const html = read('admin.html');
+    const html = renderPage('admin.html');
     expect(html).toContain('<script src="/js/scope.js"></script>');
-    for (const id of ['createFolderBtn', 'createSnapBtn', 'uploadBtn', 'selectionFab', 'dropZone', 'dropHint']) {
+    for (const id of ['createFolderBtn', 'createSnapBtn', 'createNoteBtn', 'uploadBtn', 'selectionFab', 'dropZone', 'dropHint', 'addTabBtn']) {
       expect(tag(html, id)).toContain('data-edit-only');
     }
     expect(tag(html, /<label class="play-order"[^>]*>/)).toContain('data-edit-only');
-    expect(tag(html, /<button class="tab-fab" data-proxy="uploadBtn"[^>]*>/)).toContain('data-edit-only');
-    expect(tag(html, 'accessAccountsBtn')).toContain('data-owner-only');
+    expect(tag(html, /<a [^>]*data-header-item="access"[^>]*>/)).toContain('data-owner-only');
     expect(tag(html, /<a href="\/access-accounts" class="tab"[^>]*>/)).toContain('data-owner-only');
     // Connecting Google Photos is the owner's, importing is a change
     expect(tag(html, 'googlePhotosBtn')).toMatch(/data-owner-only data-edit-only/);
@@ -87,14 +88,14 @@ describe('what each page hides', () => {
   });
 
   test('notes and snaps: no saving, adding or changing for viewers', () => {
-    const notes = read('notes.html');
+    const notes = renderPage('notes.html');
     expect(notes).toContain('<script src="/js/scope.js"></script>');
     for (const id of ['createNoteBtn', 'saveNoteBtn']) expect(tag(notes, id)).toContain('data-edit-only');
-    expect(tag(notes, /<button class="tab-fab" data-proxy="createNoteBtn"[^>]*>/)).toContain('data-edit-only');
+    expect(tag(notes, /<button type="button" class="tab-fab" data-proxy="createNoteBtn"[^>]*>/)).toContain('data-edit-only');
     for (const link of notes.match(/<a href="\/access-accounts"[^>]*>/g)) expect(link).toContain('data-owner-only');
     expect(read('css/notes.css')).toMatch(/\.view-only \.note-card-actions,\s*\.view-only \.note-toggle\s*\{\s*display: none !important;/);
 
-    const snap = read('snap.html');
+    const snap = renderPage('snap.html');
     expect(snap).toContain('<script src="/js/scope.js"></script>');
     expect(tag(snap, 'saveSnapBtn')).toContain('data-edit-only');
 

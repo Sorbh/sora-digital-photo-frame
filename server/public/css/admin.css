@@ -607,7 +607,8 @@ body {
 
 /* ---------- Context menu ---------------------------------------- */
 
-#contextMenuPopover {
+#contextMenuPopover,
+#addMenu {
     border-color: var(--rule) !important;
     border-radius: var(--shape-xs)!important;
     background: var(--popover) !important;
@@ -1337,4 +1338,17 @@ html.dark .app.file-dragging .drop-hint {
         left: 0;
         right: 0;
     }
+}
+
+/* "All notes", beside the folder's counts when it has notes */
+.all-notes-link {
+    margin-inline-start: 0.75rem;
+    color: inherit;
+    font-weight: 650;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+.all-notes-link:hover {
+    color: var(--berry);
 }

@@ -33,27 +33,7 @@
 
 <body>
     <div class="app">
-        <header class="topbar">
-            <div class="topbar-brand">
-                <a href="/admin" class="sora-wordmark" aria-label="Sora library home" data-i18n-attr="aria-label:snap.static_007">Sora</a>
-                <span class="topbar-divider"></span>
-                <span class="sora-eyebrow" data-i18n="snap.eyebrow">Snap</span>
-            </div>
-            <div class="topbar-actions">
-                <a href="/admin" class="tb-btn tb-desktop" title="Back to the library" data-i18n-attr="title:snap.static_008">
-                    <span class="material-symbols-outlined">photo_library</span>
-                    <span class="tb-label" data-i18n="common.library">Library</span>
-                </a>
-                <a href="/notes" class="tb-btn tb-desktop" title="Notes for the frame" data-i18n-attr="title:snap.static_009">
-                    <span class="material-symbols-outlined">edit_note</span>
-                    <span class="tb-label" data-i18n="common.notes">Notes</span>
-                </a>
-                <a href="/slideshow" class="tb-btn tb-desktop" title="Open the slideshow" data-i18n-attr="title:snap.static_010">
-                    <span class="material-symbols-outlined">slideshow</span>
-                    <span class="tb-label" data-i18n="common.slideshow">Slideshow</span>
-                </a>
-            </div>
-        </header>
+        <!-- sora:header -->
 
         <section class="library-head">
             <div class="library-title">
@@ -157,7 +137,9 @@
         <div id="toastContainer" class="toast-container"></div>
     </div>
 
+    <!-- sora:tabbar -->
     <script src="/js/i18n.js"></script>
+    <script src="/js/appHeader.js"></script>
     <script src="/js/scope.js"></script>
     <script src="/js/notePage.js"></script>
     <script src="/js/pageEditor.js"></script>

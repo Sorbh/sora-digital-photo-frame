@@ -28,6 +28,7 @@ const { sessionSecret, announceSessionSecret } = require('./utils/sessionSecret'
 const { setEvents } = require('./events');
 const accessAccounts = require('./controllers/accessAccountController');
 const { setMaxFolderDepth, canMakeFolderAt, maxFolderDepth } = require('./utils/folderDepth');
+const pages = require('./views/pages');
 
 /**
  * Build the photo frame app. The self-hosted server calls this with no
@@ -55,8 +56,14 @@ const { setMaxFolderDepth, canMakeFolderAt, maxFolderDepth } = require('./utils/
  *                 and data at rest (default: PHOTO_ENCRYPTION_KEY, or no encryption)
  *   beforeRoutes  function(app) run after core middleware, before core routes,
  *                 e.g. to mount extra sign-in routes
+ *   brand         { name } shown in the header's wordmark, page titles and labels
+ *                 (default: { name: 'Sora Frame' }; see views/pages.js)
+ *   accountUrl    the host's account page ("/account"): the header links to it, and
+ *                 Access leaves the header and tab bar (default: none, Access stays)
  */
-function createApp({ sessionStore, beforeRoutes, library, dataStore, resolveTenant, auth, quota, events, pinSignIn = pinSignInFromEnv(), trustProxy = process.env.TRUST_PROXY, publicPhotos = process.env.PUBLIC_PHOTOS === 'true', familyCode = false, keys = keysFromEnv() } = {}) {
+function createApp({ sessionStore, beforeRoutes, library, dataStore, resolveTenant, auth, quota, events, pinSignIn = pinSignInFromEnv(), trustProxy = process.env.TRUST_PROXY, publicPhotos = process.env.PUBLIC_PHOTOS === 'true', familyCode = false, keys = keysFromEnv(), brand, accountUrl } = {}) {
+  // Checked first: a wrong brand or accountUrl stops here, before anything is set up
+  pages.configure({ brand, accountUrl });
   announceSessionSecret();
   const secret = sessionSecret();
 

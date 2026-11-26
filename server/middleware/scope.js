@@ -3,6 +3,7 @@
 // the request through, so the self-hosted admin sees and changes everything.
 const path = require('path');
 const { scopeFor } = require('./auth');
+const { renderPage } = require('../views/pages');
 const { assignedFolders, realVisiblePath } = require('../utils/viewerAccess');
 const { resolveAdminPath, UPLOADS_DIR } = require('../utils/safePath');
 
@@ -32,7 +33,7 @@ function requireOwner(req, res, next) {
 function requireOwnerPage(req, res, next) {
   const scope = scopeFor(req);
   if (scope && !scope.isOwner) {
-    return res.status(403).sendFile(path.join(__dirname, '..', 'public', 'owner-only.html'));
+    return res.status(403).type('html').send(renderPage('owner-only.html'));
   }
   return next();
 }

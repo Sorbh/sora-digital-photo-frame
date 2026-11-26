@@ -1,31 +1,37 @@
 const path = require('path');
 const fs = require('fs');
 const accessAccounts = require('./accessAccountController');
+const pages = require('../views/pages');
+
+// A page with the shared header and the brand (see views/pages.js)
+function sendPage(res, file) {
+  res.type('html').send(pages.renderPage(file));
+}
 
 class ViewController {
   // Serve admin panel
   serveAdmin(req, res) {
-    res.sendFile(path.join(__dirname, '..', 'public', 'admin.html'));
+    sendPage(res, 'admin.html');
   }
 
   // Serve access accounts page
   serveAccessAccounts(req, res) {
-    res.sendFile(path.join(__dirname, '..', 'public', 'access-accounts.html'));
+    sendPage(res, 'access-accounts.html');
   }
 
   // Serve notes page
   serveNotes(req, res) {
-    res.sendFile(path.join(__dirname, '..', 'public', 'notes.html'));
+    sendPage(res, 'notes.html');
   }
 
   // Serve the snap editor
   // Approving a frame that showed a QR code
   servePair(req, res) {
-    res.sendFile(path.join(__dirname, '..', 'public', 'pair.html'));
+    sendPage(res, 'pair.html');
   }
 
   serveSnap(req, res) {
-    res.sendFile(path.join(__dirname, '..', 'public', 'snap.html'));
+    sendPage(res, 'snap.html');
   }
 
   // Serve slideshow page
@@ -43,7 +49,7 @@ class ViewController {
       // Hand the configured interval to slideshow.js via <html data-interval>, and
       // whether PIN sign-in is on via data-pin-sign-in, so the frame knows before
       // anything loads (no PIN pad, and a #pin= address is not used)
-      const modifiedData = data
+      const modifiedData = pages.applyBrand(data)
         .replace('data-interval="15000"', `data-interval="${defaultInterval}"`)
         .replace('data-pin-sign-in="on"', `data-pin-sign-in="${accessAccounts.pinSignIn ? 'on' : 'off'}"`);
       
@@ -56,12 +62,12 @@ class ViewController {
 
   // Serve folder selection page
   serveFolderSelection(req, res) {
-    res.sendFile(path.join(__dirname, '..', 'public', 'folder-selection.html'));
+    sendPage(res, 'folder-selection.html');
   }
 
   // Serve login page
   serveLogin(req, res) {
-    res.sendFile(path.join(__dirname, '..', 'public', 'login.html'));
+    sendPage(res, 'login.html');
   }
 
   // Redirect root to slideshow

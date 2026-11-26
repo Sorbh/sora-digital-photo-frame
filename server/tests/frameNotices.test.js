@@ -68,6 +68,37 @@ describe('Notices at the top of the frame', () => {
     expect(slots.wake).toBeNull();
   });
 
+  test('keep-awake failing again after it worked, or in a new session, is said again', () => {
+    const { notices, slots } = frame();
+    notices.start();
+    notices.wakeStatus('unavailable');
+    jest.advanceTimersByTime(20000);
+    notices.wakeStatus('active');
+    notices.wakeStatus('unavailable');
+    expect(slots.wake).toMatchObject({ key: 'slideshow.keepAwakeUnavailable' });
+
+    jest.advanceTimersByTime(20000);
+    notices.wakeStatus('pending'); // signing out turns keep-awake off...
+    notices.stop(); // ...and clears the notices
+    notices.start();
+    notices.wakeStatus('unavailable');
+    expect(slots.wake).toMatchObject({ key: 'slideshow.keepAwakeUnavailable' });
+  });
+
+  test('the small keep-awake pill leaves room for the photo caption; full messages do not', () => {
+    const { notices } = frame();
+    notices.start();
+    expect(notices.coversTop()).toBe(false);
+    notices.wakeStatus('needs-tap');
+    expect(notices.coversTop()).toBe(true);
+    jest.advanceTimersByTime(60000);
+    expect(notices.coversTop()).toBe(false); // only the pill now
+    notices.fullscreen('refused');
+    expect(notices.coversTop()).toBe(true);
+    jest.advanceTimersByTime(10000);
+    expect(notices.coversTop()).toBe(false);
+  });
+
   test('signing out clears them, and signing in again shows them afresh', () => {
     const { notices, slots } = frame();
     notices.start();

@@ -1148,6 +1148,15 @@ body.note-showing .photo-caption {
     body.notice-showing .photo-caption {
         opacity: 0;
     }
+
+    /* The small keep-awake pill: the caption moves down under it instead */
+    body.notice-pill .photo-caption {
+        top: 5rem;
+    }
+
+    body.is-paused.notice-pill .photo-caption {
+        top: 7.5rem;
+    }
 }
 
 @media (max-height: 720px) {

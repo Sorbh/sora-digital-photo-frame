@@ -606,11 +606,18 @@ class PhotoFrameSlideshow {
         });
 
         // Fullscreen came or went (the page's button, the browser's own, or Escape)
+        // (any real change answers the prefixed request, so its later check is not needed)
         ['fullscreenchange', 'webkitfullscreenchange', 'MSFullscreenChange'].forEach(type =>
-            document.addEventListener(type, () => document.body.classList.toggle('fullscreen', Boolean(fullscreenElement()))));
+            document.addEventListener(type, () => {
+                clearTimeout(this.fullscreenCheck);
+                document.body.classList.toggle('fullscreen', Boolean(fullscreenElement()));
+            }));
         // Older browsers say no with an event rather than a rejected promise
         ['webkitfullscreenerror', 'MSFullscreenError'].forEach(type =>
-            document.addEventListener(type, () => this.notices.fullscreen('refused')));
+            document.addEventListener(type, () => {
+                clearTimeout(this.fullscreenCheck);
+                this.notices.fullscreen('refused');
+            }));
 
         this.images.forEach(img => {
             img.addEventListener('error', () => {
@@ -981,7 +988,9 @@ class PhotoFrameSlideshow {
             element.classList.toggle('is-compact', Boolean(notice.compact));
             if (slot === 'wake') this.keepAwakeBtn.classList.toggle('hidden', !notice.button);
         }
-        document.body.classList.toggle('notice-showing', Object.values(this.noticeSlots).some(el => !el.classList.contains('hidden')));
+        // Narrow screens hide the caption under a message (not under the small pill)
+        document.body.classList.toggle('notice-showing', this.notices.coversTop());
+        document.body.classList.toggle('notice-pill', Boolean(this.notices.shown.wake?.compact) && !this.notices.coversTop());
     }
 
     logout() {

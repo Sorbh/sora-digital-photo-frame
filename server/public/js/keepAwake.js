@@ -24,7 +24,8 @@ class KeepAwake {
         this.videoSrc = videoSrc;
         this.useVideo = !('wakeLock' in navigator) || KeepAwake.isLegacyIosStandalone();
 
-        this.hadGesture = false;
+        this.lastGesture = 0; // when the user last tapped or pressed a key
+        this.epoch = 0; // goes up on disable(), so a late answer from before is dropped
         this.status = 'pending';
         this.onchange = null;
 
@@ -57,6 +58,7 @@ class KeepAwake {
 
     disable() {
         this.enabled = false;
+        this.epoch += 1;
 
         document.removeEventListener('visibilitychange', this.onVisibility);
         document.removeEventListener('fullscreenchange', this.reacquire);
@@ -84,8 +86,16 @@ class KeepAwake {
     }
 
     onGesture() {
-        this.hadGesture = true;
+        this.lastGesture = Date.now();
         this.reacquire();
+    }
+
+    // Was this attempt made with a fresh tap? Only then does a refusal mean a tap
+    // won't help; an old tap (before the tab was hidden, say) proves nothing.
+    freshGesture() {
+        const activation = typeof navigator !== 'undefined' && navigator.userActivation;
+        if (activation && typeof activation.isActive === 'boolean') return activation.isActive;
+        return Date.now() - this.lastGesture < 1000;
     }
 
     onVisibility() {
@@ -95,11 +105,20 @@ class KeepAwake {
     async reacquire() {
         if (!this.enabled || document.visibilityState !== 'visible' || this.active) return;
 
+        const fresh = this.freshGesture();
         if (!this.useVideo) {
+            const epoch = this.epoch;
             try {
-                this.sentinel = await navigator.wakeLock.request('screen');
+                const sentinel = await navigator.wakeLock.request('screen');
+                if (epoch !== this.epoch || !this.enabled) {
+                    // Granted after the frame was locked: not wanted any more
+                    sentinel.release().catch(() => {});
+                    return;
+                }
+                this.sentinel = sentinel;
                 this.setStatus('active');
-                this.sentinel.addEventListener('release', () => {
+                sentinel.addEventListener('release', () => {
+                    if (this.sentinel !== sentinel) return;
                     this.sentinel = null;
                     // The system released it (not us) - try again straight away
                     if (this.enabled) this.reacquire();
@@ -109,15 +128,16 @@ class KeepAwake {
                 // Before the first gesture a refusal is expected and the gesture listeners
                 // retry. Refused after a gesture (permission policy, power saving), or any
                 // other error, means the API won't help here - switch to the video.
-                if (err.name === 'NotAllowedError' && !this.hadGesture) return this.setStatus('needs-tap');
+                if (epoch !== this.epoch || !this.enabled) return;
+                if (err.name === 'NotAllowedError' && !fresh) return this.setStatus('needs-tap');
                 this.useVideo = true;
             }
         }
 
-        this.playVideo();
+        this.playVideo(fresh);
     }
 
-    playVideo() {
+    playVideo(fresh = this.freshGesture()) {
         if (!this.video) {
             const video = document.createElement('video');
             video.src = this.videoSrc;
@@ -131,6 +151,15 @@ class KeepAwake {
             // Playback is what keeps the screen on, so trust these over play()'s answer
             video.addEventListener('playing', () => { if (this.enabled) this.setStatus('active'); });
             video.addEventListener('error', () => this.setStatus('unavailable')); // can't decode it: a tap won't help
+            // Paused by the browser while the frame still wants it (power saving, say):
+            // play it again, or say a tap is needed. disable() pauses it too; that's not this.
+            video.addEventListener('pause', () => {
+                if (!this.enabled || this.sentinel) return;
+                // Once in a while; paused again straight away means it needs a tap
+                if (Date.now() - (this.lastReplay || 0) < 5000) return this.setStatus('needs-tap');
+                this.lastReplay = Date.now();
+                this.reacquire();
+            });
             document.body.appendChild(video);
             this.video = video;
         }
@@ -141,7 +170,7 @@ class KeepAwake {
             // still paused a moment later means it didn't
             clearTimeout(this.playCheck);
             this.playCheck = setTimeout(() => {
-                if (this.enabled && this.video.paused) this.setStatus(this.hadGesture ? 'unavailable' : 'needs-tap');
+                if (this.enabled && this.video.paused) this.setStatus(fresh ? 'unavailable' : 'needs-tap');
             }, 3000);
             return;
         }
@@ -149,7 +178,8 @@ class KeepAwake {
             .then(() => this.setStatus('active'))
             .catch(err => {
                 // NotSupportedError: this device can't play the video at all, so a tap won't help
-                const hopeless = this.hadGesture || (err && err.name === 'NotSupportedError');
+                if (!this.enabled) return;
+                const hopeless = fresh || (err && err.name === 'NotSupportedError');
                 this.setStatus(hopeless ? 'unavailable' : 'needs-tap');
             });
     }

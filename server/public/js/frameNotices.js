@@ -52,6 +52,7 @@
     // Signed out: the sign-in screen gets no notices
     stop() {
       this.started = false;
+      this.toldUnavailable = false; // the next session says it again
       this.show('wake', null);
       this.show('info', null);
     }
@@ -76,8 +77,15 @@
         this.toldUnavailable = true;
         this.show('wake', { ...WAKE.unavailable, compact: false }, this.unavailableMs);
       } else {
+        if (this.status === 'active') this.toldUnavailable = false; // it worked again: a new failure is news
         this.show('wake', null); // active, or not known yet
       }
+    }
+
+    // Whether a message covers the top of a narrow screen, where the photo caption
+    // sits; the small keep-awake pill doesn't
+    coversTop() {
+      return Object.values(this.shown).some(notice => notice && !notice.compact);
     }
 
     // 'unavailable' (no fullscreen in this browser) or 'refused'

@@ -300,7 +300,8 @@ describe('"New note" in the library', () => {
     const manager = context.notesManager;
 
     // The editor opens by itself, on that folder
-    for (let i = 0; i < 50 && !elements.noteModal?.open; i++) await new Promise(resolve => setImmediate(resolve));
+    // Its requests are real HTTP ones: wait on time, not a count of ticks, so a slow machine passes too
+    for (const end = Date.now() + 5000; !elements.noteModal?.open && Date.now() < end;) await new Promise(resolve => setTimeout(resolve, 10));
     expect(elements.noteModal.open).toBe(true);
     expect(manager.editing).toBe(null);
     expect(fields.folder.value).toBe('uploads/Family/Beach');

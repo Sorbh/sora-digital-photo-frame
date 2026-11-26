@@ -411,7 +411,18 @@
                     </ul>
                 </div>
 
+                <h2 id="modalPhotoName" class="sr-only"></h2>
                 <img id="modalImage" src="" alt="" class="modal-photo">
+
+                <!-- Previous / next for touch screens, where the arrow keys aren't available -->
+                <div class="photo-modal-nav">
+                    <button type="button" id="photoModalPrev" class="photo-modal-nav-btn" aria-label="Previous photo" data-i18n-attr="aria-label:admin.previousPhoto">
+                        <span class="material-symbols-outlined" aria-hidden="true">chevron_left</span>
+                    </button>
+                    <button type="button" id="photoModalNext" class="photo-modal-nav-btn" aria-label="Next photo" data-i18n-attr="aria-label:admin.nextPhoto">
+                        <span class="material-symbols-outlined" aria-hidden="true">chevron_right</span>
+                    </button>
+                </div>
             </div>
         </dialog>
 

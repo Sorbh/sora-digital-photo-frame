@@ -76,7 +76,10 @@
     "enter_code_pin": "Introduce tu código familiar y tu PIN, o escanea el código para configurar este marco.",
     "familyCodeLabel": "Código familiar",
     "familyCodeRequired": "Introduce el código familiar de 8 caracteres que aparece en la página Acceso.",
-    "familyOrPinWrong": "El código familiar y el PIN no coinciden. Revisa ambos e inténtalo de nuevo."
+    "familyOrPinWrong": "El código familiar y el PIN no coinciden. Revisa ambos e inténtalo de nuevo.",
+    "retry": "Reintentar",
+    "retryingNote": "El marco sigue intentándolo por sí solo.",
+    "connectionTitle": "No se puede acceder a tus fotos"
   },
   "accessAccounts": {
     "frames_pins": "Marcos y PIN",
@@ -287,6 +290,8 @@
     "static_051": "Cerrar",
     "static_052": "Cerrar foto",
     "static_053": "Atajos de teclado",
+    "previousPhoto": "Foto anterior",
+    "nextPhoto": "Siguiente foto",
     "static_054": "Secciones",
     "static_055": "Subir fotos",
     "sortShuffle": "Aleatorio",

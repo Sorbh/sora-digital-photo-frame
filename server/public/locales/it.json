@@ -76,7 +76,10 @@
     "enter_code_pin": "Inserisci il codice famiglia e il PIN, oppure scansiona il codice per configurare questa cornice.",
     "familyCodeLabel": "Codice famiglia",
     "familyCodeRequired": "Inserisci il codice famiglia di 8 caratteri che trovi nella pagina Accesso.",
-    "familyOrPinWrong": "Codice famiglia e PIN non corrispondono. Controllali entrambi e riprova."
+    "familyOrPinWrong": "Codice famiglia e PIN non corrispondono. Controllali entrambi e riprova.",
+    "retry": "Riprova",
+    "retryingNote": "La cornice continua a riprovare da sola.",
+    "connectionTitle": "Impossibile raggiungere le tue foto"
   },
   "accessAccounts": {
     "frames_pins": "Cornici e PIN",
@@ -288,6 +291,8 @@
     "static_051": "Chiudi",
     "static_052": "Chiudi foto",
     "static_053": "Scorciatoie da tastiera",
+    "previousPhoto": "Foto precedente",
+    "nextPhoto": "Foto successiva",
     "static_054": "Sezioni",
     "static_055": "Carica foto",
     "sortShuffle": "Casuale",

@@ -278,11 +278,13 @@ class FolderSelector {
                 color: rgba(255, 244, 239, 0.55);
             }
 
+            /* 44px target; the negative margins keep the header as tall as before */
             .close-dropdown {
                 display: grid;
                 place-items: center;
-                width: 28px;
-                height: 28px;
+                width: 44px;
+                height: 44px;
+                margin: -8px -8px -8px 0;
                 border: 0;
                 border-radius: 50%;
                 background: transparent;
@@ -363,27 +365,38 @@ class FolderSelector {
                 flex-shrink: 0;
             }
 
+            /* 44px tap target around the 22px chevron. The negative end margin
+               cancels the row gap, so the button ends where the thumbnail starts
+               and the two never overlap. */
             .expand-btn {
                 display: grid;
                 place-items: center;
-                width: 28px;
-                height: 28px;
+                width: 44px;
+                height: 44px;
                 flex-shrink: 0;
-                margin-inline-end: -6px;
+                margin-inline-end: -12px;
+                padding: 0;
                 border: 0;
-                border-radius: var(--shape-xs);
                 background: transparent;
                 color: rgba(255, 244, 239, 0.6);
                 cursor: pointer;
             }
 
+            .expand-btn .material-icons {
+                display: grid;
+                place-items: center;
+                width: 22px;
+                height: 22px;
+                border-radius: var(--shape-xs);
+                font-size: 18px;
+            }
+
             .expand-btn:hover {
-                background: rgba(255, 255, 255, 0.1);
                 color: #fff4ef;
             }
 
-            .expand-btn .material-icons {
-                font-size: 18px;
+            .expand-btn:hover .material-icons {
+                background: rgba(255, 255, 255, 0.1);
             }
 
             /* The closed arrow points the way the text reads */
@@ -490,8 +503,9 @@ class FolderSelector {
             /* Phones: icon-only so the dock fits the screen */
             @media (max-width: 600px) {
                 .folder-selector-btn {
-                    width: 40px;
-                    height: 40px;
+                    flex-shrink: 0;
+                    width: 44px;
+                    height: 44px;
                     padding: 0;
                     justify-content: center;
                 }

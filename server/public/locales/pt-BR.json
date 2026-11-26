@@ -76,7 +76,10 @@
     "enter_code_pin": "Digite seu código da família e seu PIN, ou escaneie o código para configurar este porta-retratos.",
     "familyCodeLabel": "Código da família",
     "familyCodeRequired": "Digite o código da família de 8 caracteres que aparece na página Acesso.",
-    "familyOrPinWrong": "O código da família e o PIN não conferem. Verifique os dois e tente de novo."
+    "familyOrPinWrong": "O código da família e o PIN não conferem. Verifique os dois e tente de novo.",
+    "retry": "Tentar de novo",
+    "retryingNote": "O porta-retrato continua tentando sozinho.",
+    "connectionTitle": "Não foi possível acessar suas fotos"
   },
   "accessAccounts": {
     "frames_pins": "Porta-retratos e PINs",
@@ -288,6 +291,8 @@
     "static_051": "Fechar",
     "static_052": "Fechar foto",
     "static_053": "Atalhos de teclado",
+    "previousPhoto": "Foto anterior",
+    "nextPhoto": "Próxima foto",
     "static_054": "Seções",
     "static_055": "Enviar fotos",
     "sortShuffle": "Aleatória",

@@ -46,7 +46,8 @@ class PhotoFrameAdmin {
         this.dragState = { isDragging: false, startX: 0, startY: 0, translateX: 0, translateY: 0 };
         
         // Photo modal navigation state
-        this.currentImageIndex = -1;
+        this.currentImageUrl = null; // the photo open in the viewer, kept by identity across refreshes
+        this.currentImageSlot = -1; // its last position, to land nearby if it disappears
         this.availableImages = [];
         
         this.initializeEventListeners();
@@ -259,6 +260,8 @@ class PhotoFrameAdmin {
 
         // Photo modal
         document.getElementById('closePhotoModal').addEventListener('click', () => this.hidePhotoModal());
+        document.getElementById('photoModalPrev').addEventListener('click', () => this.navigateToPreviousImage());
+        document.getElementById('photoModalNext').addEventListener('click', () => this.navigateToNextImage());
         document.getElementById('photoModal').addEventListener('click', (e) => {
             if (e.target === e.currentTarget) {
                 this.hidePhotoModal();
@@ -272,14 +275,16 @@ class PhotoFrameAdmin {
                     case 'Escape':
                         this.hidePhotoModal();
                         break;
+                    // Arrows follow the reading direction, like the on-screen
+                    // buttons: in right-to-left languages Left is next
                     case 'ArrowLeft':
+                    case 'ArrowRight': {
                         e.preventDefault();
-                        this.navigateToPreviousImage();
+                        const rtl = document.documentElement.dir === 'rtl';
+                        if ((e.key === 'ArrowRight') !== rtl) this.navigateToNextImage();
+                        else this.navigateToPreviousImage();
                         break;
-                    case 'ArrowRight':
-                        e.preventDefault();
-                        this.navigateToNextImage();
-                        break;
+                    }
                 }
             }
         });
@@ -532,11 +537,19 @@ class PhotoFrameAdmin {
     async loadFolderContents() {
         this.clearSelection(); // Clear selection when navigating
         
+        // Only the latest request may draw the grid: a slow answer for a folder
+        // the user has already left must not replace what is on screen (or the
+        // photo open in the viewer)
+        const request = this.folderRequest = (this.folderRequest || 0) + 1;
+        const path = this.currentPath;
+        const isCurrent = () => request === this.folderRequest && path === this.currentPath;
+
         try {
-            const response = await this.authenticatedFetch(`/api/admin/folders?path=${encodeURIComponent(this.currentPath)}`);
+            const response = await this.authenticatedFetch(`/api/admin/folders?path=${encodeURIComponent(path)}`);
             if (!response) return; // Session expired, handled by authenticatedFetch
             
             const data = await response.json();
+            if (!isCurrent()) return;
             
             if (response.ok) {
                 this.renderFolderContents(data);
@@ -546,6 +559,7 @@ class PhotoFrameAdmin {
                 this.showToast(i18n.error(data, 'admin.loadFolderFailed'), 'error');
             }
         } catch (error) {
+            if (!isCurrent()) return;
             console.error('Error loading folder contents:', error);
             this.showToast(t('admin.loadFolderFailed'), 'error');
         }
@@ -564,7 +578,7 @@ class PhotoFrameAdmin {
             ...file,
             index: index
         }));
-        this.currentImageIndex = -1;
+        this.updatePhotoModalNav();
 
         this.updateLibraryHeading(data);
         this.playOrder = data.order || 'shuffle';
@@ -1363,6 +1377,7 @@ class PhotoFrameAdmin {
             .slice()
             .sort((a, b) => this.fileNames.indexOf(a.name) - this.fileNames.indexOf(b.name))
             .map((file, index) => ({ ...file, index }));
+        this.updatePhotoModalNav();
     }
 
     createSnap(photoPath = null) {
@@ -1517,11 +1532,13 @@ class PhotoFrameAdmin {
         const modal = document.getElementById('photoModal');
         const modalImage = document.getElementById('modalImage');
         
-        // Find current image index
-        this.currentImageIndex = this.availableImages.findIndex(img => img.url === imageUrl);
+        this.currentImageUrl = imageUrl;
+        this.currentImageSlot = this.currentImagePosition();
         
         modalImage.src = imageUrl;
         modalImage.alt = imageName;
+        document.getElementById('modalPhotoName').textContent = imageName;
+        this.updatePhotoModalNav();
         
         // Reset zoom state
         modalImage.classList.remove('zoomed');
@@ -1538,6 +1555,7 @@ class PhotoFrameAdmin {
     hidePhotoModal() {
         const modal = document.getElementById('photoModal');
         modal.close();
+        this.currentImageUrl = null;
         
         // Clear the image and reset state
         const modalImage = document.getElementById('modalImage');
@@ -1947,21 +1965,46 @@ class PhotoFrameAdmin {
         this.hideEmptyStateUploadProgress();
     }
 
-    // Photo modal navigation methods
+    // Photo modal navigation methods. The position is looked up from the open
+    // photo each time, so a folder refresh while the viewer is open (new
+    // uploads, reordering) doesn't break Previous / Next.
+    currentImagePosition() {
+        return this.availableImages.findIndex(img => img.url === this.currentImageUrl);
+    }
+
+    // Previous / next only make sense with two or more photos; without them the
+    // photo gets the room the buttons would take
+    updatePhotoModalNav() {
+        const modal = document.getElementById('photoModal');
+        const count = this.availableImages.length;
+        const many = count > 1;
+        document.querySelector('.photo-modal-nav').hidden = !many;
+        modal.classList.toggle('has-nav', many);
+
+        // Remember where the open photo sits in the newest list. If it went
+        // away in a refresh (deleted, moved), show the photo now in that
+        // place, or close the viewer if none are left.
+        const position = this.currentImagePosition();
+        if (position !== -1) {
+            this.currentImageSlot = position;
+        } else if (modal.open && this.currentImageUrl) {
+            if (count === 0) this.hidePhotoModal();
+            else this.navigateToImageAtIndex(Math.min(Math.max(this.currentImageSlot, 0), count - 1));
+        }
+    }
+
     navigateToNextImage() {
-        if (this.availableImages.length === 0 || this.currentImageIndex === -1) return;
-        
-        const nextIndex = (this.currentImageIndex + 1) % this.availableImages.length;
-        this.navigateToImageAtIndex(nextIndex);
+        const count = this.availableImages.length;
+        if (count === 0 || !this.currentImageUrl) return;
+        const position = this.currentImagePosition();
+        this.navigateToImageAtIndex(position === -1 ? 0 : (position + 1) % count);
     }
 
     navigateToPreviousImage() {
-        if (this.availableImages.length === 0 || this.currentImageIndex === -1) return;
-        
-        const prevIndex = this.currentImageIndex === 0 
-            ? this.availableImages.length - 1 
-            : this.currentImageIndex - 1;
-        this.navigateToImageAtIndex(prevIndex);
+        const count = this.availableImages.length;
+        if (count === 0 || !this.currentImageUrl) return;
+        const position = this.currentImagePosition();
+        this.navigateToImageAtIndex(position <= 0 ? count - 1 : position - 1);
     }
 
     navigateToImageAtIndex(index) {
@@ -1970,9 +2013,11 @@ class PhotoFrameAdmin {
         const image = this.availableImages[index];
         const modalImage = document.getElementById('modalImage');
         
-        this.currentImageIndex = index;
+        this.currentImageUrl = image.url;
+        this.currentImageSlot = index;
         modalImage.src = image.url;
         modalImage.alt = image.name;
+        document.getElementById('modalPhotoName').textContent = image.name;
         
         // Reset zoom state when navigating
         modalImage.classList.remove('zoomed');

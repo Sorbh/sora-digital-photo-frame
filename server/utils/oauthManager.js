@@ -139,7 +139,6 @@ class OAuthManager {
 
   // state: a random value the callback has to bring back (see the controller)
   getAuthUrl(redirectUri, state) {
-    console.log('🔧 [DEBUG] getAuthUrl called with redirectUri:', redirectUri);
     
     const scopes = [
       'https://www.googleapis.com/auth/photospicker.mediaitems.readonly',
@@ -156,7 +155,6 @@ class OAuthManager {
         include_granted_scopes: true,
         state
       });
-      console.log('🔧 [DEBUG] Generated auth URL:', authUrl);
       return authUrl;
     } catch (error) {
       console.error('❌ [DEBUG] Failed to generate auth URL:', error.message);
@@ -225,7 +223,8 @@ class OAuthManager {
         const tokenInfo = await tokenInfoResponse.json();
         console.log('🔧 [DEBUG] Token info:', tokenInfo);
       } catch (tokenError) {
-        console.warn('⚠️ [DEBUG] Could not validate token:', tokenError.message);
+        // Not the message: a failed request's message holds its URL, with the token in it
+        console.warn('⚠️ [DEBUG] Could not validate token:', tokenError.code || tokenError.name);
       }
       
       // Generate a unique request ID (UUID v4 format)

@@ -1,6 +1,13 @@
 /**
  * Folder Selector Widget - Compact folder selector for slideshow page
  */
+
+// A folder path inside a CSS attribute selector: names can hold quotes, # and backslashes
+function cssEscape(value) {
+    if (window.CSS && typeof window.CSS.escape === 'function') return window.CSS.escape(value);
+    return String(value).replace(/[\0-\x1f\x7f]|["\\]/g, c => (/["\\]/.test(c) ? `\\${c}` : `\\${c.charCodeAt(0).toString(16)} `));
+}
+
 class FolderSelector {
     constructor(container, options = {}) {
         this.container = container;
@@ -230,13 +237,15 @@ class FolderSelector {
             }
 
             .folder-dropdown {
+                /* Moves the panel off its centre; phones use it to centre on the safe area */
+                --folder-shift: 0px;
                 position: absolute;
                 bottom: calc(100% + 18px);
                 left: 50%;
                 width: 21rem;
                 max-width: calc(100vw - 2rem);
                 padding: 6px;
-                transform: translateX(-50%);
+                transform: translateX(calc(-50% + var(--folder-shift)));
                 transform-origin: 50% 100%;
                 border: 1px solid rgba(255, 255, 255, 0.08);
                 border-radius: var(--shape-lg);
@@ -250,8 +259,8 @@ class FolderSelector {
             }
 
             @keyframes folder-pop {
-                from { opacity: 0; transform: translateX(-50%) translateY(8px) scale(0.97); }
-                to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+                from { opacity: 0; transform: translateX(calc(-50% + var(--folder-shift))) translateY(8px) scale(0.97); }
+                to { opacity: 1; transform: translateX(calc(-50% + var(--folder-shift))) translateY(0) scale(1); }
             }
 
             .folder-dropdown.hidden {
@@ -290,8 +299,13 @@ class FolderSelector {
                 font-size: 18px;
             }
 
+            /* Fit between the top of the screen and the dock, but always show at
+               least one row. dvh is the height actually visible (phone toolbars
+               shown); older browsers keep the vh line, and very old ones the first. */
             .folder-options {
-                max-height: min(56vh, 30rem);
+                max-height: 56vh;
+                max-height: max(3.75rem, min(56vh, 30rem, calc(100vh - 12rem)));
+                max-height: max(3.75rem, min(56dvh, 30rem, calc(100dvh - 12rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))));
                 overflow-y: auto;
                 overscroll-behavior: contain;
             }
@@ -373,7 +387,7 @@ class FolderSelector {
             }
 
             /* The closed arrow points the way the text reads */
-            [dir="rtl"] .expand-btn[aria-expanded="false"] .material-icons {
+            html[dir="rtl"] .expand-btn[aria-expanded="false"] .material-icons {
                 transform: scaleX(-1);
             }
 
@@ -487,6 +501,34 @@ class FolderSelector {
                     display: none;
                 }
             }
+
+            /* Small screens, narrow or short (a phone on its side): the button sits
+               off-centre in the dock, so hang the panel from the dock instead,
+               which is centred on the screen, and keep it inside the safe area
+               (notches, rounded corners) */
+            @media (max-width: 600px), (max-height: 520px) {
+                .controls .folder-selector {
+                    position: static;
+                }
+
+                .folder-dropdown {
+                    --folder-shift: calc((env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)) / 2);
+                    bottom: calc(100% + 12px);
+                    max-width: calc(100vw - 1.5rem - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px));
+                }
+            }
+
+            /* Short screens: a tighter header and gap leave room for the folders */
+            @media (max-height: 520px) {
+                .folder-dropdown {
+                    bottom: calc(100% + 8px);
+                }
+
+                .folder-dropdown-header {
+                    padding-top: 4px;
+                    padding-bottom: 4px;
+                }
+            }
         `;
         document.head.appendChild(styles);
     }
@@ -508,6 +550,7 @@ class FolderSelector {
     openDropdown() {
         this.isOpen = true;
         this.container.classList.add('open');
+        this.container.closest('.controls')?.classList.add('picker-open');
         this.container.querySelector('.folder-dropdown').classList.remove('hidden');
         this.container.querySelector('.folder-selector-btn').setAttribute('aria-expanded', 'true');
         
@@ -524,7 +567,7 @@ class FolderSelector {
         if (!this.isOpen) return;
         const choices = this.container.querySelector('.folder-options');
         const selectedPath = this.folderStorage.getCurrentFolderPath();
-        const rowFor = path => choices.querySelector(`.folder-option[data-path="${CSS.escape(path)}"] .folder-choice`);
+        const rowFor = path => choices.querySelector(`.folder-option[data-path="${cssEscape(path)}"] .folder-choice`);
         // A folder inside a closed one isn't drawn yet: open its parents first
         if (selectedPath && !rowFor(selectedPath)) await this.expandParentFolders(selectedPath);
         if (!this.isOpen) return;
@@ -542,6 +585,7 @@ class FolderSelector {
         const dropdown = this.container.querySelector('.folder-dropdown');
         const hadFocus = dropdown.contains(document.activeElement);
         this.container.classList.remove('open');
+        this.container.closest('.controls')?.classList.remove('picker-open');
         dropdown.classList.add('hidden');
         const toggle = this.container.querySelector('.folder-selector-btn');
         toggle.setAttribute('aria-expanded', 'false');
@@ -595,7 +639,7 @@ class FolderSelector {
         this.renderFolderLevel(this.folders, list, 0);
 
         if (focusPath !== undefined) {
-            list.querySelector(`.folder-option[data-path="${CSS.escape(focusPath)}"] ${focusPart}`)?.focus();
+            list.querySelector(`.folder-option[data-path="${cssEscape(focusPath)}"] ${focusPart}`)?.focus();
         }
     }
 
@@ -709,7 +753,7 @@ class FolderSelector {
         });
         
         // Add selection to current folder
-        const selectedElement = this.container.querySelector(`.folder-option[data-path="${CSS.escape(selectedPath)}"]`);
+        const selectedElement = this.container.querySelector(`.folder-option[data-path="${cssEscape(selectedPath)}"]`);
         if (selectedElement) {
             selectedElement.classList.add('selected');
             selectedElement.querySelector('.folder-choice')?.setAttribute('aria-current', 'true');
@@ -903,3 +947,4 @@ class FolderSelector {
 
 // Export for use in other scripts
 window.FolderSelector = FolderSelector;
+window.FolderSelector.cssEscape = cssEscape;

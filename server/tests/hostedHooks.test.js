@@ -23,8 +23,8 @@ describe('Hosted hooks: tenant, auth provider, quota', () => {
       requireAuth: (req, res, next) => (req.get('x-tenant') ? next() : res.status(403).json({ message: 'nope' }))
     },
     quota: {
-      async canAdd(bytes) {
-        seen.push({ tenant: currentTenant().id, bytes });
+      async canAdd({ items, bytes }) {
+        seen.push({ tenant: currentTenant().id, items, bytes });
         return currentTenant().id === 'full' ? { ok: false, message: 'Storage limit reached' } : { ok: true };
       }
     }
@@ -57,6 +57,7 @@ describe('Hosted hooks: tenant, auth provider, quota', () => {
     expect(res.body.files).toHaveLength(1);
     expect(seen.at(-1).tenant).toBe('a');
     expect(seen.at(-1).bytes).toBeGreaterThan(0);
+    expect(seen.at(-1).items).toBe(1);
     expect(await fs.pathExists(path.join(testUploadsDir, 'family', path.basename(res.body.files[0].path)))).toBe(true);
   });
 

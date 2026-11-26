@@ -2,7 +2,7 @@ const path = require('path');
 const { UPLOADS_DIR } = require('../config/paths');
 const { getLibrary } = require('../library');
 const { currentTenant } = require('../context');
-const { assertCanAdd, addWithinQuota } = require('../services/quotaService');
+const { assertCanAdd, addWithinQuota, photoItems } = require('../services/quotaService');
 const sharp = require('sharp');
 const thumbnails = require('../services/thumbnailService');
 const { sharpInput } = require('../utils/heic');
@@ -290,10 +290,12 @@ class ImageController {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
         const filename = `${file.fieldname}-${uniqueSuffix}.webp`;
         // No room left at all (the library filled up during this batch)? Then don't convert it
-        await assertCanAdd(1);
+        await assertCanAdd({ items: 1, bytes: 1 });
         // A display copy sized for frames: upright, WebP, no metadata (GPS stays private)
         const buffer = await displayCopy(file.buffer, { animated: file.mimetype === 'image/gif' });
-        const added = await addWithinQuota(buffer.length, () => getLibrary().addPhoto(toAdminPath(targetDir), {
+        // A photo is 1 item, one that stayed animated 5
+        const items = await photoItems(buffer);
+        const added = await addWithinQuota({ items, bytes: buffer.length }, () => getLibrary().addPhoto(toAdminPath(targetDir), {
           buffer, originalName: filename, contentType: 'image/webp'
         }));
         // Keep when and where it was taken, read from the original before it is dropped
@@ -514,7 +516,8 @@ class ImageController {
             throw Object.assign(new Error('The photo changed while it was being rotated'), { status: 409, code: 'PHOTO_CHANGED' });
           }
         };
-        const growth = async () => { await sameFile(); return buffer.length - original.length; };
+        // Still the same photo: no new items, only its growth
+        const growth = async () => { await sameFile(); return { items: 0, bytes: buffer.length - original.length }; };
         // Checked once more after the quota hook answered, right before writing
         await addWithinQuota(growth, async () => {
           await sameFile();

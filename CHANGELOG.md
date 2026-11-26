@@ -7,10 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+These changes are for **3.0.0**: the quota hook changed (see below).
+
 ### Added
 - `MAX_FOLDER_DEPTH` limits how many folder levels the library can have (off by default). With `2`, `Trips` and `Trips/Italy` can be made but nothing inside `Italy`: the library hides "New folder" there, and creating or importing from Google Photos to a folder past the limit is refused with `FOLDER_TOO_DEEP`. Deeper folders that already exist keep working ([#88](https://github.com/Sorbh/sora-digital-photo-frame/issues/88)). A symlinked folder counts where it really is ([#59](https://github.com/Sorbh/sora-digital-photo-frame/issues/59)).
 
 ### Changed
+- **Breaking: the quota hook counts items and screens, not just bytes.** `quota.canAdd(bytes)` is now `canAdd({ items, bytes, screens })`. A photo asks for 1 item, an animated GIF for 5 (also from Google Photos), a new snap for 1; saving a snap again or rotating a photo asks for none, only its growth. Pairing a new screen, by QR code or a new PIN sign-in, asks `{ screens: 1 }` in the same lock as `MAX_SCREENS`, and a refusal is `SCREEN_LIMIT` with the hook's message; a screen signing in again is not asked about. Self-hosted installs keep no limits. **Hosted setups must update their hook:** see "Quota" in HOOKS.md.
 - **Saving never makes a folder.** Uploading, moving photos, saving snaps or a play order into a folder that isn't there answers 404 `FOLDER_NOT_FOUND`, so a folder deleted while photos were still being saved stays deleted; a Google Photos import stops at that point. Only "New folder", an import's destination and `DEFAULT_FOLDERS` make folders. **Custom photo libraries** (`createApp({ library })`) and data stores must do the same (see HOOKS.md) ([#89](https://github.com/Sorbh/sora-digital-photo-frame/issues/89)).
 
 ### Fixed

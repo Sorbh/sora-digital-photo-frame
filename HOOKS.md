@@ -10,7 +10,7 @@ These options are a public contract. Treat a change to a name, an argument or a 
 | `dataStore` | `DataStore` subclass: `get`, `set`, `update`. `folder-settings:<folder>` documents (a folder's play order) belong to that photo folder: writing one must not create the folder, and throws 404 `FOLDER_NOT_FOUND` when it is gone | Local data files | `server/store/DataStore.js` |
 | `resolveTenant` | `async (req) => ({ id, plan })` or `null` | One `default` tenant | `server/context.js` |
 | `auth` | `{ requireAuth, requireGuest, requireViewer }` middleware, all optional | Admin password session | `server/middleware/auth.js` |
-| `quota` | `{ canAdd(bytes) => ({ ok, message }) }` for the current tenant. `bytes` is how much the library grows (a new photo, or the growth of a rotated one), counted before encryption at rest, so turning on `PHOTO_ENCRYPTION_KEY` doesn't change what counts toward a quota. A call with `1` before converting an upload just asks whether there is any room left | Unlimited | `server/services/quotaService.js` |
+| `quota` | `{ canAdd({ items, bytes, screens }) => ({ ok, message }) }` for the current tenant. **Changed in 3.0.0** (it took `bytes` alone): see [Quota](#quota) | Unlimited | `server/services/quotaService.js` |
 | `events` | `{ devicePaired, devicesRemoved, familyCodeSet }`, may be async; if one throws, the action fails, with one exception (see [Events](#events)) | None | `server/events.js` |
 | `keys` | `{ currentKey(), getKey(id) }`, may return promises | `PHOTO_ENCRYPTION_KEY`, or no encryption | `server/crypto/keys.js` |
 | `sessionStore` | `express-session` store | In memory | `server/app.js` |
@@ -19,6 +19,73 @@ These options are a public contract. Treat a change to a name, an argument or a 
 | `publicPhotos` | `true` serves photos, thumbnails, folders and notes without a viewer check (`requireViewer`) | Off (`PUBLIC_PHOTOS=true` turns it on) | `server/app.js` |
 | `familyCode` | `true`: a PIN sign-in also sends the family's code (shown on the Access page), so `resolveTenant` can find the family from it. `familyCodeSet({ code, previous, tenantId })` keeps the host's index | Off | `server/services/familyCodeService.js` |
 | `beforeRoutes` | `(app) => {}`, runs after core middleware and before core routes | None | `server/app.js` |
+
+## Quota
+
+The core asks `quota.canAdd(request)` before it adds anything to a library, and refuses when the answer isn't `{ ok: true }`. It runs for the current tenant (`currentTenant()` in `server/context.js`). The default allows everything, so a self-hosted install has no limits.
+
+`request` always has all three fields, as numbers:
+
+| Field | What it is |
+|---|---|
+| `items` | How many countable things are being added (see below) |
+| `bytes` | How much the library grows, counted before encryption at rest, so turning on `PHOTO_ENCRYPTION_KEY` doesn't change what counts. May be 0, or negative when something shrinks |
+| `screens` | `1` when a new screen joins the library, else `0` |
+
+What each action asks for:
+
+| Action | `items` | `bytes` | `screens` |
+|---|---|---|---|
+| Upload a photo | 1 | its size | 0 |
+| Upload an animated GIF (still animated after conversion to WebP) | 5 | its size | 0 |
+| Import from Google Photos | 1 per photo, 5 per animated one | its size | 0 |
+| Create a snap | 1 | its size | 0 |
+| Create a note (see below) | 1 | its size, or 0 | 0 |
+| Save a snap again | 0 | how much it grew | 0 |
+| Rotate a photo | 0 | how much it grew | 0 |
+| Pair a new screen (QR code or a new PIN sign-in) | 0 | 0 | 1 |
+| Rename, move or delete anything | not asked | | |
+
+- **"Is there any room at all?"** Before converting an upload, and before downloading each photo of an import, the core asks `{ items: 1, bytes: 1, screens: 0 }`, so a full library is refused before the work starts.
+- **Nothing added, nothing asked.** A save that adds no item, no bytes and no screen (a snap or rotated photo that got smaller, say) isn't asked about. Neither is a screen signing in again, by its token, by its PIN with its token, or by its session: it's the same screen.
+- **One at a time.** Uploads, imports, snaps and rotations ask and save in turn for each tenant, so two can't both take the last place. A new screen is asked inside the same lock as the `MAX_SCREENS` check, so two new screens can't both take the last one. Count what is really stored when you answer, not what you were asked before.
+- **Refusals.** For photos and snaps, `{ ok: false, message }` is answered 413 `QUOTA_EXCEEDED` with your `message`. For a screen, it's 403 `SCREEN_LIMIT` with your `message` (and no `limit`, which only `MAX_SCREENS` sends); the frame shows your `message` as it is, so send it in the person's language. To send your own status and code instead, throw an error with `status` (4xx), `code` and optional `vars`: they reach the browser as they are.
+- **Notes.** Code that creates a note must ask for one item: `assertCanAddItems(1)` (or `ITEMS.note`) from `server/services/quotaService.js`, or, to save in turn as snaps do, `addWithinQuota({ items: 1, bytes }, write)`.
+
+For example, a plan that counts photos and screens:
+
+```js
+createApp({
+  quota: {
+    async canAdd({ items, screens }) {
+      const plan = await plans.forTenant(currentTenant().id); // { items: 100, screens: 1 }
+      if (screens > 0 && (await countScreens()) + screens > plan.screens) {
+        return { ok: false, message: `Your plan has ${plan.screens} screen. Upgrade to add more.` };
+      }
+      if (items > 0 && (await countItems()) + items > plan.items) {
+        return { ok: false, message: `You've reached ${plan.items} photos. Upgrade, or delete some.` };
+      }
+      return { ok: true };
+    }
+  }
+});
+```
+
+### Upgrading from 2.x
+
+`canAdd(bytes)` is now `canAdd({ items, bytes, screens })`. A 2.x hook that compares the argument with a number gets an object, and will refuse everything (or, worse, allow everything). Change it to read `bytes` from the object:
+
+```js
+// 2.x
+async canAdd(bytes) { return { ok: used() + bytes <= LIMIT }; }
+
+// 3.0
+async canAdd({ bytes }) { return { ok: used() + bytes <= LIMIT }; }
+```
+
+If your hook only limits bytes, also return `{ ok: true }` when `bytes` is 0 or less: a new screen now asks with `bytes: 0`.
+
+The core's own `assertCanAdd` and `addWithinQuota` take the same object, and throw a `TypeError` when given a number.
 
 ## Events
 

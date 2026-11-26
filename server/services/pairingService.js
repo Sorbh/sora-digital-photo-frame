@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const { getDataStore } = require('../store');
 const { currentTenant, runWithTenant } = require('../context');
 const { emit } = require('../events');
+const quota = require('./quotaService');
 const PAIRING_TTL_MS = 10 * 60 * 1000;
 // Shared by every tenant on a hosted server. Each address keeps at most
 // MAX_PER_ADDRESS waiting codes, and when the queue is full the address holding
@@ -186,10 +187,18 @@ class PairingService {
     };
     // MAX_SCREENS caps screens per library (0, the default, means no cap)
     const limit = parseInt(process.env.MAX_SCREENS, 10) || 0;
-    await getDataStore().update('devices', [], devices => {
+    await getDataStore().update('devices', [], async devices => {
       if (limit && devices.length >= limit) {
         throw Object.assign(new Error(`This family already has ${limit} screens. Remove one you no longer use to add this one.`),
           { status: 403, code: 'SCREEN_LIMIT', vars: { limit } });
+      }
+      // The quota hook's own limit, asked in the same turn so two new screens can't
+      // both pass. Only here: a screen signing in again (by token or session) is
+      // never a new one, so it is never asked about.
+      const answer = await quota.ask({ screens: 1 });
+      if (!answer || !answer.ok) {
+        throw Object.assign(new Error((answer && answer.message) || 'This family has no room for another screen.'),
+          { status: 403, code: 'SCREEN_LIMIT' });
       }
       return [...devices, device];
     });

@@ -481,7 +481,7 @@ class AuthenticationManager {
     handleAuthError(error, errorCode, data = {}, retry = null) {
         // Hosted, a wrong family code and a wrong PIN look the same on purpose
         if (errorCode === 'INVALID_PIN' && this.familyCodeRequired) this.showErrorKey('slideshow.familyOrPinWrong');
-        else this.showError(i18n.error({ ...data, code: errorCode, message: error }, 'slideshow.invalidPin'));
+        else this.showError(i18n.error({ ...data, code: errorCode, message: error || data.message }, 'slideshow.invalidPin'));
 
         if (errorCode === 'RATE_LIMITED') {
             this.pinInput.disabled = true;

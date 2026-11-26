@@ -10,7 +10,7 @@ These options are a public contract. Treat a change to a name, an argument or a 
 | `dataStore` | `DataStore` subclass: `get`, `set`, `update` | Local data files | `server/store/DataStore.js` |
 | `resolveTenant` | `async (req) => ({ id, plan })` or `null` | One `default` tenant | `server/context.js` |
 | `auth` | `{ requireAuth, requireGuest, requireViewer }` middleware, all optional | Admin password session | `server/middleware/auth.js` |
-| `quota` | `{ canAdd(bytes) => ({ ok, message }) }` for the current tenant | Unlimited | `server/services/quotaService.js` |
+| `quota` | `{ canAdd(bytes) => ({ ok, message }) }` for the current tenant. `bytes` is the photo as stored before encryption at rest (what the family uploaded, after resizing), so turning on `PHOTO_ENCRYPTION_KEY` doesn't change what counts toward a quota | Unlimited | `server/services/quotaService.js` |
 | `events` | `{ devicePaired, devicesRemoved, familyCodeSet }`, may be async; if one throws, the action fails | None | `server/events.js` |
 | `keys` | `{ currentKey(), getKey(id) }`, may return promises | `PHOTO_ENCRYPTION_KEY`, or no encryption | `server/crypto/keys.js` |
 | `sessionStore` | `express-session` store | In memory | `server/app.js` |

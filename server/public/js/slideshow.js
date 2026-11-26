@@ -32,6 +32,7 @@ class AuthenticationManager {
         if (!this.pairHint) return;
         const url = document.createElement('span');
         url.id = 'pairUrl';
+        url.dir = 'ltr'; // keeps "192.168.1.5:3000/pair" in order inside right-to-left text
         url.textContent = this.pairUrlText || t('slideshow.static_001');
         this.pairHint.innerHTML = t('slideshow.pairHint', { url: url.outerHTML });
     }
@@ -199,6 +200,15 @@ class AuthenticationManager {
         try {
             const query = new URLSearchParams({ code: pairing.code, secret: pairing.secret });
             data = await (await fetch(`/api/pair/status?${query}`)).json();
+            if (this.pairing !== pairing) return;
+            // Approved: collect the token, which also signs this browser in
+            if (data?.status === 'ready') {
+                data = await (await fetch('/api/pair/collect', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ code: pairing.code, secret: pairing.secret })
+                })).json();
+            }
         } catch (error) {
             data = null; // offline for a moment: keep waiting
         }
@@ -250,9 +260,9 @@ class AuthenticationManager {
             if (outdated()) return; // signed in, or a PIN was typed, meanwhile
             if (!data.success) {
                 this.showAuthOverlay();
-                this.handleAuthError(data.error, data.code, data);
-                // Too many tries for now: try again once the lock lifts (remainingTime is in minutes)
-                if (data.code === 'RATE_LIMITED') retry(Math.max(Number(data.remainingTime) || 1, 1) * 60000 + 5000);
+                // Too many tries just now: the form's own wait tries the same PIN again
+                // once it is over, unless a PIN was typed or the frame signed in meanwhile
+                this.handleAuthError(data.error, data.code, data, () => { if (!outdated()) this.signInFromUrl(pin, attempt + 1); });
                 return;
             }
             this.keepScreen(data);
@@ -411,8 +421,15 @@ class AuthenticationManager {
         }
     }
 
+    // Signed in another way, or signed out: the wait after "too many tries" is over
+    stopRateLimitWait() {
+        clearTimeout(this.rateLimitTimer);
+        this.rateLimitTimer = null;
+    }
+
     handleAuthSuccess(account) {
         clearTimeout(this.urlRetryTimer);
+        this.stopRateLimitWait();
         this.isAuthenticated = true;
         this.userAccount = account;
 
@@ -426,7 +443,7 @@ class AuthenticationManager {
         }));
     }
 
-    handleAuthError(error, errorCode, data = {}) {
+    handleAuthError(error, errorCode, data = {}, retry = null) {
         // Hosted, a wrong family code and a wrong PIN look the same on purpose
         if (errorCode === 'INVALID_PIN' && this.familyCodeRequired) this.showErrorKey('slideshow.familyOrPinWrong');
         else this.showError(i18n.error({ ...data, code: errorCode, message: error }, 'slideshow.invalidPin'));
@@ -435,6 +452,16 @@ class AuthenticationManager {
             this.pinInput.disabled = true;
             this.pinInput.classList.add('border-destructive');
             this.authButton.disabled = true;
+            // The form comes back when the wait is over (and a bookmarked PIN is tried again)
+            this.stopRateLimitWait();
+            this.rateLimitTimer = setTimeout(() => {
+                this.rateLimitTimer = null;
+                this.pinInput.disabled = false;
+                this.authButton.disabled = false;
+                this.pinInput.classList.remove('border-destructive');
+                this.clearError();
+                if (retry) retry();
+            }, Math.max(1, Number(data.remainingTime) || 1) * 60 * 1000);
         } else {
             this.pinInput.classList.add('border-destructive');
             this.focusPin();
@@ -453,6 +480,7 @@ class AuthenticationManager {
         } finally {
             this.isAuthenticated = false;
             this.userAccount = null;
+            this.stopRateLimitWait();
             clearInterval(this.renewTimer);
             localStorage.removeItem(DEVICE_TOKEN_KEY); // signing out unpairs this browser
             sessionStorage.removeItem('authenticated');
@@ -478,8 +506,10 @@ class AuthenticationManager {
     }
 
     setLoading(loading) {
-        this.authButton.disabled = loading;
-        this.pinInput.disabled = loading;
+        // Still waiting after "too many tries": the form stays off until then
+        const off = loading || Boolean(this.rateLimitTimer);
+        this.authButton.disabled = off;
+        this.pinInput.disabled = off;
 
         if (loading) {
             this.authLoading.classList.remove('hidden');

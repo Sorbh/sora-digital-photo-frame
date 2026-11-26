@@ -13,6 +13,13 @@ const SEEN_WRITE_GAP_MS = 60 * 60 * 1000;
 const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 
 const hash = token => crypto.createHash('sha256').update(token).digest('hex');
+// Compares secrets in constant time; anything that isn't a string of the same bytes is different
+const sameSecret = (given, real) => {
+  if (typeof given !== 'string' || typeof real !== 'string') return false;
+  const a = Buffer.from(given);
+  const b = Buffer.from(real);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+};
 
 // Device tokens are "<deviceId>.<secret>", so a hosted setup can tell which
 // tenant a frame belongs to before looking it up. Older tokens are just the secret.
@@ -29,7 +36,7 @@ const deviceIdFromToken = token => (typeof token === 'string' && TOKEN_PATTERN.e
  */
 class PairingService {
   constructor() {
-    this.pairings = new Map(); // code -> { code, secret, expiresAt, approved }
+    this.pairings = new Map(); // code -> { code, secret, expiresAt, address, claimed, approved }
   }
 
   normalize(code) {
@@ -50,7 +57,7 @@ class PairingService {
 
   // Codes still waiting for an admin, oldest first (a Map keeps the order they were made in)
   waitingFrom(address) {
-    return [...this.pairings.values()].filter(p => !p.approved && p.address === address);
+    return [...this.pairings.values()].filter(p => !p.approved && !p.claimed && p.address === address);
   }
 
   // The queue is full: the address with the most waiting codes, if it has more
@@ -58,7 +65,7 @@ class PairingService {
   makeRoom(address) {
     const waiting = new Map(); // address -> its codes, oldest first
     for (const pairing of this.pairings.values()) {
-      if (pairing.approved) continue;
+      if (pairing.approved || pairing.claimed) continue;
       if (!waiting.has(pairing.address)) waiting.set(pairing.address, []);
       waiting.get(pairing.address).push(pairing);
     }
@@ -71,8 +78,9 @@ class PairingService {
   }
 
   // A new pairing for a frame: the code goes in the QR, the secret stays on the frame.
-  // address is where the request came from (see addressGroup in the controller).
-  start(address = 'unknown') {
+  // address is where the request came from (see addressGroup in the controller);
+  // browser is a key only the browser that asked has, so only it can collect.
+  start(address = 'unknown', browser = null) {
     this.dropExpired();
     const mine = this.waitingFrom(address);
     // A frame that keeps asking keeps only its newest few codes
@@ -85,6 +93,8 @@ class PairingService {
       secret: crypto.randomBytes(24).toString('hex'),
       expiresAt: Date.now() + PAIRING_TTL_MS,
       address,
+      browser,
+      claimed: false, // an admin is approving it (see claim)
       approved: null
     };
     this.pairings.set(code, pairing);
@@ -101,14 +111,49 @@ class PairingService {
     return pairing;
   }
 
-  // The admin said yes: make the device and hold its token for the frame to collect
-  async approve(code, { name, accountId }) {
+  // Takes a waiting pairing for one approval, before anything is created, so two
+  // approvals at the same time can't both go ahead. The pairing, or null when it's
+  // gone or already taken. Give it back with release() if the approval fails.
+  claim(code) {
     const pairing = this.find(code);
-    if (!pairing || pairing.approved) return null;
-    const { device, token } = await this.addDevice({ name, accountId, via: 'qr' });
-    // The frame collects this without a session; it runs as the approving tenant
-    pairing.approved = { token, device, tenant: currentTenant() };
-    return device;
+    if (!pairing || pairing.claimed) return null;
+    pairing.claimed = true;
+    return pairing;
+  }
+
+  release(pairing) {
+    if (!pairing.approved) pairing.claimed = false;
+  }
+
+  // The admin said yes: make the device and hold its token for the frame to collect.
+  // Pass a pairing from claim(), or a code to claim it here.
+  // beforeReady, if given, runs once the device exists and before the frame can
+  // collect it; if it fails, the device is removed and the approval fails.
+  async approve(codeOrPairing, { name, accountId, beforeReady = null }) {
+    const pairing = typeof codeOrPairing === 'object' ? codeOrPairing : this.claim(codeOrPairing);
+    if (!pairing || pairing.approved || this.pairings.get(pairing.code) !== pairing) return null;
+    try {
+      const { device, token } = await this.addDevice({ name, accountId, via: 'qr' });
+      // The code ran out while the device was being made: the frame has moved on
+      // to a new code and could never collect this one, so undo it
+      if (pairing.expiresAt <= Date.now() || this.pairings.get(pairing.code) !== pairing) {
+        await this.discardDevice(device.id);
+        return null;
+      }
+      if (beforeReady) {
+        try {
+          await beforeReady();
+        } catch (error) {
+          await this.discardDevice(device.id);
+          throw error;
+        }
+      }
+      // The frame collects this without a session; it runs as the approving tenant
+      pairing.approved = { token, device, tenant: currentTenant() };
+      return device;
+    } finally {
+      this.release(pairing);
+    }
   }
 
   // Every way a screen joins (QR code or PIN) ends here, so the same screen
@@ -143,13 +188,24 @@ class PairingService {
     return { device, token };
   }
 
-  // What the waiting frame sees. An approved pairing is handed over once, then gone.
-  collect(code, secret) {
+  // The pairing for a code, when the secret is its own
+  withSecret(code, secret) {
     const pairing = this.find(code);
-    if (!pairing || typeof secret !== 'string' || secret.length !== pairing.secret.length
-      || !crypto.timingSafeEqual(Buffer.from(secret), Buffer.from(pairing.secret))) {
-      return { status: 'expired' };
-    }
+    return pairing && sameSecret(secret, pairing.secret) ? pairing : null;
+  }
+
+  // What the waiting frame sees while it polls: waiting, ready (approved, to collect) or expired
+  status(code, secret) {
+    const pairing = this.withSecret(code, secret);
+    if (!pairing) return 'expired';
+    return pairing.approved ? 'ready' : 'waiting';
+  }
+
+  // The frame takes its approved pairing, from the browser that started it.
+  // Handed over once, then gone.
+  collect(code, secret, browser) {
+    const pairing = this.withSecret(code, secret);
+    if (!pairing || !sameSecret(browser, pairing.browser)) return { status: 'expired' };
     if (!pairing.approved) return { status: 'waiting' };
     this.pairings.delete(pairing.code);
     return {
@@ -210,6 +266,17 @@ class PairingService {
       return changed;
     }));
     return changed;
+  }
+
+  // Removes a device nobody ever got the token for. It goes even if the host's
+  // devicesRemoved hook fails, so it never counts toward the screen limit.
+  async discardDevice(id) {
+    await getDataStore().update('devices', [], devices => devices.filter(d => d.id !== id));
+    try {
+      await emit('devicesRemoved', { deviceIds: [id], tenantId: currentTenant().id });
+    } catch (error) {
+      console.error('Could not report a discarded device:', error);
+    }
   }
 
   async removeDevices(match) {

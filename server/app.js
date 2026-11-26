@@ -10,7 +10,7 @@ const webpFallback = require('./middleware/webpFallback');
 const media = require('./middleware/media');
 const sameOrigin = require('./middleware/sameOrigin');
 const freshViewer = require('./middleware/freshViewer');
-const { requireVisiblePhoto } = require('./utils/viewerAccess');
+const { requireVisiblePhoto, atPhotoPath } = require('./utils/viewerAccess');
 const EncryptedPhotoLibrary = require('./library/EncryptedPhotoLibrary');
 const EncryptedDataStore = require('./store/EncryptedDataStore');
 const { keysFromEnv } = require('./crypto/keys');
@@ -105,7 +105,8 @@ function createApp({ sessionStore, beforeRoutes, library, dataStore, resolveTena
 
   // Static files
   if (photoLibrary.staticDir) {
-    app.use('/uploads', requirePhotoViewer, requireVisiblePhoto, webpFallback(photoLibrary.staticDir), express.static(photoLibrary.staticDir));
+    app.use('/uploads', requirePhotoViewer, requireVisiblePhoto,
+      atPhotoPath(webpFallback(photoLibrary.staticDir)), atPhotoPath(express.static(photoLibrary.staticDir)));
   } else {
     // Encrypted or remote storage: serve through the library (decrypts on the server)
     app.use('/uploads', requirePhotoViewer, requireVisiblePhoto, media());

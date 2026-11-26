@@ -419,7 +419,8 @@ const googlePhotosController = {
         'Content-Type': contentType,
         'X-Content-Type-Options': 'nosniff',
         'Content-Security-Policy': "default-src 'none'; sandbox",
-        'Cache-Control': 'private, max-age=3600', // Cache for 1 hour, in this browser only
+        // In this browser only, and checked again each time: after signing out it must not show
+        'Cache-Control': 'private, no-cache',
         'Content-Length': imageBuffer.byteLength
       });
 

@@ -177,8 +177,9 @@ describe('Slideshow sign-in from the address', () => {
     ];
     const { timers, manager } = openSlideshow('https://frame.example/slideshow?pin=123456', { fetchPin: () => answers.shift()() });
     await flush();
-    const retry = timers.filter(t => t.fn.toString().includes('signInFromUrl')).pop();
-    expect(retry.ms).toBeGreaterThanOrEqual(15 * 60000);
+    // The form's own lockout wait tries the same PIN again when it ends
+    const retry = timers.filter(t => t.ms >= 15 * 60000).pop();
+    expect(retry).toBeDefined();
     retry.fn();
     await flush();
     expect(manager.isAuthenticated).toBe(true);

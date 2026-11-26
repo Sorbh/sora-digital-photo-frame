@@ -99,6 +99,8 @@ router.put('/snaps', requireAuth, editor,
 router.get('/features', requireAuth, (req, res) => {
     res.json({
         googlePhotosEnabled: process.env.ENABLE_GOOGLE_PHOTOS === 'true',
+        // false: frames connect only by their code, and Access shows screens with no PIN
+        pinSignIn: accessAccountController.pinSignIn,
         scope: scopeFor(req)
     });
 });

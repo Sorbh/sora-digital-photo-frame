@@ -1,5 +1,6 @@
 const path = require('path');
 const fs = require('fs');
+const accessAccounts = require('./accessAccountController');
 
 class ViewController {
   // Serve admin panel
@@ -39,8 +40,12 @@ class ViewController {
         return res.status(500).send('Error loading slideshow');
       }
       
-      // Hand the configured interval to slideshow.js via <html data-interval>
-      const modifiedData = data.replace('data-interval="15000"', `data-interval="${defaultInterval}"`);
+      // Hand the configured interval to slideshow.js via <html data-interval>, and
+      // whether PIN sign-in is on via data-pin-sign-in, so the frame knows before
+      // anything loads (no PIN pad, and a #pin= address is not used)
+      const modifiedData = data
+        .replace('data-interval="15000"', `data-interval="${defaultInterval}"`)
+        .replace('data-pin-sign-in="on"', `data-pin-sign-in="${accessAccounts.pinSignIn ? 'on' : 'off'}"`);
       
       res.setHeader('Content-Type', 'text/html');
       // The address can hold a PIN and family code (#pin=, #family=): never send it on

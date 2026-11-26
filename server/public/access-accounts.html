@@ -26,6 +26,7 @@
       } catch (_) {}
     })();
     </script>
+    <link rel="stylesheet" href="/css/pairForm.css">
     <link rel="stylesheet" href="/css/access-accounts.css">
 </head>
 
@@ -59,13 +60,19 @@
                     <button id="backBtn" class="back-btn" title="Back to library" aria-label="Back to library" data-i18n-attr="title:accessAccounts.static_020; aria-label:accessAccounts.static_021">
                         <span class="material-symbols-outlined">arrow_back</span>
                     </button>
-                    <p class="sora-eyebrow" style="margin: 0;" data-i18n-html="accessAccounts.static_002">Frames &amp; PINs</p>
+                    <p class="sora-eyebrow" id="accessEyebrow" style="margin: 0;" data-i18n-html="accessAccounts.static_002">Frames &amp; PINs</p>
                 </div>
-                <h1 class="page-title sora-display no-transform" data-i18n-html="accessAccounts.who_visit">Who can <em>visit</em></h1>
+                <h1 class="page-title sora-display no-transform" id="accessTitle" data-i18n-html="accessAccounts.who_visit">Who can <em>visit</em></h1>
                 <p id="accountsMeta" class="page-meta sora-mono"><span class="material-symbols-outlined" style="font-size:16px;font-variation-settings:'FILL' 1">favorite</span><span id="accountsMetaText" data-i18n="accessAccounts.static_003">Loading accounts</span></p>
             </div>
             <div class="library-actions">
-                <button id="createAccountBtn" class="btn mobile-hide" title="Create account" data-i18n-attr="title:accessAccounts.static_022">
+                <!-- Type the code a frame shows (the tab bar's centre button on phones) -->
+                <button id="addScreenBtn" class="btn mobile-hide" type="button">
+                    <span class="material-symbols-outlined">add_to_queue</span>
+                    <span data-i18n="accessAccounts.addScreen">Add a screen</span>
+                </button>
+                <!-- An account with a PIN: only while PIN sign-in is on -->
+                <button id="createAccountBtn" class="btn-outline hidden" title="Create account" data-i18n-attr="title:accessAccounts.static_022">
                     <span class="material-symbols-outlined">person_add</span>
                     <span data-i18n="accessAccounts.new_account">New account</span>
                 </button>
@@ -96,9 +103,9 @@
             </div>
 
             <div id="emptyState" class="empty-state hidden">
-                <span class="material-symbols-outlined">key</span>
-                <h2 data-i18n="accessAccounts.static_005">No one has a key yet</h2>
-                <p data-i18n="accessAccounts.static_006">Create an account to give a frame or a family member their own PIN.</p>
+                <span class="material-symbols-outlined" id="emptyIcon">key</span>
+                <h2 id="emptyTitle" data-i18n="accessAccounts.static_005">No one has a key yet</h2>
+                <p id="emptyText" data-i18n="accessAccounts.static_006">Create an account to give a frame or a family member their own PIN.</p>
             </div>
         </main>
 
@@ -115,17 +122,17 @@
                     <form id="accountForm" class="form grid gap-6">
                         <div class="card">
                             <header>
-                                <h3 data-i18n="accessAccounts.static_008">Account Details</h3>
+                                <h3 id="detailsTitle" data-i18n="accessAccounts.static_008">Account Details</h3>
                             </header>
                             <section class="grid gap-4">
                                 <div class="grid gap-2">
-                                    <label for="accountName" class="label" data-i18n="accessAccounts.static_009">Account Name</label>
+                                    <label for="accountName" class="label" id="accountNameLabel" data-i18n="accessAccounts.static_009">Account Name</label>
                                     <input type="text" id="accountName" name="name" class="input" required
                                         maxlength="50" placeholder="e.g. Family Photos" data-i18n-attr="placeholder:accessAccounts.static_023">
                                     <span class="error-message hidden" id="nameError"></span>
                                 </div>
 
-                                <div class="grid gap-2">
+                                <div class="grid gap-2" id="pinField">
                                     <label for="accountPin" class="label" data-i18n="accessAccounts.static_010">PIN Code</label>
                                     <input type="text" id="accountPin" name="pin" class="input" dir="ltr" required inputmode="numeric" autocomplete="off"
                                         pattern="[0-9]{4,6}" placeholder="4-6 digit PIN" data-i18n-attr="placeholder:accessAccounts.static_024" maxlength="6">
@@ -155,7 +162,7 @@
                     <button id="cancelAccountBtn" class="btn-outline" data-i18n="common.cancel">Cancel</button>
                     <button id="saveAccountBtn" class="btn" type="submit" form="accountForm">
                         <span class="material-symbols-outlined">save</span>
-                        <span data-i18n="accessAccounts.saveAccount">Save Account</span>
+                        <span id="saveAccountText" data-i18n="accessAccounts.saveAccount">Save Account</span>
                     </button>
                 </footer>
             </article>
@@ -175,9 +182,74 @@
                     <button id="cancelDeleteBtn" class="btn-outline" data-i18n="common.cancel">Cancel</button>
                     <button id="confirmDeleteBtn" class="btn-destructive">
                         <span class="material-symbols-outlined">delete</span>
-                        <span data-i18n="accessAccounts.static_014">Delete Account</span>
+                        <span id="confirmDeleteText" data-i18n="accessAccounts.static_014">Delete Account</span>
                     </button>
                 </footer>
+            </article>
+        </dialog>
+
+        <!-- Add a screen: type the code the frame shows, then the same choices as /pair
+             (js/pairFlow.js) -->
+        <dialog id="addScreenModal" class="dialog add-screen-dialog" aria-labelledby="addScreenTitle">
+            <article class="pair-flow">
+                <header>
+                    <h2 id="addScreenTitle" data-i18n="accessAccounts.addScreen">Add a screen</h2>
+                    <button id="closeAddScreen" type="button" class="btn-sm-icon-ghost absolute top-4 right-4" aria-label="Close" data-i18n-attr="aria-label:common.close">
+                        <span class="material-symbols-outlined">close</span>
+                    </button>
+                </header>
+                <section>
+                    <!-- 1. The code -->
+                    <form id="screenCodeForm" class="add-screen-step" novalidate>
+                        <label class="field">
+                            <span class="field-label" data-i18n="accessAccounts.screenCodeLabel">Type the code shown on your TV</span>
+                            <input type="text" id="screenCodeInput" class="code-input" dir="ltr" maxlength="24" placeholder="K7P-4QX" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" enterkeyhint="go" aria-describedby="screenCodeError">
+                        </label>
+                        <p class="pair-note" data-i18n="accessAccounts.screenCodeNote">Open Sora on the TV or frame. The code is next to its QR code.</p>
+                        <p class="pair-error hidden" id="screenCodeError" role="alert"></p>
+                        <button type="submit" class="pair-submit" id="screenCodeBtn">
+                            <span class="material-symbols-outlined">arrow_forward</span>
+                            <span data-i18n="pair.continue">Continue</span>
+                        </button>
+                    </form>
+
+                    <!-- 2. Its name and photos -->
+                    <form id="screenPairForm" class="add-screen-step hidden" novalidate>
+                        <div class="code-check">
+                            <span class="code-check-label" data-i18n="pair.static_007">Code on the frame</span>
+                            <span class="code-check-code"><span id="screenCodeShown" dir="ltr">······</span></span>
+                            <span class="code-check-hint"><span class="material-symbols-outlined">visibility</span><span data-i18n="pair.codeMatchHint">Check it matches the frame's screen</span></span>
+                        </div>
+                        <label class="field">
+                            <span class="field-label" data-i18n="accessAccounts.screenNameLabel">Screen name</span>
+                            <input type="text" id="screenName" maxlength="60" placeholder="Living room TV" data-i18n-attr="placeholder:accessAccounts.screenNamePlaceholder" autocomplete="off">
+                        </label>
+                        <fieldset class="field">
+                            <legend class="field-label" data-i18n="pair.static_009">Which photos</legend>
+                            <div class="choice-list" id="screenAccountList"></div>
+                            <div class="new-account hidden" id="screenNewAccount">
+                                <p class="pair-note" data-i18n="pair.static_010">Pick the folders this frame plays. Leave all unticked to play every folder.</p>
+                                <div class="folder-list" id="screenFolderList"></div>
+                            </div>
+                        </fieldset>
+                        <p class="pair-error hidden" id="screenPairError" role="alert"></p>
+                        <div class="add-screen-buttons">
+                            <button type="button" class="btn-outline" id="screenBackBtn" data-i18n="accessAccounts.screenOtherCode">Another code</button>
+                            <button type="submit" class="pair-submit" id="screenPairBtn">
+                                <span class="material-symbols-outlined">link</span>
+                                <span data-i18n="accessAccounts.screenAddButton">Add this screen</span>
+                            </button>
+                        </div>
+                    </form>
+
+                    <!-- 3. Done -->
+                    <div id="screenDone" class="add-screen-step add-screen-done hidden">
+                        <span class="material-symbols-outlined add-screen-done-icon">check_circle</span>
+                        <h3 id="screenDoneTitle"></h3>
+                        <p class="pair-note" data-i18n="accessAccounts.screenDoneNote">It starts the slideshow in a moment and stays connected.</p>
+                        <button type="button" class="pair-submit" id="screenDoneBtn" data-i18n="accessAccounts.screenDone">Done</button>
+                    </div>
+                </section>
             </article>
         </dialog>
 
@@ -193,8 +265,8 @@
         <a href="/access-accounts" class="tab active" aria-current="page">
             <span class="material-symbols-outlined">key</span><span data-i18n="common.access">Access</span>
         </a>
-        <button class="tab-fab" data-proxy="createAccountBtn" aria-label="New account" data-i18n-attr="aria-label:accessAccounts.static_026">
-            <span class="material-symbols-outlined">person_add</span>
+        <button class="tab-fab" data-proxy="addScreenBtn" aria-label="Add a screen" data-i18n-attr="aria-label:accessAccounts.addScreen">
+            <span class="material-symbols-outlined">add_to_queue</span>
         </button>
         <a href="/slideshow" class="tab">
             <span class="material-symbols-outlined">slideshow</span><span data-i18n="common.slideshow">Slideshow</span>
@@ -209,6 +281,7 @@
         });
     </script>
     <script src="/js/i18n.js"></script>
+    <script src="/js/pairFlow.js"></script>
     <script src="access-accounts.js"></script>
 </body>
 

@@ -84,7 +84,12 @@
     "fullscreenRefused": "浏览器未允许全屏。请再按一次按钮。",
     "retry": "重试",
     "retryingNote": "相框会自动继续重试。",
-    "connectionTitle": "无法连接到你的照片"
+    "connectionTitle": "无法连接到你的照片",
+    "connect_with_code": "用手机扫描代码，或在“访问权限”页面输入代码。",
+    "connect_screen": "连接这个屏幕",
+    "screenPausedTitle": "这个屏幕<em>已暂停</em>",
+    "screenPausedMessage": "请让这个图库的主人重新开启它。",
+    "screenPausedNote": "重新开启后会自动恢复播放。"
   },
   "accessAccounts": {
     "frames_pins": "相框与 PIN",
@@ -166,7 +171,32 @@
     "familyCodeRenewed": "新的家庭代码已生成",
     "familyCodeRenewFailed": "无法生成新代码，请重试。",
     "viaPin": "通过 PIN 登录",
-    "viaQr": "通过二维码配对"
+    "viaQr": "通过二维码配对",
+    "addScreen": "添加屏幕",
+    "screenCodeLabel": "输入电视上显示的代码",
+    "screenCodeNote": "在电视或相框上打开 Sora，代码就在二维码旁边。",
+    "screenCodeWrong": "这个代码无效。请核对电视上的代码后重新输入。代码每十分钟更换一次。",
+    "screenNameLabel": "屏幕名称",
+    "screenNamePlaceholder": "客厅电视",
+    "screenNameRequired": "请给屏幕起个名字，例如“客厅电视”。",
+    "screenOtherCode": "换个代码",
+    "screenAddButton": "添加这个屏幕",
+    "screenAdded": "已添加{name}",
+    "screenDoneNote": "幻灯片马上开始，屏幕会保持连接。",
+    "screenDone": "完成",
+    "screensEyebrow": "屏幕",
+    "screensTitle": "你的<em>屏幕</em>",
+    "screensCount_one": "{count} 个屏幕",
+    "screensCount_other": "{count} 个屏幕",
+    "noScreens": "还没有屏幕",
+    "screensEmptyTitle": "还没有屏幕",
+    "screensEmptyText": "在电视或相框上打开 Sora，然后点“添加屏幕”，输入它显示的代码。",
+    "screenDetails": "屏幕",
+    "editScreen": "编辑屏幕",
+    "editScreenTitle": "编辑屏幕",
+    "deleteScreen": "移除屏幕",
+    "screenUpdated": "屏幕已保存",
+    "screenDeleted": "屏幕已移除"
   },
   "pair": {
     "all_folders": "所有文件夹",
@@ -207,7 +237,8 @@
     "unreachableHeading": "无法<em>核对</em>代码",
     "unreachableNote": "照片库没有响应。请检查手机的网络连接，然后重试。",
     "tryAgain": "重试",
-    "foldersFailed": "无法加载文件夹，因此现在无法创建新账户。请选择现有账户，或重试。"
+    "foldersFailed": "无法加载文件夹，因此现在无法创建新账户。请选择现有账户，或重试。",
+    "new_screen": "一个新屏幕"
   },
   "login": {
     "invalid_password": "密码错误，请重试。",

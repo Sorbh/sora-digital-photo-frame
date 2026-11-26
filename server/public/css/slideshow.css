@@ -1337,3 +1337,132 @@ body.note-showing .photo-caption {
         font-size: 1.6rem;
     }
 }
+
+/* ---------- PIN sign-in off: the code and QR only --------------- */
+/* (createApp({ pinSignIn: false }) or PIN_SIGN_IN=off) A TV with only a remote
+   needs nothing typed: the card is the whole screen, big enough to read from
+   the sofa. */
+
+.auth-overlay.pin-off .auth-pin,
+.auth-overlay.pin-off .pin-hint {
+    display: none;
+}
+
+.auth-overlay.pin-off .auth-panel {
+    grid-template-columns: auto;
+    grid-template-areas:
+        "intro"
+        "pair";
+    justify-items: center;
+}
+
+.auth-overlay.pin-off .auth-pair {
+    flex-direction: row;
+    gap: clamp(1.5rem, 3vw, 2.75rem);
+    width: auto;
+    max-width: min(100%, 760px);
+    padding: clamp(1.25rem, 2.5vw, 2rem);
+    text-align: start;
+}
+
+.auth-overlay.pin-off .pair-qr {
+    flex: none;
+    width: clamp(180px, 22vw, 300px);
+}
+
+.auth-overlay.pin-off .pair-text {
+    gap: 10px;
+}
+
+.auth-overlay.pin-off .pair-lede {
+    font-size: clamp(1rem, 1.6vw, 1.35rem);
+}
+
+.auth-overlay.pin-off .pair-code-label {
+    font-size: clamp(0.8125rem, 1.1vw, 1rem);
+}
+
+.auth-overlay.pin-off .pair-code {
+    font-size: clamp(2rem, 4.2vw, 3.5rem);
+}
+
+@media (max-width: 560px) {
+    .auth-overlay.pin-off .auth-pair {
+        flex-direction: column;
+        text-align: center;
+    }
+
+    .auth-overlay.pin-off .pair-qr {
+        width: min(72vw, 240px);
+    }
+}
+
+/* ---------- Paused by the host ---------------------------------- */
+/* 403 SCREEN_PAUSED (js/screenPause.js): calm, over everything, and it
+   goes away by itself once the screen is let in again */
+
+.paused-screen {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: grid;
+    grid-template-rows: auto 1fr;
+    padding: clamp(1.25rem, 3vw, 2.25rem);
+    background:
+        radial-gradient(60% 45% at 50% 0%, rgba(255, 200, 120, 0.16), transparent 70%),
+        #1a1117;
+    color: #fff4ef;
+}
+
+.paused-screen > * {
+    position: relative;
+    z-index: 2;
+}
+
+.paused-screen > .sora-grain {
+    position: fixed;
+    z-index: 1;
+}
+
+.paused-screen .sora-wordmark {
+    color: #fff4ef;
+}
+
+.paused-screen-body {
+    align-self: center;
+    justify-self: center;
+    display: grid;
+    justify-items: center;
+    gap: 1rem;
+    max-width: 42rem;
+    text-align: center;
+    animation: rise-in 0.9s var(--ease-out) both;
+}
+
+.paused-screen-icon {
+    font-size: clamp(3rem, 6vw, 4.5rem);
+    color: #ffd98f;
+}
+
+.paused-screen h1 {
+    margin: 0;
+    font-size: clamp(2.5rem, 6vw, 4.5rem);
+    color: #fff4ef;
+}
+
+.paused-screen h1 em {
+    color: #ffd98f;
+}
+
+.paused-screen-message {
+    margin: 0;
+    font-size: clamp(1.125rem, 2vw, 1.6rem);
+    line-height: 1.45;
+    color: #fff4ef;
+}
+
+.paused-screen-note {
+    margin: 0;
+    font-size: clamp(0.9375rem, 1.3vw, 1.1rem);
+    color: rgba(255, 244, 239, 0.66);
+}

@@ -236,7 +236,7 @@ class PairingController {
         if (!Array.isArray(folders) || folders.some(f => typeof f !== 'string')) {
           return res.status(400).json({ success: false, error: 'Folders must be a list of folder names' });
         }
-        account = await accessAccounts.addAccountWithRandomPin({ name, assignedFolders: [...new Set(folders)], pendingPairing: true });
+        account = await accessAccounts.addAccountForFrame({ name, assignedFolders: [...new Set(folders)], pendingPairing: true });
         madeAccount = true;
       } else {
         return res.status(400).json({ success: false, error: 'Choose an account for the frame' });

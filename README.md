@@ -60,7 +60,7 @@ Prefer Docker? `ADMIN_PASSWORD=yourpassword docker compose up -d` — see [DOCKE
 **🔑 Sharing**
 - Give each frame or family member their own PIN.
 - Limit each PIN to the folders it may show.
-- Pair a frame by scanning the QR code on its screen with your phone. It stays signed in, and you can unpair it from Access.
+- Pair a frame by scanning the QR code on its screen with your phone, or type the code it shows under **Add a screen** on the Access page. Nothing needs typing on the frame, so a TV with only a remote works. It stays signed in, and you can unpair it from Access.
 - Frames with no keyboard can sign in from the address: `http://<server>:3000/slideshow#pin=123456`. After `#` the PIN never reaches the server or a proxy's logs.
 
 ## A closer look
@@ -115,6 +115,7 @@ Settings live in `server/.env` (created on first `npm install`).
 | `UPLOADS_AT_ONCE` | `4` | Most photos held in memory and converted at the same time, uploads, rotations and Google Photos imports together. Each family gets up to two uploads plus one import; the rest wait their turn |
 | `UPLOAD_WAIT_MS` | `60000` | Longest an upload waits for its turn before the server answers that it is busy |
 | `MAX_IMAGE_PIXELS` | `100000000` | Largest photo accepted, in pixels (100 MP), counting all frames of an animation |
+| `PIN_SIGN_IN` | `on` | `off` turns PIN sign-in off: frames show only their pairing code and QR code, and the Access page lists screens (a name and its folders) with no PIN. Add a frame by scanning its QR code, or with **Add a screen** on the Access page |
 | `MAX_SCREENS` | `0` | Most screens one library can have, paired by QR code or signed in with a PIN. `0` means no limit |
 | `MAX_FOLDER_DEPTH` | `0` | How many folder levels the library may have below its root. `2` allows `Trips` and `Trips/Italy` but no new folder inside `Italy`; the library hides "New folder" there, and uploads and Google Photos imports can't make one either. Deeper folders that already exist keep working. `0` (or unset) means no limit |
 | `ENABLE_GOOGLE_PHOTOS` | `false` | Turn on Google Photos import |

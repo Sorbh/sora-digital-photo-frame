@@ -42,7 +42,9 @@ const { setMaxFolderDepth, canMakeFolderAt, maxFolderDepth } = require('./utils/
  *   quota         { canAdd({ items, bytes, screens }, context) -> { ok, message } } for the current
  *                 tenant (default: unlimited; see HOOKS.md, Quota)
  *   events        { devicePaired, devicesRemoved, familyCodeSet } handlers (see events.js)
- *   pinSignIn     false turns off PIN sign-in for frames
+ *   pinSignIn     false turns off PIN sign-in: frames connect only by their pairing code
+ *                 (QR, or typed on Access), and accounts are "screens" with no PIN
+ *                 (default: PIN_SIGN_IN=off turns it off, else on)
  *   trustProxy    Express 'trust proxy' setting (default: TRUST_PROXY, else 1 = one proxy in front)
  *   publicPhotos  true lets anyone who can reach the server load photos, thumbnails, folders
  *                 and notes without signing in, as before (default: PUBLIC_PHOTOS=true, else off)
@@ -53,7 +55,7 @@ const { setMaxFolderDepth, canMakeFolderAt, maxFolderDepth } = require('./utils/
  *   beforeRoutes  function(app) run after core middleware, before core routes,
  *                 e.g. to mount extra sign-in routes
  */
-function createApp({ sessionStore, beforeRoutes, library, dataStore, resolveTenant, auth, quota, events, pinSignIn = true, trustProxy = process.env.TRUST_PROXY, publicPhotos = process.env.PUBLIC_PHOTOS === 'true', familyCode = false, keys = keysFromEnv() } = {}) {
+function createApp({ sessionStore, beforeRoutes, library, dataStore, resolveTenant, auth, quota, events, pinSignIn = pinSignInFromEnv(), trustProxy = process.env.TRUST_PROXY, publicPhotos = process.env.PUBLIC_PHOTOS === 'true', familyCode = false, keys = keysFromEnv() } = {}) {
   announceSessionSecret();
   const secret = sessionSecret();
 
@@ -133,6 +135,11 @@ function createApp({ sessionStore, beforeRoutes, library, dataStore, resolveTena
   app.use(errorHandler);
 
   return app;
+}
+
+// PIN_SIGN_IN=off (or false, 0, no) turns PIN sign-in off; anything else leaves it on
+function pinSignInFromEnv(value = process.env.PIN_SIGN_IN) {
+  return !['off', 'false', '0', 'no'].includes(String(value || '').trim().toLowerCase());
 }
 
 // TRUST_PROXY: "false"/"true", a number of proxies, or addresses Express understands

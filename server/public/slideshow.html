@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" class="dark" data-interval="15000">
+<html lang="en" class="dark" data-interval="15000" data-pin-sign-in="on">
 
 <head>
     <meta charset="UTF-8">
@@ -7,7 +7,8 @@
     <!-- Before anything else loads: keep the PIN and family code (#pin=...&family=...)
          in memory only, out of the address, the history and the requests below (see
          AuthenticationManager). After # they never reach the server. A ?pin= or ?family=
-         in the query is not used for sign-in, only taken out of the address. -->
+         in the query is not used for sign-in, only taken out of the address. With PIN
+         sign-in off (data-pin-sign-in="off"), #pin= is taken out and not used either. -->
     <script>
         (function () {
             var url = new URL(location.href);
@@ -17,7 +18,8 @@
             var inFragment = fragment.has('pin') || fragment.has('family');
             if (!inQuery && !inFragment) return;
             var pick = function (name) { return (fragment.get(name) || '').trim(); };
-            if (inFragment) window.soraUrlSignIn = { pin: pick('pin'), family: pick('family') };
+            var pinSignIn = document.documentElement.dataset.pinSignIn !== 'off';
+            if (inFragment && pinSignIn) window.soraUrlSignIn = { pin: pick('pin'), family: pick('family') };
             ['pin', 'family'].forEach(function (name) { query.delete(name); fragment.delete(name); });
             var hash = inFragment ? (String(fragment) ? '#' + fragment : '') : url.hash;
             history.replaceState(history.state, '', url.pathname + url.search + hash);
@@ -124,7 +126,7 @@
         </main>
 
         <footer class="auth-foot">
-            <span class="sora-eyebrow" data-i18n="slideshow.static_002">4 to 6 digits</span>
+            <span class="sora-eyebrow pin-hint" data-i18n="slideshow.static_002">4 to 6 digits</span>
             <a href="/login"><span class="material-icons">photo_library</span><span data-i18n="slideshow.manageLibrary">Manage library</span></a>
         </footer>
     </div>
@@ -247,6 +249,19 @@
         </div>
     </div>
 
+    <!-- The host paused this screen (403 SCREEN_PAUSED): its message, and it starts
+         again by itself (js/screenPause.js) -->
+    <div class="paused-screen hidden" id="pausedScreen" role="alert">
+        <div class="sora-grain" aria-hidden="true"></div>
+        <span class="sora-wordmark">Sora</span>
+        <div class="paused-screen-body">
+            <span class="material-icons paused-screen-icon" aria-hidden="true">pause_circle</span>
+            <h1 class="sora-display" data-i18n-html="slideshow.screenPausedTitle">This screen is <em>paused</em></h1>
+            <p class="paused-screen-message" id="pausedMessage"></p>
+            <p class="paused-screen-note" data-i18n="slideshow.screenPausedNote">It starts again by itself when it's turned back on.</p>
+        </div>
+    </div>
+
     <dialog id="languageModal" class="dialog" aria-labelledby="languageTitle">
         <article><header><h2 id="languageTitle" data-i18n="common.language">Language</h2></header>
         <section><label for="frameLanguage" data-i18n="accessAccounts.screen_language">Frame language</label>
@@ -256,6 +271,8 @@
 
     <!-- Load folder selection scripts -->
     <script src="/js/i18n.js"></script>
+    <!-- First, so it sees every request the frame makes -->
+    <script src="/js/screenPause.js"></script>
     <script src="/js/folderService.js"></script>
     <script src="/js/folderStorage.js"></script>
     <script src="/js/arrowFocus.js"></script>

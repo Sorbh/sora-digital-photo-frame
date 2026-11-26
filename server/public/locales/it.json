@@ -84,7 +84,12 @@
     "fullscreenRefused": "Il browser non ha permesso lo schermo intero. Riprova con il pulsante.",
     "retry": "Riprova",
     "retryingNote": "La cornice continua a riprovare da sola.",
-    "connectionTitle": "Impossibile raggiungere le tue foto"
+    "connectionTitle": "Impossibile raggiungere le tue foto",
+    "connect_with_code": "Scansiona il codice con il telefono, oppure scrivilo nella pagina Accesso.",
+    "connect_screen": "Collega questo schermo",
+    "screenPausedTitle": "Questo schermo è <em>in pausa</em>",
+    "screenPausedMessage": "Chiedi a chi possiede questa libreria di riattivarlo.",
+    "screenPausedNote": "Riparte da solo quando viene riattivato."
   },
   "accessAccounts": {
     "frames_pins": "Cornici e PIN",
@@ -167,7 +172,33 @@
     "familyCodeRenewed": "Nuovo codice famiglia pronto",
     "familyCodeRenewFailed": "Impossibile creare un nuovo codice. Riprova.",
     "viaPin": "Accesso con PIN",
-    "viaQr": "Associata con codice QR"
+    "viaQr": "Associata con codice QR",
+    "addScreen": "Aggiungi uno schermo",
+    "screenCodeLabel": "Scrivi il codice che mostra la tua TV",
+    "screenCodeNote": "Apri Sora sulla TV o sulla cornice. Il codice è accanto al suo codice QR.",
+    "screenCodeWrong": "Quel codice non ha funzionato. Controlla il codice sulla TV e scrivilo di nuovo. Cambia ogni dieci minuti.",
+    "screenNameLabel": "Nome dello schermo",
+    "screenNamePlaceholder": "TV del soggiorno",
+    "screenNameRequired": "Dai un nome allo schermo, ad esempio \"TV del soggiorno\".",
+    "screenOtherCode": "Un altro codice",
+    "screenAddButton": "Aggiungi questo schermo",
+    "screenAdded": "{name} è stato aggiunto",
+    "screenDoneNote": "Tra un attimo parte la presentazione e lo schermo resta collegato.",
+    "screenDone": "Fatto",
+    "screensEyebrow": "Schermi",
+    "screensTitle": "I tuoi <em>schermi</em>",
+    "screensCount_one": "{count} schermo",
+    "screensCount_many": "{count} schermi",
+    "screensCount_other": "{count} schermi",
+    "noScreens": "Ancora nessuno schermo",
+    "screensEmptyTitle": "Ancora nessuno schermo",
+    "screensEmptyText": "Apri Sora sulla TV o sulla cornice, poi tocca Aggiungi uno schermo e scrivi il codice che mostra.",
+    "screenDetails": "Schermo",
+    "editScreen": "Modifica schermo",
+    "editScreenTitle": "Modifica schermo",
+    "deleteScreen": "Rimuovi schermo",
+    "screenUpdated": "Schermo salvato",
+    "screenDeleted": "Schermo rimosso"
   },
   "pair": {
     "all_folders": "Tutte le cartelle",
@@ -208,7 +239,8 @@
     "unreachableHeading": "Impossibile <em>verificare</em> il codice",
     "unreachableNote": "La libreria non ha risposto. Controlla la connessione del telefono e riprova.",
     "tryAgain": "Riprova",
-    "foldersFailed": "Impossibile caricare le cartelle, quindi ora non si può creare un nuovo account. Scegli un account esistente o riprova."
+    "foldersFailed": "Impossibile caricare le cartelle, quindi ora non si può creare un nuovo account. Scegli un account esistente o riprova.",
+    "new_screen": "Un nuovo schermo"
   },
   "login": {
     "invalid_password": "Password non valida. Riprova.",

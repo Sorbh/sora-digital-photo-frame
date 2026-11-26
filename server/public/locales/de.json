@@ -84,7 +84,12 @@
     "fullscreenRefused": "Der Browser hat den Vollbildmodus nicht erlaubt. Versuchen Sie es noch einmal mit der Taste.",
     "retry": "Erneut versuchen",
     "retryingNote": "Der Rahmen versucht es von selbst weiter.",
-    "connectionTitle": "Ihre Fotos sind nicht erreichbar"
+    "connectionTitle": "Ihre Fotos sind nicht erreichbar",
+    "connect_with_code": "Scanne den Code mit dem Handy oder gib ihn auf der Seite „Zugang“ ein.",
+    "connect_screen": "Diesen Bildschirm verbinden",
+    "screenPausedTitle": "Dieser Bildschirm ist <em>pausiert</em>",
+    "screenPausedMessage": "Bitte die Person, der diese Bibliothek gehört, ihn wieder einzuschalten.",
+    "screenPausedNote": "Er startet von selbst wieder, sobald er wieder eingeschaltet ist."
   },
   "accessAccounts": {
     "frames_pins": "Rahmen & PINs",
@@ -166,7 +171,32 @@
     "familyCodeRenewed": "Neuer Familiencode ist bereit",
     "familyCodeRenewFailed": "Neuer Code konnte nicht erstellt werden. Bitte versuchen Sie es erneut.",
     "viaPin": "Mit PIN angemeldet",
-    "viaQr": "Per QR-Code gekoppelt"
+    "viaQr": "Per QR-Code gekoppelt",
+    "addScreen": "Bildschirm hinzufügen",
+    "screenCodeLabel": "Gib den Code ein, den dein Fernseher zeigt",
+    "screenCodeNote": "Öffne Sora auf dem Fernseher oder Rahmen. Der Code steht neben dem QR-Code.",
+    "screenCodeWrong": "Dieser Code hat nicht funktioniert. Prüfe den Code auf dem Fernseher und gib ihn noch einmal ein. Er ändert sich alle zehn Minuten.",
+    "screenNameLabel": "Name des Bildschirms",
+    "screenNamePlaceholder": "Fernseher im Wohnzimmer",
+    "screenNameRequired": "Gib dem Bildschirm einen Namen, z. B. „Fernseher im Wohnzimmer“.",
+    "screenOtherCode": "Anderer Code",
+    "screenAddButton": "Bildschirm hinzufügen",
+    "screenAdded": "{name} ist hinzugefügt",
+    "screenDoneNote": "Gleich startet die Diashow, und der Bildschirm bleibt verbunden.",
+    "screenDone": "Fertig",
+    "screensEyebrow": "Bildschirme",
+    "screensTitle": "Deine <em>Bildschirme</em>",
+    "screensCount_one": "{count} Bildschirm",
+    "screensCount_other": "{count} Bildschirme",
+    "noScreens": "Noch keine Bildschirme",
+    "screensEmptyTitle": "Noch keine Bildschirme",
+    "screensEmptyText": "Öffne Sora auf deinem Fernseher oder Rahmen, tippe dann auf „Bildschirm hinzufügen“ und gib den angezeigten Code ein.",
+    "screenDetails": "Bildschirm",
+    "editScreen": "Bildschirm bearbeiten",
+    "editScreenTitle": "Bildschirm bearbeiten",
+    "deleteScreen": "Bildschirm entfernen",
+    "screenUpdated": "Bildschirm gespeichert",
+    "screenDeleted": "Bildschirm entfernt"
   },
   "pair": {
     "all_folders": "Alle Ordner",
@@ -207,7 +237,8 @@
     "unreachableHeading": "Code konnte nicht <em>geprüft</em> werden",
     "unreachableNote": "Die Bibliothek hat nicht geantwortet. Prüfen Sie die Verbindung Ihres Telefons und versuchen Sie es erneut.",
     "tryAgain": "Erneut versuchen",
-    "foldersFailed": "Die Ordner konnten nicht geladen werden, daher lässt sich gerade kein neues Konto anlegen. Wählen Sie ein vorhandenes Konto oder versuchen Sie es erneut."
+    "foldersFailed": "Die Ordner konnten nicht geladen werden, daher lässt sich gerade kein neues Konto anlegen. Wählen Sie ein vorhandenes Konto oder versuchen Sie es erneut.",
+    "new_screen": "Ein neuer Bildschirm"
   },
   "login": {
     "invalid_password": "Falsches Passwort. Bitte versuchen Sie es noch einmal.",

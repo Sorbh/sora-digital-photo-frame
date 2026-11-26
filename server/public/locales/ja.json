@@ -84,7 +84,12 @@
     "fullscreenRefused": "ブラウザが全画面表示を許可しませんでした。もう一度ボタンを押してください。",
     "retry": "再試行",
     "retryingNote": "フレームは自動で再試行を続けます。",
-    "connectionTitle": "写真に接続できません"
+    "connectionTitle": "写真に接続できません",
+    "connect_with_code": "スマートフォンでコードを読み取るか、「アクセス」ページで入力してください。",
+    "connect_screen": "この画面をつなぐ",
+    "screenPausedTitle": "この画面は<em>一時停止中</em>です",
+    "screenPausedMessage": "このライブラリの持ち主に、もう一度オンにしてもらってください。",
+    "screenPausedNote": "オンに戻ると、自動でまた始まります。"
   },
   "accessAccounts": {
     "frames_pins": "フレームとPIN",
@@ -166,7 +171,32 @@
     "familyCodeRenewed": "新しいファミリーコードを用意しました",
     "familyCodeRenewFailed": "新しいコードを作成できませんでした。もう一度お試しください。",
     "viaPin": "PINでサインイン",
-    "viaQr": "QRコードでペアリング"
+    "viaQr": "QRコードでペアリング",
+    "addScreen": "画面を追加",
+    "screenCodeLabel": "テレビに表示されたコードを入力",
+    "screenCodeNote": "テレビやフォトフレームでSoraを開いてください。コードはQRコードの横にあります。",
+    "screenCodeWrong": "このコードは使えませんでした。テレビのコードを確かめて、もう一度入力してください。コードは10分ごとに変わります。",
+    "screenNameLabel": "画面の名前",
+    "screenNamePlaceholder": "リビングのテレビ",
+    "screenNameRequired": "「リビングのテレビ」のように、画面に名前を付けてください。",
+    "screenOtherCode": "別のコード",
+    "screenAddButton": "この画面を追加",
+    "screenAdded": "{name}を追加しました",
+    "screenDoneNote": "まもなくスライドショーが始まり、接続されたままになります。",
+    "screenDone": "完了",
+    "screensEyebrow": "画面",
+    "screensTitle": "あなたの<em>画面</em>",
+    "screensCount_one": "画面：{count}台",
+    "screensCount_other": "画面：{count}台",
+    "noScreens": "まだ画面がありません",
+    "screensEmptyTitle": "まだ画面がありません",
+    "screensEmptyText": "テレビやフォトフレームでSoraを開き、「画面を追加」をタップして表示されたコードを入力してください。",
+    "screenDetails": "画面",
+    "editScreen": "画面を編集",
+    "editScreenTitle": "画面を編集",
+    "deleteScreen": "画面を削除",
+    "screenUpdated": "画面を保存しました",
+    "screenDeleted": "画面を削除しました"
   },
   "pair": {
     "all_folders": "すべてのフォルダ",
@@ -207,7 +237,8 @@
     "unreachableHeading": "コードを<em>確認</em>できませんでした",
     "unreachableNote": "ライブラリから応答がありません。スマートフォンの接続を確認してから、もう一度お試しください。",
     "tryAgain": "もう一度試す",
-    "foldersFailed": "フォルダを読み込めなかったため、今は新しいアカウントを作成できません。既存のアカウントを選ぶか、もう一度お試しください。"
+    "foldersFailed": "フォルダを読み込めなかったため、今は新しいアカウントを作成できません。既存のアカウントを選ぶか、もう一度お試しください。",
+    "new_screen": "新しい画面"
   },
   "login": {
     "invalid_password": "パスワードが正しくありません。もう一度お試しください。",

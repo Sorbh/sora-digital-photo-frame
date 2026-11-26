@@ -84,7 +84,12 @@
     "fullscreenRefused": "ब्राउज़र ने फ़ुल स्क्रीन की अनुमति नहीं दी। बटन फिर से दबाएँ।",
     "retry": "फिर से कोशिश करें",
     "retryingNote": "फ़्रेम अपने आप कोशिश करता रहेगा।",
-    "connectionTitle": "आपकी फ़ोटो तक पहुँच नहीं हो पा रही"
+    "connectionTitle": "आपकी फ़ोटो तक पहुँच नहीं हो पा रही",
+    "connect_with_code": "फ़ोन से कोड स्कैन करें, या उसे एक्सेस पेज पर लिखें।",
+    "connect_screen": "यह स्क्रीन जोड़ें",
+    "screenPausedTitle": "यह स्क्रीन <em>रुकी हुई</em> है",
+    "screenPausedMessage": "इस लाइब्रेरी के मालिक से इसे फिर से चालू करने को कहें।",
+    "screenPausedNote": "फिर से चालू होते ही यह अपने आप शुरू हो जाएगी।"
   },
   "accessAccounts": {
     "frames_pins": "फ़्रेम और PIN",
@@ -166,7 +171,32 @@
     "familyCodeRenewed": "नया फ़ैमिली कोड तैयार है",
     "familyCodeRenewFailed": "नया कोड नहीं बन पाया। कृपया फिर से कोशिश करें।",
     "viaPin": "PIN से साइन इन किया",
-    "viaQr": "QR कोड से जोड़ा गया"
+    "viaQr": "QR कोड से जोड़ा गया",
+    "addScreen": "स्क्रीन जोड़ें",
+    "screenCodeLabel": "अपने टीवी पर दिखा कोड लिखें",
+    "screenCodeNote": "टीवी या फ़्रेम पर Sora खोलें। कोड उसके QR कोड के पास है।",
+    "screenCodeWrong": "यह कोड काम नहीं किया। टीवी पर कोड देखें और फिर से लिखें। कोड हर दस मिनट में बदलता है।",
+    "screenNameLabel": "स्क्रीन का नाम",
+    "screenNamePlaceholder": "बैठक का टीवी",
+    "screenNameRequired": "स्क्रीन को एक नाम दें, जैसे \"बैठक का टीवी\"।",
+    "screenOtherCode": "दूसरा कोड",
+    "screenAddButton": "यह स्क्रीन जोड़ें",
+    "screenAdded": "{name} जुड़ गई",
+    "screenDoneNote": "स्लाइडशो कुछ ही पल में शुरू होगा और स्क्रीन जुड़ी रहेगी।",
+    "screenDone": "हो गया",
+    "screensEyebrow": "स्क्रीन",
+    "screensTitle": "आपकी <em>स्क्रीनें</em>",
+    "screensCount_one": "{count} स्क्रीन",
+    "screensCount_other": "{count} स्क्रीनें",
+    "noScreens": "अभी कोई स्क्रीन नहीं",
+    "screensEmptyTitle": "अभी कोई स्क्रीन नहीं",
+    "screensEmptyText": "अपने टीवी या फ़्रेम पर Sora खोलें, फिर \"स्क्रीन जोड़ें\" दबाएँ और दिखा हुआ कोड लिखें।",
+    "screenDetails": "स्क्रीन",
+    "editScreen": "स्क्रीन बदलें",
+    "editScreenTitle": "स्क्रीन बदलें",
+    "deleteScreen": "स्क्रीन हटाएँ",
+    "screenUpdated": "स्क्रीन सहेजी गई",
+    "screenDeleted": "स्क्रीन हटा दी गई"
   },
   "pair": {
     "all_folders": "सभी फ़ोल्डर",
@@ -207,7 +237,8 @@
     "unreachableHeading": "कोड <em>जाँचा</em> नहीं जा सका",
     "unreachableNote": "लाइब्रेरी से जवाब नहीं मिला। अपने फ़ोन का कनेक्शन देखें, फिर दोबारा कोशिश करें।",
     "tryAgain": "फिर से कोशिश करें",
-    "foldersFailed": "फ़ोल्डर लोड नहीं हो सके, इसलिए अभी नया खाता नहीं बन सकता। कोई मौजूदा खाता चुनें, या फिर से कोशिश करें।"
+    "foldersFailed": "फ़ोल्डर लोड नहीं हो सके, इसलिए अभी नया खाता नहीं बन सकता। कोई मौजूदा खाता चुनें, या फिर से कोशिश करें।",
+    "new_screen": "एक नई स्क्रीन"
   },
   "login": {
     "invalid_password": "पासवर्ड गलत है। कृपया फिर से कोशिश करें।",

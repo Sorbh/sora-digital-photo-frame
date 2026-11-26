@@ -84,7 +84,12 @@
     "fullscreenRefused": "The browser didn't allow full screen. Try the button again.",
     "retry": "Retry",
     "retryingNote": "The frame keeps trying by itself.",
-    "connectionTitle": "Can't reach your photos"
+    "connectionTitle": "Can't reach your photos",
+    "connect_with_code": "Scan the code with your phone, or type it on the Access page.",
+    "connect_screen": "Connect this screen",
+    "screenPausedTitle": "This screen is <em>paused</em>",
+    "screenPausedMessage": "Ask the owner of this library to turn it back on.",
+    "screenPausedNote": "It starts again by itself when it's turned back on."
   },
   "accessAccounts": {
     "frames_pins": "Frames & PINs",
@@ -166,7 +171,32 @@
     "familyCodeRenewed": "New family code ready",
     "familyCodeRenewFailed": "Couldn't make a new code. Please try again.",
     "viaPin": "Signed in with a PIN",
-    "viaQr": "Paired by QR code"
+    "viaQr": "Paired by QR code",
+    "addScreen": "Add a screen",
+    "screenCodeLabel": "Type the code shown on your TV",
+    "screenCodeNote": "Open Sora on the TV or frame. The code is next to its QR code.",
+    "screenCodeWrong": "That code didn't work. Check the code on the TV and type it again. It changes every ten minutes.",
+    "screenNameLabel": "Screen name",
+    "screenNamePlaceholder": "Living room TV",
+    "screenNameRequired": "Give the screen a name, like \"Living room TV\".",
+    "screenOtherCode": "Another code",
+    "screenAddButton": "Add this screen",
+    "screenAdded": "{name} is added",
+    "screenDoneNote": "It starts the slideshow in a moment and stays connected.",
+    "screenDone": "Done",
+    "screensEyebrow": "Screens",
+    "screensTitle": "Your <em>screens</em>",
+    "screensCount_one": "{count} screen",
+    "screensCount_other": "{count} screens",
+    "noScreens": "No screens yet",
+    "screensEmptyTitle": "No screens yet",
+    "screensEmptyText": "Open Sora on your TV or frame, then tap Add a screen and type the code it shows.",
+    "screenDetails": "Screen",
+    "editScreen": "Edit screen",
+    "editScreenTitle": "Edit screen",
+    "deleteScreen": "Remove screen",
+    "screenUpdated": "Screen saved",
+    "screenDeleted": "Screen removed"
   },
   "pair": {
     "all_folders": "All folders",
@@ -207,7 +237,8 @@
     "unreachableHeading": "Couldn't <em>check</em> the code",
     "unreachableNote": "The library didn't answer. Check your phone's connection, then try again.",
     "tryAgain": "Try again",
-    "foldersFailed": "Couldn't load the folders, so a new account can't be set up right now. Pick an existing account, or try again."
+    "foldersFailed": "Couldn't load the folders, so a new account can't be set up right now. Pick an existing account, or try again.",
+    "new_screen": "A new screen"
   },
   "login": {
     "invalid_password": "Invalid password. Please try again.",

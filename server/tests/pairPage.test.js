@@ -27,8 +27,21 @@ function fakeElement() {
   return element;
 }
 
-// Opens /pair (with ?code= if given); `answer(url)` is the server
-function openPage(search, answer) {
+// The tab's sessionStorage, kept across reloads and sign-ins in the tests
+function fakeStorage() {
+  const items = new Map();
+  return {
+    getItem: key => (items.has(key) ? items.get(key) : null),
+    setItem: (key, value) => items.set(key, String(value)),
+    removeItem: key => items.delete(key),
+    items
+  };
+}
+
+// Opens /pair (with ?code= if given); `answer(url, options)` is the server.
+// `fetch` replaces the stand-in server with a real one; `account` is the account
+// ticked on the form.
+function openPage(search, answer, { storage = fakeStorage(), fetch, account } = {}) {
   const elements = {};
   const requests = [];
   const links = [{ href: '/pair' }, { href: '/pair' }]; // the two "Type a code" links
@@ -37,9 +50,10 @@ function openPage(search, answer) {
     document: {
       getElementById: id => (elements[id] = elements[id] || fakeElement()),
       createElement: () => fakeElement(),
-      querySelector: () => null,
+      querySelector: selector => (account && selector === 'input[name="account"]:checked' ? { value: account } : null),
       querySelectorAll: selector => (selector === 'a[href="/pair"]' ? links : [])
     },
+    sessionStorage: storage,
     window: { addEventListener() {} },
     location,
     history: { replaceState: (_, __, url) => { location.search = url.slice(url.indexOf('?')); } },
@@ -48,7 +62,7 @@ function openPage(search, answer) {
     console: { error() {} },
     t: key => key,
     i18n: { error: (_, key) => key },
-    fetch: async (url) => {
+    fetch: fetch ? (url, options) => { requests.push(url); return fetch(url, options); } : async (url) => {
       requests.push(url);
       const reply = await answer(url);
       return { ok: reply.status < 400, status: reply.status, json: async () => (reply.body === undefined ? Promise.reject(new SyntaxError('not JSON')) : reply.body) };
@@ -57,7 +71,7 @@ function openPage(search, answer) {
   vm.runInNewContext(source, sandbox);
   const visible = () => ['stateLoading', 'stateEnter', 'stateExpired', 'stateUnreachable', 'pairForm', 'stateDone']
     .filter(id => elements[id] && !elements[id].classList.contains('hidden'));
-  return { el: sandbox.document.getElementById, requests, location, visible, links };
+  return { el: sandbox.document.getElementById, requests, location, visible, links, storage };
 }
 
 const library = (code, accounts = []) => url => {
@@ -85,7 +99,8 @@ describe('The /pair page', () => {
     page.el('stateEnter').fire('submit');
     await flush();
     expect(page.requests[0]).toBe('/api/admin/pair/K7P4QX');
-    expect(page.location.search).toBe('?code=K7P4QX');
+    expect(page.location.search).toBe(''); // kept aside, not in the address
+    expect(page.storage.items.get('sora_pair_code')).toBe('K7P4QX');
     expect(page.requests.slice(1).sort()).toEqual(['/api/access-accounts', '/api/folders']);
     expect(page.visible()).toEqual(['pairForm']);
     expect(page.el('codeShown').textContent).toBe('K7P-4QX');
@@ -155,13 +170,52 @@ describe('The /pair page', () => {
     expect(page.links.map(link => link.href)).toEqual(['/pair?lang=ar', '/pair?lang=ar']);
   });
 
-  test('the chosen language stays in the address after typing a code', async () => {
+  test('a reload comes back to the typed code', async () => {
     const page = openPage('?lang=ar', library('K7P4QX'));
     page.el('codeInput').value = 'k7p-4qx';
     page.el('stateEnter').fire('submit');
     await flush();
-    expect(new URLSearchParams(page.location.search).get('lang')).toBe('ar');
-    expect(new URLSearchParams(page.location.search).get('code')).toBe('K7P4QX');
+    expect(page.location.search).toBe('?lang=ar');
+
+    const reloaded = openPage('?lang=ar', library('K7P4QX'), { storage: page.storage });
+    await flush();
+    expect(reloaded.requests[0]).toBe('/api/admin/pair/K7P4QX');
+    expect(reloaded.visible()).toEqual(['pairForm']);
+  });
+
+  test('signed out while typing a code: the code stays out of the sign-in address, and comes back after', async () => {
+    let signedIn = false;
+    const working = library('K7P4QX');
+    const server = url => (signedIn ? working(url) : { status: 401, body: { success: false } });
+    const page = openPage('?lang=ar', server);
+    page.el('codeInput').value = 'K7P-4QX';
+    page.el('stateEnter').fire('submit');
+    await flush();
+    expect(page.location.href).toBe('/login?next=%2Fpair%3Flang%3Dar');
+    expect(page.location.href).not.toContain('K7P');
+
+    // Back from the sign-in page (/pair?lang=ar, the same tab)
+    signedIn = true;
+    const back = openPage('?lang=ar', server, { storage: page.storage });
+    await flush();
+    expect(back.requests[0]).toBe('/api/admin/pair/K7P4QX');
+    expect(back.visible()).toEqual(['pairForm']);
+  });
+
+  test('a code from the QR address is kept out of the sign-in address too', async () => {
+    const page = openPage('?code=K7P4QX', () => ({ status: 401, body: { success: false } }));
+    await flush();
+    expect(page.location.href).toBe('/login?next=%2Fpair');
+    expect(page.storage.items.get('sora_pair_code')).toBe('K7P4QX');
+  });
+
+  test('an expired code is forgotten, so "Type a code" starts afresh', async () => {
+    const page = openPage('', library('K7P4QX'));
+    page.el('codeInput').value = 'ZZZ-ZZZ';
+    page.el('stateEnter').fire('submit');
+    await flush();
+    expect(page.visible()).toEqual(['stateExpired']);
+    expect(page.storage.items.has('sora_pair_code')).toBe(false);
   });
 
   test('losing the connection while loading the accounts is not "expired" either', async () => {

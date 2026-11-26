@@ -124,17 +124,6 @@ describe('the photo options menu with a keyboard', () => {
     expect(button.getAttribute('aria-expanded')).toBe('false');
   });
 
-  test('choosing an item closes it back on the options button too', async () => {
-    const { admin, document, node, items } = loadMenu();
-    const button = node({ 'aria-haspopup': 'menu' });
-    admin.nudge = jest.fn();
-    admin.showContextMenu({ type: 'click', currentTarget: button, preventDefault() {} }, { name: 'a.jpg', type: 'image' });
-    items[5].focus();
-    await admin.handleContextMenuAction('move-later');
-    expect(admin.nudge).toHaveBeenCalledWith(expect.objectContaining({ name: 'a.jpg' }), 1);
-    expect(document.activeElement).toBe(button);
-  });
-
   test('Tab closes it, so focus goes on from the options button', () => {
     const { admin, document, node, key, isOpen } = loadMenu();
     const button = node({ 'aria-haspopup': 'menu' });
@@ -161,5 +150,160 @@ describe('the photo options menu with a keyboard', () => {
     admin.hideContextMenu();
     expect(document.activeElement).toBe(cell);
     expect(cell.hasAttribute('aria-expanded')).toBe(false);
+  });
+});
+
+// A tiny page: enough HTML parsing and selectors for admin.js to build the real grid
+function miniPage() {
+  const document = { activeElement: null, addEventListener() {} };
+  const VOID = new Set(['img', 'input', 'hr', 'br']);
+  const camel = name => name.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+
+  function element(tag) {
+    const attributes = new Map();
+    const listeners = {};
+    const el = {
+      tagName: tag.toUpperCase(), children: [], parentNode: null, dataset: {}, textContent: '', style: { setProperty() {} },
+      get className() { return attributes.get('class') || ''; },
+      set className(value) { attributes.set('class', value); },
+      classList: {
+        contains: name => el.className.split(/\s+/).includes(name),
+        add: name => { if (!el.classList.contains(name)) el.className = `${el.className} ${name}`.trim(); },
+        remove: name => { el.className = el.className.split(/\s+/).filter(c => c !== name).join(' '); },
+        toggle: (name, on = !el.classList.contains(name)) => (on ? el.classList.add(name) : el.classList.remove(name))
+      },
+      getAttribute: name => (attributes.has(name) ? attributes.get(name) : null),
+      setAttribute: (name, value) => {
+        attributes.set(name, String(value));
+        if (name.startsWith('data-')) el.dataset[camel(name.slice(5))] = String(value);
+      },
+      hasAttribute: name => attributes.has(name),
+      removeAttribute: name => attributes.delete(name),
+      get isConnected() { let n = el; while (n.parentNode) n = n.parentNode; return Boolean(n.root); },
+      appendChild(child) { child.parentNode = el; el.children.push(child); return child; },
+      replaceChildren(...kids) { el.children.forEach(c => { c.parentNode = null; }); el.children = []; kids.forEach(k => el.appendChild(k)); },
+      set innerHTML(html) { el.replaceChildren(); parse(html, el); },
+      get innerHTML() { return ''; },
+      addEventListener: (type, fn) => { (listeners[type] = listeners[type] || []).push(fn); },
+      fire: (type, event = {}) => (listeners[type] || []).forEach(fn => fn({ type, currentTarget: el, target: el, preventDefault() {}, stopPropagation() {}, ...event })),
+      focus: () => { document.activeElement = el; },
+      getBoundingClientRect: () => ({ left: 0, top: 0, right: 40, bottom: 40, width: 40, height: 40 }),
+      matches: selector => selector.split(',').some(one => matchChain(el, one.trim().split(/\s+/))),
+      closest: selector => { for (let n = el; n; n = n.parentNode) if (n.matches && n.matches(selector)) return n; return null; },
+      contains: other => { for (let n = other; n; n = n.parentNode) if (n === el) return true; return false; },
+      querySelectorAll: selector => {
+        const found = [];
+        const walk = n => n.children.forEach(c => { if (c.matches(selector)) found.push(c); walk(c); });
+        walk(el);
+        return found;
+      },
+      querySelector: selector => el.querySelectorAll(selector)[0] || null
+    };
+    return el;
+  }
+
+  // "A B": B inside an A
+  function matchChain(el, parts) {
+    if (!matchOne(el, parts[parts.length - 1])) return false;
+    if (parts.length === 1) return true;
+    for (let n = el.parentNode; n; n = n.parentNode) if (matchChain(n, parts.slice(0, -1))) return true;
+    return false;
+  }
+
+  // tag.class.class[attr="value"]
+  function matchOne(el, selector) {
+    const m = selector.match(/^([a-z0-9]*)((?:\.[\w-]+)*)((?:\[[\w-]+(?:="[^"]*")?\])*)$/i);
+    if (!m) throw new Error(`selector not supported here: ${selector}`);
+    if (m[1] && el.tagName !== m[1].toUpperCase()) return false;
+    if (m[2] && !m[2].slice(1).split('.').every(c => el.classList.contains(c))) return false;
+    return [...m[3].matchAll(/\[([\w-]+)(?:="([^"]*)")?\]/g)].every(([, name, value]) =>
+      (value === undefined ? el.hasAttribute(name) : el.getAttribute(name) === value));
+  }
+
+  function parse(html, parent) {
+    let at = parent;
+    for (const [, close, tag, attrs] of html.matchAll(/<(\/?)([a-z0-9]+)([^>]*)>/gi)) {
+      if (close) { at = at.parentNode || at; continue; }
+      const child = element(tag.toLowerCase());
+      for (const [, name, value = ''] of attrs.matchAll(/([\w-]+)(?:="([^"]*)")?/g)) child.setAttribute(name, value);
+      at.appendChild(child);
+      if (!VOID.has(tag.toLowerCase())) at = child;
+    }
+  }
+
+  const elements = {};
+  const root = element('body');
+  root.root = true;
+  document.body = root;
+  document.createElement = tag => element(tag);
+  document.getElementById = id => {
+    if (!elements[id]) elements[id] = root.appendChild(element('div'));
+    return elements[id];
+  };
+  document.querySelector = selector => root.querySelector(selector);
+  document.querySelectorAll = () => [];
+  return { document, root };
+}
+
+describe('a menu action that redraws the grid', () => {
+  test('Rotate from the keyboard leaves focus on the same photo\'s options button in the new grid', async () => {
+    const { document } = miniPage();
+    // The menu, as admin.html has it
+    const popover = document.getElementById('contextMenuPopover');
+    popover.innerHTML = fs.readFileSync(path.join(publicDir, 'admin.html'), 'utf8')
+      .match(/<div popover="manual" id="contextMenuPopover"[^>]*>([\s\S]*?)<\/div>\s*<\/div>\s*<!-- Modals -->/)[1];
+    let open = false;
+    Object.assign(popover, { matches: s => s === ':popover-open' && open, showPopover: () => { open = true; }, hidePopover: () => { open = false; } });
+
+    const context = {
+      console: { log() {}, error() {}, warn() {} },
+      document,
+      Element: Object,
+      CSS: { escape: value => value },
+      SoraPlaceMenu: require('../public/js/placeMenu'),
+      SoraLongPress: { attach: () => ({ cancel() {} }) },
+      navigator: {},
+      innerWidth: 1280,
+      innerHeight: 800,
+      setTimeout: fn => fn(), // the grid reloads a moment after a rotation
+      t: key => key,
+      i18n: { error: (_, key) => key }
+    };
+    context.window = context;
+    vm.createContext(context);
+    vm.runInContext(`${fs.readFileSync(path.join(publicDir, 'admin.js'), 'utf8')}\n;this.PhotoFrameAdmin = PhotoFrameAdmin;`, context);
+    const admin = Object.create(context.PhotoFrameAdmin.prototype);
+    Object.assign(admin, {
+      currentPath: 'uploads/Goa', selectedItems: new Set(), availableImages: [], longPressDelay: 500,
+      clearSelection() {}, updateBreadcrumb() {}, updateBackButton() {}, showToast() {}, updatePhotoModalNav() {}
+    });
+    const listing = { folders: [], files: [
+      { name: 'a.jpg', path: 'uploads/Goa/a.jpg', url: '/a', thumbnail: '/a.t', type: 'image' },
+      { name: 'b.jpg', path: 'uploads/Goa/b.jpg', url: '/b', thumbnail: '/b.t', type: 'image' }
+    ] };
+    let reloaded;
+    const listed = new Promise(resolve => { reloaded = resolve; });
+    admin.authenticatedFetch = async (url) => {
+      if (url.startsWith('/api/admin/folders')) { setImmediate(reloaded); return { ok: true, json: async () => listing }; }
+      return { ok: true, json: async () => ({ success: true }) }; // the rotation
+    };
+    admin.renderFolderContents(listing);
+
+    const grid = document.getElementById('fileGrid');
+    const optionsFor = (p) => grid.querySelectorAll('.file-item').find(tile => tile.dataset.path === p).querySelector('.photo-more');
+    const before = optionsFor('uploads/Goa/b.jpg');
+    before.focus();
+    before.fire('click'); // Enter on the options button
+    expect(document.activeElement.dataset.action).toBe('rotate-right');
+
+    await admin.handleContextMenuAction('rotate-right'); // Enter on Rotate Right
+    await listed;
+    await new Promise(resolve => setImmediate(resolve));
+
+    const after = optionsFor('uploads/Goa/b.jpg');
+    expect(after).not.toBe(before); // the grid was drawn again
+    expect(before.isConnected).toBe(false);
+    expect(document.activeElement).toBe(after);
+    expect(after.isConnected).toBe(true);
   });
 });

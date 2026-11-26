@@ -593,6 +593,13 @@ class PhotoFrameAdmin {
     renderFolderContents(data) {
         const fileGrid = document.getElementById('fileGrid');
         const emptyState = document.getElementById('emptyState');
+
+        // Redrawing replaces every tile: focus on one (its options button after a
+        // Rotate from the menu, say) goes to the same photo's new tile
+        const focused = document.activeElement;
+        const focusTile = focused && fileGrid.contains(focused) ? focused.closest('.file-item') : null;
+        const focusPath = focusTile?.dataset.path;
+        const focusPart = focusTile && ['.photo-more', '.folder-more'].find(part => focused.matches(part));
         
         fileGrid.innerHTML = '';
         this.folderData = data; // kept to redraw the grid when the language changes
@@ -643,6 +650,12 @@ class PhotoFrameAdmin {
             const fileElement = this.createFileElement(file);
             fileGrid.appendChild(fileElement);
         });
+
+        if (focusPath !== undefined) {
+            const tile = [...fileGrid.querySelectorAll('.file-item')].find(item => item.dataset.path === focusPath);
+            const target = tile && ((focusPart && tile.querySelector(focusPart)) || tile.querySelector('.photo-more, .folder-more'));
+            target?.focus({ preventScroll: true });
+        }
     }
 
     // The library root shows as "Library"; any other folder by its own name

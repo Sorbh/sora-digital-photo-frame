@@ -165,6 +165,21 @@
 
     $('codeInput').addEventListener('input', () => $('codeError').classList.add('hidden'));
 
+    // "Type a code" is for another code: forget this one (a reload would check it again)
+    document.querySelectorAll('a[href="/pair"]').forEach(link => link.addEventListener('click', event => {
+        event.preventDefault();
+        remember(null);
+        code = '';
+        $('codeInput').value = '';
+        $('codeError').classList.add('hidden');
+        const query = new URLSearchParams(location.search);
+        if (query.has('code')) {
+            query.delete('code');
+            history.replaceState(null, '', query.toString() ? `/pair?${query}` : '/pair');
+        }
+        showEnter();
+    }));
+
     // "Type a code" keeps the chosen language
     const lang = new URLSearchParams(location.search).get('lang');
     if (lang) document.querySelectorAll('a[href="/pair"]').forEach(link => { link.href = `/pair?lang=${encodeURIComponent(lang)}`; });

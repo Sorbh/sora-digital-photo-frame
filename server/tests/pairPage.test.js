@@ -61,7 +61,17 @@ function fakeStorage() {
 function openPage(search, answer, { storage = fakeStorage(), fetch, account } = {}) {
   const elements = {};
   const requests = [];
-  const links = [{ href: '/pair' }, { href: '/pair' }]; // the two "Type a code" links
+  // The two "Type a code" links
+  const links = [0, 1].map(() => {
+    const listeners = {};
+    const link = { href: '/pair', addEventListener: (type, fn) => { listeners[type] = fn; } };
+    link.click = () => {
+      const event = { defaultPrevented: false, preventDefault() { event.defaultPrevented = true; } };
+      listeners.click?.(event);
+      return event;
+    };
+    return link;
+  });
   const location = { search, pathname: '/pair', href: '' };
   const sandbox = {
     document: {
@@ -224,6 +234,41 @@ describe('The /pair page', () => {
     await flush();
     expect(page.location.href).toBe('/login?next=%2Fpair');
     expect(page.storage.items.get('sora_pair_code')).toBe('K7P4QX');
+  });
+
+  test('"Type a code" after a failed check forgets that code and asks for another', async () => {
+    let down = true;
+    const working = library('K7P4QX');
+    const server = url => (down ? { status: 503, body: { success: false } } : working(url));
+    const page = openPage('', server);
+    page.el('codeInput').value = 'ABC-234';
+    page.el('stateEnter').fire('submit');
+    await flush();
+    expect(page.visible()).toEqual(['stateUnreachable']);
+
+    expect(page.links[1].click().defaultPrevented).toBe(true); // no reload that would check it again
+    expect(page.visible()).toEqual(['stateEnter']);
+    expect(page.storage.items.has('sora_pair_code')).toBe(false);
+
+    // A reload now asks for a code too, and the next one typed is the one checked
+    const reloaded = openPage('', server, { storage: page.storage });
+    await flush();
+    expect(reloaded.visible()).toEqual(['stateEnter']);
+    expect(reloaded.requests).toEqual([]);
+    down = false;
+    page.el('codeInput').value = 'K7P-4QX';
+    page.el('stateEnter').fire('submit');
+    await flush();
+    expect(page.requests.at(-3)).toBe('/api/admin/pair/K7P4QX');
+    expect(page.visible()).toEqual(['pairForm']);
+  });
+
+  test('"Type a code" from a QR address takes the code out of it', async () => {
+    const page = openPage('?code=K7P4QX&lang=ar', () => ({ status: 503, body: { success: false } }));
+    await flush();
+    page.links[0].click();
+    expect(page.location.search).toBe('?lang=ar');
+    expect(page.visible()).toEqual(['stateEnter']);
   });
 
   test('an expired code is forgotten, so "Type a code" starts afresh', async () => {

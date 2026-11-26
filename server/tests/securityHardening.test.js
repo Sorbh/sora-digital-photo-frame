@@ -208,6 +208,38 @@ describe('changes only from this site', () => {
     // Reading is never blocked
     await admin.get('/api/notes').set('Sec-Fetch-Site', 'cross-site').expect(200);
   });
+
+  // #66: the whole origin counts, scheme included
+  const fromOrigin = (agent, origin, headers = {}) => {
+    const req = agent.post('/api/notes').set('Origin', origin).set('Host', 'photos.example');
+    for (const [name, value] of Object.entries(headers)) req.set(name, value);
+    return req.send({ text: 'Hi' });
+  };
+  const notRefused = res => expect(res.status).not.toBe(403);
+
+  test('an http:// page is refused by an https:// site behind a trusted proxy', async () => {
+    const admin = await signedInAdmin(app); // TRUST_PROXY unset: one proxy in front
+    const https = { 'X-Forwarded-Proto': 'https' };
+    await fromOrigin(admin, 'http://photos.example', https).expect(403);
+    await fromOrigin(admin, 'https://photos.example', https).expect(notRefused);
+    // The browser leaves out the default port and writes the host in lower case; Host may not
+    await fromOrigin(admin, 'https://photos.example', { ...https, Host: 'PHOTOS.example:443' }).expect(notRefused);
+    await fromOrigin(admin, 'https://photos.example:8443', https).expect(403);
+    await fromOrigin(admin, 'null', https).expect(403);
+  });
+
+  test('a plain http install takes its own http:// pages, and no https:// ones', async () => {
+    const admin = await signedInAdmin(app);
+    await fromOrigin(admin, 'http://photos.example').expect(notRefused);
+    await fromOrigin(admin, 'https://photos.example').expect(403);
+  });
+
+  test("with TRUST_PROXY=false, X-Forwarded-Proto can't make a request pass as https", async () => {
+    const direct = createApp({ trustProxy: 'false' });
+    const admin = await signedInAdmin(direct);
+    await fromOrigin(admin, 'https://photos.example', { 'X-Forwarded-Proto': 'https' }).expect(403);
+    await fromOrigin(admin, 'http://photos.example', { 'X-Forwarded-Proto': 'https' }).expect(notRefused);
+  });
 });
 
 describe('Google Photos addresses', () => {

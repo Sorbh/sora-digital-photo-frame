@@ -7,9 +7,11 @@
 // accident and pass.
 const UNSAFE = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
-const hostOf = (origin) => {
+// Scheme, host and port, as a browser writes them in Origin (lower case, no default port)
+const originOf = (url) => {
   try {
-    return new URL(origin).host;
+    const { origin } = new URL(url);
+    return origin === 'null' ? null : origin;
   } catch {
     return null;
   }
@@ -26,10 +28,14 @@ function sameOrigin(req, res, next) {
 
   const origin = req.get('origin');
   if (!origin) return next();
-  // Only Host: X-Forwarded-Host could be sent by the page itself. (Behind a
-  // proxy that rewrites Host, such old browsers need the proxy to keep it.)
-  const host = hostOf(origin);
-  if (host && host === req.get('host')) return next();
+  // The whole origin, so an http:// page can't send changes to the https:// site.
+  // The scheme is req.protocol, which believes X-Forwarded-Proto only from a
+  // trusted proxy (TRUST_PROXY); the host is only Host: X-Forwarded-Host could
+  // be sent by the page itself. (Behind a proxy that rewrites Host, such old
+  // browsers need the proxy to keep it.)
+  const host = req.get('host');
+  const sent = originOf(origin);
+  if (host && sent && sent === originOf(`${req.protocol}://${host}`)) return next();
   return refuse(res);
 }
 

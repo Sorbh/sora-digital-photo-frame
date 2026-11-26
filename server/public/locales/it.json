@@ -246,7 +246,8 @@
     "PHOTO_CHANGED": "Questa foto è cambiata mentre veniva ruotata. Riprova.",
     "UNSUPPORTED_TYPE": "Puoi caricare solo foto JPEG, PNG, GIF, WebP e HEIC",
     "SCREEN_LIMIT": "Questa famiglia ha già {limit} schermi. Rimuovine uno che non usi più per aggiungere questo.",
-    "FOLDER_TOO_DEEP": "Qui non si può creare una nuova cartella: le cartelle possono avere al massimo {limit} livelli di profondità."
+    "FOLDER_TOO_DEEP": "Qui non si può creare una nuova cartella: le cartelle possono avere al massimo {limit} livelli di profondità.",
+    "FOLDER_NOT_FOUND": "Questa cartella non esiste più. Potrebbe essere stata eliminata."
   },
   "admin": {
     "static_001": "Libreria · Sora Frame",

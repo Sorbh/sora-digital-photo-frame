@@ -8,11 +8,22 @@
  * photoUrl returns the address a browser loads the photo from, with each path
  * segment percent-encoded (folder and file names can hold # ? % and spaces):
  * PhotoLibrary.uploadsUrl(adminPath) builds that for the /uploads route.
+ *
+ * Only createFolder makes folders. addPhoto, movePhoto and writeItem save into
+ * a folder that exists; when it doesn't (deleted meanwhile, even while saving)
+ * they throw PhotoLibrary.folderNotFoundError() (404 FOLDER_NOT_FOUND) and
+ * leave it deleted.
+ *
+ * realPath (optional) is for storage with symlinks: where a path really is, as
+ * an admin path, or null when it leads out of the library. Without it, paths
+ * are taken as they are.
  */
 const { uploadsUrl } = require('../utils/safePath');
+const { folderNotFoundError } = require('../utils/httpError');
 
 class PhotoLibrary {
   static uploadsUrl(adminPath) { return uploadsUrl(adminPath); }
+  static folderNotFoundError() { return folderNotFoundError(); }
 
   async listFolder(adminPath) { throw new Error('not implemented'); }
   async createFolder(adminPath) { throw new Error('not implemented'); }

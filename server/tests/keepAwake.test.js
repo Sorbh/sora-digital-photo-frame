@@ -175,6 +175,39 @@ describe('Keeping the screen awake', () => {
     expect(awake.active).toBe(false);
   });
 
+  test('one tap firing two events asks for the lock once', async () => {
+    const grants = [];
+    global.navigator.wakeLock = { request: () => new Promise(resolve => grants.push(resolve)) };
+    const awake = new KeepAwake();
+    awake.enable(); // asks once on its own
+    listeners.click(); // the button's click and the document's gesture listener, one tap
+    listeners.touchend();
+    expect(grants).toHaveLength(1);
+
+    const released = [];
+    grants[0]({ released: false, addEventListener: () => {}, release: () => { released.push(1); return Promise.resolve(); } });
+    await flush();
+    expect(awake.status).toBe('active');
+    expect(grants).toHaveLength(1);
+    expect(released).toHaveLength(0);
+  });
+
+  test('a tap during a refused request asks again with that tap', async () => {
+    const answers = [];
+    global.navigator.wakeLock = { request: () => new Promise((resolve, reject) => answers.push({ resolve, reject })) };
+    const awake = new KeepAwake();
+    awake.enable(); // no gesture yet: this one will be refused
+    listeners.click(); // tapped while it was still being answered
+    expect(answers).toHaveLength(1);
+
+    answers[0].reject(Object.assign(new Error('needs a gesture'), { name: 'NotAllowedError' }));
+    await flush();
+    expect(answers).toHaveLength(2);
+    answers[1].resolve(sentinel());
+    await flush();
+    expect(awake.status).toBe('active');
+  });
+
   test('without the wake lock API, the looping video keeps the screen on', async () => {
     global.playVideo = () => Promise.resolve();
     const awake = new KeepAwake();

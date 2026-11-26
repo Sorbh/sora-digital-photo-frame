@@ -43,6 +43,9 @@
   },
   "jest": {
     "testEnvironment": "node",
+    "setupFilesAfterEnv": [
+      "<rootDir>/tests/setup/dropPendingSaves.js"
+    ],
     "collectCoverageFrom": [
       "controllers/**/*.js",
       "!controllers/**/*.test.js"

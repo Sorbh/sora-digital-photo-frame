@@ -610,6 +610,11 @@ body {
     display: flex;
     align-items: center;
     gap: 0.5rem;
+    width: 100%;
+    border: 0;
+    background: transparent;
+    font: inherit;
+    text-align: start;
     padding: 0.55rem 0.75rem;
     border-radius: var(--shape-xs);
     font-size: 0.875rem;
@@ -618,8 +623,14 @@ body {
     transition: background-color 0.15s ease;
 }
 
-.menu-item:hover {
+.menu-item:hover,
+.menu-item:focus-visible {
     background-color: var(--muted);
+}
+
+.menu-item:focus-visible {
+    outline: 2px solid var(--safelight);
+    outline-offset: -2px;
 }
 
 .menu-item .material-symbols-outlined {
@@ -632,7 +643,8 @@ body {
     color: var(--destructive);
 }
 
-.menu-item-destructive:hover {
+.menu-item-destructive:hover,
+.menu-item-destructive:focus-visible {
     background-color: color-mix(in oklab, var(--destructive) 12%, transparent);
 }
 

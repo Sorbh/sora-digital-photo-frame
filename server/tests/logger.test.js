@@ -90,6 +90,62 @@ describe('Request logging keeps secrets out of the logs', () => {
     expect(safePath('/g/AbCdEfGhIj.sometoken/upload')).toBe('/g/[redacted]/upload');
     expect(safePath('/api/folders')).toBe('/api/folders');
   });
+
+  test('photo, thumbnail and folder paths are logged as their route only', () => {
+    expect(safePath('/uploads/Grandmas%20Birthday/IMG_1234.jpg')).toBe('/uploads/[photo]');
+    expect(safePath('/UPLOADS/Album/photo.jpg?w=300')).toBe('/uploads/[photo]');
+    expect(safePath('/api/images/Album%2FIMG_1234.jpg/thumbnail')).toBe('/api/images/[photo]/thumbnail');
+    expect(safePath('/api/folders/Trips/Italy/thumbnail')).toBe('/api/folders/[folder]/thumbnail');
+    expect(safePath('/api/folders/Trips/Italy')).toBe('/api/folders/[folder]');
+    expect(safePath('/g/AbCdEfGhIj.sometoken/uploads/Album/photo.jpg')).toBe('/g/[redacted]/uploads/[photo]');
+    // A request that names the whole address
+    expect(safePath('http://frame.example/uploads/Album/photo.jpg?w=1')).toBe('/uploads/[photo]');
+    expect(safePath('HTTPS://frame.example/api/folders/Trips/Italy')).toBe('/api/folders/[folder]');
+    expect(safePath('http://frame.example/g/sometoken/uploads/Album/photo.jpg')).toBe('/g/[redacted]/uploads/[photo]');
+    // Other paths stay as they are
+    expect(safePath('/uploads')).toBe('/uploads');
+    expect(safePath('/api/images/next')).toBe('/api/images/next');
+    expect(safePath('/api/notes/active')).toBe('/api/notes/active');
+  });
+
+  test('requests for photos and folders keep album and file names out of the log', async () => {
+    await request(app).get('/uploads/Grandmas%20Birthday/IMG_1234.jpg');
+    await request(app).get('/api/images/Grandmas%20Birthday%2FIMG_1234.jpg/thumbnail');
+    await request(app).get('/api/folders/Grandmas%20Birthday/thumbnail');
+    await request(app).get('/api/folders/Grandmas%20Birthday');
+    const logs = output.join('\n');
+    expect(logs).toMatch(/GET \/uploads\/\[photo\] \d{3} \d+ms/);
+    expect(logs).toMatch(/GET \/api\/images\/\[photo\]\/thumbnail \d{3} \d+ms/);
+    expect(logs).toMatch(/GET \/api\/folders\/\[folder\]\/thumbnail \d{3} \d+ms/);
+    expect(logs).toMatch(/GET \/api\/folders\/\[folder\] \d{3} \d+ms/);
+    expect(logs).not.toMatch(/Grandma|IMG_1234/);
+  });
+
+  test('a request naming the whole address keeps album and file names out of the log too', async () => {
+    const http = require('http');
+    const server = app.listen(0, '127.0.0.1');
+    await new Promise(resolve => server.once('listening', resolve));
+    try {
+      const status = await new Promise((resolve, reject) => {
+        const req = http.request({
+          host: '127.0.0.1',
+          port: server.address().port,
+          method: 'GET',
+          path: 'http://frame.example/uploads/Grandmas%20Birthday/IMG_1234.jpg',
+          headers: { Host: 'frame.example' }
+        }, (res) => { res.resume(); res.on('end', () => resolve(res.statusCode)); });
+        req.on('error', reject);
+        req.end();
+      });
+      // Routed as a photo, so it needs a signed-in viewer
+      expect(status).toBe(401);
+    } finally {
+      await new Promise(resolve => server.close(resolve));
+    }
+    const logs = output.join('\n');
+    expect(logs).toMatch(/GET \/uploads\/\[photo\] 401 \d+ms/);
+    expect(logs).not.toMatch(/Grandma|IMG_1234|frame\.example/);
+  });
 });
 
 describe('Error handler', () => {
@@ -181,6 +237,8 @@ describe('Google Photos token check', () => {
 });
 
 describe('Controller logs', () => {
+  afterAll(() => fs.remove(testUploadsDir)); // the folder-name test below writes a photo
+
   let output;
   let spies;
   beforeEach(() => {

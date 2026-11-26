@@ -69,6 +69,7 @@ class AttemptLimiter {
     // Starts a lockout and saves it; returns how long it lasts
     lockOut(key, record, now) {
         const duration = Math.min(this.lockoutDuration * 2 ** (record.lockouts || 0), this.maxLockout);
+        record.lastLockoutBefore = record.lastLockout; // for forget() to put back
         record.lockouts = (record.lockouts || 0) + 1;
         record.lockoutUntil = now + duration;
         record.lastLockout = now;
@@ -116,10 +117,20 @@ class AttemptLimiter {
         }
     }
 
-    // Take back a try that turned out not to count
+    // Take back a try that turned out not to count. If that try is what made the
+    // tries reach the limit (another one, counted meanwhile, started the lockout),
+    // the lockout is lifted too, as if it had never started.
     forget(key) {
         const record = this.entries.get(key);
-        if (record && record.attempts > 0) record.attempts -= 1;
+        if (!record || record.attempts <= 0) return;
+        record.attempts -= 1;
+        const locked = record.lockoutUntil != null && Date.now() < record.lockoutUntil;
+        if (locked && record.attempts < this.maxAttempts) {
+            record.lockoutUntil = null;
+            record.lockouts = Math.max(0, (record.lockouts || 1) - 1);
+            record.lastLockout = record.lastLockoutBefore ?? null;
+            this.save(key);
+        }
     }
 
     clear(key) {

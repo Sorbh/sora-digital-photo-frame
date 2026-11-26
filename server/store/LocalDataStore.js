@@ -3,6 +3,9 @@ const crypto = require('crypto');
 const fs = require('fs-extra');
 const DataStore = require('./DataStore');
 const { DATA_DIR, CACHE_DIR, UPLOADS_DIR } = require('../config/paths');
+const { folderNotFoundError } = require('../utils/httpError');
+
+const FOLDER_PREFIX = 'folder-settings:';
 
 // photo-info is real data: stored photos have no EXIF to read it back from
 const CACHE_NAMES = new Set(['places']);
@@ -16,8 +19,8 @@ class LocalDataStore extends DataStore {
 
   file(name) {
     if (typeof name !== 'string') throw new Error('Invalid document name');
-    if (name.startsWith('folder-settings:')) {
-      const relative = name.slice('folder-settings:'.length);
+    if (name.startsWith(FOLDER_PREFIX)) {
+      const relative = name.slice(FOLDER_PREFIX.length);
       if (!relative || relative.split('/').every(part => /^[^\\/\0]+$/.test(part) && part !== '.' && part !== '..')) {
         return path.join(UPLOADS_DIR, relative, '.sora-folder.json');
       }
@@ -45,29 +48,37 @@ class LocalDataStore extends DataStore {
     return next;
   }
 
-  async write(file, value) {
-    await fs.ensureDir(path.dirname(file));
+  // A folder's settings are saved in the folder itself, which must still be
+  // there: a deleted folder is FOLDER_NOT_FOUND, never made again. Other
+  // documents get their folder made when needed.
+  async write(file, value, { inPhotoFolder = false } = {}) {
+    const dir = path.dirname(file);
+    if (!inPhotoFolder) await fs.ensureDir(dir);
     const tmp = `${file}.${process.pid}.${crypto.randomBytes(6).toString('hex')}.tmp`;
     try {
       await fs.writeFile(tmp, JSON.stringify(value, null, 2));
       await fs.rename(tmp, file);
     } catch (error) {
       await fs.remove(tmp).catch(() => {});
+      if (inPhotoFolder && ['ENOENT', 'ENOTDIR'].includes(error.code) &&
+          !(await fs.stat(dir).catch(() => null))?.isDirectory()) throw folderNotFoundError();
       throw error;
     }
   }
 
   async set(name, value) {
     const file = this.file(name);
-    return this.queue(name, () => this.write(file, value));
+    const options = { inPhotoFolder: name.startsWith(FOLDER_PREFIX) };
+    return this.queue(name, () => this.write(file, value, options));
   }
 
   async update(name, fallback, fn) {
     const file = this.file(name);
+    const options = { inPhotoFolder: name.startsWith(FOLDER_PREFIX) };
     return this.queue(name, async () => {
       const current = await this.get(name, fallback);
       const next = await fn(current);
-      await this.write(file, next);
+      await this.write(file, next, options);
       return next;
     });
   }

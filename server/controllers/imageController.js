@@ -8,13 +8,12 @@ const thumbnails = require('../services/thumbnailService');
 const { sharpInput } = require('../utils/heic');
 const { displayCopy, assertImageSize, MAX_PIXELS } = require('../utils/displayCopy');
 const slots = require('../utils/workSlots');
-const { canSee } = require('../utils/viewerAccess');
+const { canSee, inFolder, realVisiblePath } = require('../utils/viewerAccess');
 const snaps = require('../services/snapService');
 const playOrder = require('../services/playOrderService');
 const photoInfo = require('../services/photoInfoService');
 const { resolveAdminPath, toAdminPath } = require('../utils/safePath');
-const { passClientError } = require('../utils/httpError');
-const { assertFolderAllowed } = require('../utils/folderDepth');
+const { passClientError, folderNotFoundError } = require('../utils/httpError');
 
 class ImageController {
   constructor() {
@@ -96,12 +95,8 @@ class ImageController {
       if (req.session && req.session.accessAccount && req.session.accessAccount.assignedFolders && req.session.accessAccount.assignedFolders.length > 0 && !req.session.authenticated) {
         const assignedFolders = req.session.accessAccount.assignedFolders;
 
-        availableImages = allImages.filter(img => {
-          const imgFolder = path.dirname(img.relativePath);
-          // Allowed if the image is in an assigned folder or one of its subfolders
-          return assignedFolders.some(allowedFolder =>
-            imgFolder === allowedFolder || imgFolder.startsWith(allowedFolder + path.sep));
-        });
+        // In an assigned folder or one of its subfolders, whatever the separators
+        availableImages = allImages.filter(img => canSee(req, img.relativePath));
 
         if (availableImages.length === 0) {
           console.log('❌ Access Control - No accessible images found for assigned folders:', assignedFolders);
@@ -117,10 +112,8 @@ class ImageController {
       if (hasFolderFilter) {
         const decodedFolder = folderFilter;
 
-        availableImages = availableImages.filter(img => {
-          const imgFolder = path.dirname(img.relativePath);
-          return imgFolder === decodedFolder || imgFolder.startsWith(decodedFolder + path.sep);
-        });
+        // The frame sends "/"; photo paths use the system's separator ("\\" on Windows)
+        availableImages = availableImages.filter(img => inFolder(img.relativePath, decodedFolder));
 
         if (availableImages.length === 0) {
           console.log('❌ API Filter - No images found in the chosen folder');
@@ -234,11 +227,14 @@ class ImageController {
   async getImageThumbnail(req, res) {
     try {
       // Express already decoded the param; a second decode would mangle names containing '%'
-      const imagePath = thumbnails.resolveInUploads(req.params.imageId);
+      const requested = thumbnails.resolveInUploads(req.params.imageId);
+      // Photos outside a frame's folders look like they don't exist, also through a
+      // symlink; the thumbnail is made from where the photo really is
+      const visible = requested && thumbnails.IMAGE_PATTERN.test(requested)
+        ? await realVisiblePath(req, path.relative(UPLOADS_DIR, requested)) : null;
+      const imagePath = visible === null ? null : path.join(UPLOADS_DIR, visible);
 
-      // Photos outside a frame's folders look like they don't exist
-      if (!imagePath || !thumbnails.IMAGE_PATTERN.test(imagePath) || !canSee(req, path.relative(UPLOADS_DIR, imagePath)) ||
-          !await getLibrary().exists(toAdminPath(imagePath))) {
+      if (!imagePath || !thumbnails.IMAGE_PATTERN.test(imagePath) || !await getLibrary().exists(toAdminPath(imagePath))) {
         return res.status(404).json({
           success: false,
           error: 'Image not found',
@@ -283,8 +279,8 @@ class ImageController {
       if (!targetDir) {
         return res.status(400).json({ message: 'Invalid upload folder' });
       }
-      // Uploading makes a missing folder: not one past MAX_FOLDER_DEPTH
-      await assertFolderAllowed(targetDir);
+      // Into a folder that exists: an upload never makes one, nor brings back a deleted one
+      if (!(await getLibrary().stat(toAdminPath(targetDir)))?.isFolder) throw folderNotFoundError();
 
       // A phone that shrank a photo before sending it says what the original knew (js/photoUpload.js)
       let sentInfo = [];
@@ -370,12 +366,19 @@ class ImageController {
 
       const destDir = resolveAdminPath(destination || 'uploads', { allowRoot: true });
       if (!destDir || !(await getLibrary().stat(toAdminPath(destDir)))?.isFolder) {
-        return res.status(404).json({ message: 'Destination folder not found' });
+        return res.status(404).json({ message: 'Destination folder not found', code: 'FOLDER_NOT_FOUND' });
       }
 
       const results = { movedCount: 0, failedCount: 0, errors: [] };
+      let destinationGone = false;
 
       for (const imagePath of paths) {
+        // Deleted while these were moving: it isn't made again, the rest stay put
+        if (destinationGone) {
+          results.failedCount++;
+          results.errors.push(`Failed to move: ${imagePath}`);
+          continue;
+        }
         const fullPath = resolveAdminPath(imagePath);
 
         const isSnap = Boolean(fullPath) && snaps.isSnap(fullPath);
@@ -396,7 +399,8 @@ class ImageController {
           }
           results.movedCount++;
         } catch (error) {
-          console.error(`Error moving image ${imagePath}:`, error);
+          if (error.code === 'FOLDER_NOT_FOUND') destinationGone = true;
+          else console.error(`Error moving image ${imagePath}:`, error);
           results.failedCount++;
           results.errors.push(`Failed to move: ${imagePath}`);
         }
@@ -404,8 +408,12 @@ class ImageController {
 
       this.clearImageCache();
 
+      if (destinationGone && results.movedCount === 0) {
+        return res.status(404).json({ message: 'Destination folder not found', code: 'FOLDER_NOT_FOUND', ...results });
+      }
       res.status(results.failedCount > 0 ? 207 : 200).json({
         message: `Moved ${results.movedCount} image(s)`,
+        ...(destinationGone && { code: 'FOLDER_NOT_FOUND' }),
         ...results
       });
     } catch (error) {

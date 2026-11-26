@@ -115,7 +115,7 @@ describe('muted text contrast', () => {
     });
   });
 
-  // The library banner's breadcrumbs: small white text on the berry gradient,
+  // The library banner's breadcrumbs and eyebrow: small white text on the berry gradient,
   // over a dark chip. Checked over each gradient stop, with and without the
   // warm glow in the banner's corner (the crumbs sit under it in RTL).
   describe('library breadcrumbs', () => {
@@ -128,25 +128,29 @@ describe('muted text contrast', () => {
     const head = soraDeclared('.library-head', 'background');
     const warm = /radial-gradient\([^,]+,\s*(rgb\([^)]+\))/.exec(head);
     const chip = plainColor(soraDeclared('.library-head .breadcrumb', 'background'));
+    const eyebrowChip = plainColor(soraDeclared('.library-head .sora-eyebrow', 'background'));
     const labels = [
       ['parent crumb', soraDeclared('.breadcrumb', 'color')],
       ['current crumb', soraDeclared('.library-head .breadcrumb li:last-child .breadcrumb-item', 'color')],
-      ['hovered crumb', soraDeclared('.breadcrumb .breadcrumb-item.cursor-pointer:hover', 'color').replace(/\s*!important/, '')]
+      ['hovered crumb', soraDeclared('.breadcrumb .breadcrumb-item.cursor-pointer:hover', 'color').replace(/\s*!important/, '')],
+      // Pages without a trail show an eyebrow there instead, on its own chip
+      ['eyebrow', soraDeclared('.library-head .sora-eyebrow', 'color'), eyebrowChip]
     ];
-    const cases = gradients.flatMap(([mode, gradient]) => labels.map(([label, value]) => [`${label}, ${mode}`, gradient, value]));
+    const cases = gradients.flatMap(([mode, gradient]) => labels.map(([label, value, backing = chip]) => [`${label}, ${mode}`, gradient, value, backing]));
 
     test('the banner, glow and chip are found', () => {
       expect(warm).not.toBeNull();
       expect(chip.alpha).toBeGreaterThan(0);
+      expect(eyebrowChip.alpha).toBeGreaterThan(0);
       for (const [, gradient] of gradients) expect(gradient).toMatch(/#[0-9a-f]{6}/i);
     });
 
-    test.each(cases)('%s is at least 4.5:1', (_, gradient, value) => {
+    test.each(cases)('%s is at least 4.5:1', (_, gradient, value, backing) => {
       const glow = plainColor(warm[1]);
       const { color, alpha } = plainColor(value);
       for (const stop of gradient.match(/#[0-9a-f]{6}/gi).map(rgb)) {
         for (const banner of [stop, blend(glow.color, stop, glow.alpha)]) {
-          const background = blend(chip.color, banner, chip.alpha);
+          const background = blend(backing.color, banner, backing.alpha);
           expect(ratio(blend(color, background, alpha), background)).toBeGreaterThanOrEqual(4.5);
         }
       }

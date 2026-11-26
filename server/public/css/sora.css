@@ -464,8 +464,12 @@ dialog::backdrop {
         radial-gradient(circle at 97% 120%, #fff 30px, transparent 31px);
 }
 
+/* On the same dark chip as the breadcrumbs (below), for 4.5:1 or more */
 .library-head .sora-eyebrow {
-    color: rgb(255 255 255 / 0.8);
+    padding: 4px 10px;
+    border-radius: var(--shape-sm);
+    background: rgb(61 10 38 / 0.45);
+    color: rgb(255 255 255 / 0.85);
 }
 
 .breadcrumb {

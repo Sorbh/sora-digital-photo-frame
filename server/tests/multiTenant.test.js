@@ -61,7 +61,7 @@ describe('Hosted, many tenants in one process', () => {
     const { body: started } = await frame.post('/api/pair/start').expect(200);
     await request(app).post(`/api/admin/pair/${started.code}/approve`).set('x-tenant', tenantId)
       .send({ name: `Frame ${tenantId}`, newAccount: { assignedFolders: [] } }).expect(200);
-    const { body: collected } = await frame.get('/api/pair/status').query({ code: started.code, secret: started.secret }).expect(200);
+    const { body: collected } = await frame.post('/api/pair/collect').send({ code: started.code, secret: started.secret }).expect(200);
     return { frame, collected };
   }
 
@@ -82,7 +82,7 @@ describe('Hosted, many tenants in one process', () => {
     const { body: started } = await browser.post('/api/pair/start').expect(200);
     await request(app).post(`/api/admin/pair/${started.code}/approve`).set('x-tenant', 'a')
       .send({ name: 'Admin browser', newAccount: { assignedFolders: [] } }).expect(200);
-    await browser.get('/api/pair/status').query({ code: started.code, secret: started.secret }).expect(200);
+    await browser.post('/api/pair/collect').send({ code: started.code, secret: started.secret }).expect(200);
     expect((await browser.get('/whoami').expect(200)).body.id).toBe('a');
 
     // Signing the frame out keeps the admin session but must drop the tenant
@@ -98,7 +98,7 @@ describe('Hosted, many tenants in one process', () => {
     const { body: started } = await browser.post('/api/pair/start').expect(200);
     await request(app).post(`/api/admin/pair/${started.code}/approve`).set('x-tenant', 'a')
       .send({ name: 'Shared browser', newAccount: { assignedFolders: [] } }).expect(200);
-    const collected = await browser.get('/api/pair/status').query({ code: started.code, secret: started.secret }).expect(200);
+    const collected = await browser.post('/api/pair/collect').send({ code: started.code, secret: started.secret }).expect(200);
 
     expect(sid(collected)).toBeDefined();
     expect(sid(collected)).not.toBe(sid(login));

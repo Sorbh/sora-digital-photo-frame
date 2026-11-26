@@ -71,6 +71,8 @@ class LocalPhotoLibrary extends PhotoLibrary {
   }
 
   async readPhoto(adminPath) { return fs.readFile(this.resolve(adminPath)); }
+  // Each folder and file name percent-encoded, so a name with a backslash
+  // (allowed on Linux) isn't read by the browser as a separator
   photoUrl(adminPath) {
     this.resolve(adminPath);
     return uploadsUrl(adminPath);

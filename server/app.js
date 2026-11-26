@@ -26,7 +26,7 @@ const { setAuthProvider, setPublicPhotos, requirePhotoViewer, announceAdminPassw
 const { sessionSecret, announceSessionSecret } = require('./utils/sessionSecret');
 const { setEvents } = require('./events');
 const accessAccounts = require('./controllers/accessAccountController');
-const { setMaxFolderDepth, allowsFolderAt, maxFolderDepth } = require('./utils/folderDepth');
+const { setMaxFolderDepth, canMakeFolderAt, maxFolderDepth } = require('./utils/folderDepth');
 
 /**
  * Build the photo frame app. The self-hosted server calls this with no
@@ -151,8 +151,8 @@ async function initializeUploads() {
 
   for (const folder of defaultFolders) {
     const fullPath = path.join(UPLOADS_DIR, folder.trim());
-    // Not past MAX_FOLDER_DEPTH (read by createApp, which runs first)
-    if (!allowsFolderAt(fullPath)) {
+    // Not past MAX_FOLDER_DEPTH (read by createApp, which runs first), symlinks followed
+    if (!await canMakeFolderAt(fullPath)) {
       console.warn(`⚠️  DEFAULT_FOLDERS: skipping "${folder.trim()}", deeper than MAX_FOLDER_DEPTH=${maxFolderDepth()}.`);
       continue;
     }

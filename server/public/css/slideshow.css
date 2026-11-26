@@ -223,6 +223,43 @@ body.note-showing .stage-scrim {
     color: rgba(244, 239, 230, 0.65);
 }
 
+.error-card .error-retry-note {
+    font-size: 0.85rem;
+    color: rgba(244, 239, 230, 0.5);
+}
+
+/* Big enough to hit with a finger or reach with a TV remote */
+.error-retry {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+    padding: 12px 24px;
+    min-height: 48px;
+    border: 0;
+    border-radius: 999px;
+    background: #ff5c8d;
+    color: #1a0b12;
+    font: inherit;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.error-retry .material-icons {
+    font-size: 20px;
+    color: inherit;
+}
+
+.error-retry:focus-visible {
+    outline: 3px solid #fff;
+    outline-offset: 3px;
+}
+
+.error-retry:active {
+    transform: scale(0.97);
+}
+
 .error-card a {
     margin-top: 10px;
     font-size: 0.875rem;

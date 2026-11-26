@@ -12,6 +12,7 @@ class AuthenticationManager {
         this.familyInput = document.getElementById('familyCodeInput');
         this.authSub = document.querySelector('.auth-sub');
         this.familyCodeRequired = false; // hosted: a PIN also needs the family code
+        this.signInGeneration = 0; // a sign-in typed by hand outranks one still retrying from the address
         this.authButton = document.getElementById('authButton');
         this.authErrorAlert = document.getElementById('authErrorAlert');
         this.authErrorMessage = document.getElementById('authErrorMessage');
@@ -50,9 +51,17 @@ class AuthenticationManager {
 
     init() {
         this.bindEvents();
-        // Frames with no keyboard can open /slideshow?pin=123456 (hosted: &family=ABCD-EFGH)
+        // Opening /slideshow#pin=... on this page again doesn't reload it: read it then too
+        window.addEventListener('hashchange', () => {
+            if (!/(?:^#|&)(?:pin|family)=/.test(location.hash)) return;
+            const pin = this.takeSignInFromUrl();
+            if (!pin || this.isAuthenticated) return;
+            this.signInGeneration += 1;
+            this.signInFromUrl(pin);
+        });
+        // Frames with no keyboard can open /slideshow#pin=123456 or ?pin=123456 (hosted: &family=ABCD-EFGH)
         // and sign in by themselves. A browser that already is a screen uses its token first.
-        const urlPin = new URLSearchParams(location.search).get('pin')?.trim();
+        const urlPin = this.takeSignInFromUrl();
         const deviceToken = localStorage.getItem(DEVICE_TOKEN_KEY);
         if (deviceToken) {
             this.signInAsDevice(deviceToken, urlPin);
@@ -61,6 +70,34 @@ class AuthenticationManager {
         } else {
             this.checkExistingSession();
         }
+    }
+
+    // The PIN and family code from the address, kept in memory only. slideshow.html
+    // takes them out of the address before anything loads; this also covers pages
+    // that open the script without that.
+    takeSignInFromUrl() {
+        const early = window.soraUrlSignIn;
+        if (early) {
+            window.soraUrlSignIn = null;
+            this.urlFamilyCode = early.family || '';
+            return early.pin || undefined;
+        }
+        // The head script didn't run (e.g. a policy that blocks inline scripts): same
+        // thing here, for #pin=&family= and ?pin=&family=
+        const url = new URL(location.href);
+        const query = url.searchParams;
+        const fragment = new URLSearchParams(url.hash.slice(1));
+        const inQuery = query.has('pin') || query.has('family');
+        const inFragment = fragment.has('pin') || fragment.has('family');
+        const pick = name => (fragment.get(name) || query.get(name) || '').trim();
+        const pin = pick('pin') || undefined;
+        this.urlFamilyCode = pick('family');
+        if (inQuery || inFragment) {
+            ['pin', 'family'].forEach(name => { query.delete(name); fragment.delete(name); });
+            const hash = inFragment ? (String(fragment) ? `#${fragment}` : '') : url.hash;
+            history.replaceState(history.state, '', url.pathname + url.search + hash);
+        }
+        return pin;
     }
 
     // Keep a frame that is left running signed in to its account
@@ -101,7 +138,7 @@ class AuthenticationManager {
     // The family code typed in, from the address, or remembered from last time
     familyCodeValue() {
         const typed = this.familyInput?.value.trim();
-        return typed || new URLSearchParams(location.search).get('family')?.trim() || localStorage.getItem(FAMILY_CODE_KEY) || '';
+        return typed || this.urlFamilyCode || localStorage.getItem(FAMILY_CODE_KEY) || '';
     }
 
     // Hosted: show the family code field above the PIN
@@ -210,21 +247,32 @@ class AuthenticationManager {
         this.pairing = null;
     }
 
-    async signInFromUrl(pin) {
+    // The address is clean by now, so a frame with no keyboard keeps trying with the
+    // PIN in memory until the network or server is back, or the PIN is refused
+    async signInFromUrl(pin, attempt = 0) {
+        clearTimeout(this.urlRetryTimer);
+        if (this.isAuthenticated) return;
+        const generation = this.signInGeneration;
+        const outdated = () => generation !== this.signInGeneration || this.isAuthenticated;
+        const retry = wait => { this.urlRetryTimer = setTimeout(() => this.signInFromUrl(pin, attempt + 1), wait); };
         try {
             const data = await this.requestPin(pin);
+            if (outdated()) return; // signed in, or a PIN was typed, meanwhile
             if (!data.success) {
                 this.showAuthOverlay();
-                // Too many tries just now: try the same PIN again once the wait is over
-                this.handleAuthError(data.error, data.code, data, () => this.signInFromUrl(pin));
+                // Too many tries just now: the form's own wait tries the same PIN again
+                // once it is over, unless a PIN was typed or the frame signed in meanwhile
+                this.handleAuthError(data.error, data.code, data, () => { if (!outdated()) this.signInFromUrl(pin, attempt + 1); });
                 return;
             }
             this.keepScreen(data);
             this.handleAuthSuccess(data.account);
         } catch (error) {
+            if (outdated()) return;
             console.error('Sign-in from the address failed:', error);
             this.showAuthOverlay();
             this.showErrorKey('errors.connection');
+            retry(Math.min(5000 * 2 ** attempt, 60000));
         }
     }
 
@@ -239,6 +287,8 @@ class AuthenticationManager {
                 familyCode: this.familyCodeValue() || undefined
             })
         });
+        // A server error is not an answer about the PIN: try again later
+        if (response.status >= 500) throw new Error(`HTTP ${response.status}`);
         return response.json();
     }
 
@@ -350,6 +400,9 @@ class AuthenticationManager {
         }
 
         this.setLoading(true);
+        // Typed by hand: this outranks a sign-in still retrying from the address
+        this.signInGeneration += 1;
+        clearTimeout(this.urlRetryTimer);
 
         try {
             const data = await this.requestPin(pin);
@@ -375,6 +428,7 @@ class AuthenticationManager {
     }
 
     handleAuthSuccess(account) {
+        clearTimeout(this.urlRetryTimer);
         this.stopRateLimitWait();
         this.isAuthenticated = true;
         this.userAccount = account;

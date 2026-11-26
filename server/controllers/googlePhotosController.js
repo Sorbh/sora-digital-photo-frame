@@ -73,7 +73,7 @@ const googlePhotosController = {
       
       // Handle OAuth errors (user denied access, etc.)
       if (error) {
-        console.log('OAuth error:', error);
+        console.log('Google sign-in was not completed'); // not the value: it comes from the address
         return res.send(`
           <html>
             <head><title>Google Photos Authentication</title></head>

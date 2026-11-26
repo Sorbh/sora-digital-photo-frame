@@ -1,4 +1,5 @@
 const bcrypt = require('bcryptjs');
+const { errorSummary } = require('../utils/errorSummary');
 const { getDataStore } = require('../store');
 const { passClientError } = require('../utils/httpError');
 const { rotateSession } = require('../utils/session');
@@ -148,7 +149,7 @@ class AccessAccountController {
             res.json({ accounts: accounts.map(account => this.publicAccount(account)) });
         } catch (error) {
             if (passClientError(res, error)) return;
-            console.error('Error fetching accounts:', error);
+            console.error('Error fetching accounts:', errorSummary(error));
             res.status(500).json({
                 success: false,
                 error: 'Failed to fetch accounts'
@@ -199,7 +200,7 @@ class AccessAccountController {
             });
         } catch (error) {
             if (passClientError(res, error)) return;
-            console.error('Error creating account:', error);
+            console.error('Error creating account:', errorSummary(error));
             res.status(500).json({
                 success: false,
                 error: 'Failed to create account'
@@ -260,7 +261,7 @@ class AccessAccountController {
             });
         } catch (error) {
             if (passClientError(res, error)) return;
-            console.error('Error updating account:', error);
+            console.error('Error updating account:', errorSummary(error));
             res.status(500).json({
                 success: false,
                 error: 'Failed to update account'
@@ -289,7 +290,7 @@ class AccessAccountController {
             });
         } catch (error) {
             if (passClientError(res, error)) return;
-            console.error('Error deleting account:', error);
+            console.error('Error deleting account:', errorSummary(error));
             res.status(500).json({
                 success: false,
                 error: 'Failed to delete account'
@@ -329,7 +330,7 @@ class AccessAccountController {
             res.json({ success: true, required: true, code: await familyCodes.get() });
         } catch (error) {
             if (passClientError(res, error)) return;
-            console.error('Error reading the family code:', error);
+            console.error('Error reading the family code:', errorSummary(error));
             res.status(500).json({ success: false, error: 'Could not load the family code' });
         }
     }
@@ -340,7 +341,7 @@ class AccessAccountController {
             res.json({ success: true, required: true, code: await familyCodes.renew() });
         } catch (error) {
             if (passClientError(res, error)) return;
-            console.error('Error renewing the family code:', error);
+            console.error('Error renewing the family code:', errorSummary(error));
             res.status(500).json({ success: false, error: 'Could not make a new family code' });
         }
     }
@@ -474,7 +475,7 @@ class AccessAccountController {
             });
         } catch (error) {
             if (passClientError(res, error)) return;
-            console.error('Error authenticating with PIN:', error);
+            console.error('Error authenticating with PIN:', errorSummary(error));
             res.status(500).json({
                 success: false,
                 error: 'Authentication failed'
@@ -500,7 +501,7 @@ class AccessAccountController {
             }
         } catch (error) {
             if (passClientError(res, error)) return;
-            console.error('Error checking session:', error);
+            console.error('Error checking session:', errorSummary(error));
             res.status(500).json({
                 success: false,
                 error: 'Failed to check session'
@@ -528,7 +529,7 @@ class AccessAccountController {
 
             req.session.destroy((err) => {
                 if (err) {
-                    console.error('Error destroying session:', err);
+                    console.error('Error destroying session:', errorSummary(err));
                     return res.status(500).json({
                         success: false,
                         error: 'Failed to clear session'
@@ -543,7 +544,7 @@ class AccessAccountController {
             });
         } catch (error) {
             if (passClientError(res, error)) return;
-            console.error('Error clearing session:', error);
+            console.error('Error clearing session:', errorSummary(error));
             res.status(500).json({
                 success: false,
                 error: 'Failed to clear session'

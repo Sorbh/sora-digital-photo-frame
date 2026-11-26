@@ -13,7 +13,9 @@ process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
 process.env.ADMIN_PASSWORD = 'correct-horse-battery';
 
 const { createApp } = require('../app');
-const { redact, redactUrl } = require('../middleware/logger');
+const express = require('express');
+const { safePath } = require('../middleware/logger');
+const errorHandler = require('../middleware/errorHandler');
 
 describe('Request logging keeps secrets out of the logs', () => {
   const app = createApp();
@@ -55,15 +57,184 @@ describe('Request logging keeps secrets out of the logs', () => {
     expect(output.join('\n')).not.toContain(id);
   });
 
-  test('secrets in query strings and guest link paths are hidden', () => {
-    expect(redactUrl('/slideshow?pin=4321&folder=family')).toBe('/slideshow?pin=[redacted]&folder=family');
-    expect(redactUrl('/api/x?Token=abc')).toBe('/api/x?Token=[redacted]');
-    expect(redactUrl('/g/AbCdEfGhIj.sometoken/upload')).toBe('/g/[redacted]/upload');
-    expect(redactUrl('/api/folders')).toBe('/api/folders');
+  test('family code in a PIN sign-in is never logged', async () => {
+    await request(app).post('/api/auth/pin').send({ pin: '864213', familyCode: 'QWER-TYUI' });
+    expect(output.join('\n')).not.toMatch(/QWER-TYUI/);
   });
 
-  test('nested and differently-cased keys are redacted', () => {
-    expect(redact({ user: { Password: 'x', name: 'Ann' }, items: [{ idToken: 'y' }], Authorization: 'Bearer z' }))
-      .toEqual({ user: { Password: '[redacted]', name: 'Ann' }, items: [{ idToken: '[redacted]' }], Authorization: '[redacted]' });
+  test('a body that is not valid JSON is neither logged nor echoed back', async () => {
+    const res = await request(app).post('/api/auth/pin')
+      .set('Content-Type', 'application/json')
+      .send('{"pin": "975310", "familyCode": "ZXCV-BNMA"');
+    expect(res.status).toBe(400);
+    expect(JSON.stringify(res.body)).not.toMatch(/975310|ZXCV-BNMA/);
+    const logs = output.join('\n');
+    expect(logs).toMatch(/entity\.parse\.failed/);
+    expect(logs).not.toMatch(/975310/);
+    expect(logs).not.toMatch(/ZXCV-BNMA/);
+  });
+
+  test('query strings and bodies never reach the logs', async () => {
+    const agent = request.agent(app);
+    await agent.post('/api/auth/login').send({ password: 'correct-horse-battery' }).expect(200);
+    await agent.get('/api/admin/folders?path=uploads/private-folder-name');
+    await agent.post('/api/notes').send({ title: 'Secret note title', message: 'A very private message' });
+    const logs = output.join('\n');
+    expect(logs).toMatch(/GET \/api\/admin\/folders \d{3} \d+ms/);
+    expect(logs).toMatch(/POST \/api\/notes \d{3} \d+ms/);
+    expect(logs).not.toMatch(/private-folder-name|Secret note title|very private message/);
+  });
+
+  test('paths are logged without their query, and guest link tokens are hidden', () => {
+    expect(safePath('/slideshow?pin=4321&family=ABCD-EFGH')).toBe('/slideshow');
+    expect(safePath('/g/AbCdEfGhIj.sometoken/upload')).toBe('/g/[redacted]/upload');
+    expect(safePath('/api/folders')).toBe('/api/folders');
+  });
+});
+
+describe('Error handler', () => {
+  let output;
+  let spy;
+  beforeEach(() => {
+    output = [];
+    spy = jest.spyOn(console, 'error').mockImplementation((...args) => output.push(args.map(String).join(' ')));
+  });
+  afterEach(() => spy.mockRestore());
+
+  const appThrowing = (err) => {
+    const app = express();
+    app.get('/x', (req, res, next) => next(err));
+    app.use(errorHandler);
+    return app;
+  };
+
+  test("never logs an error's own fields, such as a body a library attached", async () => {
+    const err = Object.assign(new Error('Tenant lookup failed'), { code: 'LOOKUP', requestBody: { pin: '246813', familyCode: 'PLMK-OIJN' } });
+    await request(appThrowing(err)).get('/x').expect(500);
+    const logs = output.join('\n');
+    expect(logs).toMatch(/request failed: Error LOOKUP/);
+    expect(logs).toMatch(/^\s+at /m); // where it was thrown
+    expect(logs).not.toMatch(/246813|PLMK-OIJN/);
+  });
+
+  test('a message spread over lines that look like stack frames is not logged', async () => {
+    const err = new Error('Lookup failed for request:\n    at /api/auth/pin (/secret/PLMK-OIJN.js:1:1)\n    at 246813 (/x.js:2:2)');
+    await request(appThrowing(err)).get('/x').expect(500);
+    const logs = output.join('\n');
+    expect(logs).not.toMatch(/PLMK-OIJN|246813/);
+    expect(logs).toMatch(/logger\.test\.js:\d+:\d+/); // the real frames are still there
+  });
+
+  test('a code that does not look like one is not logged', async () => {
+    const err = Object.assign(new Error('x'), { code: 'PLMK-OIJN' });
+    await request(appThrowing(err)).get('/x').expect(500);
+    const logs = output.join('\n');
+    expect(logs).not.toMatch(/PLMK-OIJN/);
+    expect(logs).toMatch(/Error \[redacted\]/);
+    output.length = 0;
+    await request(appThrowing(Object.assign(new Error('y'), { code: 'ERR_STREAM_DESTROYED' }))).get('/x').expect(500);
+    expect(output.join('\n')).toMatch(/ERR_STREAM_DESTROYED/);
+  });
+
+  test('a server error message is neither logged nor returned', async () => {
+    const err = new Error('No family for code PLMK-OIJN');
+    const res = await request(appThrowing(err)).get('/x').expect(500);
+    expect(res.body.message).toBe('Internal server error');
+    expect(JSON.stringify(res.body)).not.toMatch(/PLMK-OIJN/);
+    expect(output.join('\n')).not.toMatch(/PLMK-OIJN/);
+  });
+
+  test('a hosted tenant lookup that fails during PIN sign-in leaks nothing', async () => {
+    const hosted = createApp({
+      resolveTenant: req => { if (req.body && req.body.familyCode) throw new Error(`Unknown family ${req.body.familyCode}`); return null; }
+    });
+    const res = await request(hosted).post('/api/auth/pin').send({ pin: '135790', familyCode: 'QAZW-SXED' });
+    expect(res.status).toBe(500);
+    expect(JSON.stringify(res.body)).not.toMatch(/QAZW-SXED|135790/);
+    expect(output.join('\n')).not.toMatch(/QAZW-SXED|135790/);
+  });
+
+  test('keeps the answer of other errors that carry a type and a body', async () => {
+    const err = Object.assign(new Error('Name is required'), { status: 422, type: 'validation.failed', body: { name: '' } });
+    const res = await request(appThrowing(err)).get('/x').expect(422);
+    expect(res.body.message).toBe('Name is required');
+  });
+});
+
+describe('Google Photos token check', () => {
+  test('a failed check does not log the token from its address', async () => {
+    const oauth = require('../utils/oauthManager');
+    const realFetch = global.fetch;
+    const warnings = [];
+    const spies = ['log', 'warn', 'error'].map(m => jest.spyOn(console, m).mockImplementation((...args) => warnings.push(args.map(String).join(' '))));
+    global.fetch = jest.fn()
+      .mockRejectedValueOnce(Object.assign(new Error('request to https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=ya29.SECRETTOKEN failed'), { name: 'FetchError', code: 'ECONNRESET' }))
+      .mockResolvedValue({ ok: false, status: 500, statusText: 'Error', text: async () => '{}' });
+    try {
+      await oauth.createPickerSession('ya29.SECRETTOKEN', 'uploads').catch(() => {});
+      expect(warnings.join('\n')).not.toMatch(/SECRETTOKEN/);
+    } finally {
+      global.fetch = realFetch;
+      spies.forEach(spy => spy.mockRestore());
+    }
+  });
+});
+
+describe('Controller logs', () => {
+  let output;
+  let spies;
+  beforeEach(() => {
+    output = [];
+    const capture = (...args) => output.push(args.map(a => (typeof a === 'string' ? a : JSON.stringify(a))).join(' '));
+    spies = ['log', 'info', 'warn', 'error'].map(method => jest.spyOn(console, method).mockImplementation(capture));
+  });
+  afterEach(() => spies.forEach(spy => spy.mockRestore()));
+
+  test('a failing family code hook does not get the new code logged', async () => {
+    const familyCodes = require('../services/familyCodeService');
+    const accessAccounts = require('../controllers/accessAccountController');
+    const spy = jest.spyOn(familyCodes, 'renew').mockRejectedValue(new Error('Index update failed for ZXCV-QWER'));
+    const was = accessAccounts.familyCode;
+    accessAccounts.familyCode = true;
+    try {
+      const res = { status: () => res, json: () => res };
+      await accessAccounts.renewFamilyCode({}, res);
+      expect(output.join('\n')).not.toMatch(/ZXCV-QWER/);
+      expect(output.join('\n')).toMatch(/Error renewing the family code/);
+    } finally {
+      accessAccounts.familyCode = was;
+      spy.mockRestore();
+    }
+  });
+
+  test('a folder name from the address is not logged', async () => {
+    const app = createApp();
+    const agent = request.agent(app);
+    await agent.post('/api/auth/login').send({ password: 'correct-horse-battery' }).expect(200);
+    await fs.ensureDir(path.join(testUploadsDir, 'family'));
+    await fs.writeFile(path.join(testUploadsDir, 'family', 'a.png'), Buffer.from('x'));
+    await agent.get('/api/images/next').query({ folder: 'Private-Folder-Name' });
+    expect(output.join('\n')).not.toMatch(/Private-Folder-Name/);
+  });
+
+  test('a Google sign-in error from the address is not logged', async () => {
+    const google = require('../controllers/googlePhotosController');
+    const res = { send: () => res, status: () => res, json: () => res, redirect: () => res };
+    await google.handleCallback({ query: { error: 'odd-value-XYZ123' }, session: {} }, res, () => {});
+    expect(output.join('\n')).not.toMatch(/odd-value-XYZ123/);
+  });
+});
+
+describe('Google sign-in start', () => {
+  test('does not log the address to come back to', () => {
+    const oauth = require('../utils/oauthManager');
+    const lines = [];
+    const spy = jest.spyOn(console, 'log').mockImplementation((...args) => lines.push(args.map(String).join(' ')));
+    try {
+      oauth.getAuthUrl('https://frame.example/back?private=1', 'state-SECRET');
+      expect(lines.join('\n')).not.toMatch(/private=1|state-SECRET/);
+    } finally {
+      spy.mockRestore();
+    }
   });
 });

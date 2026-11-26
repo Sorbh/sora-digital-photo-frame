@@ -3,6 +3,25 @@
 
 <head>
     <meta charset="UTF-8">
+    <meta name="referrer" content="no-referrer">
+    <!-- Before anything else loads: keep the PIN and family code (#pin=...&family=...,
+         or ?pin=...&family=...) in memory only, out of the address, the history and
+         the requests below (see AuthenticationManager). After # they never reach the server. -->
+    <script>
+        (function () {
+            var url = new URL(location.href);
+            var query = url.searchParams;
+            var fragment = new URLSearchParams(url.hash.slice(1));
+            var inQuery = query.has('pin') || query.has('family');
+            var inFragment = fragment.has('pin') || fragment.has('family');
+            if (!inQuery && !inFragment) return;
+            var pick = function (name) { return (fragment.get(name) || query.get(name) || '').trim(); };
+            window.soraUrlSignIn = { pin: pick('pin'), family: pick('family') };
+            ['pin', 'family'].forEach(function (name) { query.delete(name); fragment.delete(name); });
+            var hash = inFragment ? (String(fragment) ? '#' + fragment : '') : url.hash;
+            history.replaceState(history.state, '', url.pathname + url.search + hash);
+        })();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="theme-color" content="#1a1117">
     <!-- Opened from the home screen, the frame runs full screen with no browser chrome -->

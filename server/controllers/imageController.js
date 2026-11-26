@@ -121,7 +121,7 @@ class ImageController {
         });
 
         if (availableImages.length === 0) {
-          console.log('❌ API Filter - No images found in folder:', decodedFolder);
+          console.log('❌ API Filter - No images found in the chosen folder');
           return res.status(404).json({ 
             success: false,
             error: `No images found in folder: ${decodedFolder}`,

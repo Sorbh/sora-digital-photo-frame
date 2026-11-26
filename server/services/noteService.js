@@ -5,7 +5,7 @@ const thumbnails = require('./thumbnailService');
 const { getLibrary } = require('../library');
 const { getDataStore } = require('../store');
 const LocalDataStore = require('../store/LocalDataStore');
-const { toAdminPath } = require('../utils/safePath');
+const { toAdminPath, uploadsUrl } = require('../utils/safePath');
 
 const THEMES = ['paper', 'berry', 'ink'];
 // Book layouts and the photos each needs (mirrors NotePage.templates in public/js/notePage.js)
@@ -154,7 +154,7 @@ class NoteService {
   photoUrls(photos = []) {
     return photos.map(photo => ({
       path: photo,
-      url: `/uploads/${photo.split(path.sep).map(encodeURIComponent).join('/')}`,
+      url: uploadsUrl(path.join('uploads', photo)),
       // ?revalidate=1: not the address browsers cached for a day before thumbnails were always checked
       thumbnail: `/api/images/${encodeURIComponent(photo)}/thumbnail?revalidate=1`
     }));

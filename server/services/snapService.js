@@ -1,6 +1,7 @@
 const path = require('path');
 const { getLibrary } = require('../library');
 const { toAdminPath } = require('../utils/safePath');
+const { addWithinQuota } = require('./quotaService');
 
 const { UPLOADS_DIR } = require('../config/paths');
 const notes = require('./noteService');
@@ -88,8 +89,19 @@ class SnapService {
     return { snap: saved, fullPath };
   }
 
-  async write(fullPath, snap) {
-    await getLibrary().writeItem(toAdminPath(fullPath), Buffer.from(JSON.stringify(snap, null, 2)));
+  // A new snap, or one that grew, needs room in the library like a photo
+  // (not when the server itself keeps snaps in step with a moved photo)
+  async write(fullPath, snap, { checkQuota = true } = {}) {
+    const buffer = Buffer.from(JSON.stringify(snap, null, 2));
+    const write = () => getLibrary().writeItem(toAdminPath(fullPath), buffer);
+    if (!checkQuota) return write();
+    // Measured in the family's turn, against the snap as it is now (its content, so
+    // an encrypted library compares like with like)
+    const growth = async () => {
+      const current = await getLibrary().readItem(toAdminPath(fullPath)).catch(() => null);
+      return buffer.length - (current ? current.length : 0);
+    };
+    await addWithinQuota(growth, write);
   }
 
   slug(title) {
@@ -126,7 +138,7 @@ class SnapService {
         const snap = await this.read(fullPath);
         if (!snap.photos?.includes(from)) continue;
         snap.photos = snap.photos.map(p => (p === from ? to : p));
-        await this.write(fullPath, snap);
+        await this.write(fullPath, snap, { checkQuota: false });
       } catch (error) {
         console.error('Could not update snap after a move:', fullPath, error.message);
       }

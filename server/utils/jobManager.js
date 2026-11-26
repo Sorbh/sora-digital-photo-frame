@@ -3,6 +3,23 @@ const path = require('path');
 const { currentTenant } = require('../context');
 const { isGooglePhotoUrl, fetchGooglePhoto } = require('./googleUrls');
 const { displayCopy } = require('./displayCopy');
+const { MAX_FILE_SIZE } = require('../middleware/upload');
+
+// A download's body, or null when it is (or says it is) bigger than max bytes
+async function readLimited(response, max) {
+  if (Number(response.headers.get('content-length')) > max) {
+    await response.body?.cancel?.().catch(() => {});
+    return null;
+  }
+  const chunks = [];
+  let size = 0;
+  for await (const chunk of response.body) {
+    size += chunk.length;
+    if (size > max) return null; // leaving the loop cancels the download
+    chunks.push(Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks);
+}
 const { resolveAdminPath } = require('./safePath');
 const { UPLOADS_DIR } = require('../config/paths');
 const photoInfo = require('../services/photoInfoService');
@@ -81,7 +98,9 @@ class JobManager {
   async executeGooglePhotosImport(job) {
     const { mediaItems, destinationPath, accessToken } = job.data;
     const { getLibrary } = require('../library');
-    const { assertCanAdd } = require('../services/quotaService');
+    const { assertCanAdd, addWithinQuota } = require('../services/quotaService');
+    const { currentTenant } = require('../context');
+    const slots = require('./workSlots');
 
     console.log('🔧 [DEBUG] Executing Google Photos import job:', job.id);
     console.log('🔧 [DEBUG] Importing', mediaItems.length, 'photos to', destinationPath);
@@ -104,8 +123,13 @@ class JobManager {
         continue;
       }
 
+      let release = null;
       try {
         console.log('🔧 [DEBUG] Processing item', i + 1, 'of', mediaItems.length, ':', item.id);
+        // Room left, and a turn among the photos being converted, before downloading it
+        await assertCanAdd(1);
+        release = await slots.acquire(currentTenant().id, { kind: 'import' });
+        await assertCanAdd(1); // the library may have filled up while this waited
 
         // Get download URL
         let downloadUrl = '';
@@ -147,7 +171,13 @@ class JobManager {
 
         // Stored like an upload: a WebP display copy with a name of our own, so a
         // file called x.html (or one that isn't an image at all) can't end up on the site
-        const original = Buffer.from(await response.arrayBuffer());
+        // No bigger than an upload may be, read up to that and no further
+        const original = await readLimited(response, MAX_FILE_SIZE);
+        if (!original) {
+          job.progress.failed++;
+          importResults.push({ id: item.id, success: false, error: 'Photo too large' });
+          continue;
+        }
         let imageBuffer;
         try {
           imageBuffer = await displayCopy(original, { animated: /gif/i.test(response.headers.get('content-type') || '') });
@@ -157,12 +187,11 @@ class JobManager {
           continue;
         }
         const filename = `google-${Date.now()}-${Math.round(Math.random() * 1E9)}.webp`;
-        await assertCanAdd(imageBuffer.length);
-        const added = await getLibrary().addPhoto(destinationPath, {
+        const added = await addWithinQuota(imageBuffer.length, () => getLibrary().addPhoto(destinationPath, {
           buffer: imageBuffer,
           originalName: filename,
           contentType: 'image/webp'
-        });
+        }));
         // Keep when and where it was taken, read from the original before it is dropped
         const storedPath = resolveAdminPath(added.path);
         if (storedPath) {
@@ -188,6 +217,8 @@ class JobManager {
           success: false,
           error: error.message
         });
+      } finally {
+        if (release) release();
       }
 
       // Small delay to prevent overwhelming the server
@@ -275,3 +306,4 @@ class JobManager {
 
 // Export singleton instance
 module.exports = new JobManager();
+module.exports.readLimited = readLimited;

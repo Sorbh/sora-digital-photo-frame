@@ -234,6 +234,10 @@
     "connection": "Connection error. Please try again.",
     "unknown": "Something went wrong. Please try again.",
     "FILE_TOO_LARGE": "Each photo can be up to {size} MB",
+    "IMAGE_TOO_LARGE": "This photo is too large to process. Try a smaller photo or a shorter animation.",
+    "UPLOAD_TOO_LARGE": "Each upload can be up to {size} MB.",
+    "BUSY": "Many photos are being uploaded right now. Please try again in a moment.",
+    "PHOTO_CHANGED": "This photo changed while it was being rotated. Please try again.",
     "UNSUPPORTED_TYPE": "Only JPEG, PNG, GIF, WebP and HEIC photos can be uploaded",
     "SCREEN_LIMIT": "This family already has {limit} screens. Remove one you no longer use to add this one."
   },

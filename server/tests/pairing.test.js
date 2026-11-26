@@ -67,6 +67,18 @@ describe('Pairing a frame by QR code', () => {
     expect(shown.body).toMatchObject({ code: pairing.code, approved: false });
   });
 
+  test('opening /pair by hand, as the frame suggests, offers a box to type the code', async () => {
+    const page = await admin.get('/pair').expect(200);
+    expect(page.text).toContain('id="stateEnter"');
+    expect(page.text).toContain('id="codeInput"');
+
+    // However it was typed off the screen, the code is found
+    const pairing = await start(request.agent(app));
+    const typed = ` ${pairing.code.slice(0, 3).toLowerCase()} ${pairing.code.slice(3).toLowerCase()} `;
+    const shown = await admin.get(`/api/admin/pair/${encodeURIComponent(typed)}`).expect(200);
+    expect(shown.body.code).toBe(pairing.code);
+  });
+
   test('approving with a new account signs the frame in for good', async () => {
     const frame = request.agent(app);
     const pairing = await start(frame);

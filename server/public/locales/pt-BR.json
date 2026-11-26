@@ -191,7 +191,16 @@
     "donePaired": "{name} está <em>conectado</em>",
     "expiredHeading": "Este código <em>expirou</em>",
     "heading": "Mostrar fotos <em>neste porta-retrato</em>",
-    "codeMatchHint": "Confira se é igual ao da tela do porta-retrato"
+    "codeMatchHint": "Confira se é igual ao da tela do porta-retrato",
+    "enterHeading": "Digite o <em>código</em>",
+    "enterNote": "O porta-retrato mostra o código abaixo do QR code, como <bdi class=\"code-example\">K7P-4QX</bdi>.",
+    "continue": "Continuar",
+    "codeInvalid": "Digite as 6 letras e números que aparecem no porta-retrato.",
+    "typeCode": "Digitar um código",
+    "unreachableHeading": "Não foi possível <em>verificar</em> o código",
+    "unreachableNote": "A biblioteca não respondeu. Confira a conexão do celular e tente de novo.",
+    "tryAgain": "Tentar de novo",
+    "foldersFailed": "Não foi possível carregar as pastas, então não dá para criar uma conta nova agora. Escolha uma conta existente ou tente de novo."
   },
   "login": {
     "invalid_password": "Senha incorreta. Tente de novo.",

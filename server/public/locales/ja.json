@@ -190,7 +190,16 @@
     "donePaired": "{name}を<em>接続しました</em>",
     "expiredHeading": "このコードは<em>期限切れ</em>です",
     "heading": "<em>このフレーム</em>に写真を表示",
-    "codeMatchHint": "フレームの画面と同じか確認してください"
+    "codeMatchHint": "フレームの画面と同じか確認してください",
+    "enterHeading": "<em>コード</em>を入力",
+    "enterNote": "フレームのQRコードの下に、<bdi class=\"code-example\">K7P-4QX</bdi> のように表示されています。",
+    "continue": "続ける",
+    "codeInvalid": "フレームに表示された6文字の英数字を入力してください。",
+    "typeCode": "コードを入力",
+    "unreachableHeading": "コードを<em>確認</em>できませんでした",
+    "unreachableNote": "ライブラリから応答がありません。スマートフォンの接続を確認してから、もう一度お試しください。",
+    "tryAgain": "もう一度試す",
+    "foldersFailed": "フォルダを読み込めなかったため、今は新しいアカウントを作成できません。既存のアカウントを選ぶか、もう一度お試しください。"
   },
   "login": {
     "invalid_password": "パスワードが正しくありません。もう一度お試しください。",

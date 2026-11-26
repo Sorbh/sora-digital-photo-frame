@@ -128,19 +128,37 @@ class PhotoFrameAdmin {
         return 'uploads';
     }
 
-    updateURL() {
+    // Each folder opened is a history entry, so the phone's Back button goes up
+    // a folder instead of leaving the library. push: a new entry, else the
+    // current one is corrected in place (first load, or Back itself).
+    updateURL(push = false) {
         const url = new URL(window.location);
         if (this.currentPath === 'uploads') {
             url.searchParams.delete('path');
         } else {
             url.searchParams.set('path', this.currentPath);
         }
-        window.history.replaceState({}, '', url);
+        if (url.href === location.href) return;
+        if (push) window.history.pushState({}, '', url);
+        else window.history.replaceState(history.state, '', url);
+    }
+
+    // Back and Forward: close the photo viewer first, then show the folder the
+    // entry is for
+    handleHistory() {
+        const modal = document.getElementById('photoModal');
+        if (modal.open && !history.state?.photo) this.hidePhotoModal();
+        const path = this.getInitialPath();
+        if (path !== this.currentPath) {
+            this.currentPath = path;
+            this.loadFolderContents();
+        }
     }
 
     initializeEventListeners() {
         // Navigation
         document.getElementById('backBtn').addEventListener('click', () => this.navigateBack());
+        window.addEventListener('popstate', () => this.handleHistory());
         
         // Access Accounts
         document.getElementById('accessAccountsBtn').addEventListener('click', () => {
@@ -263,6 +281,9 @@ class PhotoFrameAdmin {
         document.getElementById('closePhotoModal').addEventListener('click', () => this.hidePhotoModal());
         document.getElementById('photoModalPrev').addEventListener('click', () => this.navigateToPreviousImage());
         document.getElementById('photoModalNext').addEventListener('click', () => this.navigateToNextImage());
+        document.getElementById('photoModal').addEventListener('close', () => {
+            if (history.state?.photo) history.back();
+        });
         document.getElementById('photoModal').addEventListener('click', (e) => {
             if (e.target === e.currentTarget) {
                 this.hidePhotoModal();
@@ -947,19 +968,18 @@ class PhotoFrameAdmin {
     }
 
     navigateTo(path) {
+        if (path === this.currentPath) return;
         this.currentPath = path;
-        this.updateURL();
+        this.updateURL(true);
         this.loadFolderContents();
     }
 
     navigateBack() {
         if (this.currentPath === 'uploads') return;
-        
+
         const pathParts = this.currentPath.split('/');
         pathParts.pop();
-        this.currentPath = pathParts.join('/') || 'uploads';
-        this.updateURL();
-        this.loadFolderContents();
+        this.navigateTo(pathParts.join('/') || 'uploads');
     }
 
     updateBreadcrumb() {
@@ -1635,7 +1655,11 @@ class PhotoFrameAdmin {
         // Add event listeners for zoom and pan
         this.setupPhotoModalInteractions(modalImage);
         
-        modal.showModal();
+        if (!modal.open) {
+            modal.showModal();
+            // An entry for the viewer: the phone's Back button closes it
+            if (!history.state?.photo) history.pushState({ ...history.state, photo: true }, '', location.href);
+        }
     }
 
     hidePhotoModal() {

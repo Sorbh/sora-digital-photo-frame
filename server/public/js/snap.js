@@ -106,7 +106,7 @@ class SnapEditor extends PageEditor {
                 if (data.errors) this.showErrors(data.errors);
                 throw new Error(i18n.error(data, 'snap.saveFailed'));
             }
-            window.location.href = `/admin?path=${encodeURIComponent(this.folder)}`;
+            window.location.replace(`/admin?path=${encodeURIComponent(this.folder)}`);
         } catch (error) {
             btn.disabled = false;
             if (error.message !== 'Signed out') this.showToast(error.message, 'error');

@@ -119,7 +119,9 @@ class AccessAccountController {
     }
 
     // A new account with a PIN nobody has yet (used when a frame is paired by QR code)
-    async addAccountWithRandomPin({ name, assignedFolders = [] }) {
+    // pendingPairing marks an account made while approving a frame, until the
+    // frame is paired; such an account can't be chosen for another frame yet
+    async addAccountWithRandomPin({ name, assignedFolders = [], pendingPairing = false }) {
         let account;
         await getDataStore().update('access-accounts', [], async accounts => {
             let pin;
@@ -132,7 +134,8 @@ class AccessAccountController {
                 pinHash: await this.hashPin(pin),
                 assignedFolders,
                 createdAt: new Date().toISOString(),
-                lastAccessed: null
+                lastAccessed: null,
+                ...(pendingPairing && { pendingPairing: true })
             };
             return [...accounts, account];
         });

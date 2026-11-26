@@ -9,7 +9,9 @@ const { getLibrary } = require('../library');
 const { jpegCopy, acceptsWebp } = require('../middleware/webpFallback');
 const { currentTenant, DEFAULT_TENANT } = require('../context');
 
-const CACHE_DIR = path.join(CACHE_ROOT, 'thumbs');
+// v2: keys that always name the family (see cachePathFor). Files from before sit one
+// folder up and are never looked at, so an old key that two families shared can't be served.
+const CACHE_DIR = path.join(CACHE_ROOT, 'thumbs', 'v2');
 const IMAGE_PATTERN = /\.(jpg|jpeg|png|gif|webp)$/i;
 
 // Square cover crop, big enough for a 2x-density grid tile
@@ -40,8 +42,9 @@ class ThumbnailService {
 
   cachePathFor(sourcePath) {
     // Tenants share admin paths ("uploads/Family/..."), so their thumbnails must not
+    // (the default one included: its "family/a.jpg" must never be tenant "family"'s "a.jpg")
     const { id } = currentTenant();
-    const scope = id === DEFAULT_TENANT.id ? '' : `${id}/`;
+    const scope = id === DEFAULT_TENANT.id ? '__default__/' : `t/${encodeURIComponent(id)}/`;
     const key = crypto.createHash('sha1')
       .update(`${scope}${path.relative(UPLOADS_DIR, sourcePath)}:${THUMB_SIZE}`)
       .digest('hex');
@@ -125,23 +128,29 @@ class ThumbnailService {
   }
 
   /**
-   * Send a thumbnail; ETag/Last-Modified come from sendFile.
+   * Send a thumbnail with an ETag of its own (see sendTagged).
    */
-  send(res, thumbPath, { versioned = true } = {}) {
-    // Versioned URLs (?v=...) change with the source, so they can be cached for long
-    // private: tenants share these URLs, so a shared cache must never keep one
-    res.set('Cache-Control', versioned
-      ? 'private, max-age=604800, immutable'
-      : 'private, max-age=300, stale-while-revalidate=86400');
+  send(res, thumbPath) {
+    // private: tenants share these URLs, so a shared cache must never keep one.
+    // no-cache: the browser keeps its copy but asks first (a cheap 304 via the ETag),
+    // so it stops showing it after signing out or losing access to the folder.
+    res.set('Cache-Control', 'private, no-cache');
     res.vary('Accept');
-    if (acceptsWebp(res.req)) {
-      res.type('image/webp');
-      return res.sendFile(thumbPath);
-    }
     // Old frames without WebP get a JPEG copy
-    return jpegCopy(thumbPath)
-      .then(copy => res.type('jpeg').sendFile(copy))
+    const file = acceptsWebp(res.req) ? Promise.resolve(thumbPath) : jpegCopy(thumbPath);
+    return file
+      .then(ready => this.sendTagged(res, ready, acceptsWebp(res.req) ? 'image/webp' : 'jpeg'))
       .catch(() => res.status(500).json({ message: 'Server error' }));
+  }
+
+  // sendFile's own ETag is only size and time, which two families' thumbnails can share.
+  // The cache file's name is unique per family and photo, so it goes into the ETag too.
+  async sendTagged(res, file, type) {
+    const stat = await fs.stat(file);
+    const tag = crypto.createHash('sha1').update(`${file}:${stat.size}:${stat.mtimeMs}`).digest('base64url');
+    res.set('ETag', `"${tag}"`);
+    // No Last-Modified: a date can match another family's thumbnail, the ETag can't
+    res.type(type).sendFile(file, { lastModified: false });
   }
 }
 

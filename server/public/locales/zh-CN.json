@@ -324,6 +324,7 @@
     "countSnaps_one": "{count} 个回忆页",
     "countSnaps_other": "{count} 个回忆页",
     "folderOptions": "文件夹选项",
+    "photoOptions": "照片选项",
     "selectPhoto": "选择照片",
     "viewPhoto": "查看照片",
     "deletePhoto": "删除照片",

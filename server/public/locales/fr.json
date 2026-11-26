@@ -330,6 +330,7 @@
     "countSnaps_other": "{count} pages souvenir",
     "countSnaps_many": "{count} pages souvenir",
     "folderOptions": "Options du dossier",
+    "photoOptions": "Options de la photo",
     "selectPhoto": "Sélectionner la photo",
     "viewPhoto": "Voir la photo",
     "deletePhoto": "Supprimer la photo",

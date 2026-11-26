@@ -109,12 +109,14 @@ class JobManager {
     // Set up progress tracking
     job.progress.total = mediaItems.length;
 
-    // Ensure destination folder exists (the library refuses paths outside uploads/),
-    // and not past MAX_FOLDER_DEPTH (the import route already refused that up front)
+    // Make the destination folder, the one time the import may (the library refuses
+    // paths outside uploads/), and not past MAX_FOLDER_DEPTH (the import route already
+    // refused that up front). Each photo is then saved only while it's still there.
     const destinationDir = resolveAdminPath(destinationPath, { allowRoot: true });
     if (destinationDir) await assertFolderAllowed(destinationDir);
     await getLibrary().createFolder(destinationPath);
     let quotaReached = false;
+    let folderGone = false;
 
     const importResults = [];
 
@@ -124,6 +126,12 @@ class JobManager {
       if (quotaReached) {
         job.progress.failed++;
         importResults.push({ id: item.id, success: false, error: 'Storage limit reached' });
+        continue;
+      }
+      // Deleted during the import: it stays deleted, and the rest aren't downloaded
+      if (folderGone) {
+        job.progress.failed++;
+        importResults.push({ id: item.id, success: false, error: 'Folder not found', code: 'FOLDER_NOT_FOUND' });
         continue;
       }
 
@@ -215,11 +223,13 @@ class JobManager {
       } catch (error) {
         console.error('❌ [DEBUG] Error importing photo:', item.id, error);
         if (error.code === 'QUOTA_EXCEEDED') quotaReached = true;
+        if (error.code === 'FOLDER_NOT_FOUND') folderGone = true;
         job.progress.failed++;
         importResults.push({
           id: item.id,
           success: false,
-          error: error.message
+          error: error.message,
+          ...(error.code === 'FOLDER_NOT_FOUND' && { code: error.code })
         });
       } finally {
         if (release) release();

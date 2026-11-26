@@ -98,6 +98,10 @@ describe('Request logging keeps secrets out of the logs', () => {
     expect(safePath('/api/folders/Trips/Italy/thumbnail')).toBe('/api/folders/[folder]/thumbnail');
     expect(safePath('/api/folders/Trips/Italy')).toBe('/api/folders/[folder]');
     expect(safePath('/g/AbCdEfGhIj.sometoken/uploads/Album/photo.jpg')).toBe('/g/[redacted]/uploads/[photo]');
+    // A request that names the whole address
+    expect(safePath('http://frame.example/uploads/Album/photo.jpg?w=1')).toBe('/uploads/[photo]');
+    expect(safePath('HTTPS://frame.example/api/folders/Trips/Italy')).toBe('/api/folders/[folder]');
+    expect(safePath('http://frame.example/g/sometoken/uploads/Album/photo.jpg')).toBe('/g/[redacted]/uploads/[photo]');
     // Other paths stay as they are
     expect(safePath('/uploads')).toBe('/uploads');
     expect(safePath('/api/images/next')).toBe('/api/images/next');
@@ -115,6 +119,32 @@ describe('Request logging keeps secrets out of the logs', () => {
     expect(logs).toMatch(/GET \/api\/folders\/\[folder\]\/thumbnail \d{3} \d+ms/);
     expect(logs).toMatch(/GET \/api\/folders\/\[folder\] \d{3} \d+ms/);
     expect(logs).not.toMatch(/Grandma|IMG_1234/);
+  });
+
+  test('a request naming the whole address keeps album and file names out of the log too', async () => {
+    const http = require('http');
+    const server = app.listen(0, '127.0.0.1');
+    await new Promise(resolve => server.once('listening', resolve));
+    try {
+      const status = await new Promise((resolve, reject) => {
+        const req = http.request({
+          host: '127.0.0.1',
+          port: server.address().port,
+          method: 'GET',
+          path: 'http://frame.example/uploads/Grandmas%20Birthday/IMG_1234.jpg',
+          headers: { Host: 'frame.example' }
+        }, (res) => { res.resume(); res.on('end', () => resolve(res.statusCode)); });
+        req.on('error', reject);
+        req.end();
+      });
+      // Routed as a photo, so it needs a signed-in viewer
+      expect(status).toBe(401);
+    } finally {
+      await new Promise(resolve => server.close(resolve));
+    }
+    const logs = output.join('\n');
+    expect(logs).toMatch(/GET \/uploads\/\[photo\] 401 \d+ms/);
+    expect(logs).not.toMatch(/Grandma|IMG_1234|frame\.example/);
   });
 });
 

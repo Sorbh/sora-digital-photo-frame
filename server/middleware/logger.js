@@ -11,10 +11,21 @@ const PRIVATE_PATHS = [
   [/^\/api\/folders\/./i, '/api/folders/[folder]']
 ];
 
+// The path alone, as Express routes it. A request can name the whole address
+// (GET http://frame.example/uploads/...), which Express routes by its path too.
+const pathOf = (url) => {
+  if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(url)) return url.split('?')[0];
+  try {
+    return new URL(url).pathname;
+  } catch (error) {
+    return '[unreadable]';
+  }
+};
+
 // The path without its query, with guest link tokens (/g/<token>/...) hidden,
 // and photo and folder names left out
 const safePath = (url) => {
-  let path = url.split('?')[0];
+  let path = pathOf(url);
   let prefix = '';
   const guest = /^\/g\/[^/]+/.exec(path);
   if (guest) {

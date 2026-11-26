@@ -35,14 +35,16 @@ const stillGif = async () => sharp(await png()).gif().toBuffer();
 
 // Every request the hook was asked, and what it answers (swapped per test)
 const asked = [];
+const contexts = [];
 let answer = async () => ({ ok: true });
 
 const app = createApp({
   auth: { requireAuth: (req, res, next) => next() },
   quota: {
-    async canAdd(request) {
+    async canAdd(request, context) {
       asked.push(request);
-      return answer(request);
+      contexts.push(context);
+      return answer(request, context);
     }
   }
 });
@@ -59,6 +61,7 @@ beforeAll(async () => {
 
 beforeEach(() => {
   asked.length = 0;
+  contexts.length = 0;
   answer = async () => ({ ok: true });
   fetchGooglePhoto.mockReset();
 });
@@ -253,6 +256,27 @@ describe('screens', () => {
     }
   });
 
+  test('the hook is told how many screens there are now, and can limit by that alone', async () => {
+    await getDataStore().set('devices', []);
+    // At most 2 screens, from the count the core passes (no index of its own)
+    answer = async ({ screens }, context) => ({
+      ok: context.screensInUse + screens <= 2,
+      message: 'Your plan has 2 screens. Upgrade to add more.'
+    });
+    await signIn(request.agent(app), { pin: '482913' }).expect(200);
+    await signIn(request.agent(app), { pin: '482913' }).expect(200);
+    const third = await signIn(request.agent(app), { pin: '482913' }).expect(403);
+    expect(third.body).toMatchObject({ code: 'SCREEN_LIMIT', message: 'Your plan has 2 screens. Upgrade to add more.' });
+    expect(contexts.filter(Boolean)).toEqual([{ screensInUse: 0 }, { screensInUse: 1 }, { screensInUse: 2 }]);
+    expect(await devices()).toBe(2);
+
+    // The same when they all come at once
+    await getDataStore().set('devices', []);
+    const results = await Promise.all([1, 2, 3].map(() => signIn(request.agent(app), { pin: '482913' })));
+    expect(results.map(r => r.status).sort()).toEqual([200, 200, 403]);
+    expect(await devices()).toBe(2);
+  });
+
   test('two new screens at once cannot both take the last place', async () => {
     limit = (await devices()) + 1;
     const results = await Promise.all([signIn(request.agent(app), { pin: '482913' }), signIn(request.agent(app), { pin: '482913' })]);
@@ -295,6 +319,18 @@ describe('the hook contract', () => {
   test('old callers passing a number are caught, not read as no limit', async () => {
     await expect(quotaService.assertCanAdd(5)).rejects.toThrow(TypeError);
     await expect(quotaService.addWithinQuota(5, async () => {})).rejects.toThrow(TypeError);
+  });
+
+  test('a context is passed through to the hook unchanged; photos send none', async () => {
+    const context = { screensInUse: 3 };
+    await quotaService.ask({ screens: 1 }, context);
+    await quotaService.assertCanAdd({ screens: 1 }, context);
+    await quotaService.addWithinQuota({ items: 1 }, async () => {}, context);
+    expect(contexts).toEqual([context, context, context]);
+    expect(contexts.every(c => c === context)).toBe(true);
+    contexts.length = 0;
+    await upload(await png(), 'p.png').expect(200);
+    expect(contexts.every(c => c === undefined)).toBe(true);
   });
 
   test('a note asks for 1 item with assertCanAddItems', async () => {

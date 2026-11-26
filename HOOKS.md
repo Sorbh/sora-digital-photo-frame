@@ -10,7 +10,7 @@ These options are a public contract. Treat a change to a name, an argument or a 
 | `dataStore` | `DataStore` subclass: `get`, `set`, `update`. `folder-settings:<folder>` documents (a folder's play order) belong to that photo folder: writing one must not create the folder, and throws 404 `FOLDER_NOT_FOUND` when it is gone | Local data files | `server/store/DataStore.js` |
 | `resolveTenant` | `async (req) => ({ id, plan })` or `null` | One `default` tenant | `server/context.js` |
 | `auth` | `{ requireAuth, requireGuest, requireViewer }` middleware, all optional | Admin password session | `server/middleware/auth.js` |
-| `quota` | `{ canAdd({ items, bytes, screens }) => ({ ok, message }) }` for the current tenant. **Changed in 3.0.0** (it took `bytes` alone): see [Quota](#quota) | Unlimited | `server/services/quotaService.js` |
+| `quota` | `{ canAdd({ items, bytes, screens }, context) => ({ ok, message }) }` for the current tenant. **Changed in 3.0.0** (it took `bytes` alone): see [Quota](#quota) | Unlimited | `server/services/quotaService.js` |
 | `events` | `{ devicePaired, devicesRemoved, familyCodeSet }`, may be async; if one throws, the action fails, with one exception (see [Events](#events)) | None | `server/events.js` |
 | `keys` | `{ currentKey(), getKey(id) }`, may return promises | `PHOTO_ENCRYPTION_KEY`, or no encryption | `server/crypto/keys.js` |
 | `sessionStore` | `express-session` store | In memory | `server/app.js` |
@@ -22,7 +22,7 @@ These options are a public contract. Treat a change to a name, an argument or a 
 
 ## Quota
 
-The core asks `quota.canAdd(request)` before it adds anything to a library, and refuses when the answer isn't `{ ok: true }`. It runs for the current tenant (`currentTenant()` in `server/context.js`). The default allows everything, so a self-hosted install has no limits.
+The core asks `quota.canAdd(request, context)` before it adds anything to a library, and refuses when the answer isn't `{ ok: true }`. It runs for the current tenant (`currentTenant()` in `server/context.js`). The default allows everything, so a self-hosted install has no limits.
 
 `request` always has all three fields, as numbers:
 
@@ -31,6 +31,14 @@ The core asks `quota.canAdd(request)` before it adds anything to a library, and 
 | `items` | How many countable things are being added (see below) |
 | `bytes` | How much the library grows, counted before encryption at rest, so turning on `PHOTO_ENCRYPTION_KEY` doesn't change what counts. May be 0, or negative when something shrinks |
 | `screens` | `1` when a new screen joins the library, else `0` |
+
+`context` is an optional second argument with facts the core already has, so the hook doesn't need to look them up:
+
+| Field | Sent with | What it is |
+|---|---|---|
+| `screensInUse` | Screen requests only (`screens: 1`) | How many screens the library has now, without the new one. It is counted inside the same lock as the check, so it is always exact. An index the host keeps from `devicePaired` is only updated after the lock is released, so it can be one behind when two pairings run back to back |
+
+Other requests get no `context` (`undefined`). New fields may be added later, so read only the ones you need.
 
 What each action asks for:
 
@@ -57,9 +65,9 @@ For example, a plan that counts photos and screens:
 ```js
 createApp({
   quota: {
-    async canAdd({ items, screens }) {
+    async canAdd({ items, screens }, context) {
       const plan = await plans.forTenant(currentTenant().id); // { items: 100, screens: 1 }
-      if (screens > 0 && (await countScreens()) + screens > plan.screens) {
+      if (screens > 0 && context.screensInUse + screens > plan.screens) {
         return { ok: false, message: `Your plan has ${plan.screens} screen. Upgrade to add more.` };
       }
       if (items > 0 && (await countItems()) + items > plan.items) {
@@ -85,7 +93,7 @@ async canAdd({ bytes }) { return { ok: used() + bytes <= LIMIT }; }
 
 If your hook only limits bytes, also return `{ ok: true }` when `bytes` is 0 or less: a new screen now asks with `bytes: 0`.
 
-The core's own `assertCanAdd` and `addWithinQuota` take the same object, and throw a `TypeError` when given a number.
+The core's own `ask(request, context)`, `assertCanAdd(request, context)` and `addWithinQuota(request, write, context)` take the same object, pass a `context` on to the hook unchanged, and throw a `TypeError` when given a number.
 
 ## Events
 

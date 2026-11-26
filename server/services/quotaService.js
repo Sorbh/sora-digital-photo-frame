@@ -3,12 +3,14 @@
  * own quota to createApp, with a canAdd(request) that answers for the current
  * tenant (see context.js).
  *
- * canAdd({ items, bytes, screens }) -> { ok, message? }
+ * canAdd({ items, bytes, screens }, context?) -> { ok, message? }
  *   items    countable things being added (ITEMS below): a photo is 1, an animated
  *            one 5, a new snap or note 1. Rotating, renaming, moving or editing is 0.
  *   bytes    how much the library grows, counted before encryption at rest
  *   screens  1 when a new screen (frame) joins the library, else 0
- * The core always passes all three, as numbers. Hooks written for the old
+ * The core always passes all three, as numbers. context is optional extra
+ * facts the core has in hand: { screensInUse } with screen requests, the
+ * number of screens the library has now, read under the devices lock. Hooks written for the old
  * canAdd(bytes) must change (see HOOKS.md).
  */
 const unlimited = {
@@ -44,17 +46,19 @@ function normalize(request) {
 // Something is added when any of the three grows
 const addsAnything = ({ items, bytes, screens }) => items > 0 || bytes > 0 || screens > 0;
 
-// The quota hook's answer for this request (normalized)
-async function ask(request) {
-  return quota.canAdd(normalize(request));
+// The quota hook's answer for this request (normalized). context, when given,
+// goes to the hook unchanged as its second argument (e.g. { screensInUse })
+async function ask(request, context) {
+  const normalized = normalize(request);
+  return context === undefined ? quota.canAdd(normalized) : quota.canAdd(normalized, context);
 }
 
 /**
  * Throws a 413 QUOTA_EXCEEDED error when the current tenant cannot add
  * `request` ({ items, bytes, screens }; missing fields are 0).
  */
-async function assertCanAdd(request) {
-  const result = await ask(request);
+async function assertCanAdd(request, context) {
+  const result = await ask(request, context);
   if (!result || !result.ok) {
     const error = new Error((result && result.message) || 'Storage limit reached');
     error.status = 413;
@@ -86,10 +90,11 @@ async function photoItems(buffer) {
  * `request` may be a function, measured in the tenant's turn: what a replaced
  * file adds (e.g. a snap that grew, or one that didn't exist yet). Nothing is
  * checked when nothing is added (no new items, no growth, no screens).
+ * context, when given, reaches the hook unchanged (see ask).
  */
 const queues = new Map();
 
-async function addWithinQuota(request, write) {
+async function addWithinQuota(request, write, context) {
   const id = currentTenant().id;
   const previous = queues.get(id) || Promise.resolve();
   let done;
@@ -99,7 +104,7 @@ async function addWithinQuota(request, write) {
   await previous;
   try {
     const wanted = normalize(typeof request === 'function' ? await request() : request);
-    if (addsAnything(wanted)) await assertCanAdd(wanted);
+    if (addsAnything(wanted)) await assertCanAdd(wanted, context);
     return await write();
   } finally {
     done();

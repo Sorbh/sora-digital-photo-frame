@@ -194,8 +194,9 @@ class PairingService {
       }
       // The quota hook's own limit, asked in the same turn so two new screens can't
       // both pass. Only here: a screen signing in again (by token or session) is
-      // never a new one, so it is never asked about.
-      const answer = await quota.ask({ screens: 1 });
+      // never a new one, so it is never asked about. The count is the exact one,
+      // under this lock: a host's own index only hears of a screen after it.
+      const answer = await quota.ask({ screens: 1 }, { screensInUse: devices.length });
       if (!answer || !answer.ok) {
         throw Object.assign(new Error((answer && answer.message) || 'This family has no room for another screen.'),
           { status: 403, code: 'SCREEN_LIMIT' });

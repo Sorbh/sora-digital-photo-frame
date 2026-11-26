@@ -39,7 +39,7 @@ const { setMaxFolderDepth, canMakeFolderAt, maxFolderDepth } = require('./utils/
  *   resolveTenant async function(req) -> { id, plan } or null (default: one 'default' tenant)
  *   auth          { requireAuth, requireGuest, requireViewer } middleware, all optional
  *                 (default: admin password session)
- *   quota         { canAdd({ items, bytes, screens }) -> { ok, message } } for the current
+ *   quota         { canAdd({ items, bytes, screens }, context) -> { ok, message } } for the current
  *                 tenant (default: unlimited; see HOOKS.md, Quota)
  *   events        { devicePaired, devicesRemoved, familyCodeSet } handlers (see events.js)
  *   pinSignIn     false turns off PIN sign-in for frames

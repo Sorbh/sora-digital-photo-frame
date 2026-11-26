@@ -20,7 +20,8 @@ async function refuseTooDeep(res, destinationPath) {
       code: error.code,
       message: error.message,
       ...error.vars,
-      error: { code: error.code, message: error.message }
+      // The dialog translates the nested error, so it carries the limit too
+      error: { code: error.code, message: error.message, ...error.vars }
     });
     return true;
   }

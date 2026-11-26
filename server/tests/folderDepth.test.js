@@ -15,7 +15,8 @@ process.env.ADMIN_PASSWORD = 'test-admin-pass';
 process.env.ENABLE_GOOGLE_PHOTOS = 'true';
 delete process.env.MAX_FOLDER_DEPTH;
 
-const { createApp } = require('../app');
+const vm = require('vm');
+const { createApp, initializeUploads } = require('../app');
 const oauthManager = require('../utils/oauthManager');
 const jobManager = require('../utils/jobManager');
 const { parseMaxFolderDepth, folderDepth } = require('../utils/folderDepth');
@@ -29,6 +30,16 @@ async function adminFor(depth) {
   const admin = request.agent(createApp());
   await admin.post('/api/auth/login').send({ password: 'test-admin-pass' }).expect(200);
   return admin;
+}
+
+// public/js/i18n.js as a browser page runs it, with one language's catalogue loaded
+function browserI18n(locale) {
+  const window = {};
+  const document = { documentElement: { classList: { add() {}, remove() {} }, dataset: {} }, addEventListener() {} };
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../public/js/i18n.js'), 'utf8'), { window, document, setTimeout: () => {} });
+  const load = code => JSON.parse(fs.readFileSync(path.join(__dirname, `../public/locales/${code}.json`), 'utf8'));
+  Object.assign(window.i18n, { locale, messages: load(locale), fallback: load('en') });
+  return window.i18n;
 }
 
 const mkdir = (admin, parent, name) => admin.post('/api/admin/folders').send({ path: parent, name });
@@ -107,20 +118,55 @@ describe('MAX_FOLDER_DEPTH', () => {
     expect(adminJs).toMatch(/createFolderBtn'\)\.classList\.toggle\('hidden', data\.canCreateFolder === false\)/);
   });
 
-  test('folders already deeper stay readable, playable, uploadable and deletable', async () => {
-    const admin = await adminFor('2');
-    const deep = path.join(testUploadsDir, 'Trips/Italy/Rome/Old');
+  // A library with a photo in a folder made before the limit (level 4)
+  async function deeperFolder() {
+    const deep = path.join(testUploadsDir, 'Trips', 'Italy', 'Rome', 'Old');
     await fs.ensureDir(deep);
     await fs.writeFile(path.join(deep, 'photo.jpg'), await jpeg());
+  }
+
+  test('folders already deeper stay readable, uploadable and deletable', async () => {
+    const admin = await adminFor('2');
+    await deeperFolder();
 
     const listed = await admin.get(`/api/admin/folders?path=${encodeURIComponent('uploads/Trips/Italy/Rome/Old')}`).expect(200);
     expect(listed.body.files.map(file => file.name)).toEqual(['photo.jpg']);
-    const random = await admin.get(`/api/images/random?folder=${encodeURIComponent('Trips/Italy/Rome/Old')}`).expect(200);
-    expect(random.body.success).toBe(true);
     await admin.post('/api/upload').field('path', 'uploads/Trips/Italy/Rome/Old')
       .attach('images', await jpeg(), 'more.jpg').expect(200);
     await admin.delete(`/api/admin/folders?path=${encodeURIComponent('uploads/Trips/Italy/Rome')}`).expect(200);
-    expect(await fs.pathExists(path.join(testUploadsDir, 'Trips/Italy/Rome'))).toBe(false);
+    expect(await fs.pathExists(path.join(testUploadsDir, 'Trips', 'Italy', 'Rome'))).toBe(false);
+  });
+
+  test('folders already deeper still play on the frame', async () => {
+    const admin = await adminFor('2');
+    await deeperFolder();
+    // The folder filter is compared with the photo's folder as the server writes it
+    // (path.sep), so the test builds it the same way
+    const folder = path.join('Trips', 'Italy', 'Rome', 'Old');
+    const random = await admin.get(`/api/images/random?folder=${encodeURIComponent(folder)}`).expect(200);
+    expect(random.body.success).toBe(true);
+  });
+
+  test('DEFAULT_FOLDERS past the limit are skipped at start, with a warning', async () => {
+    const before = process.env.DEFAULT_FOLDERS;
+    process.env.DEFAULT_FOLDERS = 'Trips,Trips/Italy,Trips/Italy/Rome';
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      await adminFor('2');
+      await initializeUploads();
+      expect(await fs.pathExists(path.join(testUploadsDir, 'Trips', 'Italy'))).toBe(true);
+      expect(await fs.pathExists(path.join(testUploadsDir, 'Trips', 'Italy', 'Rome'))).toBe(false);
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('Trips/Italy/Rome'));
+
+      // Without a limit they are all made, as before
+      await adminFor(undefined);
+      await initializeUploads();
+      expect(await fs.pathExists(path.join(testUploadsDir, 'Trips', 'Italy', 'Rome'))).toBe(true);
+    } finally {
+      warn.mockRestore();
+      if (before === undefined) delete process.env.DEFAULT_FOLDERS;
+      else process.env.DEFAULT_FOLDERS = before;
+    }
   });
 
   test('an upload can\'t make a missing folder past the limit', async () => {
@@ -155,6 +201,18 @@ describe('MAX_FOLDER_DEPTH', () => {
         .send({ mediaItems: [{ id: '1' }], destinationPath: 'uploads/Trips/Italy/Rome' }).expect(400);
       expect(imported.body).toMatchObject({ success: false, code: 'FOLDER_TOO_DEEP', limit: 2 });
       expect(createJob).not.toHaveBeenCalled();
+
+      // The import dialog translates the nested error (googlePhotosSync.js), so it
+      // must carry the number: French, not a literal {limit}
+      const dialog = await fs.readFile(path.join(__dirname, '../public/js/googlePhotosSync.js'), 'utf8');
+      expect(dialog).toContain("i18n.error(data.error, 'googlePhotos.importStartFailed')");
+      const i18n = browserI18n('fr');
+      const shown = i18n.error(imported.body.error, 'googlePhotos.importStartFailed');
+      expect(shown).toContain('2');
+      expect(shown).not.toContain('{limit}');
+      expect(shown).toBe(i18n.t('errors.FOLDER_TOO_DEEP', { limit: 2 }));
+      // The library page and the picker translate the whole answer
+      expect(i18n.error(session.body)).toBe(shown);
 
       // Within the limit, or into a deeper folder that already exists, it starts
       await admin.post('/api/admin/google-photos/import')

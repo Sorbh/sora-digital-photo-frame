@@ -749,6 +749,12 @@ class PhotoFrameSlideshow {
             const response = await fetch(`/api/images/next?${params}`, { signal });
             // The server or a proxy in trouble is not an empty folder
             if (response.status >= 500) return { error: { offline: true } };
+            // Nothing to show from the saved folder (404), or nothing this frame may see (403:
+            // its only folder was deleted, say): if the folder is gone, play all folders
+            // instead, which the server still limits to the frame's own folders
+            if ((response.status === 404 || response.status === 403) && selectedFolderPath && await this.dropMissingFolder(selectedFolderPath, signal)) {
+                return this.fetchRandomImage(signal);
+            }
             if (!response.ok) throw new Error(t('slideshow.fetchImageFailed'));
             const data = await response.json();
 
@@ -765,6 +771,27 @@ class PhotoFrameSlideshow {
             const folder = this.folderStorage.getCurrentFolderPath() && this.folderStorage.getCurrentFolderName();
             return { error: folder ? { key: 'slideshow.noImagesInFolder', vars: { folder } } : { key: 'slideshow.noImages' } };
         }
+    }
+
+    // True when `folder`, the saved folder, no longer exists (or this frame can't
+    // open it any more) and was replaced by all folders. Asked on every 404 for it,
+    // so a check that can't be made now (offline, the folder list failed to load
+    // at start) is made again on the next try.
+    async dropMissingFolder(folder, signal) {
+        try {
+            const response = await fetch(`/api/folders/${encodeURIComponent(folder)}`, { credentials: 'same-origin', signal });
+            if (response.status !== 404) return false;
+            const data = await response.json().catch(() => ({}));
+            if (data.code !== 'FOLDER_NOT_FOUND') return false;
+        } catch {
+            return false;
+        }
+        if (this.folderStorage.getCurrentFolderPath() !== folder) return false; // another folder was picked meanwhile
+        console.log('The saved folder is gone; playing all folders');
+        this.folderStorage.saveSelectedFolder('', 'All Folders');
+        this.folderSelector?.updateCurrentSelection();
+        this.folderSelector?.updateSelectedState();
+        return true;
     }
 
     lastShown() {
@@ -800,11 +827,14 @@ class PhotoFrameSlideshow {
     async imageSource(imageData) {
         const cipher = window.SoraPhotoCipher;
         if (imageData.rawUrl && cipher && cipher.supported()) {
+            let decrypting = Promise.resolve();
             try {
+                decrypting = cipher.loadImage(imageData.rawUrl, id => this.frameKey(id), imageData.mimeType);
                 // Slower than the server copy would be: use that instead
-                return await PhotoRecovery.withTimeout(
-                    cipher.loadImage(imageData.rawUrl, id => this.frameKey(id), imageData.mimeType), KEY_TIMEOUT_MS);
+                return await PhotoRecovery.withTimeout(decrypting, KEY_TIMEOUT_MS);
             } catch (error) {
+                // A download that finishes after that is not used: free its decrypted copy
+                decrypting.then(url => url && URL.revokeObjectURL(url), () => {});
                 console.warn('Decrypting in the browser failed, using the server copy:', error.message);
             }
         }

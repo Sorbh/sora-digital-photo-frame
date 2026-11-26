@@ -219,12 +219,13 @@ class PhotoFrameAdmin {
         // closes it on the mouse-up of the same right-click that opened it.
         document.addEventListener('pointerdown', (e) => {
             if (e.button === 0 && !e.target.closest('#contextMenuPopover, .folder-more, .photo-more')) {
-                this.hideContextMenu();
+                this.hideContextMenu({ returnFocus: false }); // focus goes where the click was
             }
         });
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') this.hideContextMenu();
         });
+        document.getElementById('contextMenuPopover').addEventListener('keydown', (e) => this.contextMenuKey(e));
         window.addEventListener('resize', () => this.hideContextMenu());
         // Scrolling the page moves the menu's anchor away; scrolling a long menu itself doesn't
         document.addEventListener('scroll', (e) => {
@@ -592,6 +593,13 @@ class PhotoFrameAdmin {
     renderFolderContents(data) {
         const fileGrid = document.getElementById('fileGrid');
         const emptyState = document.getElementById('emptyState');
+
+        // Redrawing replaces every tile: focus on one (its options button after a
+        // Rotate from the menu, say) goes to the same photo's new tile
+        const focused = document.activeElement;
+        const focusTile = focused && fileGrid.contains(focused) ? focused.closest('.file-item') : null;
+        const focusPath = focusTile?.dataset.path;
+        const focusPart = focusTile && ['.photo-more', '.folder-more'].find(part => focused.matches(part));
         
         fileGrid.innerHTML = '';
         this.folderData = data; // kept to redraw the grid when the language changes
@@ -642,6 +650,12 @@ class PhotoFrameAdmin {
             const fileElement = this.createFileElement(file);
             fileGrid.appendChild(fileElement);
         });
+
+        if (focusPath !== undefined) {
+            const tile = [...fileGrid.querySelectorAll('.file-item')].find(item => item.dataset.path === focusPath);
+            const target = tile && ((focusPart && tile.querySelector(focusPart)) || tile.querySelector('.photo-more, .folder-more'));
+            target?.focus({ preventScroll: true });
+        }
     }
 
     // The library root shows as "Library"; any other folder by its own name
@@ -718,7 +732,7 @@ class PhotoFrameAdmin {
             </div>
             <div class="folder-meta">
                 <div class="folder-name"></div>
-                <button type="button" class="folder-more" aria-label="${escapeHtml(t('admin.folderOptions'))}" aria-haspopup="menu">
+                <button type="button" class="folder-more" aria-label="${escapeHtml(t('admin.folderOptions'))}" aria-haspopup="menu" aria-expanded="false">
                     <span class="material-symbols-outlined">more_vert</span>
                 </button>
                 <span class="folder-kind material-symbols-outlined" aria-hidden="true">chevron_right</span>
@@ -778,7 +792,7 @@ class PhotoFrameAdmin {
                             <span class="sr-only">${escapeHtml(t('admin.selectPhoto'))}</span>
                         </label>
                     </div>
-                    <button type="button" class="btn-icon photo-more" data-action="more" aria-haspopup="menu" aria-label="${escapeHtml(t('admin.photoOptions'))}">
+                    <button type="button" class="btn-icon photo-more" data-action="more" aria-haspopup="menu" aria-expanded="false" aria-label="${escapeHtml(t('admin.photoOptions'))}">
                         <span class="material-symbols-outlined">more_vert</span>
                     </button>
                 </div>
@@ -1214,6 +1228,14 @@ class PhotoFrameAdmin {
         
         this.contextMenuTarget = item;
         const popover = document.getElementById('contextMenuPopover');
+        // Focus comes back here when the menu closes: the options button, or what had
+        // focus for a right-click (the menu key on a keyboard)
+        const opener = event.type === 'click' && event.currentTarget instanceof Element ? event.currentTarget : document.activeElement;
+        if (!popover.contains(opener)) {
+            this.markMenuOpen(this.contextMenuOpener, false);
+            this.contextMenuOpener = opener && opener !== document.body ? opener : null;
+        }
+        this.markMenuOpen(this.contextMenuOpener, true);
         
         // Show/hide menu items based on item type (data-for lists the types)
         popover.querySelectorAll('[data-for]').forEach(menuItem => {
@@ -1243,14 +1265,53 @@ class PhotoFrameAdmin {
             popover.style.maxHeight = spot.maxHeight + 'px';
             popover.style.overflowY = 'auto';
         }
+        this.contextMenuItems()[0]?.focus({ preventScroll: true });
     }
 
-    hideContextMenu() {
+    // An options button says whether its menu is open
+    markMenuOpen(button, open) {
+        if (button?.hasAttribute('aria-haspopup')) button.setAttribute('aria-expanded', String(open));
+    }
+
+    // The menu's items shown for this photo or folder
+    contextMenuItems() {
+        return [...document.getElementById('contextMenuPopover').querySelectorAll('.menu-item')]
+            .filter(item => item.style.display !== 'none');
+    }
+
+    // Keys inside the open menu: up and down (round the ends), Home and End;
+    // Enter and Space press the item (they are buttons); Escape (see setupEventListeners)
+    // and Tab close it, back on the button it opened from
+    contextMenuKey(e) {
+        const items = this.contextMenuItems();
+        if (!items.length) return;
+        const at = items.indexOf(document.activeElement);
+        const to = {
+            ArrowDown: (at + 1) % items.length,
+            ArrowUp: (at <= 0 ? items.length : at) - 1,
+            Home: 0,
+            End: items.length - 1
+        }[e.key];
+        if (to !== undefined) {
+            e.preventDefault();
+            items[to].focus();
+        } else if (e.key === 'Tab') {
+            this.hideContextMenu(); // Tab then goes on from the button
+        }
+    }
+
+    hideContextMenu({ returnFocus = true } = {}) {
         const popover = document.getElementById('contextMenuPopover');
+        const hadFocus = popover.contains(document.activeElement);
         if (popover.matches(':popover-open')) {
             popover.hidePopover();
         }
         this.contextMenuTarget = null;
+        const opener = this.contextMenuOpener;
+        this.contextMenuOpener = null;
+        if (!opener) return;
+        this.markMenuOpen(opener, false);
+        if (returnFocus && hadFocus && opener.isConnected) opener.focus({ preventScroll: true });
     }
 
     async handleContextMenuAction(action) {

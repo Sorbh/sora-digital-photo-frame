@@ -115,7 +115,10 @@ describe('MAX_FOLDER_DEPTH', () => {
     expect(await listing('uploads/Trips/Italy/Rome')).toMatchObject({ canCreateFolder: false });
 
     const adminJs = await fs.readFile(path.join(__dirname, '../public/admin.js'), 'utf8');
-    expect(adminJs).toMatch(/createFolderBtn'\)\.classList\.toggle\('hidden', data\.canCreateFolder === false\)/);
+    expect(adminJs).toMatch(/createFolderBtn\.classList\.toggle\('hidden', data\.canCreateFolder === false\)/);
+    // Not usable while a folder's listing is on its way (it may be at the limit)
+    expect(adminJs).toMatch(/getElementById\('createFolderBtn'\)\.disabled = true;/);
+    expect(adminJs).toMatch(/createFolderBtn\.disabled = data\.canCreateFolder === false;/);
   });
 
   // A library with a photo in a folder made before the limit (level 4)

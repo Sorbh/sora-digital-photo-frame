@@ -543,6 +543,9 @@ class PhotoFrameAdmin {
         const request = this.folderRequest = (this.folderRequest || 0) + 1;
         const path = this.currentPath;
         const isCurrent = () => request === this.folderRequest && path === this.currentPath;
+        // Until this folder's listing says whether it may hold new folders (it may be
+        // at MAX_FOLDER_DEPTH), "New folder" can't be used
+        document.getElementById('createFolderBtn').disabled = true;
 
         try {
             const response = await this.authenticatedFetch(`/api/admin/folders?path=${encodeURIComponent(path)}`);
@@ -556,10 +559,12 @@ class PhotoFrameAdmin {
                 this.updateBreadcrumb();
                 this.updateBackButton();
             } else {
+                document.getElementById('createFolderBtn').disabled = false; // the server still checks
                 this.showToast(i18n.error(data, 'admin.loadFolderFailed'), 'error');
             }
         } catch (error) {
             if (!isCurrent()) return;
+            document.getElementById('createFolderBtn').disabled = false; // the server still checks
             console.error('Error loading folder contents:', error);
             this.showToast(t('admin.loadFolderFailed'), 'error');
         }
@@ -585,7 +590,9 @@ class PhotoFrameAdmin {
         this.fileNames = data.files.map(file => file.name);
         this.showPlayOrder();
         // MAX_FOLDER_DEPTH: no "New folder" in a folder at the deepest level
-        document.getElementById('createFolderBtn').classList.toggle('hidden', data.canCreateFolder === false);
+        const createFolderBtn = document.getElementById('createFolderBtn');
+        createFolderBtn.classList.toggle('hidden', data.canCreateFolder === false);
+        createFolderBtn.disabled = data.canCreateFolder === false;
         
         // Background hint under the grid; the empty state has its own upload box
         const isEmpty = data.folders.length === 0 && data.files.length === 0;

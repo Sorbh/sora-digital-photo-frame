@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-11-26
+
+### Upgrading from 1.x
+- **Photos need a signed-in viewer.** Frames that sign in keep working. If something loads photos without signing in (a home dashboard, say), set `PUBLIC_PHOTOS=true`.
+- **No default admin password.** Without `ADMIN_PASSWORD` (or with the old `admin123`), the server makes one up, keeps it in `data/admin-password` and prints it at start.
+- **No example session secret.** An example value is replaced with a secret of the server's own, so everyone signs in again once and Google Photos needs connecting again.
+- **License is now AGPL-3.0** (was ISC).
+- **Custom photo libraries** (`createApp({ library })`): `photoUrl()` must return percent-encoded path segments (see Changed).
+- Slideshow links: prefer `/slideshow#pin=123456`, which never reaches the server or its logs. `?pin=` still works.
+
+### Fixed
+- A frame limited to a folder checks and reads the same photo path, so `..` and encoded tricks can't reach other folders ([#42](https://github.com/Sorbh/sora-digital-photo-frame/issues/42)).
+- Collecting a pairing is a POST from the browser that started it, and each code is approved once ([#43](https://github.com/Sorbh/sora-digital-photo-frame/issues/43)).
+- The family's PIN attempt limit survives correct PINs, restarts and bursts of tries; account PINs must be 4–6 digits ([#44](https://github.com/Sorbh/sora-digital-photo-frame/issues/44)).
+- PINs, family codes and tokens no longer reach the server log; server errors answer "Internal server error" ([#45](https://github.com/Sorbh/sora-digital-photo-frame/issues/45)).
+- Upload size, uploads at once and the storage quota hold: uploads wait their turn for a slot, Google Photos imports have their own, and a stalled upload is dropped ([#46](https://github.com/Sorbh/sora-digital-photo-frame/issues/46)). `UPLOAD_WAIT_MS` sets how long an upload waits.
+- Thumbnails are checked again for each family, and the thumbnail cache can't mix families ([#47](https://github.com/Sorbh/sora-digital-photo-frame/issues/47)).
+- Photos in folders with `#`, `?` or `%` in their names load on frames ([#48](https://github.com/Sorbh/sora-digital-photo-frame/issues/48)).
+- The frame recovers by itself after Wi-Fi drops, keeping the last photo up, with a Retry button ([#49](https://github.com/Sorbh/sora-digital-photo-frame/issues/49)).
+- Typing the pairing code at `/pair` works, and only a real expiry says expired ([#50](https://github.com/Sorbh/sora-digital-photo-frame/issues/50)).
+- Library on phones: taps open photos again, hold to select, and a photo options button ([#51](https://github.com/Sorbh/sora-digital-photo-frame/issues/51)).
+- The slideshow folder picker fits on phones ([#52](https://github.com/Sorbh/sora-digital-photo-frame/issues/52)), and folders can be chosen with a keyboard or TV remote ([#53](https://github.com/Sorbh/sora-digital-photo-frame/issues/53)).
+- Phones: 44px tap targets, notch safe areas, and a dock that fits 320px screens ([#54](https://github.com/Sorbh/sora-digital-photo-frame/issues/54)).
+- Muted text reaches 4.5:1 contrast in light and dark mode ([#55](https://github.com/Sorbh/sora-digital-photo-frame/issues/55)).
+- Arabic (right to left): folder indent, note spine, and codes that keep their order ([#56](https://github.com/Sorbh/sora-digital-photo-frame/issues/56)).
+- TV frames: readable date and captions, slow screen shift against burn-in, and a notice when fullscreen or keep-awake can't work ([#57](https://github.com/Sorbh/sora-digital-photo-frame/issues/57)).
+- Accessibility: number keypad for PINs, photo viewer title and buttons, empty-state headings ([#58](https://github.com/Sorbh/sora-digital-photo-frame/issues/58)).
+
 ### Added
 - Uploads from a phone: camera photos are shrunk in the browser to the 2560px the server stores, so they travel far smaller; when and where a photo was taken is read first and sent along. Photos go one per request with real progress, are tried again when the connection drops, and the screen stays on while they upload. Formats the browser can't read (HEIC on Android) are sent as before.
 - The library can be added to a phone's home screen (offered after an upload), and on Android it then appears in the gallery's Share menu, so photos can be sent to it from there.

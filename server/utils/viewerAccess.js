@@ -56,6 +56,15 @@ function photoPath(req) {
   return parts.filter(Boolean).join('/');
 }
 
+// The request ends in a slash, plain or encoded (%2F): a folder, never a photo
+function isFolderUrl(req) {
+  try {
+    return SEPARATORS.test(decodeURIComponent(req.path).slice(-1));
+  } catch {
+    return false;
+  }
+}
+
 // For /uploads: photos outside the account's folders look like they don't exist.
 // The request goes on with the path that was checked in req.photoPath, for
 // whatever reads the file (see atPhotoPath).
@@ -75,7 +84,8 @@ function atPhotoPath(reader) {
   return (req, res, next) => {
     const original = req.url;
     const query = original.indexOf('?');
-    const folder = req.photoPath && req.path.endsWith('/') ? '/' : ''; // a folder URL keeps its slash
+    // A folder URL keeps its slash, so express.static passes it on as before
+    const folder = req.photoPath && isFolderUrl(req) ? '/' : '';
     req.url = '/' + req.photoPath.split('/').map(encodeURIComponent).join('/') + folder
       + (query === -1 ? '' : original.slice(query));
     reader(req, res, (error) => {
@@ -85,4 +95,4 @@ function atPhotoPath(reader) {
   };
 }
 
-module.exports = { assignedFolders, canSee, canOpen, foldersBelow, photoPath, requireVisiblePhoto, atPhotoPath };
+module.exports = { assignedFolders, canSee, canOpen, foldersBelow, photoPath, isFolderUrl, requireVisiblePhoto, atPhotoPath };

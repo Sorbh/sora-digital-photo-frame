@@ -2,7 +2,7 @@ const path = require('path');
 const sharp = require('sharp');
 const { getLibrary } = require('../library');
 const { acceptsWebp } = require('./webpFallback');
-const { photoPath } = require('../utils/viewerAccess');
+const { photoPath, isFolderUrl } = require('../utils/viewerAccess');
 
 const TYPES = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.gif': 'image/gif', '.webp': 'image/webp', '.json': 'application/json' };
 
@@ -18,7 +18,8 @@ function media() {
 
     // The same path requireVisiblePhoto checked
     const relativePath = req.photoPath ?? photoPath(req);
-    if (!relativePath) return next();
+    // A URL ending in a slash is a folder: leave it to later routes
+    if (!relativePath || isFolderUrl(req)) return next();
     const adminPath = `uploads/${relativePath}`;
 
     try {

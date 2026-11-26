@@ -122,6 +122,13 @@ for (const [storage, options] of [
       expect(res.text).toBe('cover from the host');
     });
 
+    test('a photo URL ending in an encoded slash is treated as a folder, not the photo', async () => {
+      // So it falls through to routes a deployment adds, as it did before
+      await admin.get('/uploads/a/b/nested.png').expect(200);
+      const res = await admin.get('/uploads/a/b/nested.png%2F').redirects(0);
+      expect(res.status).toBe(404);
+    });
+
     test('a folder URL with a trailing slash is not redirected', async () => {
       const res = await admin.get('/uploads/private/').redirects(0);
       expect(res.status).toBe(404);

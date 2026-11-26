@@ -76,7 +76,10 @@
     "enter_code_pin": "Geben Sie Ihren Familiencode und Ihre PIN ein oder scannen Sie den Code, um diesen Rahmen einzurichten.",
     "familyCodeLabel": "Familiencode",
     "familyCodeRequired": "Geben Sie den 8-stelligen Familiencode von der Seite „Zugang“ ein.",
-    "familyOrPinWrong": "Familiencode und PIN passen nicht zusammen. Prüfen Sie beides und versuchen Sie es erneut."
+    "familyOrPinWrong": "Familiencode und PIN passen nicht zusammen. Prüfen Sie beides und versuchen Sie es erneut.",
+    "retry": "Erneut versuchen",
+    "retryingNote": "Der Rahmen versucht es von selbst weiter.",
+    "connectionTitle": "Ihre Fotos sind nicht erreichbar"
   },
   "accessAccounts": {
     "frames_pins": "Rahmen & PINs",
@@ -291,6 +294,8 @@
     "static_051": "Schließen",
     "static_052": "Foto schließen",
     "static_053": "Tastenkürzel",
+    "previousPhoto": "Vorheriges Foto",
+    "nextPhoto": "Nächstes Foto",
     "static_054": "Bereiche",
     "static_055": "Fotos hochladen",
     "sortShuffle": "Zufällig",
@@ -564,6 +569,8 @@
     "fetchRandomFailed": "Es konnte kein zufälliges Bild abgerufen werden",
     "everyPhoto": "Alle Fotos aus der Bibliothek",
     "browseFolder": "Ordner öffnen",
+    "browseNamed": "{name} öffnen",
+    "subfoldersOf": "Ordner in {name}",
     "photoCount_one": "{count} Foto",
     "photoCount_other": "{count} Fotos"
   },

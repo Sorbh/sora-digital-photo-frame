@@ -76,7 +76,10 @@
     "enter_code_pin": "Enter your family code and PIN, or scan the code to set up this frame.",
     "familyCodeLabel": "Family code",
     "familyCodeRequired": "Enter the 8-character family code from the Access page.",
-    "familyOrPinWrong": "That family code and PIN don't match. Check both and try again."
+    "familyOrPinWrong": "That family code and PIN don't match. Check both and try again.",
+    "retry": "Retry",
+    "retryingNote": "The frame keeps trying by itself.",
+    "connectionTitle": "Can't reach your photos"
   },
   "accessAccounts": {
     "frames_pins": "Frames & PINs",
@@ -291,6 +294,8 @@
     "static_051": "Close",
     "static_052": "Close Photo",
     "static_053": "Keyboard shortcuts",
+    "previousPhoto": "Previous photo",
+    "nextPhoto": "Next photo",
     "static_054": "Sections",
     "static_055": "Upload photos",
     "sortShuffle": "Shuffle",
@@ -564,6 +569,8 @@
     "fetchRandomFailed": "Failed to fetch random image",
     "everyPhoto": "Every photo in the library",
     "browseFolder": "Browse folder",
+    "browseNamed": "Open {name}",
+    "subfoldersOf": "Folders in {name}",
     "photoCount_one": "{count} photo",
     "photoCount_other": "{count} photos"
   },

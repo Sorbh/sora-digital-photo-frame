@@ -76,7 +76,10 @@
     "enter_code_pin": "أدخل رمز العائلة ورمز PIN، أو امسح الرمز لإعداد هذا الإطار.",
     "familyCodeLabel": "رمز العائلة",
     "familyCodeRequired": "أدخل رمز العائلة المكوَّن من 8 خانات من صفحة الوصول.",
-    "familyOrPinWrong": "رمز العائلة ورقم PIN غير متطابقين. تحقّق منهما وحاول مرة أخرى."
+    "familyOrPinWrong": "رمز العائلة ورقم PIN غير متطابقين. تحقّق منهما وحاول مرة أخرى.",
+    "retry": "إعادة المحاولة",
+    "retryingNote": "يواصل الإطار المحاولة تلقائيًا.",
+    "connectionTitle": "تعذّر الوصول إلى صورك"
   },
   "accessAccounts": {
     "frames_pins": "الإطارات ورموز PIN",
@@ -295,6 +298,8 @@
     "static_051": "إغلاق",
     "static_052": "إغلاق الصورة",
     "static_053": "اختصارات لوحة المفاتيح",
+    "previousPhoto": "الصورة السابقة",
+    "nextPhoto": "الصورة التالية",
     "static_054": "الأقسام",
     "static_055": "رفع الصور",
     "sortShuffle": "عشوائي",
@@ -644,6 +649,8 @@
     "fetchRandomFailed": "تعذّر جلب صورة عشوائية",
     "everyPhoto": "كل الصور في المكتبة",
     "browseFolder": "تصفّح المجلد",
+    "browseNamed": "فتح {name}",
+    "subfoldersOf": "المجلدات داخل {name}",
     "photoCount_one": "{count} صورة",
     "photoCount_other": "{count} صورة",
     "photoCount_zero": "لا توجد صور",

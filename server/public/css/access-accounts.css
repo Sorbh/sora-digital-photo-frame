@@ -114,8 +114,14 @@ body {
 
 .account-actions {
     display: flex;
-    gap: 2px;
-    margin: -6px -8px 0 0;
+    gap: 8px;
+    margin: -10px -12px 0 0;
+}
+
+/* 44px tap targets, with room between edit and delete */
+.account-actions .tb-btn.icon {
+    width: 44px;
+    height: 44px;
 }
 
 .account-actions .tb-btn[data-danger]:hover {
@@ -255,7 +261,7 @@ body {
     font-variation-settings: 'FILL' 0, 'wght' 250, 'GRAD' 0, 'opsz' 40;
 }
 
-.empty-state h3 {
+.empty-state h2 {
     margin: 0.5rem 0 0;
     font-family: var(--font-display);
     font-size: 2rem;

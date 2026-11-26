@@ -151,7 +151,7 @@ describe('Slideshow folder picker', () => {
       querySelector: (query) => { selectors.push(query); return null; }
     };
     selector.updateSelectedState();
-    expect(selectors).toEqual(['[data-path="family/Trip \\"A\\" #1"]']);
+    expect(selectors).toEqual(['.folder-option[data-path="family/Trip \\"A\\" #1"]']);
   });
 
   test("uses the browser's CSS.escape when it has one", () => {

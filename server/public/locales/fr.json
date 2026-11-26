@@ -76,7 +76,10 @@
     "enter_code_pin": "Saisissez votre code famille et votre code PIN, ou scannez le code pour configurer ce cadre.",
     "familyCodeLabel": "Code famille",
     "familyCodeRequired": "Saisissez le code famille de 8 caractères affiché sur la page Accès.",
-    "familyOrPinWrong": "Ce code famille et ce PIN ne correspondent pas. Vérifiez les deux et réessayez."
+    "familyOrPinWrong": "Ce code famille et ce PIN ne correspondent pas. Vérifiez les deux et réessayez.",
+    "retry": "Réessayer",
+    "retryingNote": "Le cadre continue d’essayer tout seul.",
+    "connectionTitle": "Impossible d’accéder à vos photos"
   },
   "accessAccounts": {
     "frames_pins": "Cadres et codes PIN",
@@ -292,6 +295,8 @@
     "static_051": "Fermer",
     "static_052": "Fermer la photo",
     "static_053": "Raccourcis clavier",
+    "previousPhoto": "Photo précédente",
+    "nextPhoto": "Photo suivante",
     "static_054": "Sections",
     "static_055": "Importer des photos",
     "sortShuffle": "Aléatoire",
@@ -584,6 +589,8 @@
     "fetchRandomFailed": "Impossible de récupérer une image au hasard",
     "everyPhoto": "Toutes les photos de la photothèque",
     "browseFolder": "Parcourir le dossier",
+    "browseNamed": "Ouvrir {name}",
+    "subfoldersOf": "Dossiers de {name}",
     "photoCount_one": "{count} photo",
     "photoCount_other": "{count} photos",
     "photoCount_many": "{count} photos"

@@ -76,7 +76,10 @@
     "enter_code_pin": "ファミリーコードとPINを入力するか、コードを読み取ってこのフレームを設定してください。",
     "familyCodeLabel": "ファミリーコード",
     "familyCodeRequired": "アクセスページにある8文字のファミリーコードを入力してください。",
-    "familyOrPinWrong": "ファミリーコードとPINが一致しません。両方を確認して、もう一度お試しください。"
+    "familyOrPinWrong": "ファミリーコードとPINが一致しません。両方を確認して、もう一度お試しください。",
+    "retry": "再試行",
+    "retryingNote": "フレームは自動で再試行を続けます。",
+    "connectionTitle": "写真に接続できません"
   },
   "accessAccounts": {
     "frames_pins": "フレームとPIN",
@@ -291,6 +294,8 @@
     "static_051": "閉じる",
     "static_052": "写真を閉じる",
     "static_053": "キーボードショートカット",
+    "previousPhoto": "前の写真",
+    "nextPhoto": "次の写真",
     "static_054": "セクション",
     "static_055": "写真をアップロード",
     "sortShuffle": "シャッフル",
@@ -564,6 +569,8 @@
     "fetchRandomFailed": "写真を取得できませんでした",
     "everyPhoto": "ライブラリのすべての写真",
     "browseFolder": "フォルダを見る",
+    "browseNamed": "{name} を開く",
+    "subfoldersOf": "{name} 内のフォルダ",
     "photoCount_one": "{count}枚の写真",
     "photoCount_other": "{count}枚の写真"
   },

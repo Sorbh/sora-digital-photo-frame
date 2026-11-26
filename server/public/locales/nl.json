@@ -76,7 +76,10 @@
     "enter_code_pin": "Voer je familiecode en pincode in, of scan de code om deze fotolijst in te stellen.",
     "familyCodeLabel": "Familiecode",
     "familyCodeRequired": "Voer de familiecode van 8 tekens in die op de pagina Toegang staat.",
-    "familyOrPinWrong": "Die familiecode en pincode horen niet bij elkaar. Controleer ze allebei en probeer het opnieuw."
+    "familyOrPinWrong": "Die familiecode en pincode horen niet bij elkaar. Controleer ze allebei en probeer het opnieuw.",
+    "retry": "Opnieuw proberen",
+    "retryingNote": "De fotolijst blijft het zelf opnieuw proberen.",
+    "connectionTitle": "Je foto's zijn niet bereikbaar"
   },
   "accessAccounts": {
     "frames_pins": "Fotolijsten en pincodes",
@@ -291,6 +294,8 @@
     "static_051": "Sluiten",
     "static_052": "Foto sluiten",
     "static_053": "Sneltoetsen",
+    "previousPhoto": "Vorige foto",
+    "nextPhoto": "Volgende foto",
     "static_054": "Onderdelen",
     "static_055": "Foto's uploaden",
     "sortShuffle": "Willekeurig",
@@ -564,6 +569,8 @@
     "fetchRandomFailed": "Er kon geen willekeurige foto worden opgehaald",
     "everyPhoto": "Elke foto in de bibliotheek",
     "browseFolder": "Map bekijken",
+    "browseNamed": "{name} openen",
+    "subfoldersOf": "Mappen in {name}",
     "photoCount_one": "{count} foto",
     "photoCount_other": "{count} foto's"
   },

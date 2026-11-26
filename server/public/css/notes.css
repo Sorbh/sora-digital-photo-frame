@@ -171,7 +171,7 @@
     transform: rotate(-1.5deg);
 }
 
-.notes-empty h3 {
+.notes-empty h2 {
     margin: 0 0 0.6rem;
     font-family: var(--font-display);
     font-variation-settings: 'SOFT' 100, 'opsz' 144;
@@ -308,16 +308,15 @@
 
 .nf-photo-remove {
     position: absolute;
-    top: 4px;
-    right: 4px;
+    top: 0;
+    right: 0;
     display: grid;
-    place-items: center;
-    width: 24px;
-    height: 24px;
-    padding: 0;
+    place-items: start end;
+    width: 44px;
+    height: 44px;
+    padding: 4px;
     border: 0;
-    border-radius: 50%;
-    background: rgb(20 12 17 / 0.7);
+    background: transparent;
     color: #fff;
     cursor: pointer;
     opacity: 0;
@@ -329,11 +328,27 @@
     opacity: 1;
 }
 
+/* The tile clips the button's edges, so the focus ring goes on the circle */
+.nf-photo-remove:focus-visible {
+    outline: none;
+}
+
+.nf-photo-remove:focus-visible .material-symbols-outlined {
+    outline: 2px solid var(--safelight);
+    outline-offset: 1px;
+}
+
 @media (hover: none) {
     .nf-photo-remove { opacity: 1; }
 }
 
 .nf-photo-remove .material-symbols-outlined {
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: rgb(20 12 17 / 0.7);
     font-size: 16px;
 }
 
@@ -408,10 +423,13 @@
 /* Theme swatches */
 .nf-swatches {
     display: flex;
-    gap: 10px;
+    gap: 0;
+    margin-inline-start: -7px;
 }
 
+/* 30px circle inside a 44px tap target */
 .swatch {
+    padding: 7px;
     cursor: pointer;
 }
 
@@ -516,16 +534,24 @@
 }
 
 .preview-orient button {
+    position: relative;
     display: grid;
     place-items: center;
-    width: 34px;
-    height: 28px;
+    width: 44px;
+    height: 36px;
     padding: 0;
     border: 0;
     border-radius: 999px;
     background: transparent;
     color: var(--muted-foreground);
     cursor: pointer;
+}
+
+/* Stretch the tap target over the pill's padding: 44px tall */
+.preview-orient button::after {
+    content: '';
+    position: absolute;
+    inset: -4px 0;
 }
 
 .preview-orient button.active {

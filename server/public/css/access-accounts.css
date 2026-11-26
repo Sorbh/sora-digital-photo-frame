@@ -261,7 +261,7 @@ body {
     font-variation-settings: 'FILL' 0, 'wght' 250, 'GRAD' 0, 'opsz' 40;
 }
 
-.empty-state h3 {
+.empty-state h2 {
     margin: 0.5rem 0 0;
     font-family: var(--font-display);
     font-size: 2rem;

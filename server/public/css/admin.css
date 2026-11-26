@@ -892,6 +892,12 @@ html[dir="rtl"] .photo-modal-nav-btn .material-symbols-outlined {
     gap: 4px;
 }
 
+/* Right-to-left: Right Arrow is previous and Left Arrow next, so the hint
+   lists → first, next to "Previous / next" */
+html[dir="rtl"] .photo-modal-hints .keys {
+    flex-direction: row-reverse;
+}
+
 .photo-modal-hints li > span:last-child {
     align-self: center;
     white-space: nowrap;

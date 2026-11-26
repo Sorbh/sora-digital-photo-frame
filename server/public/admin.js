@@ -534,11 +534,19 @@ class PhotoFrameAdmin {
     async loadFolderContents() {
         this.clearSelection(); // Clear selection when navigating
         
+        // Only the latest request may draw the grid: a slow answer for a folder
+        // the user has already left must not replace what is on screen (or the
+        // photo open in the viewer)
+        const request = this.folderRequest = (this.folderRequest || 0) + 1;
+        const path = this.currentPath;
+        const isCurrent = () => request === this.folderRequest && path === this.currentPath;
+
         try {
-            const response = await this.authenticatedFetch(`/api/admin/folders?path=${encodeURIComponent(this.currentPath)}`);
+            const response = await this.authenticatedFetch(`/api/admin/folders?path=${encodeURIComponent(path)}`);
             if (!response) return; // Session expired, handled by authenticatedFetch
             
             const data = await response.json();
+            if (!isCurrent()) return;
             
             if (response.ok) {
                 this.renderFolderContents(data);
@@ -548,6 +556,7 @@ class PhotoFrameAdmin {
                 this.showToast(i18n.error(data, 'admin.loadFolderFailed'), 'error');
             }
         } catch (error) {
+            if (!isCurrent()) return;
             console.error('Error loading folder contents:', error);
             this.showToast(t('admin.loadFolderFailed'), 'error');
         }
@@ -1989,9 +1998,13 @@ class PhotoFrameAdmin {
         document.querySelector('.photo-modal-nav').hidden = !many;
         modal.classList.toggle('has-nav', many);
 
-        // The open photo went away in a refresh (deleted, moved): show the
-        // photo now in its place, or close the viewer if none are left
-        if (modal.open && this.currentImageUrl && this.currentImagePosition() === -1) {
+        // Remember where the open photo sits in the newest list. If it went
+        // away in a refresh (deleted, moved), show the photo now in that
+        // place, or close the viewer if none are left.
+        const position = this.currentImagePosition();
+        if (position !== -1) {
+            this.currentImageSlot = position;
+        } else if (modal.open && this.currentImageUrl) {
             if (count === 0) this.hidePhotoModal();
             else this.navigateToImageAtIndex(Math.min(Math.max(this.currentImageSlot, 0), count - 1));
         }

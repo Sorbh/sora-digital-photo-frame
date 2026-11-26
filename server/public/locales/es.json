@@ -225,7 +225,6 @@
     "IMAGE_TOO_LARGE": "Esta foto es demasiado grande para procesarla. Prueba con una foto más pequeña o una animación más corta.",
     "UPLOAD_TOO_LARGE": "Cada subida puede pesar como máximo {size} MB.",
     "BUSY": "Se están subiendo muchas fotos ahora mismo. Inténtalo de nuevo en un momento.",
-    "LENGTH_REQUIRED": "No se pudo leer esta subida. Inténtalo de nuevo.",
     "PHOTO_CHANGED": "Esta foto cambió mientras se giraba. Inténtalo de nuevo.",
     "UNSUPPORTED_TYPE": "Solo se pueden subir fotos JPEG, PNG, GIF, WebP y HEIC",
     "SCREEN_LIMIT": "Esta familia ya tiene {limit} pantallas. Quita una que ya no uses para añadir esta."

@@ -10,4 +10,20 @@ function passClientError(res, error) {
   return true;
 }
 
-module.exports = { passClientError };
+/**
+ * The same answer as passClientError, with extra fields (e.g. the photos already
+ * saved), and Connection: close for a request whose body wasn't read.
+ */
+function clientErrorResponse(res, error, extra = {}) {
+  const status = error && error.status;
+  if (!Number.isInteger(status) || status < 400 || status > 499 || res.headersSent) return false;
+  res.status(status).set('Connection', 'close').json({
+    message: error.expose === false ? 'Request failed' : error.message,
+    ...(error.code && { code: error.code }),
+    ...(error.vars && { ...error.vars }),
+    ...extra
+  });
+  return true;
+}
+
+module.exports = { passClientError, clientErrorResponse };

@@ -3,6 +3,7 @@ const multer = require('multer');
 const slots = require('../utils/workSlots');
 const { runWithTenant } = require('../context');
 const { assertCanAdd } = require('../services/quotaService');
+const { clientErrorResponse } = require('../utils/httpError');
 // Multer configuration for file uploads. Files stay in memory (never in plain
 // text on disk), so the number per request is capped; the admin page sends
 // larger selections in batches.
@@ -47,11 +48,9 @@ const upload = multer({
  * the route's handler calls req.uploadSlot.finish() when it is done.
  */
 async function uploadLimits(req, res, next) {
+  // Without a Content-Length (chunked), multer's per-file and per-form limits still apply
   const length = Number(req.headers['content-length']);
-  if (!req.headers['content-length'] || !Number.isFinite(length)) {
-    return res.status(411).json({ code: 'LENGTH_REQUIRED', message: 'Uploads need a Content-Length.' });
-  }
-  if (length > MAX_UPLOAD_SIZE) {
+  if (Number.isFinite(length) && length > MAX_UPLOAD_SIZE) {
     const size = Math.round(MAX_UPLOAD_SIZE / (1024 * 1024));
     return res.status(413).set('Connection', 'close')
       .json({ code: 'UPLOAD_TOO_LARGE', size, message: `Upload too large. Maximum is ${size}MB per request.` });
@@ -70,8 +69,10 @@ async function uploadLimits(req, res, next) {
   try {
     await runWithTenant(req.tenant, () => assertCanAdd(1));
   } catch (error) {
-    if (error.code !== 'QUOTA_EXCEEDED') return next(error);
-    return res.status(413).set('Connection', 'close').json({ code: error.code, message: error.message, files: [] });
+    // Answered like the upload handler answers a hook's error: code, vars, and no photos saved
+    if (closed) return;
+    if (!clientErrorResponse(res, error, { files: [] })) next(error);
+    return;
   }
 
   if (closed) return; // gone already: nothing to read or answer

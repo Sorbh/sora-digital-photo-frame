@@ -478,13 +478,12 @@ class ImageController {
         return res.status(400).json({ message: 'Angle must be a multiple of 90 degrees' });
       }
       
-      // Rotating drops EXIF, so make sure it's been read before the file changes
-      await photoInfo.get(fullPath, path.relative(this.uploadsDir, fullPath))
-        .catch(error => console.warn('Could not read photo info:', error.message));
-
       // Converted like an upload: in turn with the others, and only if not too large
       const release = await slots.acquire(currentTenant().id);
       try {
+        // Rotating drops EXIF, so make sure it's been read before the file changes
+        await photoInfo.get(fullPath, path.relative(this.uploadsDir, fullPath))
+          .catch(error => console.warn('Could not read photo info:', error.message));
         const before = await getLibrary().stat(toAdminPath(fullPath));
         const original = await getLibrary().readPhoto(toAdminPath(fullPath));
         await assertImageSize(original);

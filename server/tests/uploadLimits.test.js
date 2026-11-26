@@ -188,6 +188,39 @@ describe('Upload limits', () => {
     expect(res.body.code).toBe('IMAGE_TOO_LARGE');
   });
 
+  test('rotation reads the photo only once it has its turn', async () => {
+    await fs.writeFile(path.join(testUploadsDir, 'family', 'order.png'), await png(20, 10));
+    const photoInfo = require('../services/photoInfoService');
+    const seen = [];
+    const spy = jest.spyOn(photoInfo, 'get').mockImplementation(async () => { seen.push(slots.running.total); return {}; });
+    try {
+      await request(app).post('/api/images/rotate').send({ path: 'uploads/family/order.png', angle: 90 }).expect(200);
+      expect(seen).toEqual([1]);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  test('a photo changed or removed while rotating is not overwritten', async () => {
+    await fs.writeFile(path.join(testUploadsDir, 'family', 'moved.png'), await png(20, 10));
+    const library = getLibrary();
+    const realStat = library.stat.bind(library);
+    let calls = 0;
+    const statSpy = jest.spyOn(library, 'stat').mockImplementation(async adminPath => {
+      calls += 1;
+      return calls === 1 ? realStat(adminPath) : null; // gone by the time it is written
+    });
+    const writeSpy = jest.spyOn(library, 'writeItem');
+    try {
+      const res = await request(app).post('/api/images/rotate').send({ path: 'uploads/family/moved.png', angle: 90 }).expect(409);
+      expect(res.body.code).toBe('PHOTO_CHANGED');
+      expect(writeSpy).not.toHaveBeenCalled();
+    } finally {
+      statSpy.mockRestore();
+      writeSpy.mockRestore();
+    }
+  });
+
   test('rotation waits its turn among the photos being converted', async () => {
     await fs.writeFile(path.join(testUploadsDir, 'family', 'turn.png'), await png(20, 10));
     const held = [slots.tryAcquire('default'), slots.tryAcquire('default')];
@@ -254,10 +287,25 @@ describe('Upload limits', () => {
       expect(res.body.code).toBe('UPLOAD_TOO_LARGE');
     });
 
-    test('a request without a length is refused', async () => {
-      const { res, next } = await call({});
-      expect(next).not.toHaveBeenCalled();
-      expect(res.statusCode).toBe(411);
+    test('a chunked request without a length goes on to the per-file limits', async () => {
+      const { res, next } = await call({ 'transfer-encoding': 'chunked' });
+      expect(next).toHaveBeenCalled();
+      res.emit('close');
+      expect(slots.running.total).toBe(0);
+    });
+
+    test("a quota hook's own error keeps its status, code and details", async () => {
+      const appQuota = quotaService.getQuota();
+      quotaService.setQuota({ canAdd: async () => { throw Object.assign(new Error('Upgrade to add more'), { status: 402, code: 'PLAN_LIMIT', vars: { plan: 'free' } }); } });
+      try {
+        const { res, next } = await call(ok, { id: 'g' });
+        expect(next).not.toHaveBeenCalled();
+        expect(res.statusCode).toBe(402);
+        expect(res.body).toEqual({ message: 'Upgrade to add more', code: 'PLAN_LIMIT', plan: 'free', files: [] });
+        expect(slots.running.total).toBe(0);
+      } finally {
+        quotaService.setQuota(appQuota);
+      }
     });
 
     test('a full library is refused before its photos are read', async () => {

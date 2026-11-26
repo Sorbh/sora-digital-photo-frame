@@ -89,8 +89,21 @@ describe('muted text contrast', () => {
       const { color, alpha } = resolveColor(colorValue, t);
       const opacity = chain.reduce((product, sel) => product * Number(declared(sel, 'opacity') ?? 1), 1);
       const page = rgb(token(t, 'paper'));
-      const background = dragging ? blend(rgb(token(t, 'berry')), page, 0.12) : page;
+      // The drop zone's berry wash, read from admin.css, plus a margin for the soft glow around it
+      const wash = Number((declared('.drop-zone', 'background') || '').match(/var\(--berry\)\s+(\d+(?:\.\d+)?)%/)?.[1]);
+      expect(wash).toBeGreaterThan(0);
+      const background = dragging ? blend(rgb(token(t, 'berry')), page, Math.max(0.12, wash / 100 + 0.07)) : page;
       expect(ratio(blend(color, background, alpha * opacity), background)).toBeGreaterThanOrEqual(4.5);
+    });
+  });
+
+  describe('phone tab bar', () => {
+    test.each([['light', lightTokens], ['dark', darkTokens]])('labels stay readable over any photo (%s)', (_, t) => {
+      const block = sora.slice(sora.indexOf('    .tabbar {', sora.indexOf('@media (max-width: 640px)')));
+      const background = block.slice(0, block.indexOf('}')).match(/\n\s*background:\s*([^;]+);/)[1].trim();
+      // Must be solid: a see-through bar lets a white or black photo shift the label contrast
+      expect(background).toBe('var(--paper-raised)');
+      expect(ratio(rgb(token(t, 'ink-faint')), rgb(token(t, 'paper-raised')))).toBeGreaterThanOrEqual(4.5);
     });
   });
 });

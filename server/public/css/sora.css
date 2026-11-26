@@ -673,7 +673,8 @@ dialog::backdrop {
         padding: 0 6px;
         border: 1px solid var(--rule);
         border-radius: var(--shape-lg);
-        background: color-mix(in oklab, var(--paper-raised) 90%, transparent);
+        /* Solid, so a bright photo scrolling underneath can't wash out the muted labels */
+        background: var(--paper-raised);
         backdrop-filter: blur(18px) saturate(1.4);
         -webkit-backdrop-filter: blur(18px) saturate(1.4);
         box-shadow: 0 20px 40px -18px rgb(90 20 50 / 0.35);

@@ -1,4 +1,5 @@
 const bcrypt = require('bcryptjs');
+const { errorSummary } = require('../utils/errorSummary');
 const { getDataStore } = require('../store');
 const { passClientError } = require('../utils/httpError');
 const { rotateSession } = require('../utils/session');
@@ -9,14 +10,59 @@ const AttemptLimiter = require('../utils/attemptLimiter');
 
 // bcrypt cost for PINs: each sign-in compares against every account's hash, so keep it modest
 const PIN_ROUNDS = 10;
+// PINs are 4 to 6 digits, as the PIN pad and the Access page take them
+const PIN_PATTERN = /^\d{4,6}$/;
+const validPin = pin => typeof pin === 'string' && PIN_PATTERN.test(pin);
+const invalidPin = res => res.status(400).json({
+    success: false,
+    error: 'The PIN must be 4 to 6 digits',
+    code: 'INVALID_PIN_FORMAT'
+});
 
 class AccessAccountController {
     constructor() {
         // Rate limiting for PIN attempts
         this.pinSignIn = true; // createApp({ pinSignIn: false }) turns it off
         this.familyCode = false; // createApp({ familyCode: true }): PIN sign-in also needs the family code (hosted)
-        // 5 wrong tries in 5 minutes locks for 15 minutes, then 30, 60... up to a day
-        this.limiter = new AttemptLimiter({ keep: key => key.startsWith('family:') });
+        // 5 wrong tries in 5 minutes locks for 15 minutes, then 30, 60... up to a day.
+        // A family's wrong tries and lockout are saved with its data, so a restart
+        // doesn't give it a fresh set.
+        this.limiter = new AttemptLimiter({
+            keep: key => key.startsWith('family:'),
+            onSave: (key, state) => (key.startsWith('family:') ? this.saveAttempts(key, state) : null)
+        });
+        this.restoredLockouts = new Map(); // family -> reading its saved tries, once since starting
+        this.unsavedAttempts = new Set(); // families whose last save failed, saved again on their next try
+    }
+
+    async saveAttempts(familyKey, state) {
+        try {
+            await getDataStore().set('pin-attempts', state);
+            this.unsavedAttempts.delete(familyKey);
+        } catch (error) {
+            console.error('Could not save PIN attempts, will try again:', error.message);
+            this.unsavedAttempts.add(familyKey);
+        }
+    }
+
+    // Reads a family's saved tries once after a restart. Every request for the
+    // family waits for the same read, so none gets in before it's back. A read
+    // that fails is tried again by the next request.
+    restoreLockout(familyKey) {
+        if (!this.restoredLockouts.has(familyKey)) {
+            const reading = getDataStore().get('pin-attempts', null)
+                .catch((error) => {
+                    // No family to look in (a client error): nothing saved for it
+                    if (error.status >= 400 && error.status < 500) return null;
+                    throw error;
+                })
+                .then(state => this.limiter.restore(familyKey, state));
+            this.restoredLockouts.set(familyKey, reading);
+            reading.catch(() => {
+                if (this.restoredLockouts.get(familyKey) === reading) this.restoredLockouts.delete(familyKey);
+            });
+        }
+        return this.restoredLockouts.get(familyKey);
     }
 
     async loadAccounts() {
@@ -59,8 +105,11 @@ class AccessAccountController {
         await getDataStore().set('access-accounts', accounts);
     }
 
-    // Rate limiting (see utils/attemptLimiter). A key is an address, or a whole
-    // family ("family:<tenant>"), so spreading guesses over many addresses doesn't help.
+    // Rate limiting (see utils/attemptLimiter). A key is an address ("ip:<address>",
+    // from addressKey), or a whole family ("family:<tenant>"), so spreading guesses
+    // over many addresses doesn't help. The prefixes keep an address from ever
+    // being taken for a family.
+    addressKey(ip) { return `ip:${ip}`; }
     checkRateLimit(key) { return this.limiter.check(key); }
     recordFailedAttempt(key) { this.limiter.fail(key); }
     forgetAttempt(key) { this.limiter.forget(key); }
@@ -71,7 +120,9 @@ class AccessAccountController {
     }
 
     // A new account with a PIN nobody has yet (used when a frame is paired by QR code)
-    async addAccountWithRandomPin({ name, assignedFolders = [] }) {
+    // pendingPairing marks an account made while approving a frame, until the
+    // frame is paired; such an account can't be chosen for another frame yet
+    async addAccountWithRandomPin({ name, assignedFolders = [], pendingPairing = false }) {
         let account;
         await getDataStore().update('access-accounts', [], async accounts => {
             let pin;
@@ -84,7 +135,8 @@ class AccessAccountController {
                 pinHash: await this.hashPin(pin),
                 assignedFolders,
                 createdAt: new Date().toISOString(),
-                lastAccessed: null
+                lastAccessed: null,
+                ...(pendingPairing && { pendingPairing: true })
             };
             return [...accounts, account];
         });
@@ -97,7 +149,7 @@ class AccessAccountController {
             res.json({ accounts: accounts.map(account => this.publicAccount(account)) });
         } catch (error) {
             if (passClientError(res, error)) return;
-            console.error('Error fetching accounts:', error);
+            console.error('Error fetching accounts:', errorSummary(error));
             res.status(500).json({
                 success: false,
                 error: 'Failed to fetch accounts'
@@ -115,6 +167,7 @@ class AccessAccountController {
                     error: 'Name and PIN are required'
                 });
             }
+            if (!validPin(pin)) return invalidPin(res);
 
             let duplicate = false;
             let newAccount;
@@ -147,7 +200,7 @@ class AccessAccountController {
             });
         } catch (error) {
             if (passClientError(res, error)) return;
-            console.error('Error creating account:', error);
+            console.error('Error creating account:', errorSummary(error));
             res.status(500).json({
                 success: false,
                 error: 'Failed to create account'
@@ -167,6 +220,8 @@ class AccessAccountController {
                     error: 'Name is required'
                 });
             }
+            // A blank PIN keeps the current one; anything else must be a valid PIN
+            if (pin !== undefined && pin !== '' && !validPin(pin)) return invalidPin(res);
 
             let notFound = false;
             let duplicate = false;
@@ -206,7 +261,7 @@ class AccessAccountController {
             });
         } catch (error) {
             if (passClientError(res, error)) return;
-            console.error('Error updating account:', error);
+            console.error('Error updating account:', errorSummary(error));
             res.status(500).json({
                 success: false,
                 error: 'Failed to update account'
@@ -235,7 +290,7 @@ class AccessAccountController {
             });
         } catch (error) {
             if (passClientError(res, error)) return;
-            console.error('Error deleting account:', error);
+            console.error('Error deleting account:', errorSummary(error));
             res.status(500).json({
                 success: false,
                 error: 'Failed to delete account'
@@ -275,7 +330,7 @@ class AccessAccountController {
             res.json({ success: true, required: true, code: await familyCodes.get() });
         } catch (error) {
             if (passClientError(res, error)) return;
-            console.error('Error reading the family code:', error);
+            console.error('Error reading the family code:', errorSummary(error));
             res.status(500).json({ success: false, error: 'Could not load the family code' });
         }
     }
@@ -286,7 +341,7 @@ class AccessAccountController {
             res.json({ success: true, required: true, code: await familyCodes.renew() });
         } catch (error) {
             if (passClientError(res, error)) return;
-            console.error('Error renewing the family code:', error);
+            console.error('Error renewing the family code:', errorSummary(error));
             res.status(500).json({ success: false, error: 'Could not make a new family code' });
         }
     }
@@ -298,9 +353,10 @@ class AccessAccountController {
         try {
             const { pin, token, familyCode } = req.body;
             const clientIP = req.ip || req.connection.remoteAddress || req.socket.remoteAddress;
+            const addressKey = this.addressKey(clientIP);
 
             // Check rate limiting
-            const rateLimitCheck = this.checkRateLimit(clientIP);
+            const rateLimitCheck = this.checkRateLimit(addressKey);
             if (!rateLimitCheck.allowed) {
                 console.log(`🚫 Rate limit exceeded for IP: ${clientIP}`);
                 return res.status(429).json({
@@ -319,9 +375,23 @@ class AccessAccountController {
             }
 
             // Wrong tries also count against the family, so spreading them over many
-            // addresses (or faking X-Forwarded-For) doesn't help
+            // addresses (or faking X-Forwarded-For) doesn't help. Only wrong PINs are
+            // counted for the family, once known: a right one, from someone who knows
+            // one PIN, uses nothing up and clears nothing (see AttemptLimiter.begin).
             const familyKey = `family:${currentTenant().id}`;
-            const familyCheck = this.checkRateLimit(familyKey);
+            try {
+                await this.restoreLockout(familyKey);
+            } catch (error) {
+                // Can't tell whether the family is locked out: refuse for now
+                console.error('Could not read PIN attempts:', error.message);
+                return res.status(503).json({
+                    success: false,
+                    error: 'Sign-in is not available right now. Try again in a moment.',
+                    code: 'SIGN_IN_UNAVAILABLE'
+                });
+            }
+            if (this.unsavedAttempts.has(familyKey)) await this.limiter.save(familyKey);
+            const familyCheck = await this.limiter.begin(familyKey);
             if (!familyCheck.allowed) {
                 return res.status(429).json({
                     success: false,
@@ -331,17 +401,34 @@ class AccessAccountController {
                 });
             }
 
-            // Count the try before checking it (see recordFailedAttempt)
-            this.recordFailedAttempt(clientIP);
-            this.recordFailedAttempt(familyKey);
+            // The address again, now that waiting for the family is over: other tries
+            // from it may have been counted meanwhile. Then its try is counted before
+            // checking it (see recordFailedAttempt), with no wait in between.
+            const addressCheck = this.checkRateLimit(addressKey);
+            if (!addressCheck.allowed) {
+                this.limiter.end(familyKey, false);
+                return res.status(429).json({
+                    success: false,
+                    error: addressCheck.message,
+                    code: 'RATE_LIMITED',
+                    remainingTime: addressCheck.remainingTime
+                });
+            }
+            this.recordFailedAttempt(addressKey);
 
-            const accounts = await this.accountsForSignIn(familyCode);
-            const account = await this.findByPin(accounts, pin);
+            let accounts = [];
+            let account = null;
+            try {
+                accounts = await this.accountsForSignIn(familyCode);
+                account = await this.findByPin(accounts, pin);
+            } finally {
+                // No frames to guess at (e.g. a wrong family code): not the family's try.
+                // A wrong one is saved before answering.
+                await this.limiter.end(familyKey, !account && accounts.length > 0);
+            }
 
             if (!account) {
-                // No frames to guess at (e.g. a wrong family code): not the family's try
-                if (!accounts.length) this.forgetAttempt(familyKey);
-                const newRateLimitCheck = this.checkRateLimit(clientIP);
+                const newRateLimitCheck = this.checkRateLimit(addressKey);
 
                 console.log(`❌ Failed PIN attempt from IP: ${clientIP}, attempts remaining: ${newRateLimitCheck.attemptsRemaining || 0}`);
 
@@ -353,14 +440,13 @@ class AccessAccountController {
                 });
             }
 
+            // A right PIN clears this address's wrong tries
+            this.recordSuccessfulAttempt(addressKey);
+
             // A PIN sign-in makes this browser a screen, as pairing by QR code does,
             // so it counts toward the same limit. A browser that already is one of
             // this account's screens (it sends its token) stays that screen.
             const screen = await this.screenFor(account, token, req.session.deviceId);
-
-            // Record successful attempt (clears rate limiting)
-            this.recordSuccessfulAttempt(clientIP);
-            this.recordSuccessfulAttempt(familyKey);
             console.log(`✅ Successful PIN authentication from IP: ${clientIP} for account: ${account.name}`);
 
             // Update last accessed time
@@ -389,7 +475,7 @@ class AccessAccountController {
             });
         } catch (error) {
             if (passClientError(res, error)) return;
-            console.error('Error authenticating with PIN:', error);
+            console.error('Error authenticating with PIN:', errorSummary(error));
             res.status(500).json({
                 success: false,
                 error: 'Authentication failed'
@@ -415,7 +501,7 @@ class AccessAccountController {
             }
         } catch (error) {
             if (passClientError(res, error)) return;
-            console.error('Error checking session:', error);
+            console.error('Error checking session:', errorSummary(error));
             res.status(500).json({
                 success: false,
                 error: 'Failed to check session'
@@ -443,7 +529,7 @@ class AccessAccountController {
 
             req.session.destroy((err) => {
                 if (err) {
-                    console.error('Error destroying session:', err);
+                    console.error('Error destroying session:', errorSummary(err));
                     return res.status(500).json({
                         success: false,
                         error: 'Failed to clear session'
@@ -458,7 +544,7 @@ class AccessAccountController {
             });
         } catch (error) {
             if (passClientError(res, error)) return;
-            console.error('Error clearing session:', error);
+            console.error('Error clearing session:', errorSummary(error));
             res.status(500).json({
                 success: false,
                 error: 'Failed to clear session'

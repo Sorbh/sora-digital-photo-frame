@@ -194,7 +194,16 @@
     "donePaired": "{name} è <em>abbinata</em>",
     "expiredHeading": "Questo codice è <em>scaduto</em>",
     "heading": "Mostra le foto su <em>questa cornice</em>",
-    "codeMatchHint": "Controlla che sia uguale a quello sullo schermo della cornice"
+    "codeMatchHint": "Controlla che sia uguale a quello sullo schermo della cornice",
+    "enterHeading": "Scrivi il <em>codice</em>",
+    "enterNote": "La cornice lo mostra sotto il codice QR, ad esempio <bdi class=\"code-example\">K7P-4QX</bdi>.",
+    "continue": "Continua",
+    "codeInvalid": "Scrivi le 6 lettere e cifre mostrate sulla cornice.",
+    "typeCode": "Scrivi un codice",
+    "unreachableHeading": "Impossibile <em>verificare</em> il codice",
+    "unreachableNote": "La libreria non ha risposto. Controlla la connessione del telefono e riprova.",
+    "tryAgain": "Riprova",
+    "foldersFailed": "Impossibile caricare le cartelle, quindi ora non si può creare un nuovo account. Scegli un account esistente o riprova."
   },
   "login": {
     "invalid_password": "Password non valida. Riprova.",
@@ -333,6 +342,7 @@
     "countSnaps_other": "{count} snap",
     "countSnaps_many": "{count} snap",
     "folderOptions": "Opzioni cartella",
+    "photoOptions": "Opzioni foto",
     "selectPhoto": "Seleziona foto",
     "viewPhoto": "Guarda foto",
     "deletePhoto": "Elimina foto",

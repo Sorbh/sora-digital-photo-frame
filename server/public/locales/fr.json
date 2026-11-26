@@ -194,7 +194,16 @@
     "donePaired": "{name} est <em>associé</em>",
     "expiredHeading": "Ce code a <em>expiré</em>",
     "heading": "Afficher des photos sur <em>ce cadre</em>",
-    "codeMatchHint": "Vérifiez qu’il correspond à l’écran du cadre"
+    "codeMatchHint": "Vérifiez qu’il correspond à l’écran du cadre",
+    "enterHeading": "Saisissez le <em>code</em>",
+    "enterNote": "Le cadre l’affiche sous son code QR, par exemple <bdi class=\"code-example\">K7P-4QX</bdi>.",
+    "continue": "Continuer",
+    "codeInvalid": "Saisissez les 6 lettres et chiffres affichés sur le cadre.",
+    "typeCode": "Saisir un code",
+    "unreachableHeading": "Impossible de <em>vérifier</em> le code",
+    "unreachableNote": "La bibliothèque n’a pas répondu. Vérifiez la connexion de votre téléphone, puis réessayez.",
+    "tryAgain": "Réessayer",
+    "foldersFailed": "Impossible de charger les dossiers : un nouveau compte ne peut pas être créé pour le moment. Choisissez un compte existant ou réessayez."
   },
   "login": {
     "invalid_password": "Mot de passe incorrect. Veuillez réessayer.",
@@ -333,6 +342,7 @@
     "countSnaps_other": "{count} pages souvenir",
     "countSnaps_many": "{count} pages souvenir",
     "folderOptions": "Options du dossier",
+    "photoOptions": "Options de la photo",
     "selectPhoto": "Sélectionner la photo",
     "viewPhoto": "Voir la photo",
     "deletePhoto": "Supprimer la photo",

@@ -110,8 +110,10 @@ Otherwise it returns `{ folders, canEdit, isOwner }`:
 - **It must answer at once,** not with a promise: it's asked many times per request. Read what your `requireAuth` already looked up, e.g. from `req` or the session. A promise, a thrown error or any other value locks everything (no folders, no changes, not the owner).
 - **Only `true` grants** `canEdit` and `isOwner`, and only `null` means all folders; anything else that isn't a list of names means no folders.
 - **Folders work as they do for PIN frames** (`server/utils/viewerAccess.js`). Folders above theirs can be opened to reach them, and show only what leads there. Symlinks are followed to where they really lead.
-- **Reads** outside their folders answer 404, as if the photo or folder didn't exist. This covers folder lists, thumbnails, the next and random photo, `/uploads` and snaps.
-- **Changes** outside them answer 403 `OUTSIDE_FOLDERS`. A move checks where each photo comes from and where it goes. A snap checks its folder and its photos. A folder can be made, reordered or deleted only inside theirs, and one of their own folders can't be deleted.
+- **Reads** outside their folders answer 404, as if the photo or folder didn't exist. This covers folder lists, thumbnails, the next and random photo, `/uploads`, snaps and notes.
+- **Changes** outside them answer 403 `OUTSIDE_FOLDERS`. A move checks where each photo comes from and where it goes. A snap or note checks its folder (both ends when a note moves) and its photos. A folder can be made, reordered or deleted only inside theirs, and one of their own folders can't be deleted.
+- **Notes** are scoped like photos: only notes in their folders are listed or shown, with only the photos they can see. Notes in the top folder go to every frame, so someone limited to some folders can't see, make, change or delete them.
+- **Photos they can't see are never lost.** A snap or note shows them only the photos they can see; when they save it, the others stay where they were, and their own list fills the other places.
 - `GET /api/features` returns the scope as `scope`, so pages hide what the person can't use. The server refuses it either way.
 - `server/tests/peopleScope.test.js` holds the decision for every API route, and fails when a route is added without one.
 

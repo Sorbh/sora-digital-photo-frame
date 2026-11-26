@@ -589,6 +589,13 @@ class PhotoFrameAdmin {
                 this.renderFolderContents(data);
                 this.updateBreadcrumb();
                 this.updateBackButton();
+            } else if (response.status === 404 && path !== 'uploads') {
+                // Gone, or not one this person can see (an old link, say): back
+                // to the top of the library rather than an empty page
+                this.showToast(t('errors.FOLDER_NOT_FOUND'), 'error');
+                this.currentPath = 'uploads';
+                this.updateURL();
+                this.loadFolderContents();
             } else {
                 this.setCreateFolder(this.knownCreateFolder(path));
                 this.showToast(i18n.error(data, 'admin.loadFolderFailed'), 'error');

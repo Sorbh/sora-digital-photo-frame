@@ -4,7 +4,7 @@ const { getLibrary } = require('../library');
 const { UPLOADS_DIR } = require('../config/paths');
 const { resolveAdminPath, toAdminPath } = require('../utils/safePath');
 const { passClientError } = require('../utils/httpError');
-const { canSee } = require('../utils/viewerAccess');
+const { canSee, keepHiddenPhotos } = require('../utils/viewerAccess');
 
 // Relative to uploads, "/"-separated, as the viewerAccess helpers take it
 const relative = (fullPath) => path.relative(UPLOADS_DIR, fullPath).split(path.sep).join('/');
@@ -15,6 +15,11 @@ const relative = (fullPath) => path.relative(UPLOADS_DIR, fullPath).split(path.s
  * change goes through the viewerAccess helpers, like photos.
  */
 class NoteController {
+  // The photos (relative to uploads) this person may see on a note
+  visible(req) {
+    return (photo) => canSee(req, photo);
+  }
+
   // A folder (absolute) the person may use, or null
   async folderFor(req, adminPath) {
     const folder = resolveAdminPath(adminPath || 'uploads', { allowRoot: true });
@@ -54,7 +59,7 @@ class NoteController {
     try {
       const fullPath = await this.notePath(req);
       if (!fullPath) return res.status(404).json({ success: false, error: 'Note not found' });
-      res.json({ success: true, note: await notes.load(fullPath) });
+      res.json({ success: true, note: await notes.load(fullPath, undefined, this.visible(req)) });
     } catch (error) {
       if (passClientError(res, error)) return;
       console.error('Error reading note:', error);
@@ -70,7 +75,7 @@ class NoteController {
 
       const { note, errors, fullPath } = await notes.create(folder, req.body || {});
       if (errors) return res.status(400).json({ success: false, error: 'Please check the note', errors });
-      res.status(201).json({ success: true, note: await notes.load(fullPath), path: toAdminPath(fullPath), id: note.id });
+      res.status(201).json({ success: true, note: await notes.load(fullPath, undefined, this.visible(req)), path: toAdminPath(fullPath), id: note.id });
     } catch (error) {
       if (passClientError(res, error)) return;
       console.error('Error creating note:', error);
@@ -85,6 +90,8 @@ class NoteController {
       if (!fullPath) return res.status(404).json({ success: false, error: 'Note not found' });
 
       const { folder: folderPath, ...input } = req.body || {};
+      // Someone limited to some folders never drops the photos they can't see
+      if (input.photos !== undefined) input.photos = keepHiddenPhotos(req, (await notes.read(fullPath))?.photos, input.photos);
       let target = null;
       if (folderPath !== undefined) {
         target = await this.folderFor(req, folderPath);
@@ -94,7 +101,7 @@ class NoteController {
       const { errors } = await notes.update(fullPath, input);
       if (errors) return res.status(400).json({ success: false, error: 'Please check the note', errors });
       if (target) fullPath = await notes.move(fullPath, target);
-      res.json({ success: true, note: await notes.load(fullPath), path: toAdminPath(fullPath) });
+      res.json({ success: true, note: await notes.load(fullPath, undefined, this.visible(req)), path: toAdminPath(fullPath) });
     } catch (error) {
       if (passClientError(res, error)) return;
       console.error('Error updating note:', error);

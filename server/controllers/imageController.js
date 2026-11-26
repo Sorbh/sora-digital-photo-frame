@@ -138,7 +138,7 @@ class ImageController {
 
       // A snap is drawn by the frame itself, from its page data
       if (randomImage.type === 'snap') {
-        const snap = await snaps.forFrame(randomImage.path, req.session, photo => canSee(req, photo));
+        const snap = await snaps.forFrame(randomImage.path, req);
         return res.json({
           success: true,
           image: {

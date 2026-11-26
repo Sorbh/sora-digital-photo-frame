@@ -51,12 +51,17 @@ const as = (person) => {
 };
 
 // Anything that would show "Other" or the top folder's photo
-const LEAK = /Other|secret|inner|top\.jpg/;
+const LEAK = /Other|secret|inner|top\.jpg|toplevel|Toplevel/;
 const noLeak = (res) => expect(JSON.stringify(res.body) + (res.text || '')).not.toMatch(LEAK);
 
 let jpeg;
 const place = (relative, data) => fs.outputFile(path.join(testUploadsDir, relative), data);
 const snap = (title, photos) => JSON.stringify({ version: 1, title, message: '', signoff: '', eyebrow: '', theme: 'paper', layout: 'auto', photos });
+// A note showing now
+const note = (id, title, photos = []) => JSON.stringify({
+  version: 1, id, title, message: '', signoff: '', eyebrow: '', theme: 'paper', layout: 'auto', photos,
+  eventAt: null, startsAt: '2020-01-01T00:00:00.000Z', endsAt: null, everyMinutes: 5, showForSeconds: 20, enabled: true
+});
 
 async function buildLibrary() {
   imageController.clearImageCache(); // photos are listed once a minute
@@ -69,6 +74,10 @@ async function buildLibrary() {
   await place('Other/Inner/inner.jpg', jpeg);
   await place('Other/other.snap.json', snap('Other page', ['Other/secret.jpg']));
   await place('top.jpg', jpeg);
+  // Notes: one in Family (with a photo from Other too), one in Other, one at the top (every frame's)
+  await place('Family/fam.note.json', note('nt_fam', 'Family note', ['Family/fam.jpg', 'Other/secret.jpg']));
+  await place('Other/other.note.json', note('nt_other', 'Other note', ['Other/secret.jpg']));
+  await place('toplevel.note.json', note('nt_top', 'Toplevel note'));
 }
 
 // Every file under uploads (dot files too, e.g. a folder's play order), with a hash
@@ -101,12 +110,10 @@ const outsideFamily = () => tree(relative => !relative.startsWith('Family/'));
 //                 VIEW_ONLY, an editor 403 OUTSIDE_FOLDERS, and nothing changes.
 //                 inside: one inside Family. A viewer gets 403 VIEW_ONLY, an
 //                 editor insideStatus, and nothing outside Family changes.
-// notes(request): note changes: refused to viewers (VIEW_ONLY); their folders are C2's
 // owner(request): 403 OWNER_ONLY to anyone but the owner
 const none = (why) => ({ kind: 'none', why });
 const read = (check) => ({ kind: 'read', check });
 const write = (outside, inside, insideStatus) => ({ kind: 'write', outside, inside, insideStatus });
-const notes = (send) => ({ kind: 'notes', send });
 const owner = (send) => ({ kind: 'owner', send });
 
 const enc = encodeURIComponent;
@@ -192,7 +199,7 @@ const ROUTES = {
     expect(top.body.canChange).toBe(false);
     const family = await as(person).get('/api/admin/folders?path=uploads%2FFamily').expect(200);
     noLeak(family);
-    expect(family.body.files.map(file => file.name).sort()).toEqual(['fam.jpg', 'fam.snap.json']);
+    expect(family.body.files.map(file => file.name).sort()).toEqual(['fam.jpg', 'fam.note.json', 'fam.snap.json']);
     expect(family.body.canCreateFolder).toBe(person === 'editor');
     expect(family.body.canChange).toBe(person === 'editor');
   }),
@@ -220,12 +227,49 @@ const ROUTES = {
   'GET /admin/family-code': owner(p => as(p).get('/api/admin/family-code')),
   'POST /admin/family-code': owner(p => as(p).post('/api/admin/family-code')),
 
-  // Notes: changes need "can edit"; which folders they're in is checked where notes live
-  'GET /notes': none('notes are scoped to their folders where they are kept (C2), through utils/viewerAccess'),
-  'POST /notes': notes(p => as(p).post('/api/notes').send({ title: 'Hello' })),
-  'GET /notes/active': none('notes are scoped to their folders where they are kept (C2), through utils/viewerAccess'),
-  'PUT /notes/:id': notes(p => as(p).put('/api/notes/missing').send({ title: 'Hello' })),
-  'DELETE /notes/:id': notes(p => as(p).delete('/api/notes/missing')),
+  // Notes: files in folders, scoped like photos. Top-folder notes go to every
+  // frame, so someone limited to Family can't see, make or change them.
+  'GET /notes': read(async (person) => {
+    for (const folder of ['uploads/Other', 'uploads', 'uploads/Family/../Other']) {
+      await as(person).get(`/api/notes?folder=${enc(folder)}`).expect(404);
+    }
+    const all = await as(person).get('/api/notes').expect(200);
+    noLeak(all);
+    expect(all.body.notes.map(n => n.title)).toEqual(['Family note']);
+    expect(all.body.notes[0].photos).toEqual(['Family/fam.jpg']);
+    noLeak(await as(person).get(`/api/notes?folder=${enc('uploads/Family')}`).expect(200));
+  }),
+  'POST /notes': write(
+    [p => as(p).post('/api/notes').send({ title: 'Hi', folder: 'uploads/Other' }),
+      p => as(p).post('/api/notes').send({ title: 'Hi' }), // the top folder, by default
+      p => as(p).post('/api/notes').send({ title: 'Hi', folder: 'uploads' }),
+      p => as(p).post('/api/notes').send({ title: 'Hi', folder: 'uploads/Family', photos: ['Other/secret.jpg'] })],
+    p => as(p).post('/api/notes').send({ title: 'Hi', folder: 'uploads/Family', photos: ['Family/fam.jpg'] }), 201),
+  'GET /notes/active': read(async (person) => {
+    for (const url of ['/api/notes/active', '/api/notes/active?folder=Family', '/api/notes/active?folder=Other']) {
+      const res = await as(person).get(url).expect(200);
+      noLeak(res);
+      expect(res.body.notes.map(n => n.title)).toEqual(url.endsWith('Other') ? [] : ['Family note']);
+    }
+  }),
+  'GET /notes/note': read(async (person) => {
+    for (const file of ['uploads/Other/other.note.json', 'uploads/toplevel.note.json']) {
+      await as(person).get(`/api/notes/note?path=${enc(file)}`).expect(404);
+    }
+    noLeak(await as(person).get(`/api/notes/note?path=${enc('uploads/Family/fam.note.json')}`).expect(200));
+  }),
+  'PUT /notes': write(
+    [p => as(p).put(`/api/notes?path=${enc('uploads/Other/other.note.json')}`).send({ title: 'Changed' }),
+      p => as(p).put(`/api/notes?path=${enc('uploads/toplevel.note.json')}`).send({ title: 'Changed' }),
+      p => as(p).put(`/api/notes?path=${enc('uploads/Family/fam.note.json')}`).send({ folder: 'uploads/Other' }), // into Other
+      p => as(p).put(`/api/notes?path=${enc('uploads/Family/fam.note.json')}`).send({ folder: 'uploads' }), // to the top
+      p => as(p).put(`/api/notes?path=${enc('uploads/Other/other.note.json')}`).send({ folder: 'uploads/Family' }), // out of Other
+      p => as(p).put(`/api/notes?path=${enc('uploads/Family/fam.note.json')}`).send({ photos: ['Other/Inner/inner.jpg'] })],
+    p => as(p).put(`/api/notes?path=${enc('uploads/Family/fam.note.json')}`).send({ title: 'Changed', folder: 'uploads/Family/Sub' }), 200),
+  'DELETE /notes': write(
+    [p => as(p).delete(`/api/notes?path=${enc('uploads/Other/other.note.json')}`),
+      p => as(p).delete(`/api/notes?path=${enc('uploads/toplevel.note.json')}`)],
+    p => as(p).delete(`/api/notes?path=${enc('uploads/Family/fam.note.json')}`), 200),
 
   // Snaps: their folder, and the photos on them
   'GET /snaps': read(async (person) => {
@@ -371,17 +415,6 @@ describe('People limited by scope(req)', () => {
       expect(await outsideFamily()).toEqual(others);
     });
 
-    test.each(cases(ROUTES, 'notes'))('%s needs "can edit"', async (route, { send }) => {
-      const res = await send(person);
-      if (person === 'viewer') {
-        expect(res.status).toBe(403);
-        expect(res.body.code).toBe('VIEW_ONLY');
-      } else {
-        expect(res.body.code).not.toBe('VIEW_ONLY');
-        expect(res.status).not.toBe(403);
-      }
-    });
-
     test.each(cases(ROUTES, 'owner'))('%s is for the owner only', async (route, { send }) => {
       const res = await send(person);
       expect(res.status).toBe(403);
@@ -427,7 +460,10 @@ describe('People limited by scope(req)', () => {
       await buildLibrary();
       const top = await as(person).get('/api/admin/folders?path=uploads').expect(200);
       expect(top.body.folders.map(folder => folder.name)).toEqual(['Family', 'Other']);
-      expect(top.body.files.map(file => file.name)).toEqual(['top.jpg']);
+      expect(top.body.files.map(file => file.name).sort()).toEqual(['top.jpg', 'toplevel.note.json']);
+      const active = await as(person).get('/api/notes/active').expect(200);
+      expect(active.body.notes.map(n => n.title).sort()).toEqual(['Family note', 'Other note', 'Toplevel note']);
+      expect(active.body.notes.find(n => n.title === 'Family note').photos).toHaveLength(2);
       const family = await as(person).get('/api/snaps?path=uploads%2FFamily%2Ffam.snap.json').expect(200);
       expect(family.body.snap.photos).toEqual(['Family/fam.jpg', 'Other/secret.jpg']);
       await as(person).get('/uploads/Other/secret.jpg').expect(200);
@@ -451,6 +487,63 @@ describe('People limited by scope(req)', () => {
     } finally {
       delete PEOPLE.sub;
     }
+  });
+
+  // The editor only ever gets the photos they can see; saving keeps the others
+  describe.each([
+    ['snap', 'uploads/Family/fam.snap.json', '/api/snaps', '/api/snaps', 'snap'],
+    ['note', 'uploads/Family/fam.note.json', '/api/notes', '/api/notes/note', 'note']
+  ])('a %s with photos they can\'t see', (kind, file, save, load, field) => {
+    const photosOnDisk = async () => JSON.parse(await fs.readFile(path.join(testUploadsDir, file.replace(/^uploads\//, '')), 'utf8')).photos;
+
+    test('keeps them when only the title changes', async () => {
+      const shown = await as('editor').get(`${load}?path=${enc(file)}`).expect(200);
+      expect(shown.body[field].photos).toEqual(['Family/fam.jpg']);
+      // As the editor page sends it: everything it was shown, with a new title
+      const res = await as('editor').put(`${save}?path=${enc(file)}`)
+        .send({ ...shown.body[field], title: 'New title' }).expect(200);
+      noLeak(res);
+      expect(await photosOnDisk()).toEqual(['Family/fam.jpg', 'Other/secret.jpg']);
+      const saved = JSON.parse(await fs.readFile(path.join(testUploadsDir, file.replace(/^uploads\//, '')), 'utf8'));
+      expect(saved.title).toBe('New title');
+    });
+
+    test('keeps them in their places when the editor changes their own', async () => {
+      await place('Family/two.jpg', jpeg);
+      await place('Family/three.jpg', jpeg);
+      // Other's photo first: it stays first, the editor's two fill the rest
+      const name = file.replace(/^uploads\//, '');
+      const data = JSON.parse(await fs.readFile(path.join(testUploadsDir, name), 'utf8'));
+      data.photos = ['Other/secret.jpg', 'Family/fam.jpg'];
+      await place(name, JSON.stringify(data));
+      await as('editor').put(`${save}?path=${enc(file)}`).send({ photos: ['Family/two.jpg', 'Family/three.jpg'] }).expect(200);
+      expect(await photosOnDisk()).toEqual(['Other/secret.jpg', 'Family/two.jpg', 'Family/three.jpg']);
+      // Removing their own keeps Other's
+      await as('editor').put(`${save}?path=${enc(file)}`).send({ photos: [] }).expect(200);
+      expect(await photosOnDisk()).toEqual(['Other/secret.jpg']);
+    });
+
+    test('the owner\'s own save is taken as it is', async () => {
+      await as('owner').put(`${save}?path=${enc(file)}`).send({ photos: ['Family/fam.jpg'] }).expect(200);
+      expect(await photosOnDisk()).toEqual(['Family/fam.jpg']);
+    });
+  });
+
+  test('a symlink in their folder doesn\'t lead them into another', async () => {
+    try {
+      await fs.symlink(path.join(testUploadsDir, 'Other'), path.join(testUploadsDir, 'Family', 'link'), 'dir');
+    } catch {
+      return console.warn('Skipped: symlinks can\'t be made here');
+    }
+    for (const person of LIMITED) {
+      await as(person).get(`/api/notes?folder=${enc('uploads/Family/link')}`).expect(404);
+      await as(person).get(`/api/notes/note?path=${enc('uploads/Family/link/other.note.json')}`).expect(404);
+      await as(person).get(`/api/snaps?path=${enc('uploads/Family/link/other.snap.json')}`).expect(404);
+      await as(person).get('/uploads/Family/link/secret.jpg').expect(404);
+      const change = await as(person).put(`/api/notes?path=${enc('uploads/Family/link/other.note.json')}`).send({ title: 'Changed' });
+      expect([change.status, change.body.code]).toEqual([403, person === 'viewer' ? 'VIEW_ONLY' : 'OUTSIDE_FOLDERS']);
+    }
+    expect(JSON.parse(await fs.readFile(path.join(testUploadsDir, 'Other/other.note.json'), 'utf8')).title).toBe('Other note');
   });
 
   test('a scope with no folders sees nothing', async () => {

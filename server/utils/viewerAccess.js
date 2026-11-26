@@ -50,6 +50,24 @@ function canOpen(req, relativePath) {
   return norm(relativePath) === '' || canSee(req, relativePath) || foldersBelow(req, relativePath).length > 0;
 }
 
+/**
+ * The photos a snap or note keeps when someone limited to some folders saves it.
+ * They were only shown the photos they can see (current, as saved), and send
+ * back their own list (edited): photos they can't see stay where they were, and
+ * theirs fill the other places, in their order. Nobody else's photos are lost.
+ * Without a limit, or without a list, edited is used as it is.
+ */
+function keepHiddenPhotos(req, current, edited) {
+  if (!Array.isArray(edited) || !Array.isArray(current) || !assignedFolders(req)) return edited;
+  const theirs = [...edited];
+  const kept = [];
+  for (const photo of current) {
+    if (!canSee(req, photo)) kept.push(photo);
+    else if (theirs.length) kept.push(theirs.shift());
+  }
+  return [...kept, ...theirs];
+}
+
 // A photo (relative to uploads) in this folder or one inside it. Either may use
 // "/"; on Windows (sep "\\") either may use "\\" too, as path.relative writes it.
 // An empty folder name is in no photo's path, so it matches none.
@@ -138,4 +156,4 @@ function atPhotoPath(reader) {
   };
 }
 
-module.exports = { assignedFolders, canSee, canOpen, foldersBelow, inFolder, realVisiblePath, photoPath, isFolderUrl, requireVisiblePhoto, atPhotoPath };
+module.exports = { assignedFolders, canSee, canOpen, keepHiddenPhotos, foldersBelow, inFolder, realVisiblePath, photoPath, isFolderUrl, requireVisiblePhoto, atPhotoPath };

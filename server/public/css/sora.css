@@ -681,7 +681,9 @@ dialog::backdrop {
         bottom: calc(12px + env(safe-area-inset-bottom));
         z-index: 60;
         display: grid;
-        grid-template-columns: repeat(5, 1fr);
+        /* One column per tab shown: a shared library hides some (js/scope.js) */
+        grid-auto-flow: column;
+        grid-auto-columns: 1fr;
         align-items: center;
         height: 66px;
         padding: 0 6px;

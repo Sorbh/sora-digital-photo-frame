@@ -342,3 +342,30 @@ describe('for someone who can only view (js/scope.js)', () => {
     expect(done).toEqual(['move', 'upload']);
   });
 });
+
+describe('a folder that can\'t be opened', () => {
+  test('goes back to the top of the library instead of an empty page', async () => {
+    const { admin } = loadMenu({ i18n: { error: () => 'error' } });
+    const asked = [];
+    const toasts = [];
+    admin.currentPath = 'uploads/Other';
+    admin.clearSelection = () => {};
+    admin.setCreateFolder = () => {};
+    admin.knownCreateFolder = () => 'allowed';
+    admin.updateURL = () => {};
+    admin.updateBreadcrumb = () => {};
+    admin.updateBackButton = () => {};
+    admin.renderFolderContents = () => {};
+    admin.showToast = (message) => toasts.push(message);
+    admin.authenticatedFetch = async (url) => {
+      asked.push(decodeURIComponent(url));
+      const top = url.endsWith('=uploads');
+      return { ok: top, status: top ? 200 : 404, json: async () => (top ? { folders: [], files: [] } : { message: 'Folder not found' }) };
+    };
+    await admin.loadFolderContents();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(asked).toEqual(['/api/admin/folders?path=uploads/Other', '/api/admin/folders?path=uploads']);
+    expect(admin.currentPath).toBe('uploads');
+    expect(toasts).toEqual(['errors.FOLDER_NOT_FOUND']);
+  });
+});

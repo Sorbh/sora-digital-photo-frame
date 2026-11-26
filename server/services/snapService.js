@@ -40,11 +40,11 @@ class SnapService {
     return { ...snap, photos, photoUrls: notes.photoUrls(photos) };
   }
 
-  // The page a frame shows, with photos limited to what this frame may see
-  // (and, for a signed-in person, to visible(photo))
-  async forFrame(fullPath, session = {}, visible = () => true) {
+  // The page a frame shows, with photos limited to what this frame (or a
+  // signed-in person limited to some folders) may see
+  async forFrame(fullPath, req = {}) {
     const snap = await this.read(fullPath);
-    const photos = (await notes.visiblePhotos(snap.photos || [], session)).filter(visible);
+    const photos = await notes.visiblePhotos(snap.photos || [], req);
     return {
       title: snap.title,
       message: snap.message,

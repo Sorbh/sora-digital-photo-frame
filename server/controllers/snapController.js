@@ -3,7 +3,7 @@ const snaps = require('../services/snapService');
 const imageController = require('./imageController');
 const { resolveAdminPath, toAdminPath } = require('../utils/safePath');
 const { passClientError } = require('../utils/httpError');
-const { canSee } = require('../utils/viewerAccess');
+const { canSee, keepHiddenPhotos } = require('../utils/viewerAccess');
 
 // Snaps are addressed like photos: ?path=uploads/Family/visit.snap.json
 class SnapController {
@@ -52,9 +52,12 @@ class SnapController {
         return res.status(404).json({ success: false, error: 'Snap not found' });
       }
 
-      const { snap, errors } = await snaps.update(fullPath, req.body);
+      // Someone limited to some folders never drops the photos they can't see
+      const input = { ...req.body };
+      if (input.photos !== undefined) input.photos = keepHiddenPhotos(req, (await snaps.read(fullPath))?.photos, input.photos);
+      const { snap, errors } = await snaps.update(fullPath, input);
       if (errors) return res.status(400).json({ success: false, error: 'Please check the snap', errors });
-      res.json({ success: true, path: toAdminPath(fullPath), snap });
+      res.json({ success: true, path: toAdminPath(fullPath), snap: await snaps.load(fullPath, photo => canSee(req, photo)) });
     } catch (error) {
       if (passClientError(res, error)) return;
       console.error('Error updating snap:', error);

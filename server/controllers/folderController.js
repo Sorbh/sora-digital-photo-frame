@@ -349,7 +349,7 @@ class FolderController {
           // A note gets its own tile, which opens the note editor. It is not a
           // photo: the frame shows it on its schedule, not in the rotation.
           const notePath = path.join(fullPath, item.name);
-          fileJobs.push(shows(path.relative(this.uploadsDir, notePath)).then(shown => shown && notes.load(notePath, photo => canSee(req, photo)).then(note => ({
+          fileJobs.push(shows(path.relative(this.uploadsDir, notePath)).then(shown => shown && notes.load(notePath, undefined, photo => canSee(req, photo)).then(note => ({
             name: item.name,
             type: 'note',
             path: path.join(folderPath, item.name),

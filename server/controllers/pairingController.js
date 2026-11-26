@@ -157,6 +157,7 @@ class PairingController {
 
       // The frame has no session yet; having the pairing secret lets it act as the approving tenant
       let account;
+      let signedOut = null; // the session's sign-in fields from before this, once they're replaced
       try {
         account = await runWithTenant(result.tenant, async () => {
           const found = (await accessAccounts.loadAccounts()).find(a => a.id === result.device.accountId);
@@ -165,13 +166,22 @@ class PairingController {
         });
         if (!account) return res.json({ success: true, status: 'expired' });
         await rotateSession(req);
+        const { accessAccount, deviceId, tenantId } = req.session;
+        signedOut = { accessAccount, deviceId, tenantId };
         req.session.accessAccount = this.sessionAccount(account);
         req.session.deviceId = result.device.id;
         req.session.tenantId = result.tenant.id;
         // Saved before answering, so a failure here still lets the frame try again
         await new Promise((resolve, reject) => req.session.save(error => (error ? reject(error) : resolve())));
       } catch (error) {
-        // Not handed over: the frame can collect again on its next poll
+        // Not handed over: the frame can collect again on its next poll, and this
+        // browser isn't signed in by the session saved as the reply goes out
+        if (signedOut) {
+          for (const [field, value] of Object.entries(signedOut)) {
+            if (value === undefined) delete req.session[field];
+            else req.session[field] = value;
+          }
+        }
         result.restore();
         throw error;
       }
@@ -230,19 +240,17 @@ class PairingController {
         return res.status(400).json({ success: false, error: 'Choose an account for the frame' });
       }
 
-      const device = await pairing.approve(claimed, { name, accountId: account.id });
+      // Once the device is made, and before the frame can collect it, a new account
+      // becomes one others can choose. If that fails, the approval fails as a whole.
+      const finishAccount = () => getDataStore().update('access-accounts', [], accounts => accounts.map((a) => {
+        if (a.id !== account.id) return a;
+        const { pendingPairing, ...paired } = a;
+        return paired;
+      }));
+      const device = await pairing.approve(claimed, { name, accountId: account.id, beforeReady: madeAccount ? finishAccount : null });
       if (!device) {
         await undoAccount();
         return res.status(404).json({ success: false, error: 'This code has expired', code: 'PAIRING_EXPIRED' });
-      }
-      if (madeAccount) {
-        // The frame is paired, so its account can be chosen for others now
-        await getDataStore().update('access-accounts', [], accounts => accounts.map((a) => {
-          if (a.id !== account.id) return a;
-          const { pendingPairing, ...paired } = a;
-          return paired;
-        }))
-          .catch(error => console.error('Could not finish the account made for a pairing:', error));
       }
       res.json({ success: true, device: { id: device.id, name: device.name }, account: this.sessionAccount(account) });
     } catch (error) {

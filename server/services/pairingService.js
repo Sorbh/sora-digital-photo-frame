@@ -127,7 +127,9 @@ class PairingService {
 
   // The admin said yes: make the device and hold its token for the frame to collect.
   // Pass a pairing from claim(), or a code to claim it here.
-  async approve(codeOrPairing, { name, accountId }) {
+  // beforeReady, if given, runs once the device exists and before the frame can
+  // collect it; if it fails, the device is removed and the approval fails.
+  async approve(codeOrPairing, { name, accountId, beforeReady = null }) {
     const pairing = typeof codeOrPairing === 'object' ? codeOrPairing : this.claim(codeOrPairing);
     if (!pairing || pairing.approved || this.pairings.get(pairing.code) !== pairing) return null;
     try {
@@ -137,6 +139,14 @@ class PairingService {
       if (pairing.expiresAt <= Date.now() || this.pairings.get(pairing.code) !== pairing) {
         await this.discardDevice(device.id);
         return null;
+      }
+      if (beforeReady) {
+        try {
+          await beforeReady();
+        } catch (error) {
+          await this.discardDevice(device.id);
+          throw error;
+        }
       }
       // The frame collects this without a session; it runs as the approving tenant
       pairing.approved = { token, device, tenant: currentTenant() };

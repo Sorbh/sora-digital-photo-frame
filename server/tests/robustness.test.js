@@ -22,25 +22,39 @@ const photoInfo = require('../services/photoInfoService');
 // A store that can break on demand, like a database going away
 let storeDown = false;
 let noTenant = false;
+const failingWrites = { name: null, skip: 0, fail: 0 }; // writes of one file to let through, then to fail
 class FlakyStore extends LocalDataStore {
   async get(name, fallback) {
     if (storeDown) throw new Error('store is down');
     if (noTenant) throw Object.assign(new Error('Authentication required'), { status: 401, code: 'AUTH_REQUIRED' });
     return super.get(name, fallback);
   }
+  async update(name, fallback, updater) {
+    if (name === failingWrites.name) {
+      if (failingWrites.skip > 0) failingWrites.skip -= 1;
+      else if (failingWrites.fail > 0) {
+        failingWrites.fail -= 1;
+        throw new Error('store is down');
+      }
+    }
+    return super.update(name, fallback, updater);
+  }
 }
 
 // A session store that can fail to swap a session id, like a database going away
 const session = require('express-session');
 let sessionsDown = false;
-let sessionWritesDown = false;
+let sessionWritesToFail = 0;
 class FlakySessions extends session.MemoryStore {
   destroy(sid, callback) {
     if (sessionsDown) return callback(new Error('sessions are down'));
     return super.destroy(sid, callback);
   }
   set(sid, data, callback) {
-    if (sessionWritesDown) return callback(new Error('sessions are down'));
+    if (sessionWritesToFail > 0) {
+      sessionWritesToFail -= 1;
+      return callback(new Error('sessions are down'));
+    }
     return super.set(sid, data, callback);
   }
 }
@@ -181,17 +195,40 @@ describe('Robustness', () => {
       await pairing.approve(started.code, { name: 'Tablet', accountId: 'acc_pair' });
       const poll = () => frame.post('/api/pair/collect').send({ code: started.code, secret: started.secret });
 
-      sessionWritesDown = true;
+      // Exactly one write fails: the one saving the signed-in session
+      sessionWritesToFail = 1;
       let failed;
       try {
         failed = await poll();
       } finally {
-        sessionWritesDown = false;
+        sessionWritesToFail = 0;
       }
       expect(failed.status).toBe(500);
+      // The failed try left this browser signed out, whatever cookie came back
+      expect((await frame.get('/api/auth/session').expect(200)).body.authenticated).toBe(false);
       const { body } = await poll().expect(200);
       expect(body.status).toBe('approved');
       expect((await frame.get('/api/auth/session').expect(200)).body.authenticated).toBe(true);
+    });
+
+    test('an approval whose new account could not be finished fails and is undone', async () => {
+      const devicesBefore = (await admin.get('/api/admin/devices').expect(200)).body.devices.length;
+      const frame = request.agent(app);
+      const { body: started } = await frame.post('/api/pair/start').expect(200);
+      // The account is made, then the write that finishes it fails once
+      Object.assign(failingWrites, { name: 'access-accounts', skip: 1, fail: 1 });
+      let res;
+      try {
+        res = await admin.post(`/api/admin/pair/${started.code}/approve`).send({ name: 'Unfinished', newAccount: {} });
+      } finally {
+        Object.assign(failingWrites, { name: null, skip: 0, fail: 0 });
+      }
+      expect(res.status).toBe(500);
+      expect((await admin.get('/api/admin/devices').expect(200)).body.devices).toHaveLength(devicesBefore);
+      const accounts = (await admin.get('/api/access-accounts').expect(200)).body.accounts;
+      expect(accounts.some(a => a.name === 'Unfinished')).toBe(false);
+      const collected = await frame.post('/api/pair/collect').send({ code: started.code, secret: started.secret }).expect(200);
+      expect(collected.body.status).not.toBe('approved');
     });
 
     test('saved photo info is not replaced after a failed read', async () => {

@@ -20,6 +20,9 @@ const LocalPhotoLibrary = require('../library/LocalPhotoLibrary');
 const FOLDER = '50% off #1';
 const FILE = 'a#b%c.png';
 const onWindows = process.platform === 'win32';
+// Names that a second decode of ?folder= would break (100% throws, %23 turns into #)
+const PERCENT_FOLDER = '100%';
+const ENCODED_LOOKING = 'a%23b';
 const Q_FOLDER = 'Trip?';
 const Q_FILE = 'a?b.png';
 const png = color => sharp({ create: { width: 8, height: 8, channels: 3, background: color } }).png().toBuffer();
@@ -36,6 +39,10 @@ describe('Photo URLs for names with # and %', () => {
     // Photos elsewhere, so a slideshow that ignored the folder would show them
     await fs.ensureDir(path.join(testUploadsDir, 'other'));
     for (let i = 0; i < 5; i += 1) await fs.writeFile(path.join(testUploadsDir, 'other', `o${i}.png`), await png('#2b6ec4'));
+    for (const [folder, color] of [[PERCENT_FOLDER, '#123456'], [ENCODED_LOOKING, '#654321']]) {
+      await fs.ensureDir(path.join(testUploadsDir, folder));
+      await fs.writeFile(path.join(testUploadsDir, folder, 'p.png'), await png(color));
+    }
     // ? is not allowed in Windows file names
     if (!onWindows) {
       await fs.ensureDir(path.join(testUploadsDir, Q_FOLDER));
@@ -103,6 +110,15 @@ describe('Photo URLs for names with # and %', () => {
     expect(Buffer.compare(res.body, picture)).toBe(0);
   });
 
+  test.each([PERCENT_FOLDER, ENCODED_LOOKING])('the folder %s is read once, as sent', async (folder) => {
+    for (let i = 0; i < 3; i += 1) {
+      const { body } = await admin.get(`/api/images/next?folder=${encodeURIComponent(folder)}`).expect(200);
+      expect(body.image.folder).toBe(folder);
+      const res = await admin.get(new URL(body.image.url).pathname).expect(200);
+      expect(res.body.length).toBeGreaterThan(0);
+    }
+  });
+
   test('the admin grid gets the same URL', async () => {
     const { body: next } = await admin.get('/api/images/next').query({ folder: FOLDER }).expect(200);
     const { body } = await admin.get('/api/admin/folders').query({ path: `uploads/${FOLDER}` }).expect(200);
@@ -110,5 +126,36 @@ describe('Photo URLs for names with # and %', () => {
     const image = files.find(item => item.name === FILE);
     expect(image).toBeTruthy();
     expect(image.url).toBe(new URL(next.image.url).pathname);
+  });
+});
+
+describe('Slideshow folder picker', () => {
+  const vm = require('vm');
+  const source = fs.readFileSync(path.join(__dirname, '../public/js/folderSelector.js'), 'utf8');
+  const load = (CSS) => {
+    const sandbox = { window: {}, console, FolderService: class {}, FolderStorage: class {} };
+    if (CSS) sandbox.window.CSS = CSS;
+    vm.runInContext(source, vm.createContext(sandbox));
+    return sandbox.window.FolderSelector;
+  };
+  const NAME = 'Trip "A" #1';
+
+  test('marks the chosen folder even when its name has quotes and #', () => {
+    const FolderSelector = load();
+    const selectors = [];
+    const selector = Object.create(FolderSelector.prototype);
+    selector.folderStorage = { getCurrentFolderPath: () => `family/${NAME}` };
+    selector.expandParentFolders = () => {};
+    selector.container = {
+      querySelectorAll: () => [],
+      querySelector: (query) => { selectors.push(query); return null; }
+    };
+    selector.updateSelectedState();
+    expect(selectors).toEqual(['[data-path="family/Trip \\"A\\" #1"]']);
+  });
+
+  test("uses the browser's CSS.escape when it has one", () => {
+    const FolderSelector = load({ escape: value => `escaped(${value})` });
+    expect(FolderSelector.cssEscape(NAME)).toBe(`escaped(${NAME})`);
   });
 });

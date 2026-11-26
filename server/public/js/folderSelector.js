@@ -1,6 +1,13 @@
 /**
  * Folder Selector Widget - Compact folder selector for slideshow page
  */
+
+// A folder path inside a CSS attribute selector: names can hold quotes, # and backslashes
+function cssEscape(value) {
+    if (window.CSS && typeof window.CSS.escape === 'function') return window.CSS.escape(value);
+    return String(value).replace(/[\0-\x1f\x7f]|["\\]/g, c => (/["\\]/.test(c) ? `\\${c}` : `\\${c.charCodeAt(0).toString(16)} `));
+}
+
 class FolderSelector {
     constructor(container, options = {}) {
         this.container = container;
@@ -616,7 +623,7 @@ class FolderSelector {
         });
         
         // Add selection to current folder
-        const selectedElement = this.container.querySelector(`[data-path="${selectedPath}"]`);
+        const selectedElement = this.container.querySelector(`[data-path="${cssEscape(selectedPath)}"]`);
         if (selectedElement) {
             selectedElement.classList.add('selected');
             
@@ -809,3 +816,4 @@ class FolderSelector {
 
 // Export for use in other scripts
 window.FolderSelector = FolderSelector;
+window.FolderSelector.cssEscape = cssEscape;

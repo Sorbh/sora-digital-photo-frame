@@ -22,7 +22,9 @@ const invalidPin = res => res.status(400).json({
 class AccessAccountController {
     constructor() {
         // Rate limiting for PIN attempts
-        this.pinSignIn = true; // createApp({ pinSignIn: false }) turns it off
+        // createApp({ pinSignIn: false }) or PIN_SIGN_IN=off turns it off: frames connect
+        // only by their pairing code, and accounts are screens with a name and folders, no PIN
+        this.pinSignIn = true;
         this.familyCode = false; // createApp({ familyCode: true }): PIN sign-in also needs the family code (hosted)
         // 5 wrong tries in 5 minutes locks for 15 minutes, then 30, 60... up to a day.
         // A family's wrong tries and lockout are saved with its data, so a restart
@@ -119,20 +121,25 @@ class AccessAccountController {
         return 'acc_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
     }
 
-    // A new account with a PIN nobody has yet (used when a frame is paired by QR code)
+    // A new account for a frame paired by its code (QR or typed). With PIN sign-in
+    // on, it gets a PIN nobody has yet, as every account has one; with it off, none.
     // pendingPairing marks an account made while approving a frame, until the
     // frame is paired; such an account can't be chosen for another frame yet
-    async addAccountWithRandomPin({ name, assignedFolders = [], pendingPairing = false }) {
+    async addAccountForFrame({ name, assignedFolders = [], pendingPairing = false }) {
         let account;
         await getDataStore().update('access-accounts', [], async accounts => {
-            let pin;
-            do {
-                pin = String(require('crypto').randomInt(100000, 1000000));
-            } while (await this.findByPin(accounts, pin));
+            let pinHash;
+            if (this.pinSignIn) {
+                let pin;
+                do {
+                    pin = String(require('crypto').randomInt(100000, 1000000));
+                } while (await this.findByPin(accounts, pin));
+                pinHash = await this.hashPin(pin);
+            }
             account = {
                 id: this.generateAccountId(),
                 name,
-                pinHash: await this.hashPin(pin),
+                ...(pinHash && { pinHash }),
                 assignedFolders,
                 createdAt: new Date().toISOString(),
                 lastAccessed: null,
@@ -146,7 +153,8 @@ class AccessAccountController {
     async getAllAccounts(req, res) {
         try {
             const accounts = await this.loadAccounts();
-            res.json({ accounts: accounts.map(account => this.publicAccount(account)) });
+            // pinSignIn: false, the page shows them as screens, with no PIN
+            res.json({ accounts: accounts.map(account => this.publicAccount(account)), pinSignIn: this.pinSignIn });
         } catch (error) {
             if (passClientError(res, error)) return;
             console.error('Error fetching accounts:', errorSummary(error));
@@ -159,27 +167,29 @@ class AccessAccountController {
 
     async createAccount(req, res) {
         try {
-            const { name, pin, assignedFolders = [] } = req.body;
+            const { name, assignedFolders = [] } = req.body;
+            // With PIN sign-in off, a screen has no PIN: any PIN sent is not kept
+            const pin = this.pinSignIn ? req.body.pin : undefined;
 
-            if (!name || !pin) {
+            if (!name || (this.pinSignIn && !pin)) {
                 return res.status(400).json({
                     success: false,
-                    error: 'Name and PIN are required'
+                    error: this.pinSignIn ? 'Name and PIN are required' : 'Name is required'
                 });
             }
-            if (!validPin(pin)) return invalidPin(res);
+            if (this.pinSignIn && !validPin(pin)) return invalidPin(res);
 
             let duplicate = false;
             let newAccount;
-            const pinHash = await this.hashPin(pin);
+            const pinHash = pin ? await this.hashPin(pin) : null;
             await this.loadAccounts(); // hash any PINs still stored as-is first
             await getDataStore().update('access-accounts', [], async accounts => {
-                duplicate = Boolean(await this.findByPin(accounts, pin));
+                duplicate = Boolean(pin && await this.findByPin(accounts, pin));
                 if (duplicate) return accounts;
                 newAccount = {
                     id: this.generateAccountId(),
                     name,
-                    pinHash,
+                    ...(pinHash && { pinHash }),
                     assignedFolders,
                     createdAt: new Date().toISOString(),
                     lastAccessed: null
@@ -211,7 +221,9 @@ class AccessAccountController {
     async updateAccount(req, res) {
         try {
             const { id } = req.params;
-            const { name, pin, assignedFolders = [] } = req.body;
+            const { name, assignedFolders = [] } = req.body;
+            // With PIN sign-in off, a PIN sent is not kept (screens have none)
+            const pin = this.pinSignIn ? req.body.pin : undefined;
 
             // PINs can't be shown, so a blank PIN keeps the current one
             if (!name) {
@@ -348,7 +360,7 @@ class AccessAccountController {
 
     async authenticateWithPin(req, res) {
         if (!this.pinSignIn) {
-            return res.status(404).json({ success: false, error: 'PIN sign-in is turned off', code: 'PIN_DISABLED' });
+            return res.status(404).json({ success: false, error: 'PIN sign-in is turned off. Connect this screen with its code.', code: 'PIN_DISABLED' });
         }
         try {
             const { pin, token, familyCode } = req.body;

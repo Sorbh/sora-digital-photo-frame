@@ -1,0 +1,206 @@
+/* The pairing form, shared by the /pair page and "Add a screen" on the Access
+   page (js/pairFlow.js): the code, the name, "Which photos" and the button.
+   Everything sits inside .pair-flow so it can't clash with a page's own styles. */
+
+.pair-flow .pair-note {
+    margin: 0;
+    font-size: 0.9375rem;
+    line-height: 1.5;
+    color: var(--ink-soft);
+}
+
+/* The code, big, so it's easy to compare with the frame */
+.pair-flow .code-check {
+    display: grid;
+    gap: 4px;
+    padding: 1.1rem 1.25rem;
+    border-radius: var(--shape-lg);
+    background: var(--berry-gradient);
+    color: #fff;
+    box-shadow: 0 18px 36px -20px rgba(120, 10, 60, 0.6);
+}
+
+.pair-flow .code-check-label {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.75);
+}
+
+.pair-flow .code-check-code {
+    font-family: var(--font-mono);
+    font-size: 2rem;
+    font-weight: 500;
+    letter-spacing: 0.2em;
+    color: #ffe2a8;
+}
+
+.pair-flow .code-check-hint {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.8125rem;
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.pair-flow .code-check-hint .material-icons {
+    font-size: 16px;
+}
+
+.pair-flow .field {
+    display: grid;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    min-width: 0;
+}
+
+.pair-flow .field-label {
+    padding: 0;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: var(--ink-soft);
+}
+
+.pair-flow .field input[type="text"] {
+    width: 100%;
+    padding: 14px 16px;
+    border: 1.5px solid var(--paper-sunk);
+    border-radius: var(--shape-md);
+    background: var(--paper-raised);
+    color: var(--ink);
+    font: inherit;
+    font-size: 1rem;
+    outline: none;
+    transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.pair-flow .field input[type="text"]:focus {
+    border-color: var(--berry);
+    box-shadow: 0 0 0 4px var(--safelight-soft);
+}
+
+/* Typed by hand from the frame's screen, so as big and plain as the code there */
+.pair-flow .field input.code-input {
+    font-family: var(--font-mono);
+    font-size: 1.5rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+}
+
+.pair-flow .code-example {
+    white-space: nowrap;
+}
+
+.pair-flow .field input.code-input::placeholder {
+    color: var(--ink-faint);
+}
+
+.pair-flow .choice-list,
+.pair-flow .folder-list {
+    display: grid;
+    gap: 8px;
+}
+
+.pair-flow .choice,
+.pair-flow .folder {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    border: 1.5px solid var(--paper-sunk);
+    border-radius: var(--shape-md);
+    background: var(--paper-raised);
+    cursor: pointer;
+    transition: border-color 0.18s ease, background-color 0.18s ease;
+}
+
+.pair-flow .choice:has(input:checked),
+.pair-flow .folder:has(input:checked) {
+    border-color: var(--berry);
+    background: color-mix(in oklab, var(--berry) 6%, var(--paper-raised));
+}
+
+.pair-flow .choice input,
+.pair-flow .folder input {
+    flex: none;
+    width: 20px;
+    height: 20px;
+    margin: 0;
+    accent-color: var(--berry);
+}
+
+.pair-flow .choice-text {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+}
+
+.pair-flow .choice-title {
+    font-weight: 700;
+}
+
+.pair-flow .choice-detail {
+    overflow: hidden;
+    font-size: 0.8125rem;
+    color: var(--ink-faint);
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.pair-flow .new-account {
+    display: grid;
+    gap: 10px;
+    margin-top: 6px;
+}
+
+.pair-flow .folder .material-icons {
+    font-size: 20px;
+    color: var(--berry);
+}
+
+.pair-flow .folder-name {
+    font-weight: 600;
+}
+
+.pair-flow .pair-error {
+    margin: 0;
+    padding: 10px 14px;
+    border-radius: var(--shape-sm);
+    background: color-mix(in oklab, var(--berry) 10%, var(--paper-raised));
+    color: var(--berry-deep);
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+.pair-flow .pair-submit {
+    position: sticky;
+    bottom: max(1rem, env(safe-area-inset-bottom));
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    padding: 16px 20px;
+    border: 0;
+    border-radius: 999px;
+    background: var(--berry-gradient);
+    color: #fff;
+    font: inherit;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 16px 30px -14px rgba(160, 20, 80, 0.7);
+    transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.pair-flow .pair-submit:active {
+    transform: scale(0.98);
+}
+
+.pair-flow .pair-submit:disabled {
+    opacity: 0.6;
+    cursor: progress;
+}

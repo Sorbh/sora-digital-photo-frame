@@ -23,8 +23,28 @@ class AuthenticationManager {
         this.pairHint = document.getElementById('pairHint') || document.querySelector('.pair-code-label');
         this.pairStatus = document.getElementById('pairStatus');
         this.pairUrlText = null; // host/pair once a code is shown
+        // Off (the server says so on <html>): no PIN pad and no #pin= sign-in, only
+        // the pairing code and QR, so a TV with only a remote needs nothing typed
+        this.pinSignIn = document.documentElement.dataset.pinSignIn !== 'off';
+        if (!this.pinSignIn) this.hidePinSignIn();
 
         this.init();
+    }
+
+    // Only the pairing code and QR on the sign-in screen
+    hidePinSignIn() {
+        this.pinSignIn = false;
+        this.authOverlay.classList.add('pin-off');
+        this.pinForm.hidden = true;
+        if (this.authSub) {
+            this.authSub.dataset.i18n = 'slideshow.connect_with_code';
+            this.authSub.textContent = t('slideshow.connect_with_code');
+        }
+        const pairTitle = document.getElementById('pairTitle');
+        if (pairTitle) {
+            pairTitle.dataset.i18n = 'slideshow.connect_screen';
+            pairTitle.textContent = t('slideshow.connect_screen');
+        }
     }
 
     // "Or open example.com/pair and check the code" is one sentence with the address inside
@@ -78,8 +98,8 @@ class AuthenticationManager {
     // that open the script without that.
     takeSignInFromUrl() {
         const early = window.soraUrlSignIn;
-        if (early) {
-            window.soraUrlSignIn = null;
+        window.soraUrlSignIn = null;
+        if (early && this.pinSignIn) {
             this.urlFamilyCode = early.family || '';
             return early.pin || undefined;
         }
@@ -98,6 +118,11 @@ class AuthenticationManager {
             ['pin', 'family'].forEach(name => { query.delete(name); fragment.delete(name); });
             const hash = inFragment ? (String(fragment) ? `#${fragment}` : '') : url.hash;
             history.replaceState(history.state, '', url.pathname + url.search + hash);
+        }
+        // PIN sign-in off: the address is cleaned, its PIN never used
+        if (!this.pinSignIn) {
+            this.urlFamilyCode = '';
+            return undefined;
         }
         return pin;
     }
@@ -119,6 +144,9 @@ class AuthenticationManager {
                 return;
             }
             if (data.code === 'DEVICE_UNKNOWN') localStorage.removeItem(DEVICE_TOKEN_KEY);
+            // Paused by the host: the token is kept, and the paused card (js/screenPause.js)
+            // checks again by itself, so no pairing code or PIN pad meanwhile
+            if (data.code === 'SCREEN_PAUSED') return;
         } catch (error) {
             console.error('Signing in as a paired frame failed:', error);
         }
@@ -394,18 +422,21 @@ class AuthenticationManager {
 
     focusPin() {
         // Skip on touch screens so the on-screen keyboard doesn't cover the keypad
-        if (matchMedia('(pointer: fine)').matches) this.pinInput.focus();
+        if (this.pinSignIn && matchMedia('(pointer: fine)').matches) this.pinInput.focus();
     }
 
     async checkExistingSession() {
         try {
             const response = await fetch('/api/auth/session');
             const data = await response.json();
+            // Paused by the host: its card is up (js/screenPause.js) and checks again
+            // by itself, so no sign-in screen or pairing code underneath
+            if (data.code === 'SCREEN_PAUSED') return;
 
             if (data.authenticated) {
                 this.handleAuthSuccess(data.account);
             } else {
-                if (data.pinSignIn === false) this.pinForm.style.display = 'none';
+                if (data.pinSignIn === false) this.hidePinSignIn();
                 else if (data.familyCode) this.showFamilyField();
                 this.showAuthOverlay();
             }

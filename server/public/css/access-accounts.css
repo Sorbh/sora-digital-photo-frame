@@ -419,3 +419,84 @@ body {
     font-size: 0.9rem;
     color: var(--ink-soft, var(--muted-foreground));
 }
+
+/* ---------- Add a screen ------------------------------------------ */
+/* The form itself is css/pairForm.css (shared with /pair) */
+
+.add-screen-dialog > article {
+    display: flex;
+    flex-direction: column;
+    width: min(100vw - 1.5rem, 520px);
+    max-height: calc(100dvh - 1.5rem);
+    overflow: hidden;
+}
+
+/* A long folder list scrolls inside the dialog; the button stays in reach */
+.add-screen-dialog > article > section {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+.add-screen-step {
+    display: grid;
+    gap: 1.1rem;
+}
+
+.add-screen-dialog .pair-submit {
+    position: static;
+}
+
+.add-screen-buttons {
+    position: sticky;
+    bottom: 0;
+    padding: 10px 0 2px;
+    background: linear-gradient(to bottom, transparent, var(--paper) 30%);
+}
+
+.add-screen-buttons {
+    display: flex;
+    gap: 10px;
+}
+
+.add-screen-buttons .btn-outline {
+    flex: none;
+    height: auto;
+    border-radius: 999px;
+    padding: 0 18px;
+}
+
+.add-screen-done {
+    justify-items: center;
+    padding: 1rem 0 0.5rem;
+    text-align: center;
+}
+
+.add-screen-done h3 {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 1.6rem;
+    font-weight: 500;
+}
+
+.add-screen-done-icon {
+    font-size: 52px !important;
+    color: var(--berry);
+    font-variation-settings: 'FILL' 1;
+}
+
+/* The arrow points the way the page reads */
+html[dir="rtl"] #screenCodeBtn .material-symbols-outlined {
+    transform: scaleX(-1);
+}
+
+@media (max-width: 420px) {
+    .add-screen-buttons {
+        flex-direction: column-reverse;
+    }
+
+    .add-screen-buttons .btn-outline {
+        height: 44px;
+    }
+}

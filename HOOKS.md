@@ -14,7 +14,7 @@ These options are a public contract. Treat a change to a name, an argument or a 
 | `events` | `{ devicePaired, devicesRemoved, familyCodeSet }`, may be async; if one throws, the action fails, with one exception (see [Events](#events)) | None | `server/events.js` |
 | `keys` | `{ currentKey(), getKey(id) }`, may return promises | `PHOTO_ENCRYPTION_KEY`, or no encryption | `server/crypto/keys.js` |
 | `sessionStore` | `express-session` store | In memory | `server/app.js` |
-| `pinSignIn` | `false` turns off PIN sign-in for frames | On | `server/app.js` |
+| `pinSignIn` | `false` turns off PIN sign-in: frames connect only by their pairing code (see [Frames that connect by code](#frames-that-connect-by-code)) | On (`PIN_SIGN_IN=off` turns it off) | `server/app.js` |
 | `trustProxy` | Express `trust proxy` setting | `TRUST_PROXY`, else `1` | `server/app.js` |
 | `publicPhotos` | `true` serves photos, thumbnails, folders and notes without a viewer check (`requireViewer`) | Off (`PUBLIC_PHOTOS=true` turns it on) | `server/app.js` |
 | `familyCode` | `true`: a PIN sign-in also sends the family's code (shown on the Access page), so `resolveTenant` can find the family from it. `familyCodeSet({ code, previous, tenantId })` keeps the host's index | Off | `server/services/familyCodeService.js` |
@@ -140,6 +140,26 @@ A note is a `<name>.note.json` file in a library folder, the same way a snap is 
 - **A note is never a photo:** it is not in `allPhotos`, the frame's rotation or a folder's photo count. The library grid shows it as its own tile (`type: 'note'`).
 
 **Upgrading:** before 3.0, notes were one list in the `notes` data document, each with an `audience` (all frames, or some access accounts). At start, `initializeUploads()` moves that list into the top folder, one file per note, keeps a copy in the `notes-before-folders` document and empties `notes`, so it runs once; running it again does nothing, and a note already moved (same id) is never doubled. `audience` is dropped. A note that was shown only on some frames is logged with its title, so the admin can move it into a folder only those frames show. A host that doesn't call `initializeUploads()` can call `migrateNotes()` from `server/app.js` for each tenant, inside `runWithTenant` (`server/context.js`).
+
+## Frames that connect by code
+
+Many frames are TVs with only a remote, so a host may want nothing ever typed on a frame. `createApp({ pinSignIn: false })`, or `PIN_SIGN_IN=off`, does that:
+
+- The frame shows only its pairing code and QR code, never a PIN pad. The server tells the page before anything loads (`<html data-pin-sign-in="off">`), and `GET /api/auth/session` says `pinSignIn: false` too.
+- `POST /api/auth/pin` answers 404 with code `PIN_DISABLED`, and a `/slideshow#pin=` link is taken out of the address and not used.
+- The Access page shows access accounts as **Screens**: a name and its folders, with no PIN field. `GET /api/access-accounts` and `GET /api/features` say `pinSignIn: false`. A screen made there or by pairing gets no PIN at all, and a PIN sent to `POST`/`PUT /api/access-accounts` is not kept.
+
+Whether PIN sign-in is on or off, the owner adds a frame by scanning its QR code (`/pair`) or with **Add a screen** on the Access page: type the code the frame shows (any case, with or without the dash or spaces), name the screen, pick an existing screen or a new one and its folders. Both use `GET /api/admin/pair/:code` and `POST /api/admin/pair/:code/approve`.
+
+### Paused screens
+
+A host can refuse a frame whose screen it has paused (a plan with fewer screens, say). Answer any of the frame's requests (`/api/*`, `/uploads/*`, including `GET /api/auth/session` and `POST /api/auth/device`) with 403 and:
+
+```json
+{ "success": false, "code": "SCREEN_PAUSED", "message": "This screen is paused. Ask the owner to upgrade." }
+```
+
+The frame then shows a calm full-screen card with that message (`error` is used if there is no `message`, and a translated line if neither). It keeps its token, asks again every 3 minutes (`POST /api/auth/device` with its token, else `GET /api/folders`), and reloads by itself once the answer is anything else, so it starts playing again after an upgrade with nobody touching it. The slideshow page and its scripts themselves must still load.
 
 ## Adding a hook
 

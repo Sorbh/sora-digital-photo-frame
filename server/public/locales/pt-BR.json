@@ -84,7 +84,12 @@
     "fullscreenRefused": "O navegador não permitiu a tela cheia. Tente o botão de novo.",
     "retry": "Tentar de novo",
     "retryingNote": "O porta-retrato continua tentando sozinho.",
-    "connectionTitle": "Não foi possível acessar suas fotos"
+    "connectionTitle": "Não foi possível acessar suas fotos",
+    "connect_with_code": "Leia o código com o celular ou digite-o na página Acesso.",
+    "connect_screen": "Conecte esta tela",
+    "screenPausedTitle": "Esta tela está <em>pausada</em>",
+    "screenPausedMessage": "Peça à pessoa dona desta biblioteca para ativá-la de novo.",
+    "screenPausedNote": "Ela volta sozinha assim que for ativada de novo."
   },
   "accessAccounts": {
     "frames_pins": "Porta-retratos e PINs",
@@ -167,7 +172,33 @@
     "familyCodeRenewed": "Novo código da família pronto",
     "familyCodeRenewFailed": "Não foi possível criar um código novo. Tente de novo.",
     "viaPin": "Entrou com um PIN",
-    "viaQr": "Pareado por QR code"
+    "viaQr": "Pareado por QR code",
+    "addScreen": "Adicionar uma tela",
+    "screenCodeLabel": "Digite o código que aparece na sua TV",
+    "screenCodeNote": "Abra o Sora na TV ou no porta-retratos. O código fica ao lado do QR code.",
+    "screenCodeWrong": "Esse código não funcionou. Confira o código na TV e digite de novo. Ele muda a cada dez minutos.",
+    "screenNameLabel": "Nome da tela",
+    "screenNamePlaceholder": "TV da sala",
+    "screenNameRequired": "Dê um nome à tela, como \"TV da sala\".",
+    "screenOtherCode": "Outro código",
+    "screenAddButton": "Adicionar esta tela",
+    "screenAdded": "{name} foi adicionada",
+    "screenDoneNote": "A apresentação começa em instantes e a tela fica conectada.",
+    "screenDone": "Pronto",
+    "screensEyebrow": "Telas",
+    "screensTitle": "Suas <em>telas</em>",
+    "screensCount_one": "{count} tela",
+    "screensCount_many": "{count} telas",
+    "screensCount_other": "{count} telas",
+    "noScreens": "Nenhuma tela ainda",
+    "screensEmptyTitle": "Nenhuma tela ainda",
+    "screensEmptyText": "Abra o Sora na sua TV ou porta-retratos, toque em Adicionar uma tela e digite o código que aparece.",
+    "screenDetails": "Tela",
+    "editScreen": "Editar tela",
+    "editScreenTitle": "Editar tela",
+    "deleteScreen": "Remover tela",
+    "screenUpdated": "Tela salva",
+    "screenDeleted": "Tela removida"
   },
   "pair": {
     "all_folders": "Todas as pastas",
@@ -208,7 +239,8 @@
     "unreachableHeading": "Não foi possível <em>verificar</em> o código",
     "unreachableNote": "A biblioteca não respondeu. Confira a conexão do celular e tente de novo.",
     "tryAgain": "Tentar de novo",
-    "foldersFailed": "Não foi possível carregar as pastas, então não dá para criar uma conta nova agora. Escolha uma conta existente ou tente de novo."
+    "foldersFailed": "Não foi possível carregar as pastas, então não dá para criar uma conta nova agora. Escolha uma conta existente ou tente de novo.",
+    "new_screen": "Uma tela nova"
   },
   "login": {
     "invalid_password": "Senha incorreta. Tente de novo.",

@@ -84,7 +84,12 @@
     "fullscreenRefused": "De browser stond volledig scherm niet toe. Probeer de knop nog eens.",
     "retry": "Opnieuw proberen",
     "retryingNote": "De fotolijst blijft het zelf opnieuw proberen.",
-    "connectionTitle": "Je foto's zijn niet bereikbaar"
+    "connectionTitle": "Je foto's zijn niet bereikbaar",
+    "connect_with_code": "Scan de code met je telefoon, of typ hem op de pagina Toegang.",
+    "connect_screen": "Dit scherm verbinden",
+    "screenPausedTitle": "Dit scherm is <em>gepauzeerd</em>",
+    "screenPausedMessage": "Vraag de eigenaar van deze bibliotheek om het weer aan te zetten.",
+    "screenPausedNote": "Het start vanzelf weer zodra het weer aan staat."
   },
   "accessAccounts": {
     "frames_pins": "Fotolijsten en pincodes",
@@ -166,7 +171,32 @@
     "familyCodeRenewed": "Nieuwe familiecode klaar",
     "familyCodeRenewFailed": "Kon geen nieuwe code maken. Probeer het opnieuw.",
     "viaPin": "Aangemeld met pincode",
-    "viaQr": "Gekoppeld met QR-code"
+    "viaQr": "Gekoppeld met QR-code",
+    "addScreen": "Scherm toevoegen",
+    "screenCodeLabel": "Typ de code die je tv laat zien",
+    "screenCodeNote": "Open Sora op de tv of fotolijst. De code staat naast de QR-code.",
+    "screenCodeWrong": "Die code werkte niet. Kijk naar de code op de tv en typ hem opnieuw. Hij verandert elke tien minuten.",
+    "screenNameLabel": "Naam van het scherm",
+    "screenNamePlaceholder": "Tv in de woonkamer",
+    "screenNameRequired": "Geef het scherm een naam, zoals \"Tv in de woonkamer\".",
+    "screenOtherCode": "Andere code",
+    "screenAddButton": "Dit scherm toevoegen",
+    "screenAdded": "{name} is toegevoegd",
+    "screenDoneNote": "De diavoorstelling begint zo en het scherm blijft verbonden.",
+    "screenDone": "Klaar",
+    "screensEyebrow": "Schermen",
+    "screensTitle": "Je <em>schermen</em>",
+    "screensCount_one": "{count} scherm",
+    "screensCount_other": "{count} schermen",
+    "noScreens": "Nog geen schermen",
+    "screensEmptyTitle": "Nog geen schermen",
+    "screensEmptyText": "Open Sora op je tv of fotolijst, tik dan op Scherm toevoegen en typ de code die je ziet.",
+    "screenDetails": "Scherm",
+    "editScreen": "Scherm bewerken",
+    "editScreenTitle": "Scherm bewerken",
+    "deleteScreen": "Scherm verwijderen",
+    "screenUpdated": "Scherm opgeslagen",
+    "screenDeleted": "Scherm verwijderd"
   },
   "pair": {
     "all_folders": "Alle mappen",
@@ -207,7 +237,8 @@
     "unreachableHeading": "Code kon niet worden <em>gecontroleerd</em>",
     "unreachableNote": "De bibliotheek gaf geen antwoord. Controleer de verbinding van je telefoon en probeer het opnieuw.",
     "tryAgain": "Opnieuw proberen",
-    "foldersFailed": "De mappen konden niet worden geladen, dus een nieuw account kan nu niet worden aangemaakt. Kies een bestaand account of probeer het opnieuw."
+    "foldersFailed": "De mappen konden niet worden geladen, dus een nieuw account kan nu niet worden aangemaakt. Kies een bestaand account of probeer het opnieuw.",
+    "new_screen": "Een nieuw scherm"
   },
   "login": {
     "invalid_password": "Onjuist wachtwoord. Probeer het opnieuw.",

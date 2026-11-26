@@ -1,10 +1,202 @@
+// "Add a screen": the owner types the code a frame shows (a TV has only a remote,
+// so nothing is typed on it), names it and picks its photos. The lookup, the
+// choices and the approval are js/pairFlow.js, the same as the /pair page.
+class AddScreenDialog {
+    constructor({ onAdded } = {}) {
+        const $ = id => document.getElementById(id);
+        this.$ = $;
+        this.onAdded = onAdded;
+        this.modal = $('addScreenModal');
+        this.code = null; // the code found, as the server knows it
+        this.codeError = null; // [key] shown under the code, kept to re-translate
+        this.pairError = null; // [key] or [null, text from the server]
+        this.doneName = null;
+        this.choices = window.SoraPairFlow.choices({
+            accountList: $('screenAccountList'),
+            newAccount: $('screenNewAccount'),
+            folderList: $('screenFolderList'),
+            name: 'screenAccount'
+        });
+
+        $('screenCodeForm').addEventListener('submit', (event) => { event.preventDefault(); this.lookup(); });
+        $('screenCodeInput').addEventListener('input', () => this.showCodeError(null));
+        $('screenPairForm').addEventListener('submit', (event) => { event.preventDefault(); this.approve(); });
+        $('screenBackBtn').addEventListener('click', () => this.startOver());
+        $('screenDoneBtn').addEventListener('click', () => this.close());
+        $('closeAddScreen').addEventListener('click', () => this.close());
+        window.addEventListener('sora:languagechange', () => this.renderLanguage());
+    }
+
+    // Signed out meanwhile: back to Access after signing in
+    getJson(url, options) {
+        return window.SoraPairFlow.request(url, options, () => {
+            location.href = `/login?next=${encodeURIComponent('/access-accounts')}`;
+        });
+    }
+
+    step(name) {
+        const steps = { code: 'screenCodeForm', pair: 'screenPairForm', done: 'screenDone' };
+        Object.entries(steps).forEach(([step, id]) => this.$(id).classList.toggle('hidden', step !== name));
+    }
+
+    open() {
+        this.startOver();
+        if (!this.modal.open) this.modal.showModal();
+        this.$('screenCodeInput').focus();
+    }
+
+    close() {
+        if (this.modal.open) this.modal.close();
+    }
+
+    startOver(errorKey = null) {
+        this.code = null;
+        this.doneName = null;
+        this.$('screenCodeInput').value = '';
+        this.showPairError(null);
+        this.showCodeError(errorKey);
+        this.step('code');
+    }
+
+    showCodeError(key) {
+        this.codeError = key;
+        const element = this.$('screenCodeError');
+        element.textContent = key ? t(key) : '';
+        element.classList.toggle('hidden', !key);
+    }
+
+    // A translation key, or the server's own words (i18n.error) as text
+    showPairError(key, text) {
+        this.pairError = key || text ? [key, text] : null;
+        const element = this.$('screenPairError');
+        element.textContent = key ? t(key) : (text || '');
+        element.classList.toggle('hidden', !(key || text));
+    }
+
+    renderDone() {
+        const span = document.createElement('span');
+        span.textContent = this.doneName || '';
+        this.$('screenDoneTitle').innerHTML = t('accessAccounts.screenAdded', { name: span.outerHTML });
+    }
+
+    renderLanguage() {
+        if (this.codeError) this.showCodeError(this.codeError);
+        if (this.pairError?.[0]) this.showPairError(this.pairError[0]);
+        if (this.doneName) this.renderDone();
+        this.choices.render();
+    }
+
+    // The code as typed: any case, with or without dashes and spaces
+    async lookup() {
+        const { normalize, CODE_LENGTH, pretty } = window.SoraPairFlow;
+        const typed = normalize(this.$('screenCodeInput').value);
+        if (typed.length !== CODE_LENGTH) {
+            this.showCodeError('pair.codeInvalid');
+            this.$('screenCodeInput').focus();
+            return;
+        }
+        this.showCodeError(null);
+        const button = this.$('screenCodeBtn');
+        button.disabled = true;
+        try {
+            const found = await window.SoraPairFlow.lookup(typed, (url, options) => this.getJson(url, options));
+            if (found.state === 'expired') return this.showCodeError('accessAccounts.screenCodeWrong');
+            if (found.state !== 'ready') return this.showCodeError('pair.unreachableNote');
+            this.code = found.code;
+            this.$('screenCodeShown').textContent = pretty(found.code);
+            this.$('screenName').value = '';
+            this.showPairError(null);
+            this.choices.show(found);
+            this.step('pair');
+            this.$('screenName').focus();
+        } catch (error) {
+            if (error.signedOut) return;
+            console.error('Could not check the code:', error);
+            this.showCodeError('pair.unreachableNote');
+        } finally {
+            button.disabled = false;
+        }
+    }
+
+    async approve() {
+        const name = this.$('screenName').value.trim();
+        if (!name) {
+            this.showPairError('accessAccounts.screenNameRequired');
+            this.$('screenName').focus();
+            return;
+        }
+        const chosen = this.choices.body(name);
+        if (chosen.error) return this.showPairError(chosen.error);
+
+        this.showPairError(null);
+        const button = this.$('screenPairBtn');
+        button.disabled = true;
+        try {
+            const result = await window.SoraPairFlow.approve(this.code, chosen.body, (url, options) => this.getJson(url, options));
+            if (result.state === 'done') {
+                this.doneName = result.device.name;
+                this.renderDone();
+                this.step('done');
+                if (this.onAdded) this.onAdded(result);
+            } else if (result.state === 'expired') {
+                // Used or too old meanwhile: the TV shows a new code by now
+                this.startOver('accessAccounts.screenCodeWrong');
+            } else {
+                this.showPairError(null, i18n.error(result.data, 'pair.failed'));
+            }
+        } catch (error) {
+            if (error.signedOut) return;
+            this.showPairError('errors.connection');
+        } finally {
+            button.disabled = false;
+        }
+    }
+}
+
 class AccessAccountsManager {
     constructor() {
         this.accounts = [];
         this.devices = []; // screens: paired by QR code or signed in by PIN
         this.folders = [];
         this.currentEditingAccount = null;
+        // false: PIN sign-in is off, so accounts are screens (a name and folders, no PIN)
+        this.pinSignIn = true;
+        this.addScreen = new AddScreenDialog({ onAdded: () => this.loadAccounts() });
         this.init();
+    }
+
+    // With PIN sign-in off, the page talks about screens and has no PIN field
+    get screens() {
+        return this.pinSignIn === false;
+    }
+
+    // This page's words for an account, or for a screen
+    term(accountKey, screenKey) {
+        return this.screens ? screenKey : accountKey;
+    }
+
+    applyMode() {
+        const screens = this.screens;
+        const swap = (id, attribute, accountKey, screenKey) => {
+            const element = document.getElementById(id);
+            if (!element) return;
+            const key = screens ? screenKey : accountKey;
+            element.dataset[attribute] = key; // kept on a language change (i18n.apply)
+            if (attribute === 'i18nHtml') element.innerHTML = t(key);
+            else element.textContent = t(key);
+        };
+        swap('accessEyebrow', 'i18nHtml', 'accessAccounts.static_002', 'accessAccounts.screensEyebrow');
+        swap('accessTitle', 'i18nHtml', 'accessAccounts.who_visit', 'accessAccounts.screensTitle');
+        swap('emptyTitle', 'i18n', 'accessAccounts.static_005', 'accessAccounts.screensEmptyTitle');
+        swap('emptyText', 'i18n', 'accessAccounts.static_006', 'accessAccounts.screensEmptyText');
+        swap('detailsTitle', 'i18n', 'accessAccounts.static_008', 'accessAccounts.screenDetails');
+        swap('accountNameLabel', 'i18n', 'accessAccounts.static_009', 'accessAccounts.screenNameLabel');
+        swap('delete-title', 'i18n', 'accessAccounts.static_014', 'accessAccounts.deleteScreen');
+        swap('confirmDeleteText', 'i18n', 'accessAccounts.static_014', 'accessAccounts.deleteScreen');
+        swap('saveAccountText', 'i18n', 'accessAccounts.saveAccount', 'common.save');
+        document.getElementById('emptyIcon').textContent = screens ? 'tv' : 'key';
+        document.getElementById('pinField').classList.toggle('hidden', screens);
+        document.getElementById('createAccountBtn').classList.toggle('hidden', screens);
     }
 
     init() {
@@ -55,6 +247,8 @@ class AccessAccountsManager {
         });
 
         document.getElementById('renewFamilyCodeBtn').addEventListener('click', () => this.renewFamilyCode());
+
+        document.getElementById('addScreenBtn').addEventListener('click', () => this.addScreen.open());
 
         // Create new account button
         document.getElementById('createAccountBtn').addEventListener('click', () => {
@@ -107,6 +301,8 @@ class AccessAccountsManager {
             if (response.ok) {
                 this.accounts = data.accounts || [];
                 this.devices = devices.devices || [];
+                this.pinSignIn = data.pinSignIn !== false;
+                this.applyMode();
                 this.renderAccounts();
             } else {
                 this.showToast(t('accessAccounts.loadFailed'), 'error');
@@ -159,8 +355,8 @@ class AccessAccountsManager {
         if (meta) {
             const count = this.accounts.length;
             meta.textContent = count === 0
-                ? t('accessAccounts.no_accounts')
-                : t('accessAccounts.accounts', { count });
+                ? t(this.term('accessAccounts.no_accounts', 'accessAccounts.noScreens'))
+                : t(this.term('accessAccounts.accounts', 'accessAccounts.screensCount'), { count });
         }
         
         if (this.accounts.length === 0) {
@@ -204,16 +400,16 @@ class AccessAccountsManager {
                     <div class="account-avatar" aria-hidden="true">${esc(account.name.trim().charAt(0).toUpperCase() || '?')}</div>
                     <div class="account-heading">
                         <h3 class="account-name">${esc(account.name)}</h3>
-                        <span class="pin-reveal" title="${esc(t('accessAccounts.pinHidden'))}">
+                        ${this.screens ? '' : `<span class="pin-reveal" title="${esc(t('accessAccounts.pinHidden'))}">
                             <span class="material-symbols-outlined">key</span>
                             <span class="pin-value">••••••</span>
-                        </span>
+                        </span>`}
                     </div>
                     <div class="account-actions">
-                        <button class="tb-btn icon edit-account" title="${esc(t('accessAccounts.editAccount'))}" data-account-id="${esc(account.id)}">
+                        <button class="tb-btn icon edit-account" title="${esc(t(this.term('accessAccounts.editAccount', 'accessAccounts.editScreen')))}" data-account-id="${esc(account.id)}">
                             <span class="material-symbols-outlined">edit</span>
                         </button>
-                        <button class="tb-btn icon delete-account" data-danger title="${esc(t('accessAccounts.deleteAccount'))}" data-account-id="${esc(account.id)}">
+                        <button class="tb-btn icon delete-account" data-danger title="${esc(t(this.term('accessAccounts.deleteAccount', 'accessAccounts.deleteScreen')))}" data-account-id="${esc(account.id)}">
                             <span class="material-symbols-outlined">delete</span>
                         </button>
                     </div>
@@ -330,7 +526,7 @@ class AccessAccountsManager {
         } else {
             form.reset();
             const pinInput = document.getElementById('accountPin');
-            pinInput.required = true;
+            pinInput.required = !this.screens; // screens have no PIN
         }
         this.renderModalText();
 
@@ -343,7 +539,9 @@ class AccessAccountsManager {
     // Title and PIN placeholder depend on whether an account is being edited
     renderModalText() {
         const editing = Boolean(this.currentEditingAccount);
-        document.getElementById('modalTitle').textContent = t(editing ? 'accessAccounts.editAccountTitle' : 'accessAccounts.static_007');
+        document.getElementById('modalTitle').textContent = t(editing
+            ? this.term('accessAccounts.editAccountTitle', 'accessAccounts.editScreenTitle')
+            : 'accessAccounts.static_007');
         const pinInput = document.getElementById('accountPin');
         pinInput.placeholder = t(editing ? 'accessAccounts.pinKeepPlaceholder' : 'accessAccounts.static_024');
         // The placeholder is set here, not by i18n.apply()
@@ -413,7 +611,8 @@ class AccessAccountsManager {
 
         const accountData = {
             name: formData.get('name'),
-            pin: formData.get('pin'),
+            // Screens (PIN sign-in off) have no PIN
+            ...(!this.screens && { pin: formData.get('pin') }),
             assignedFolders: selectedFolders
         };
 
@@ -436,7 +635,9 @@ class AccessAccountsManager {
 
             if (response.ok) {
                 this.showToast(
-                    t(this.currentEditingAccount ? 'accessAccounts.accountUpdated' : 'accessAccounts.accountCreated'),
+                    t(this.currentEditingAccount
+                        ? this.term('accessAccounts.accountUpdated', 'accessAccounts.screenUpdated')
+                        : 'accessAccounts.accountCreated'),
                     'success'
                 );
                 this.closeAccountModal();
@@ -487,7 +688,7 @@ class AccessAccountsManager {
             });
 
             if (response.ok) {
-                this.showToast(t('accessAccounts.accountDeleted'), 'success');
+                this.showToast(t(this.term('accessAccounts.accountDeleted', 'accessAccounts.screenDeleted')), 'success');
                 this.closeDeleteModal();
                 this.loadAccounts();
             } else {
@@ -514,8 +715,8 @@ class AccessAccountsManager {
             isValid = false;
         }
 
-        // Editing with a blank PIN keeps the current one
-        if (!(this.currentEditingAccount && !pin) && !this.validatePin(pin)) {
+        // Editing with a blank PIN keeps the current one; screens have none
+        if (!this.screens && !(this.currentEditingAccount && !pin) && !this.validatePin(pin)) {
             isValid = false;
         }
 

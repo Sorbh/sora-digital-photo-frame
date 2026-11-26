@@ -84,7 +84,12 @@
     "fullscreenRefused": "Le navigateur a refusé le plein écran. Réessayez avec le bouton.",
     "retry": "Réessayer",
     "retryingNote": "Le cadre continue d’essayer tout seul.",
-    "connectionTitle": "Impossible d’accéder à vos photos"
+    "connectionTitle": "Impossible d’accéder à vos photos",
+    "connect_with_code": "Scannez le code avec votre téléphone, ou tapez-le sur la page Accès.",
+    "connect_screen": "Connecter cet écran",
+    "screenPausedTitle": "Cet écran est <em>en pause</em>",
+    "screenPausedMessage": "Demandez à la personne à qui appartient cette bibliothèque de le réactiver.",
+    "screenPausedNote": "Il redémarre tout seul dès qu’il est réactivé."
   },
   "accessAccounts": {
     "frames_pins": "Cadres et codes PIN",
@@ -167,7 +172,33 @@
     "familyCodeRenewed": "Nouveau code famille prêt",
     "familyCodeRenewFailed": "Impossible de créer un nouveau code. Veuillez réessayer.",
     "viaPin": "Connecté avec un PIN",
-    "viaQr": "Associé par code QR"
+    "viaQr": "Associé par code QR",
+    "addScreen": "Ajouter un écran",
+    "screenCodeLabel": "Tapez le code affiché sur votre télé",
+    "screenCodeNote": "Ouvrez Sora sur la télé ou le cadre. Le code est à côté de son QR code.",
+    "screenCodeWrong": "Ce code n'a pas marché. Vérifiez le code sur la télé et tapez-le à nouveau. Il change toutes les dix minutes.",
+    "screenNameLabel": "Nom de l'écran",
+    "screenNamePlaceholder": "Télé du salon",
+    "screenNameRequired": "Donnez un nom à l'écran, comme « Télé du salon ».",
+    "screenOtherCode": "Un autre code",
+    "screenAddButton": "Ajouter cet écran",
+    "screenAdded": "{name} est ajouté",
+    "screenDoneNote": "Le diaporama démarre dans un instant et l’écran reste connecté.",
+    "screenDone": "Terminé",
+    "screensEyebrow": "Écrans",
+    "screensTitle": "Vos <em>écrans</em>",
+    "screensCount_one": "{count} écran",
+    "screensCount_many": "{count} écrans",
+    "screensCount_other": "{count} écrans",
+    "noScreens": "Pas encore d'écran",
+    "screensEmptyTitle": "Pas encore d'écran",
+    "screensEmptyText": "Ouvrez Sora sur votre télé ou votre cadre, puis touchez Ajouter un écran et tapez le code affiché.",
+    "screenDetails": "Écran",
+    "editScreen": "Modifier l'écran",
+    "editScreenTitle": "Modifier l'écran",
+    "deleteScreen": "Retirer l'écran",
+    "screenUpdated": "Écran enregistré",
+    "screenDeleted": "Écran retiré"
   },
   "pair": {
     "all_folders": "Tous les dossiers",
@@ -208,7 +239,8 @@
     "unreachableHeading": "Impossible de <em>vérifier</em> le code",
     "unreachableNote": "La bibliothèque n’a pas répondu. Vérifiez la connexion de votre téléphone, puis réessayez.",
     "tryAgain": "Réessayer",
-    "foldersFailed": "Impossible de charger les dossiers : un nouveau compte ne peut pas être créé pour le moment. Choisissez un compte existant ou réessayez."
+    "foldersFailed": "Impossible de charger les dossiers : un nouveau compte ne peut pas être créé pour le moment. Choisissez un compte existant ou réessayez.",
+    "new_screen": "Un nouvel écran"
   },
   "login": {
     "invalid_password": "Mot de passe incorrect. Veuillez réessayer.",

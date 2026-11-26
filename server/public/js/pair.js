@@ -1,10 +1,9 @@
-// Approving a frame that showed a QR code: /pair?code=K7P4QX, or /pair to type the code
+// Approving a frame that showed a QR code: /pair?code=K7P4QX, or /pair to type the code.
+// The lookup, the "Which photos" choice and the approval are js/pairFlow.js, shared
+// with "Add a screen" on the Access page.
 (() => {
-    const NEW = '__new__';
-    const CODE_LENGTH = 6;
+    const { CODE_LENGTH, normalize, pretty } = window.SoraPairFlow;
     const $ = id => document.getElementById(id);
-    // As shown on the frame (K7P-4QX), any case, with or without the hyphen or spaces
-    const normalize = value => String(value || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
     // A typed code is kept for this tab only, not in the address: a reload, or
     // signing in again, comes back to it without the code going into ?next=
     const CODE_KEY = 'sora_pair_code';
@@ -21,91 +20,23 @@
     const states = ['stateLoading', 'stateEnter', 'stateExpired', 'stateUnreachable', 'pairForm', 'stateDone'];
 
     const show = id => states.forEach(s => $(s).classList.toggle('hidden', s !== id));
-    const pretty = c => `${c.slice(0, 3)}-${c.slice(3)}`;
-
-    const folderSummary = folders => (folders && folders.length ? folders.join(', ') : t('pair.all_folders'));
-
-    function choice(value, title, detail, checked) {
-        const label = document.createElement('label');
-        label.className = 'choice';
-        label.innerHTML = '<input type="radio" name="account"><span class="choice-text"><span class="choice-title"></span><span class="choice-detail"></span></span>';
-        const input = label.querySelector('input');
-        input.value = value;
-        input.checked = checked;
-        label.querySelector('.choice-title').textContent = title;
-        label.querySelector('.choice-detail').textContent = detail;
-        return label;
-    }
-
-    let loaded = null; // { accounts, folders } once fetched, to re-render on language change
+    const choices = window.SoraPairFlow.choices({ accountList: $('accountList'), newAccount: $('newAccount'), folderList: $('folderList') });
     let doneName = null;
-
-    function renderAccounts(accounts) {
-        const list = $('accountList');
-        const selected = selectedAccount();
-        list.innerHTML = '';
-        accounts.forEach((account, i) => {
-            list.appendChild(choice(account.id, account.name, folderSummary(account.assignedFolders), selected ? selected === account.id : i === 0));
-        });
-        list.appendChild(choice(NEW, t('pair.new_account'), t('pair.choose_folders'), selected ? selected === NEW : accounts.length === 0));
-        updateNewAccount();
-    }
-
-    function renderFolders(folders) {
-        const list = $('folderList');
-        if (list.querySelector('input')) return; // folder names need no translation, keep the ticks
-        list.innerHTML = '';
-        if (!folders) {
-            // Without the list, "no ticks" would mean every folder: a new account waits for it
-            list.innerHTML = `<p class="pair-error">${t('pair.foldersFailed')}</p>`;
-            return;
-        }
-        if (!folders.length) {
-            list.innerHTML = `<p class="pair-note">${t('pair.no_folders')}</p>`;
-            return;
-        }
-        folders.forEach(folder => {
-            const label = document.createElement('label');
-            label.className = 'folder';
-            label.innerHTML = '<input type="checkbox"><span class="material-icons">folder</span><span class="folder-name"></span>';
-            label.querySelector('input').value = folder.path;
-            label.querySelector('.folder-name').textContent = folder.name;
-            list.appendChild(label);
-        });
-    }
-
-    function selectedAccount() {
-        return document.querySelector('input[name="account"]:checked')?.value;
-    }
-
-    function updateNewAccount() {
-        $('newAccount').classList.toggle('hidden', selectedAccount() !== NEW);
-    }
 
     function showError(message) {
         $('pairError').textContent = message;
         $('pairError').classList.toggle('hidden', !message);
     }
 
-    async function getJson(url, options) {
-        const response = await fetch(url, options);
-        if (response.status === 401) {
-            // Back here after signing in, with the code kept aside rather than in the sign-in address
-            remember(code);
-            const query = new URLSearchParams(location.search); // keeps ?lang= and the like
-            query.delete('code');
-            const back = query.toString() ? `${location.pathname}?${query}` : location.pathname;
-            location.href = `/login?next=${encodeURIComponent(back)}`;
-            throw Object.assign(new Error('Signed out'), { signedOut: true });
-        }
-        // A proxy's error page (or a sign-in page) is not JSON: `json` is false then
-        let data = null;
-        try {
-            data = await response.json();
-        } catch (_) { /* not JSON */ }
-        const json = Boolean(data) && typeof data === 'object';
-        return { ok: response.ok, status: response.status, json, data: json ? data : {} };
+    // Signed out: back here after signing in, with the code kept aside rather than in the sign-in address
+    function signedOut() {
+        remember(code);
+        const query = new URLSearchParams(location.search); // keeps ?lang= and the like
+        query.delete('code');
+        const back = query.toString() ? `${location.pathname}?${query}` : location.pathname;
+        location.href = `/login?next=${encodeURIComponent(back)}`;
     }
+    const getJson = (url, options) => window.SoraPairFlow.request(url, options, signedOut);
 
     // A code that is used up or too old is not offered again
     function expired() {
@@ -122,23 +53,11 @@
         if (!code) return showEnter();
         show('stateLoading');
         try {
-            const pairing = await getJson(`/api/admin/pair/${encodeURIComponent(code)}`);
-            // Only the server's own "no such code" means expired; anything else (a 503,
-            // a proxy's 404 page, a restarting server) is worth another try
-            if (pairing.json && (pairing.data.code === 'PAIRING_EXPIRED' || (pairing.ok && pairing.data.approved))) return expired();
-            if (!pairing.ok || !pairing.json || typeof pairing.data.code !== 'string') return show('stateUnreachable');
-
-            // The folder list only matters for a new account: without it, "no ticks"
-            // would mean every folder. Existing accounts can still be chosen.
-            const [accounts, folders] = await Promise.all([getJson('/api/access-accounts'), getJson('/api/folders')]);
-            const listed = (reply, key) => reply.ok && reply.json && Array.isArray(reply.data[key]);
-            const folderList = listed(folders, 'folders') ? folders.data.folders : null;
-            if (!listed(accounts, 'accounts')) return show('stateUnreachable');
-            if (!folderList && !accounts.data.accounts.length) return show('stateUnreachable'); // nothing to choose
-            $('codeShown').textContent = pretty(pairing.data.code);
-            loaded = { accounts: accounts.data.accounts, folders: folderList };
-            renderAccounts(loaded.accounts);
-            renderFolders(loaded.folders);
+            const found = await window.SoraPairFlow.lookup(code, getJson);
+            if (found.state === 'expired') return expired();
+            if (found.state !== 'ready') return show('stateUnreachable');
+            $('codeShown').textContent = pretty(found.code);
+            choices.show(found);
             show('pairForm');
             if (matchMedia('(pointer: fine)').matches) $('frameName').focus();
         } catch (error) {
@@ -193,29 +112,22 @@
             $('frameName').focus();
             return;
         }
-        const account = selectedAccount();
-        if (account === NEW && !loaded?.folders) {
-            showError(t('pair.foldersFailed'));
+        const chosen = choices.body(name);
+        if (chosen.error) {
+            showError(t(chosen.error));
             return;
         }
-        const body = account === NEW
-            ? { name, newAccount: { assignedFolders: [...document.querySelectorAll('#folderList input:checked')].map(i => i.value) } }
-            : { name, accountId: account };
 
         showError('');
         $('pairButton').disabled = true;
         try {
-            const result = await getJson(`/api/admin/pair/${encodeURIComponent(code)}/approve`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body)
-            });
-            if (result.ok) {
+            const result = await window.SoraPairFlow.approve(code, chosen.body, getJson);
+            if (result.state === 'done') {
                 remember(null); // paired: a later /pair starts afresh
-                doneName = result.data.device.name;
+                doneName = result.device.name;
                 renderDone();
                 show('stateDone');
-            } else if (result.data.code === 'PAIRING_EXPIRED') {
+            } else if (result.state === 'expired') {
                 expired();
             } else {
                 showError(i18n.error(result.data, 'pair.failed'));
@@ -236,14 +148,10 @@
         $('doneTitle').innerHTML = t('pair.donePaired', { name: span.outerHTML });
     }
 
-    $('accountList').addEventListener('change', updateNewAccount);
     window.addEventListener('sora:languagechange', () => {
         renderDone();
         if (!$('codeError').classList.contains('hidden')) $('codeError').textContent = t('pair.codeInvalid');
-        if (loaded) {
-            renderAccounts(loaded.accounts);
-            renderFolders(loaded.folders);
-        }
+        choices.render();
     });
 
     load();

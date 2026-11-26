@@ -15,7 +15,8 @@ process.env.DATA_DIR = testDataDir;
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
 process.env.ADMIN_PASSWORD = 'test-admin-pass';
 
-const source = fs.readFileSync(path.join(__dirname, '..', 'public', 'js', 'pair.js'), 'utf8');
+// The page's own script, after the shared flow it uses (js/pairFlow.js), as pair.html loads them
+const source = ['pairFlow.js', 'pair.js'].map(file => fs.readFileSync(path.join(__dirname, '..', 'public', 'js', file), 'utf8')).join('\n');
 // Waits for the page to get somewhere that goes through the real server (not just promises)
 const waitFor = async (done) => {
   for (let i = 0; i < 200 && !done(); i++) await new Promise(resolve => setTimeout(resolve, 10));
@@ -39,6 +40,7 @@ function fakeElement() {
     focus() {},
     appendChild(child) { element.children.push(child); },
     querySelector: () => (element.innerHTML ? fakeElement() : null),
+    querySelectorAll: () => [],
     get outerHTML() { return `<span>${element.textContent}</span>`; }
   };
   return element;

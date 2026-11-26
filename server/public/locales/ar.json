@@ -84,7 +84,12 @@
     "fullscreenRefused": "لم يسمح المتصفح بملء الشاشة. جرّب الزر مرة أخرى.",
     "retry": "إعادة المحاولة",
     "retryingNote": "يواصل الإطار المحاولة تلقائيًا.",
-    "connectionTitle": "تعذّر الوصول إلى صورك"
+    "connectionTitle": "تعذّر الوصول إلى صورك",
+    "connect_with_code": "امسح الرمز بهاتفك، أو اكتبه في صفحة الوصول.",
+    "connect_screen": "اربط هذه الشاشة",
+    "screenPausedTitle": "هذه الشاشة <em>متوقفة مؤقتًا</em>",
+    "screenPausedMessage": "اطلب من صاحب هذه المكتبة إعادة تشغيلها.",
+    "screenPausedNote": "تبدأ من جديد تلقائيًا عند إعادة تشغيلها."
   },
   "accessAccounts": {
     "frames_pins": "الإطارات ورموز PIN",
@@ -170,7 +175,36 @@
     "familyCodeRenewed": "رمز العائلة الجديد جاهز",
     "familyCodeRenewFailed": "تعذّر إنشاء رمز جديد. حاول مرة أخرى.",
     "viaPin": "سجّل الدخول برقم PIN",
-    "viaQr": "مقترن عبر رمز QR"
+    "viaQr": "مقترن عبر رمز QR",
+    "addScreen": "إضافة شاشة",
+    "screenCodeLabel": "اكتب الرمز الظاهر على التلفاز",
+    "screenCodeNote": "افتح Sora على التلفاز أو الإطار. الرمز بجانب رمز QR.",
+    "screenCodeWrong": "لم ينجح هذا الرمز. تحقق من الرمز على التلفاز واكتبه مرة أخرى. يتغير كل عشر دقائق.",
+    "screenNameLabel": "اسم الشاشة",
+    "screenNamePlaceholder": "تلفاز غرفة الجلوس",
+    "screenNameRequired": "أعطِ الشاشة اسمًا، مثل «تلفاز غرفة الجلوس».",
+    "screenOtherCode": "رمز آخر",
+    "screenAddButton": "إضافة هذه الشاشة",
+    "screenAdded": "تمت إضافة {name}",
+    "screenDoneNote": "يبدأ عرض الصور بعد لحظة وتبقى الشاشة متصلة.",
+    "screenDone": "تم",
+    "screensEyebrow": "الشاشات",
+    "screensTitle": "<em>شاشاتك</em>",
+    "screensCount_zero": "لا توجد شاشات",
+    "screensCount_one": "شاشة واحدة",
+    "screensCount_two": "شاشتان",
+    "screensCount_few": "{count} شاشات",
+    "screensCount_many": "{count} شاشة",
+    "screensCount_other": "{count} شاشة",
+    "noScreens": "لا توجد شاشات بعد",
+    "screensEmptyTitle": "لا توجد شاشات بعد",
+    "screensEmptyText": "افتح Sora على التلفاز أو الإطار، ثم اضغط «إضافة شاشة» واكتب الرمز الظاهر.",
+    "screenDetails": "الشاشة",
+    "editScreen": "تعديل الشاشة",
+    "editScreenTitle": "تعديل الشاشة",
+    "deleteScreen": "إزالة الشاشة",
+    "screenUpdated": "تم حفظ الشاشة",
+    "screenDeleted": "تمت إزالة الشاشة"
   },
   "pair": {
     "all_folders": "كل المجلدات",
@@ -211,7 +245,8 @@
     "unreachableHeading": "تعذّر <em>التحقق</em> من الرمز",
     "unreachableNote": "لم تستجب المكتبة. تحقّق من اتصال هاتفك، ثم حاول مرة أخرى.",
     "tryAgain": "حاول مرة أخرى",
-    "foldersFailed": "تعذّر تحميل المجلدات، لذا لا يمكن إنشاء حساب جديد الآن. اختر حسابًا موجودًا، أو حاول مرة أخرى."
+    "foldersFailed": "تعذّر تحميل المجلدات، لذا لا يمكن إنشاء حساب جديد الآن. اختر حسابًا موجودًا، أو حاول مرة أخرى.",
+    "new_screen": "شاشة جديدة"
   },
   "login": {
     "invalid_password": "كلمة المرور غير صحيحة. يُرجى المحاولة مرة أخرى.",

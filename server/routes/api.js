@@ -80,7 +80,7 @@ router.get('/frame/keys', requireViewer, frameKeyController.get.bind(frameKeyCon
 
 // Pairing a frame by QR code: the frame starts and waits, an admin approves
 router.post('/pair/start', pairingController.start.bind(pairingController));
-router.get('/pair/status', pairingController.status.bind(pairingController));
+router.post('/pair/status', pairingController.status.bind(pairingController));
 router.post('/pair/collect', pairingController.collect.bind(pairingController));
 router.post('/auth/device', pairingController.signIn.bind(pairingController));
 router.get('/admin/pair/:code', requireAuth, pairingController.show.bind(pairingController));

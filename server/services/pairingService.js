@@ -1,6 +1,6 @@
 const crypto = require('crypto');
 const { getDataStore } = require('../store');
-const { currentTenant } = require('../context');
+const { currentTenant, runWithTenant } = require('../context');
 const { emit } = require('../events');
 const PAIRING_TTL_MS = 10 * 60 * 1000;
 // Shared by every tenant on a hosted server. Each address keeps at most
@@ -9,6 +9,10 @@ const PAIRING_TTL_MS = 10 * 60 * 1000;
 const MAX_PENDING = 2000;
 const MAX_PER_ADDRESS = 5;
 const SEEN_WRITE_GAP_MS = 60 * 60 * 1000;
+// Removals the host's devicesRemoved hook missed, kept per library until it takes them
+const REMOVALS_OUTBOX = 'device-removals';
+// How long to wait before each try again; after the last, the next device change tries
+const RETRY_DELAYS_MS = [30 * 1000, 2 * 60 * 1000, 10 * 60 * 1000, 60 * 60 * 1000];
 // No 0/O, 1/I/L: the code is read off a frame across the room
 const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 
@@ -37,6 +41,9 @@ const deviceIdFromToken = token => (typeof token === 'string' && TOKEN_PATTERN.e
 class PairingService {
   constructor() {
     this.pairings = new Map(); // code -> { code, secret, expiresAt, address, claimed, approved }
+    this.retries = new Map(); // tenant id -> { timer, attempt }, for reportRemovals
+    this.reporting = new Map(); // tenant id -> { running, again }, so reports don't pile up
+    this.retryDelays = RETRY_DELAYS_MS;
   }
 
   normalize(code) {
@@ -132,11 +139,12 @@ class PairingService {
   async approve(codeOrPairing, { name, accountId, beforeReady = null }) {
     const pairing = typeof codeOrPairing === 'object' ? codeOrPairing : this.claim(codeOrPairing);
     if (!pairing || pairing.approved || this.pairings.get(pairing.code) !== pairing) return null;
+    // The code ran out, or was replaced, while waiting: the frame has moved on to
+    // a new code and could never collect this one
+    const lapsed = () => pairing.expiresAt <= Date.now() || this.pairings.get(pairing.code) !== pairing;
     try {
       const { device, token } = await this.addDevice({ name, accountId, via: 'qr' });
-      // The code ran out while the device was being made: the frame has moved on
-      // to a new code and could never collect this one, so undo it
-      if (pairing.expiresAt <= Date.now() || this.pairings.get(pairing.code) !== pairing) {
+      if (lapsed()) {
         await this.discardDevice(device.id);
         return null;
       }
@@ -147,7 +155,13 @@ class PairingService {
           await this.discardDevice(device.id);
           throw error;
         }
+        // Checked again: finishing the account may have taken past the deadline
+        if (lapsed()) {
+          await this.discardDevice(device.id);
+          return null;
+        }
       }
+      // Nothing is awaited from here on, so the frame can collect what this returns.
       // The frame collects this without a session; it runs as the approving tenant
       pairing.approved = { token, device, tenant: currentTenant() };
       return device;
@@ -185,6 +199,9 @@ class PairingService {
       await getDataStore().update('devices', [], devices => devices.filter(d => d.id !== id));
       throw error;
     }
+    // The host answered, so it can take any removals it missed. In the background:
+    // a host slow with those must not hold up this sign-in.
+    this.reportRemovals();
     return { device, token };
   }
 
@@ -269,14 +286,92 @@ class PairingService {
   }
 
   // Removes a device nobody ever got the token for. It goes even if the host's
-  // devicesRemoved hook fails, so it never counts toward the screen limit.
+  // devicesRemoved hook fails, so it never counts toward the screen limit; the
+  // host then hears about it later. Kept to report before it's removed, so the
+  // removal can't be lost between the two (see reportRemovals).
   async discardDevice(id) {
-    await getDataStore().update('devices', [], devices => devices.filter(d => d.id !== id));
     try {
+      await getDataStore().update(REMOVALS_OUTBOX, [], pending => [...new Set([...pending, id])]);
+    } catch (saveError) {
+      // Nowhere to keep it: tell the host first and only then remove it here, so
+      // the two never disagree. If the host can't hear it either, the device stays.
+      console.error('Could not keep a discarded device to report:', saveError);
       await emit('devicesRemoved', { deviceIds: [id], tenantId: currentTenant().id });
-    } catch (error) {
-      console.error('Could not report a discarded device:', error);
+      await getDataStore().update('devices', [], devices => devices.filter(d => d.id !== id));
+      return;
     }
+    await this.reportRemovals();
+  }
+
+  // Removes the devices kept in the outbox and sends devicesRemoved for them,
+  // along with any earlier ones the host missed. Never throws: what's still
+  // unreported stays kept and is tried again later. One report at a time per
+  // library; calls during one share a single follow-up.
+  reportRemovals() {
+    const tenant = currentTenant();
+    let state = this.reporting.get(tenant.id);
+    if (!state) {
+      state = { running: null, again: null };
+      this.reporting.set(tenant.id, state);
+    }
+    if (!state.running) {
+      state.running = this.sendRemovals(tenant).finally(() => {
+        state.running = null;
+        if (!state.again) this.reporting.delete(tenant.id);
+      });
+      return state.running;
+    }
+    if (!state.again) {
+      state.again = state.running.then(() => {
+        state.again = null;
+        return runWithTenant(tenant, () => this.reportRemovals());
+      });
+    }
+    return state.again;
+  }
+
+  async sendRemovals(tenant) {
+    let left;
+    try {
+      const pending = await getDataStore().get(REMOVALS_OUTBOX, []);
+      if (!Array.isArray(pending) || !pending.length) return;
+      // Gone here first (again, after a restart in between), so they never
+      // count toward the screen limit while the host is away
+      await getDataStore().update('devices', [], devices => devices.filter(d => !pending.includes(d.id)));
+      await emit('devicesRemoved', { deviceIds: pending, tenantId: tenant.id });
+      await getDataStore().update(REMOVALS_OUTBOX, [], current => {
+        left = current.filter(id => !pending.includes(id));
+        return left;
+      });
+    } catch (error) {
+      console.error('Could not report removed devices yet:', error);
+      this.retryLater();
+      return;
+    }
+    const retry = this.retries.get(tenant.id);
+    if (retry) clearTimeout(retry.timer);
+    this.retries.delete(tenant.id);
+    if (left.length) this.retryLater();
+  }
+
+  // Tries reportRemovals again for this library after the next delay, unless one
+  // is already waiting. After the last delay, the library's next device change does.
+  retryLater() {
+    const tenant = currentTenant();
+    const retry = this.retries.get(tenant.id) || { timer: null, attempt: 0 };
+    if (retry.timer) return;
+    const delay = this.retryDelays[retry.attempt];
+    if (delay === undefined) {
+      this.retries.delete(tenant.id);
+      return;
+    }
+    retry.timer = setTimeout(() => {
+      retry.timer = null;
+      retry.attempt += 1;
+      runWithTenant(tenant, () => this.reportRemovals());
+    }, delay);
+    retry.timer.unref?.();
+    this.retries.set(tenant.id, retry);
   }
 
   async removeDevices(match) {
@@ -293,6 +388,7 @@ class PairingService {
       await getDataStore().update('devices', [], devices => [...devices, ...removed]);
       throw error;
     }
+    this.reportRemovals(); // in the background, as in addDevice
     return removed.length;
   }
 }

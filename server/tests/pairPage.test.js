@@ -335,7 +335,7 @@ describe('The /pair page against the real server', () => {
     expect(page.storage.items.has('sora_pair_code')).toBe(false);
 
     // The frame hears it was approved, collects its sign-in and is in
-    const polled = await frame.get('/api/pair/status').query({ code: pairing.code, secret: pairing.secret }).expect(200);
+    const polled = await frame.post('/api/pair/status').send({ code: pairing.code, secret: pairing.secret }).expect(200);
     expect(polled.body.status).toBe('ready');
     const collected = await frame.post('/api/pair/collect').send({ code: pairing.code, secret: pairing.secret }).expect(200);
     expect(collected.body).toMatchObject({ status: 'approved', device: { name: 'Hall frame' }, account: { name: 'Hall frame' } });

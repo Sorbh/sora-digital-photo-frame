@@ -200,18 +200,19 @@ class AuthenticationManager {
 
         let data;
         try {
-            const query = new URLSearchParams({ code: pairing.code, secret: pairing.secret });
-            data = await (await fetch(`/api/pair/status?${query}`)).json();
+            // The secret goes in the body, never the URL, which proxies may log
+            const ask = path => fetch(path, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code: pairing.code, secret: pairing.secret })
+            }).then(response => response.json());
+            data = await ask('/api/pair/status');
             if (this.pairing !== pairing) return;
             // Approved: collect the token, which also signs this browser in. A
             // sign-in from the address still under way would replace it: stop it first.
             if (data?.status === 'ready') {
                 this.outrankUrlSignIn();
-                data = await (await fetch('/api/pair/collect', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ code: pairing.code, secret: pairing.secret })
-                })).json();
+                data = await ask('/api/pair/collect');
             }
         } catch (error) {
             data = null; // offline for a moment: keep waiting

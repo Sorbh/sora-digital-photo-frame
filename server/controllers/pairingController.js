@@ -39,7 +39,7 @@ function addressGroup(ip) {
  * Pairing a frame by QR code, and signing paired frames back in.
  *
  *   frame   POST /api/pair/start         a code, a secret and the QR code
- *   frame   GET  /api/pair/status        waiting | ready | expired, changes nothing
+ *   frame   POST /api/pair/status        waiting | ready | expired, changes nothing
  *   frame   POST /api/pair/collect       a ready pairing: the device token, and signs in
  *   admin   GET  /api/admin/pair/:code   the code exists and is waiting
  *   admin   POST /api/admin/pair/:code/approve
@@ -138,9 +138,11 @@ class PairingController {
     }
   }
 
+  // A POST with the secret in the body, so it never shows in a URL a proxy might log
   async status(req, res) {
     try {
-      res.json({ success: true, status: pairing.status(req.query.code, req.query.secret) });
+      const { code, secret } = req.body || {};
+      res.json({ success: true, status: pairing.status(code, secret) });
     } catch (error) {
       console.error('Error checking pairing:', error);
       res.status(500).json({ success: false, error: 'Could not check pairing' });

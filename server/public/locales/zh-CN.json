@@ -246,7 +246,10 @@
     "UNSUPPORTED_TYPE": "只能上传 JPEG、PNG、GIF、WebP 和 HEIC 照片",
     "SCREEN_LIMIT": "这个家庭已有 {limit} 块屏幕。请先移除一块不再使用的屏幕，再添加这一块。",
     "FOLDER_TOO_DEEP": "无法在此处新建文件夹：文件夹最多只能有 {limit} 层。",
-    "FOLDER_NOT_FOUND": "此文件夹已不存在，可能已被删除。"
+    "FOLDER_NOT_FOUND": "此文件夹已不存在，可能已被删除。",
+    "VIEW_ONLY": "你可以查看这些照片，但不能更改。",
+    "OWNER_ONLY": "只有这个相册的主人才能这样做。",
+    "OUTSIDE_FOLDERS": "你只能更改与你共享的文件夹。"
   },
   "admin": {
     "static_001": "照片库 · Sora Frame",
@@ -671,5 +674,11 @@
     "unknownError": "未知错误",
     "importing": "正在把照片导入您的文件夹…",
     "mayTakeMoments": "这可能需要一点时间"
+  },
+  "ownerOnly": {
+    "title": "仅限主人 · Sora Frame",
+    "heading": "只有主人才能打开此页面",
+    "body": "请联系与你共享这些照片的人。",
+    "back": "返回相册"
   }
 }

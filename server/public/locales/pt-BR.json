@@ -247,7 +247,10 @@
     "UNSUPPORTED_TYPE": "Só é possível enviar fotos JPEG, PNG, GIF, WebP e HEIC",
     "SCREEN_LIMIT": "Esta família já tem {limit} telas. Remova uma que você não usa mais para adicionar esta.",
     "FOLDER_TOO_DEEP": "Não é possível criar uma pasta aqui: as pastas podem ter no máximo {limit} níveis de profundidade.",
-    "FOLDER_NOT_FOUND": "Esta pasta não existe mais. Talvez tenha sido excluída."
+    "FOLDER_NOT_FOUND": "Esta pasta não existe mais. Talvez tenha sido excluída.",
+    "VIEW_ONLY": "Você pode ver estas fotos, mas não alterá-las.",
+    "OWNER_ONLY": "Só o dono desta biblioteca pode fazer isso.",
+    "OUTSIDE_FOLDERS": "Você só pode alterar as pastas compartilhadas com você."
   },
   "admin": {
     "static_001": "Biblioteca · Sora Frame",
@@ -700,5 +703,11 @@
     "unknownError": "Erro desconhecido",
     "importing": "Importando fotos para a sua pasta...",
     "mayTakeMoments": "Isso pode levar alguns instantes"
+  },
+  "ownerOnly": {
+    "title": "Só para o dono · Sora Frame",
+    "heading": "Só o dono pode abrir esta página",
+    "body": "Peça à pessoa que compartilhou estas fotos com você.",
+    "back": "Voltar à biblioteca"
   }
 }

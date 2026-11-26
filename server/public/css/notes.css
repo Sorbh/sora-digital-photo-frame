@@ -732,3 +732,9 @@
     .note-preview.is-portrait { height: 50vh; }
     .snap-sheet { padding: 16px; border-radius: 0; border-inline: 0; }
 }
+
+/* "Can view" only (js/scope.js): notes can be read, not paused, edited or deleted */
+.view-only .note-card-actions,
+.view-only .note-toggle {
+    display: none !important;
+}

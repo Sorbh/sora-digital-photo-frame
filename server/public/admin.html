@@ -70,7 +70,7 @@
                 <span class="sora-eyebrow" data-i18n="common.library">Library</span>
             </div>
             <div class="topbar-actions">
-                <button id="accessAccountsBtn" class="tb-btn tb-desktop" title="Manage access accounts" data-i18n-attr="title:admin.static_033">
+                <button id="accessAccountsBtn" class="tb-btn tb-desktop" data-owner-only title="Manage access accounts" data-i18n-attr="title:admin.static_033">
                     <span class="material-symbols-outlined">key</span>
                     <span class="tb-label" data-i18n="common.access">Access</span>
                 </button>
@@ -78,7 +78,7 @@
                     <span class="material-symbols-outlined">sticky_note_2</span>
                     <span class="tb-label" data-i18n="common.notes">Notes</span>
                 </a>
-                <button id="googlePhotosBtn" class="tb-btn" title="Sync Google Photos" data-i18n-attr="title:admin.static_035">
+                <button id="googlePhotosBtn" class="tb-btn" data-owner-only data-edit-only title="Sync Google Photos" data-i18n-attr="title:admin.static_035">
                     <span class="material-symbols-outlined">add_photo_alternate</span>
                     <span class="tb-label" data-i18n="admin.static_002">Google Photos</span>
                 </button>
@@ -117,7 +117,7 @@
                 <p id="folderMeta" class="page-meta sora-mono">&nbsp;</p>
             </div>
             <div class="library-actions">
-                <label class="play-order" title="How this folder plays on the frame" data-i18n-attr="title:admin.static_043">
+                <label class="play-order" data-edit-only title="How this folder plays on the frame" data-i18n-attr="title:admin.static_043">
                     <span class="material-symbols-outlined" id="playOrderIcon" aria-hidden="true">shuffle</span>
                     <span class="sr-only" data-i18n="admin.static_004">Play order</span>
                     <select id="playOrderSelect">
@@ -128,15 +128,15 @@
                     </select>
                     <span class="material-symbols-outlined play-order-caret" aria-hidden="true">expand_more</span>
                 </label>
-                <button id="createFolderBtn" class="btn-outline" title="Create folder" data-i18n-attr="title:admin.static_044">
+                <button id="createFolderBtn" class="btn-outline" data-edit-only title="Create folder" data-i18n-attr="title:admin.static_044">
                     <span class="material-symbols-outlined">create_new_folder</span>
                     <span data-i18n="admin.newFolder">New folder</span>
                 </button>
-                <button id="createSnapBtn" class="btn-outline" title="Make a memory-book page for this folder" data-i18n-attr="title:admin.static_045">
+                <button id="createSnapBtn" class="btn-outline" data-edit-only title="Make a memory-book page for this folder" data-i18n-attr="title:admin.static_045">
                     <span class="material-symbols-outlined">auto_stories</span>
                     <span data-i18n="admin.newSnap">New snap</span>
                 </button>
-                <button id="uploadBtn" class="btn mobile-hide" title="Upload images" data-i18n-attr="title:admin.static_046">
+                <button id="uploadBtn" class="btn mobile-hide" data-edit-only title="Upload images" data-i18n-attr="title:admin.static_046">
                     <span class="material-symbols-outlined">upload</span>
                     <span data-i18n="admin.upload">Upload</span>
                 </button>
@@ -145,7 +145,7 @@
 
         <main class="main-content">
             <!-- Shown while files from the computer are dragged over the library -->
-            <div id="dropZone" class="drop-zone" aria-hidden="true">
+            <div id="dropZone" class="drop-zone" aria-hidden="true" data-edit-only>
                 <div class="drop-zone-content">
                     <span class="material-symbols-outlined">cloud_upload</span>
                     <p id="dropZoneText"></p>
@@ -153,7 +153,7 @@
             </div>
 
             <!-- Floating Action Button -->
-            <div id="selectionFab" class="selection-fab hidden">
+            <div id="selectionFab" class="selection-fab hidden" data-edit-only>
                 <button id="bulkDeleteBtn" class="fab-button" data-tooltip="Delete Selected Photos"
                     aria-label="Delete Selected Photos" data-i18n-attr="aria-label:admin.static_047; data-tooltip:admin.static_047">
                     <span class="material-symbols-outlined">delete</span>
@@ -166,7 +166,7 @@
             </div>
 
             <!-- Quiet reminder in the free space below the grid -->
-            <div id="dropHint" class="drop-hint hidden" aria-hidden="true">
+            <div id="dropHint" class="drop-hint hidden" aria-hidden="true" data-edit-only>
                 <span class="material-symbols-outlined">place_item</span>
                 <p id="dropHintText"></p>
                 <p id="dropHintMove" class="drop-hint-sub hidden" data-i18n="admin.static_005">Drag a photo onto a folder to move it there</p>
@@ -177,9 +177,11 @@
                     <div class="text-center mb-6">
                         <span class="material-symbols-outlined text-6xl text-muted-foreground">photo_library</span>
                         <h3 class="text-xl font-semibold mt-4 mb-2" data-i18n="admin.static_006">No images yet</h3>
-                        <p class="text-muted-foreground" data-i18n="admin.static_007">Upload some images to get started</p>
+                        <p class="text-muted-foreground" data-edit-only data-i18n="admin.static_007">Upload some images to get started</p>
                     </div>
 
+                    <!-- Uploading: not for people who can only view (js/scope.js) -->
+                    <div data-edit-only>
                     <input type="file" id="emptyStateFileInput" multiple accept="image/*,.heic,.heif" hidden>
                     <div class="upload-drop-zone border-2 border-dashed border-muted rounded-lg p-8 text-center cursor-pointer hover:bg-muted/50 transition-colors"
                         id="emptyStateUploadZone">
@@ -216,6 +218,7 @@
                             <span class="material-symbols-outlined">upload</span>
                             <span id="emptyStateUploadBtnText" data-i18n="admin.static_012">Select Files</span>
                         </button>
+                    </div>
                     </div>
                 </div>
             </div>
@@ -439,10 +442,10 @@
         <a href="/admin" class="tab active" aria-current="page">
             <span class="material-symbols-outlined">photo_library</span><span data-i18n="common.library">Library</span>
         </a>
-        <a href="/access-accounts" class="tab">
+        <a href="/access-accounts" class="tab" data-owner-only>
             <span class="material-symbols-outlined">key</span><span data-i18n="common.access">Access</span>
         </a>
-        <button class="tab-fab" data-proxy="uploadBtn" aria-label="Upload photos" data-i18n-attr="aria-label:admin.static_055">
+        <button class="tab-fab" data-proxy="uploadBtn" data-edit-only aria-label="Upload photos" data-i18n-attr="aria-label:admin.static_055">
             <span class="material-symbols-outlined">add</span>
         </button>
         <a href="/slideshow" class="tab">
@@ -460,6 +463,7 @@
     </script>
 
     <script src="/js/i18n.js"></script>
+    <script src="/js/scope.js"></script>
     <script src="js/notePage.js"></script>
     <script src="/js/photoUpload.js"></script>
     <script src="/js/longPress.js"></script>

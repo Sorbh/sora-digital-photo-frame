@@ -246,7 +246,10 @@
     "UNSUPPORTED_TYPE": "Je kunt alleen JPEG-, PNG-, GIF-, WebP- en HEIC-foto's uploaden",
     "SCREEN_LIMIT": "Deze familie heeft al {limit} schermen. Verwijder er een die je niet meer gebruikt om dit scherm toe te voegen.",
     "FOLDER_TOO_DEEP": "Hier kan geen nieuwe map worden gemaakt: mappen mogen hoogstens {limit} niveaus diep zijn.",
-    "FOLDER_NOT_FOUND": "Deze map bestaat niet meer. Misschien is hij verwijderd."
+    "FOLDER_NOT_FOUND": "Deze map bestaat niet meer. Misschien is hij verwijderd.",
+    "VIEW_ONLY": "Je kunt deze foto's bekijken, maar niet wijzigen.",
+    "OWNER_ONLY": "Alleen de eigenaar van deze bibliotheek kan dit doen.",
+    "OUTSIDE_FOLDERS": "Je kunt alleen de mappen wijzigen die met je zijn gedeeld."
   },
   "admin": {
     "static_001": "Bibliotheek · Sora Frame",
@@ -671,5 +674,11 @@
     "unknownError": "Onbekende fout",
     "importing": "Foto's worden naar je map geïmporteerd...",
     "mayTakeMoments": "Dit kan even duren"
+  },
+  "ownerOnly": {
+    "title": "Alleen voor de eigenaar · Sora Frame",
+    "heading": "Alleen de eigenaar kan deze pagina openen",
+    "body": "Vraag het aan de persoon die deze foto's met je heeft gedeeld.",
+    "back": "Terug naar de bibliotheek"
   }
 }

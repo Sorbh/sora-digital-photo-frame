@@ -6,6 +6,7 @@ const { getLibrary } = require('../library');
 const { getDataStore } = require('../store');
 const { addWithinQuota, ITEMS } = require('./quotaService');
 const { canSee, inFolder } = require('../utils/viewerAccess');
+const { scopeFor } = require('../middleware/auth');
 const { toAdminPath, uploadsUrl } = require('../utils/safePath');
 
 const THEMES = ['paper', 'berry', 'ink'];
@@ -97,29 +98,33 @@ class NoteService {
     return folders;
   }
 
-  // The note as the Notes page and the library show it
-  describe(fullPath, note, now = new Date()) {
+  // The note as the Notes page and the library show it. visible(photo) keeps
+  // out photos (relative to uploads) the person can't see.
+  describe(fullPath, note, now = new Date(), visible = () => true) {
+    const photos = (note.photos || []).filter(visible);
     return {
       ...note,
+      photos,
       path: toAdminPath(fullPath),
       folder: toAdminPath(path.dirname(fullPath)),
       status: this.status(note, now),
-      photoUrls: this.photoUrls(note.photos)
+      photoUrls: this.photoUrls(photos)
     };
   }
 
-  async load(fullPath, now = new Date()) {
-    return this.describe(fullPath, await this.read(fullPath), now);
+  async load(fullPath, now = new Date(), visible = () => true) {
+    return this.describe(fullPath, await this.read(fullPath), now, visible);
   }
 
   /**
    * Notes for the Notes page: in one folder (absolute), or in the whole
-   * library. visible(relativePath) says which ones the person may see.
+   * library. visible(relativePath) says which ones the person may see, and
+   * which of their photos.
    */
   async list({ folder = null, visible = () => true, now = new Date() } = {}) {
     const files = folder ? await this.findAll(folder, { recursive: false }) : await this.findAll();
     const notes = await Promise.all(files.filter(file => visible(this.relative(file))).map(file =>
-      this.load(file, now).catch(error => {
+      this.load(file, now, visible).catch(error => {
         console.error('Skipping unreadable note:', file, error.message);
         return null;
       })));
@@ -194,7 +199,9 @@ class NoteService {
    * playing is the folder the frame chose to play (relative to uploads), if any.
    */
   isForFrame(req, relativePath, playing = '') {
-    if (folderOf(relativePath) === '') return true;
+    // Not to a signed-in person limited to some folders (their scope): the top
+    // folder isn't one of theirs
+    if (folderOf(relativePath) === '') return !scopeFor(req)?.folders;
     if (!canSee(req, relativePath)) return false;
     return !playing || inFolder(relativePath, playing, '/');
   }
@@ -204,7 +211,6 @@ class NoteService {
    * frame may see, and with photos limited to the folders it may see.
    */
   async active(req = {}, { now = new Date(), folder = '' } = {}) {
-    const session = req.session || {};
     const files = (await this.findAll()).filter(file => this.isForFrame(req, this.relative(file), folder));
     const notes = [];
     for (const file of files) {
@@ -217,7 +223,7 @@ class NoteService {
     }
 
     return Promise.all(notes.map(async ({ file, note }) => {
-      const photos = await this.visiblePhotos(note.photos, session);
+      const photos = await this.visiblePhotos(note.photos, req);
 
       return {
         id: note.id || this.relative(file),
@@ -248,11 +254,6 @@ class NoteService {
     if (note.endsAt) return new Date(note.endsAt);
     if (note.eventAt) return new Date(new Date(note.eventAt).getTime() + EVENT_GRACE_MS);
     return null;
-  }
-
-  inFolders(photo, folders) {
-    const folder = path.dirname(photo);
-    return folders.some(allowed => folder === allowed || folder.startsWith(allowed + path.sep));
   }
 
   async photoExists(photo) {
@@ -360,17 +361,13 @@ class NoteService {
   }
 
   /**
-   * The photos a frame may show: the ones that still exist and, for a PIN
-   * limited to some folders, sit inside them.
+   * The photos a frame or person (req) may show: the ones that still exist and,
+   * for a PIN or a signed-in person limited to some folders, sit inside them.
    */
-  async visiblePhotos(photos = [], session = {}) {
-    const account = session.accessAccount;
-    const restrictFolders = account && !session.authenticated && account.assignedFolders?.length > 0
-      ? account.assignedFolders
-      : null;
+  async visiblePhotos(photos = [], req = {}) {
     const visible = [];
     for (const photo of photos) {
-      if (restrictFolders && !this.inFolders(photo, restrictFolders)) continue;
+      if (!canSee(req, photo)) continue;
       if (await this.photoExists(photo)) visible.push(photo);
     }
     return visible;

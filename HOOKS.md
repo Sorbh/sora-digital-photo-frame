@@ -9,7 +9,7 @@ These options are a public contract. Treat a change to a name, an argument or a 
 | `library` | `PhotoLibrary` subclass. Its `photoUrl(adminPath)` must return a URL with each path segment percent-encoded, since folder and file names can hold `#`, `?` and `%` (`PhotoLibrary.uploadsUrl(adminPath)` builds one for the `/uploads` route). May also offer `rawUrl(adminPath)`, which lets frames fetch encrypted photos from remote storage and decrypt them in the browser. Only `createFolder` makes folders: `addPhoto`, `movePhoto` and `writeItem` into a missing folder (deleted meanwhile, even mid-write) must throw `PhotoLibrary.folderNotFoundError()` (404 `FOLDER_NOT_FOUND`) and leave it missing. Storage with symlinks should offer `realPath(adminPath)`: the admin path a path really leads to, or `null` when it leads out of the library; frames' folder limits and `MAX_FOLDER_DEPTH` are checked there. Notes are `*.note.json` files in folders, stored like snaps (`*.snap.json`): `listItems`, `readItem`, `writeItem`, `movePhoto` and `deletePhoto` must handle them, and so must moving, renaming and deleting a folder. `listFolder` should give them type `'note'`, and `allPhotos` must never return them: a note is not a photo (see [Notes](#notes)) | Local uploads folder | `server/library/PhotoLibrary.js` |
 | `dataStore` | `DataStore` subclass: `get`, `set`, `update`. `folder-settings:<folder>` documents (a folder's play order) belong to that photo folder: writing one must not create the folder, and throws 404 `FOLDER_NOT_FOUND` when it is gone. Notes are not kept here any more but in the library, as `*.note.json` files like `*.snap.json`; the old `notes` document is read once at start, then emptied, with a copy in `notes-before-folders` (see [Notes](#notes)) | Local data files | `server/store/DataStore.js` |
 | `resolveTenant` | `async (req) => ({ id, plan })` or `null` | One `default` tenant | `server/context.js` |
-| `auth` | `{ requireAuth, requireGuest, requireViewer }` middleware, all optional | Admin password session | `server/middleware/auth.js` |
+| `auth` | `{ requireAuth, requireGuest, requireViewer }` middleware, and `scope(req)` (see [Scope](#scope)), all optional | Admin password session, which sees and changes everything | `server/middleware/auth.js` |
 | `quota` | `{ canAdd({ items, bytes, screens }, context) => ({ ok, message }) }` for the current tenant. **Changed in 3.0.0** (it took `bytes` alone): see [Quota](#quota) | Unlimited | `server/services/quotaService.js` |
 | `events` | `{ devicePaired, devicesRemoved, familyCodeSet }`, may be async; if one throws, the action fails, with one exception (see [Events](#events)) | None | `server/events.js` |
 | `keys` | `{ currentKey(), getKey(id) }`, may return promises | `PHOTO_ENCRYPTION_KEY`, or no encryption | `server/crypto/keys.js` |
@@ -94,6 +94,28 @@ async canAdd({ bytes }) { return { ok: used() + bytes <= LIMIT }; }
 If your hook only limits bytes, also return `{ ok: true }` when `bytes` is 0 or less: a new screen now asks with `bytes: 0`.
 
 The core's own `ask(request, context)`, `assertCanAdd(request, context)` and `addWithinQuota(request, write, context)` take the same object, pass a `context` on to the hook unchanged, and throw a `TypeError` when given a number.
+
+## Scope
+
+`auth.scope(req)` says what the signed-in person may do, for a library shared with people who shouldn't see or change all of it. Without it, or when it returns `null`, nothing is limited: that's the self-hosted admin.
+
+Otherwise it returns `{ folders, canEdit, isOwner }`:
+
+| Field | Meaning |
+|---|---|
+| `folders` | The folders they can see, relative to the uploads folder, the same form as PIN accounts' `assignedFolders`: `"Family"` or `"Family/Beach"`. Each includes everything inside it. `null` means all folders; an empty list means none. |
+| `canEdit` | `true` to upload, delete, rotate and move photos, make, delete and reorder folders, make and edit snaps and notes, and import from Google Photos. Otherwise every one of those answers 403 `VIEW_ONLY`. |
+| `isOwner` | `true` for the library's owner. Otherwise these answer 403 `OWNER_ONLY`: access accounts, the family code, devices, approving a pairing (and the `/access-accounts` and `/pair` pages), and connecting or disconnecting Google Photos. |
+
+- **It must answer at once,** not with a promise: it's asked many times per request. Read what your `requireAuth` already looked up, e.g. from `req` or the session. A promise, a thrown error or any other value locks everything (no folders, no changes, not the owner).
+- **Only `true` grants** `canEdit` and `isOwner`, and only `null` means all folders; anything else that isn't a list of names means no folders.
+- **Folders work as they do for PIN frames** (`server/utils/viewerAccess.js`). Folders above theirs can be opened to reach them, and show only what leads there. Symlinks are followed to where they really lead.
+- **Reads** outside their folders answer 404, as if the photo or folder didn't exist. This covers folder lists, thumbnails, the next and random photo, `/uploads`, snaps and notes.
+- **Changes** outside them answer 403 `OUTSIDE_FOLDERS`. A move checks where each photo comes from and where it goes. A snap or note checks its folder (both ends when a note moves) and its photos. A folder can be made, reordered or deleted only inside theirs, and one of their own folders can't be deleted.
+- **Notes** are scoped like photos: only notes in their folders are listed or shown, with only the photos they can see. Notes in the top folder go to every frame, so someone limited to some folders can't see, make, change or delete them.
+- **Photos they can't see are never lost.** A snap or note shows them only the photos they can see; when they save it, the others stay where they were, and their own list fills the other places.
+- `GET /api/features` returns the scope as `scope`, so pages hide what the person can't use. The server refuses it either way.
+- `server/tests/peopleScope.test.js` holds the decision for every API route, and fails when a route is added without one.
 
 ## Events
 

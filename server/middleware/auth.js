@@ -179,11 +179,46 @@ const sessionRequireViewer = (req, res, next) => {
 };
 
 // A hosted setup can swap in its own sign-in, e.g. Google accounts.
-// provider: { requireAuth, requireGuest, requireViewer } middleware, all optional.
+// provider: { requireAuth, requireGuest, requireViewer } middleware, all optional,
+// and scope(req) (see scopeFor below), also optional.
 let provider = {};
 
 const setAuthProvider = (next) => {
   provider = next || {};
+};
+
+// Nothing at all: what a broken scope hook gets, so a mistake never opens the library
+const LOCKED = Object.freeze({ folders: Object.freeze([]), canEdit: false, isOwner: false });
+
+/**
+ * What the signed-in person may do: null for everything (the self-hosted admin,
+ * or a provider without scope), else { folders, canEdit, isOwner }.
+ *   folders  folders they can see, relative to uploads ("Family", "Family/Beach"),
+ *            each with everything inside it; null for all folders
+ *   canEdit  true to upload, move, rotate, delete and make folders, snaps and notes
+ *   isOwner  true for the library's owner: Access (PINs, frames, family code),
+ *            pairing and the Google Photos connection
+ * The provider's scope(req) must answer at once (no promise), so it reads what its
+ * requireAuth already looked up. Anything else it returns locks everything.
+ */
+const scopeFor = (req) => {
+  if (typeof provider.scope !== 'function') return null;
+  let scope;
+  try {
+    scope = provider.scope(req);
+  } catch (error) {
+    console.error('Auth provider scope(req) failed:', error && error.message);
+    return LOCKED;
+  }
+  if (scope === null || scope === undefined) return null;
+  if (typeof scope !== 'object' || typeof scope.then === 'function') {
+    console.error('Auth provider scope(req) must return null or { folders, canEdit, isOwner }, not a promise');
+    return LOCKED;
+  }
+  // Only null means all folders; anything that isn't a list of names means none
+  const folders = scope.folders === null ? null
+    : (Array.isArray(scope.folders) ? scope.folders.filter(folder => typeof folder === 'string') : []);
+  return { folders, canEdit: scope.canEdit === true, isOwner: scope.isOwner === true };
 };
 
 const requireAuth = (req, res, next) => (provider.requireAuth || sessionRequireAuth)(req, res, next);
@@ -206,6 +241,7 @@ module.exports = {
   announceAdminPassword,
   setAuthProvider,
   setPublicPhotos,
+  scopeFor,
   login,
   logout,
   getAuthStatus

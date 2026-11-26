@@ -681,7 +681,9 @@ dialog::backdrop {
         bottom: calc(12px + env(safe-area-inset-bottom));
         z-index: 60;
         display: grid;
-        grid-template-columns: repeat(5, 1fr);
+        /* One column per tab shown: a shared library hides some (js/scope.js) */
+        grid-auto-flow: column;
+        grid-auto-columns: 1fr;
         align-items: center;
         height: 66px;
         padding: 0 6px;
@@ -765,4 +767,11 @@ dialog::backdrop {
         animation-iteration-count: 1 !important;
         transition-duration: 0.01ms !important;
     }
+}
+
+/* A library shared with someone (js/scope.js): what they can't use isn't shown */
+.view-only [data-edit-only],
+.read-only-folder [data-edit-only],
+.not-owner [data-owner-only] {
+    display: none !important;
 }

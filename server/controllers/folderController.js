@@ -8,7 +8,8 @@ const playOrder = require('../services/playOrderService');
 const imageController = require('./imageController');
 const { resolveAdminPath, toAdminPath, uploadsUrl } = require('../utils/safePath');
 const { passClientError } = require('../utils/httpError');
-const { canSee, canOpen, foldersBelow, realVisiblePath } = require('../utils/viewerAccess');
+const { assignedFolders, canSee, canOpen, foldersBelow, realVisiblePath } = require('../utils/viewerAccess');
+const { scopeFor } = require('../middleware/auth');
 const { maxFolderDepth, canMakeFolderIn, folderTooDeepError } = require('../utils/folderDepth');
 
 class FolderController {
@@ -265,6 +266,17 @@ class FolderController {
     }
   }
 
+  // A folder tile's cover and prints. For a person limited to some folders, a
+  // folder that only leads to theirs shows photos from theirs, never its own.
+  async folderCover(req, folderRelative) {
+    const sources = canSee(req, folderRelative) ? [folderRelative] : foldersBelow(req, folderRelative);
+    for (const source of sources) {
+      const thumbnail = await this.generateFolderThumbnail(source);
+      if (thumbnail) return [thumbnail, await this.generateFolderPrints(source)];
+    }
+    return [null, []];
+  }
+
   // Get folder contents for the admin library
   async getFolderContents(req, res) {
     try {
@@ -275,6 +287,16 @@ class FolderController {
         return res.status(404).json({ message: 'Folder not found' });
       }
 
+      // A person limited to some folders (their scope) opens those and the folders
+      // on the way to them; anything else looks like it doesn't exist. Whatever is
+      // listed is checked where it really is, in case of symlinks.
+      const limited = Boolean(assignedFolders(req));
+      const currentRelative = path.relative(this.uploadsDir, fullPath);
+      if (limited && await realVisiblePath(req, currentRelative, canOpen) === null) {
+        return res.status(404).json({ message: 'Folder not found' });
+      }
+      const shows = async (relativePath, check = canSee) => !limited || await realVisiblePath(req, relativePath, check) !== null;
+
       const items = await this.entries(fullPath);
       const folderJobs = [];
       const fileJobs = [];
@@ -284,32 +306,37 @@ class FolderController {
 
         if (item.isDirectory()) {
           const folderRelative = path.relative(this.uploadsDir, path.join(fullPath, item.name));
-          folderJobs.push(Promise.all([
-            this.generateFolderThumbnail(folderRelative),
-            this.generateFolderPrints(folderRelative)
-          ]).then(([thumbnail, prints]) => ({
-            name: item.name,
-            type: 'folder',
-            path: path.join(folderPath, item.name),
-            thumbnail, // null for empty folders, so the grid skips the request
-            prints
-          })));
+          folderJobs.push((async () => {
+            if (!await shows(folderRelative, canOpen)) return null;
+            const [thumbnail, prints] = limited ? await this.folderCover(req, folderRelative) : await Promise.all([
+              this.generateFolderThumbnail(folderRelative),
+              this.generateFolderPrints(folderRelative)
+            ]);
+            return {
+              name: item.name,
+              type: 'folder',
+              path: path.join(folderPath, item.name),
+              thumbnail, // null for empty folders, so the grid skips the request
+              prints
+            };
+          })());
         } else if (item.isFile() && thumbnails.IMAGE_PATTERN.test(item.name)) {
           const imageFullPath = path.join(fullPath, item.name);
           const relativePath = path.relative(this.uploadsDir, imageFullPath);
 
-          fileJobs.push(getLibrary().stat(toAdminPath(imageFullPath)).then(stat => ({
+          fileJobs.push(shows(relativePath).then(shown => shown && getLibrary().stat(toAdminPath(imageFullPath)).then(stat => ({
             name: item.name,
             type: 'image',
             path: path.join(folderPath, item.name),
             url: uploadsUrl(toAdminPath(imageFullPath)),
             // Grid tiles use the small cached version; ?rev= changes after a rotate
             thumbnail: `/api/images/${encodeURIComponent(relativePath)}/thumbnail?rev=${Math.round(stat.mtimeMs)}`
-          })));
+          }))));
         } else if (item.isFile() && snaps.isSnap(item.name)) {
           // Snaps carry their page, so the grid can draw them like the frame does
+          // (with only the photos this person can see)
           const snapPath = path.join(fullPath, item.name);
-          fileJobs.push(snaps.load(snapPath).then(snap => ({
+          fileJobs.push(shows(path.relative(this.uploadsDir, snapPath)).then(shown => shown && snaps.load(snapPath, photo => canSee(req, photo)).then(snap => ({
             name: item.name,
             type: 'snap',
             path: path.join(folderPath, item.name),
@@ -317,12 +344,12 @@ class FolderController {
           })).catch(error => {
             console.error('Skipping unreadable snap:', snapPath, error.message);
             return null;
-          }));
+          })));
         } else if (item.isFile() && notes.isNote(item.name)) {
           // A note gets its own tile, which opens the note editor. It is not a
           // photo: the frame shows it on its schedule, not in the rotation.
           const notePath = path.join(fullPath, item.name);
-          fileJobs.push(notes.load(notePath).then(note => ({
+          fileJobs.push(shows(path.relative(this.uploadsDir, notePath)).then(shown => shown && notes.load(notePath, undefined, photo => canSee(req, photo)).then(note => ({
             name: item.name,
             type: 'note',
             path: path.join(folderPath, item.name),
@@ -330,7 +357,7 @@ class FolderController {
           })).catch(error => {
             console.error('Skipping unreadable note:', notePath, error.message);
             return null;
-          }));
+          })));
         }
       }
 
@@ -344,14 +371,18 @@ class FolderController {
         return { file, path: filePath, relativePath: path.relative(this.uploadsDir, filePath) };
       });
       const sorted = await playOrder.sort(fullPath, entries, order);
+      // Whether this person can change what's here: not in a folder that only
+      // leads to theirs, and not if they can only view
+      const canChange = (!limited || canSee(req, currentRelative)) && scopeFor(req)?.canEdit !== false;
 
       res.json({
         currentPath: folderPath,
         order,
         // MAX_FOLDER_DEPTH: the library hides "New folder" where one can't be made
         maxFolderDepth: maxFolderDepth(),
-        canCreateFolder: await canMakeFolderIn(fullPath),
-        folders: folders.sort((a, b) => a.name.localeCompare(b.name)),
+        canChange,
+        canCreateFolder: canChange && await canMakeFolderIn(fullPath),
+        folders: folders.filter(Boolean).sort((a, b) => a.name.localeCompare(b.name)),
         files: sorted.map(entry => entry.file)
       });
     } catch (error) {

@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#d6336a">
+    <title data-i18n="ownerOnly.title">Only for the owner · Sora Frame</title>
+    <link rel="icon" href="/icons/favicon.ico" sizes="48x48">
+    <link rel="icon" href="/icons/favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="/css/sora.css">
+
+    <!-- Theme: follow the saved choice, else the system -->
+    <script>
+    (() => {
+      try {
+        const stored = localStorage.getItem('themeMode');
+        const dark = stored === 'dark' || ((!stored || stored === 'system') && matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.classList.toggle('dark', dark);
+      } catch (_) {}
+    })();
+    </script>
+    <link rel="stylesheet" href="/css/pair.css">
+    <link rel="stylesheet" href="/css/i18n.css">
+</head>
+
+<body>
+    <header class="pair-top">
+        <a href="/admin" class="sora-wordmark" aria-label="Sora library home" data-i18n-attr="aria-label:pair.static_014">Sora</a>
+    </header>
+
+    <!-- A page only the library's owner can open (see middleware/scope.js) -->
+    <main class="pair-main">
+        <section class="pair-state">
+            <span class="material-icons pair-big-icon">lock</span>
+            <h1 class="sora-display" data-i18n="ownerOnly.heading">Only the owner can open this page</h1>
+            <p class="pair-note" data-i18n="ownerOnly.body">Ask the person who shared these photos with you.</p>
+            <a class="pair-link" href="/admin"><span class="material-icons">photo_library</span><span data-i18n="ownerOnly.back">Back to the library</span></a>
+        </section>
+    </main>
+
+<script src="/js/i18n.js"></script>
+</body>
+
+</html>

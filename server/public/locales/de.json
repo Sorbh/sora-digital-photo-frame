@@ -246,7 +246,10 @@
     "UNSUPPORTED_TYPE": "Es können nur JPEG-, PNG-, GIF-, WebP- und HEIC-Fotos hochgeladen werden",
     "SCREEN_LIMIT": "Diese Familie hat bereits {limit} Bildschirme. Entfernen Sie einen, den Sie nicht mehr nutzen, um diesen hinzuzufügen.",
     "FOLDER_TOO_DEEP": "Hier kann kein neuer Ordner erstellt werden: Ordner dürfen höchstens {limit} Ebenen tief sein.",
-    "FOLDER_NOT_FOUND": "Diesen Ordner gibt es nicht mehr. Vielleicht wurde er gelöscht."
+    "FOLDER_NOT_FOUND": "Diesen Ordner gibt es nicht mehr. Vielleicht wurde er gelöscht.",
+    "VIEW_ONLY": "Sie können diese Fotos ansehen, aber nicht ändern.",
+    "OWNER_ONLY": "Das kann nur der Besitzer dieser Bibliothek.",
+    "OUTSIDE_FOLDERS": "Sie können nur die Ordner ändern, die mit Ihnen geteilt wurden."
   },
   "admin": {
     "static_001": "Bibliothek · Sora Frame",
@@ -671,5 +674,11 @@
     "unknownError": "Unbekannter Fehler",
     "importing": "Fotos werden in Ihren Ordner importiert…",
     "mayTakeMoments": "Das kann einen Moment dauern"
+  },
+  "ownerOnly": {
+    "title": "Nur für den Besitzer · Sora Frame",
+    "heading": "Nur der Besitzer kann diese Seite öffnen",
+    "body": "Fragen Sie die Person, die diese Fotos mit Ihnen geteilt hat.",
+    "back": "Zurück zur Bibliothek"
   }
 }

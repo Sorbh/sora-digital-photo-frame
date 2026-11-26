@@ -247,7 +247,10 @@
     "UNSUPPORTED_TYPE": "Seules les photos JPEG, PNG, GIF, WebP et HEIC peuvent être importées",
     "SCREEN_LIMIT": "Cette famille a déjà {limit} écrans. Retirez-en un que vous n’utilisez plus pour ajouter celui-ci.",
     "FOLDER_TOO_DEEP": "Impossible de créer un dossier ici : les dossiers peuvent avoir au plus {limit} niveaux de profondeur.",
-    "FOLDER_NOT_FOUND": "Ce dossier n’existe plus. Il a peut-être été supprimé."
+    "FOLDER_NOT_FOUND": "Ce dossier n’existe plus. Il a peut-être été supprimé.",
+    "VIEW_ONLY": "Vous pouvez voir ces photos, mais pas les modifier.",
+    "OWNER_ONLY": "Seul le propriétaire de cette bibliothèque peut faire cela.",
+    "OUTSIDE_FOLDERS": "Vous ne pouvez modifier que les dossiers partagés avec vous."
   },
   "admin": {
     "static_001": "Photothèque · Sora Frame",
@@ -700,5 +703,11 @@
     "unknownError": "Erreur inconnue",
     "importing": "Importation des photos dans votre dossier…",
     "mayTakeMoments": "Cela peut prendre quelques instants"
+  },
+  "ownerOnly": {
+    "title": "Réservé au propriétaire · Sora Frame",
+    "heading": "Seul le propriétaire peut ouvrir cette page",
+    "body": "Demandez à la personne qui a partagé ces photos avec vous.",
+    "back": "Retour à la bibliothèque"
   }
 }

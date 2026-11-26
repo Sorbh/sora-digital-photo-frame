@@ -198,7 +198,8 @@
     "typeCode": "Type a code",
     "unreachableHeading": "Couldn't <em>check</em> the code",
     "unreachableNote": "The library didn't answer. Check your phone's connection, then try again.",
-    "tryAgain": "Try again"
+    "tryAgain": "Try again",
+    "foldersFailed": "Couldn't load the folders, so a new account can't be set up right now. Pick an existing account, or try again."
   },
   "login": {
     "invalid_password": "Invalid password. Please try again.",

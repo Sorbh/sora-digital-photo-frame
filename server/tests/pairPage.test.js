@@ -31,13 +31,14 @@ function fakeElement() {
 function openPage(search, answer) {
   const elements = {};
   const requests = [];
+  const links = [{ href: '/pair' }, { href: '/pair' }]; // the two "Type a code" links
   const location = { search, pathname: '/pair', href: '' };
   const sandbox = {
     document: {
       getElementById: id => (elements[id] = elements[id] || fakeElement()),
       createElement: () => fakeElement(),
       querySelector: () => null,
-      querySelectorAll: () => []
+      querySelectorAll: selector => (selector === 'a[href="/pair"]' ? links : [])
     },
     window: { addEventListener() {} },
     location,
@@ -56,16 +57,16 @@ function openPage(search, answer) {
   vm.runInNewContext(source, sandbox);
   const visible = () => ['stateLoading', 'stateEnter', 'stateExpired', 'stateUnreachable', 'pairForm', 'stateDone']
     .filter(id => elements[id] && !elements[id].classList.contains('hidden'));
-  return { el: sandbox.document.getElementById, requests, location, visible };
+  return { el: sandbox.document.getElementById, requests, location, visible, links };
 }
 
-const library = code => url => {
+const library = (code, accounts = []) => url => {
   if (url.startsWith('/api/admin/pair/')) {
     return decodeURIComponent(url.split('/').pop()) === code
       ? { status: 200, body: { success: true, code, approved: false } }
       : { status: 404, body: { success: false, code: 'PAIRING_EXPIRED' } };
   }
-  if (url === '/api/access-accounts') return { status: 200, body: { accounts: [] } };
+  if (url === '/api/access-accounts') return { status: 200, body: { accounts } };
   if (url === '/api/folders') return { status: 200, body: { folders: [] } };
   throw new Error(`unexpected ${url}`);
 };
@@ -131,12 +132,27 @@ describe('The /pair page', () => {
     expect(page.visible()).toEqual(['stateUnreachable']);
   });
 
-  test('a folder list that is not JSON (a sign-in page, say) stops before the form', async () => {
+  test('with no accounts yet, a folder list that is not JSON (a sign-in page, say) stops before the form', async () => {
     const working = library('K7P4QX');
     const page = openPage('?code=K7P4QX', url => (url === '/api/folders' ? { status: 200 } : working(url)));
     await flush();
     // Going on would offer a new account "every folder" by mistake
     expect(page.visible()).toEqual(['stateUnreachable']);
+  });
+
+  test('a failed folder list still lets the frame join an existing account, but not a new one', async () => {
+    const working = library('K7P4QX', [{ id: 'acc_1', name: 'Kitchen', assignedFolders: ['Goa'] }]);
+    const page = openPage('?code=K7P4QX', url => (url === '/api/folders' ? { status: 500, body: { success: false } } : working(url)));
+    await flush();
+    expect(page.visible()).toEqual(['pairForm']);
+    // Where the folders would be, it says why a new account has to wait
+    expect(page.el('folderList').innerHTML).toContain('pair.foldersFailed');
+  });
+
+  test('"Type a code" keeps the chosen language', async () => {
+    const page = openPage('?lang=ar', library('K7P4QX'));
+    await flush();
+    expect(page.links.map(link => link.href)).toEqual(['/pair?lang=ar', '/pair?lang=ar']);
   });
 
   test('the chosen language stays in the address after typing a code', async () => {

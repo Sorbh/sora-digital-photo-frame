@@ -199,7 +199,8 @@
     "typeCode": "Saisir un code",
     "unreachableHeading": "Impossible de <em>vérifier</em> le code",
     "unreachableNote": "La bibliothèque n’a pas répondu. Vérifiez la connexion de votre téléphone, puis réessayez.",
-    "tryAgain": "Réessayer"
+    "tryAgain": "Réessayer",
+    "foldersFailed": "Impossible de charger les dossiers : un nouveau compte ne peut pas être créé pour le moment. Choisissez un compte existant ou réessayez."
   },
   "login": {
     "invalid_password": "Mot de passe incorrect. Veuillez réessayer.",

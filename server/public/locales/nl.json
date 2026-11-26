@@ -198,7 +198,8 @@
     "typeCode": "Code typen",
     "unreachableHeading": "Code kon niet worden <em>gecontroleerd</em>",
     "unreachableNote": "De bibliotheek gaf geen antwoord. Controleer de verbinding van je telefoon en probeer het opnieuw.",
-    "tryAgain": "Opnieuw proberen"
+    "tryAgain": "Opnieuw proberen",
+    "foldersFailed": "De mappen konden niet worden geladen, dus een nieuw account kan nu niet worden aangemaakt. Kies een bestaand account of probeer het opnieuw."
   },
   "login": {
     "invalid_password": "Onjuist wachtwoord. Probeer het opnieuw.",

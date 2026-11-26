@@ -199,7 +199,8 @@
     "typeCode": "Digitar um código",
     "unreachableHeading": "Não foi possível <em>verificar</em> o código",
     "unreachableNote": "A biblioteca não respondeu. Confira a conexão do celular e tente de novo.",
-    "tryAgain": "Tentar de novo"
+    "tryAgain": "Tentar de novo",
+    "foldersFailed": "Não foi possível carregar as pastas, então não dá para criar uma conta nova agora. Escolha uma conta existente ou tente de novo."
   },
   "login": {
     "invalid_password": "Senha incorreta. Tente de novo.",

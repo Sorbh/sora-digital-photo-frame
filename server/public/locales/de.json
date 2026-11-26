@@ -198,7 +198,8 @@
     "typeCode": "Code eingeben",
     "unreachableHeading": "Code konnte nicht <em>geprüft</em> werden",
     "unreachableNote": "Die Bibliothek hat nicht geantwortet. Prüfen Sie die Verbindung Ihres Telefons und versuchen Sie es erneut.",
-    "tryAgain": "Erneut versuchen"
+    "tryAgain": "Erneut versuchen",
+    "foldersFailed": "Die Ordner konnten nicht geladen werden, daher lässt sich gerade kein neues Konto anlegen. Wählen Sie ein vorhandenes Konto oder versuchen Sie es erneut."
   },
   "login": {
     "invalid_password": "Falsches Passwort. Bitte versuchen Sie es noch einmal.",

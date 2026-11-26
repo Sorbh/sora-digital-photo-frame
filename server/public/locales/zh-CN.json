@@ -198,7 +198,8 @@
     "typeCode": "输入代码",
     "unreachableHeading": "无法<em>核对</em>代码",
     "unreachableNote": "照片库没有响应。请检查手机的网络连接，然后重试。",
-    "tryAgain": "重试"
+    "tryAgain": "重试",
+    "foldersFailed": "无法加载文件夹，因此现在无法创建新账户。请选择现有账户，或重试。"
   },
   "login": {
     "invalid_password": "密码错误，请重试。",

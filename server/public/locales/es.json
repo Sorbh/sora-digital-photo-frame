@@ -198,7 +198,8 @@
     "typeCode": "Escribir un código",
     "unreachableHeading": "No se pudo <em>comprobar</em> el código",
     "unreachableNote": "La biblioteca no respondió. Revisa la conexión de tu teléfono y vuelve a intentarlo.",
-    "tryAgain": "Reintentar"
+    "tryAgain": "Reintentar",
+    "foldersFailed": "No se pudieron cargar las carpetas, así que ahora no se puede crear una cuenta nueva. Elige una cuenta existente o vuelve a intentarlo."
   },
   "login": {
     "invalid_password": "Contraseña incorrecta. Inténtalo de nuevo.",

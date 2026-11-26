@@ -43,6 +43,11 @@
         const list = $('folderList');
         if (list.querySelector('input')) return; // folder names need no translation, keep the ticks
         list.innerHTML = '';
+        if (!folders) {
+            // Without the list, "no ticks" would mean every folder: a new account waits for it
+            list.innerHTML = `<p class="pair-error">${t('pair.foldersFailed')}</p>`;
+            return;
+        }
         if (!folders.length) {
             list.innerHTML = `<p class="pair-note">${t('pair.no_folders')}</p>`;
             return;
@@ -100,13 +105,15 @@
             if (pairing.json && (pairing.data.code === 'PAIRING_EXPIRED' || (pairing.ok && pairing.data.approved))) return show('stateExpired');
             if (!pairing.ok || !pairing.json || typeof pairing.data.code !== 'string') return show('stateUnreachable');
 
-            // Without the real lists, a new account would look like "no folders" and
-            // get every folder: stop here rather than guess
+            // The folder list only matters for a new account: without it, "no ticks"
+            // would mean every folder. Existing accounts can still be chosen.
             const [accounts, folders] = await Promise.all([getJson('/api/access-accounts'), getJson('/api/folders')]);
             const listed = (reply, key) => reply.ok && reply.json && Array.isArray(reply.data[key]);
-            if (!listed(accounts, 'accounts') || !listed(folders, 'folders')) return show('stateUnreachable');
+            const folderList = listed(folders, 'folders') ? folders.data.folders : null;
+            if (!listed(accounts, 'accounts')) return show('stateUnreachable');
+            if (!folderList && !accounts.data.accounts.length) return show('stateUnreachable'); // nothing to choose
             $('codeShown').textContent = pretty(pairing.data.code);
-            loaded = { accounts: accounts.data.accounts, folders: folders.data.folders };
+            loaded = { accounts: accounts.data.accounts, folders: folderList };
             renderAccounts(loaded.accounts);
             renderFolders(loaded.folders);
             show('pairForm');
@@ -137,6 +144,10 @@
     });
 
     $('codeInput').addEventListener('input', () => $('codeError').classList.add('hidden'));
+
+    // "Type a code" keeps the chosen language
+    const lang = new URLSearchParams(location.search).get('lang');
+    if (lang) document.querySelectorAll('a[href="/pair"]').forEach(link => { link.href = `/pair?lang=${encodeURIComponent(lang)}`; });
     $('retryCheck').addEventListener('click', () => load());
 
     $('pairForm').addEventListener('submit', async event => {
@@ -148,6 +159,10 @@
             return;
         }
         const account = selectedAccount();
+        if (account === NEW && !loaded?.folders) {
+            showError(t('pair.foldersFailed'));
+            return;
+        }
         const body = account === NEW
             ? { name, newAccount: { assignedFolders: [...document.querySelectorAll('#folderList input:checked')].map(i => i.value) } }
             : { name, accountId: account };

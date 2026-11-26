@@ -282,13 +282,16 @@ class NotesManager extends PageEditor {
 
     // "Show every [5 min] for [20 sec]" is one sentence: the translation decides where the selects go
     renderScheduleControls() {
+        // Kept from the first call: a sentence without a slot (the key itself, before
+        // the language has loaded) must never take the selects out of the form
         const f = this.form.elements;
-        [f.everyMinutes, f.showForSeconds].forEach(select => {
+        this.scheduleSelects = this.scheduleSelects || { every: f.everyMinutes, duration: f.showForSeconds };
+        const slots = this.scheduleSelects;
+        Object.values(slots).forEach(select => {
             [...select.options].forEach(option => { option.textContent = this.optionLabel(select, option.value); });
         });
         const row = document.getElementById('showEveryRow');
         if (!row) return;
-        const slots = { every: f.everyMinutes, duration: f.showForSeconds };
         const parts = t(row.dataset.i18nTemplate || 'notes.showEveryFor').split(/\{(\w+)\}/);
         const nodes = [];
         parts.forEach((part, i) => {
@@ -303,6 +306,7 @@ class NotesManager extends PageEditor {
             label.textContent = text;
             nodes.push(label);
         });
+        Object.values(slots).forEach(select => { if (!nodes.includes(select)) nodes.push(select); });
         row.replaceChildren(...nodes);
     }
 

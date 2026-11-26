@@ -48,17 +48,17 @@ What each action asks for:
 | Upload an animated GIF (still animated after conversion to WebP) | 5 | its size | 0 |
 | Import from Google Photos | 1 per photo, 5 per animated one | its size | 0 |
 | Create a snap | 1 | its size | 0 |
-| Create a note (see below) | 1 | its size, or 0 | 0 |
-| Save a snap again | 0 | how much it grew | 0 |
+| Create a note | 1 | its size | 0 |
+| Save a snap or note again | 0 | how much it grew | 0 |
 | Rotate a photo | 0 | how much it grew | 0 |
 | Pair a new screen (QR code or a new PIN sign-in) | 0 | 0 | 1 |
 | Rename, move or delete anything | not asked | | |
 
 - **"Is there any room at all?"** Before converting an upload, and before downloading each photo of an import, the core asks `{ items: 1, bytes: 1, screens: 0 }`, so a full library is refused before the work starts.
 - **Nothing added, nothing asked.** A save that adds no item, no bytes and no screen (a snap or rotated photo that got smaller, say) isn't asked about. Neither is a screen signing in again, by its token, by its PIN with its token, or by its session: it's the same screen.
-- **One at a time.** Uploads, imports, snaps and rotations ask and save in turn for each tenant, so two can't both take the last place. A new screen is asked inside the same lock as the `MAX_SCREENS` check, so two new screens can't both take the last one. Count what is really stored when you answer, not what you were asked before.
-- **Refusals.** For photos and snaps, `{ ok: false, message }` is answered 413 `QUOTA_EXCEEDED` with your `message`. For a screen, it's 403 `SCREEN_LIMIT` with your `message` (and no `limit`, which only `MAX_SCREENS` sends); the frame shows your `message` as it is, so send it in the person's language. To send your own status and code instead, throw an error with `status` (4xx), `code` and optional `vars`: they reach the browser as they are.
-- **Notes.** Code that creates a note must ask for one item: `assertCanAddItems(1)` (or `ITEMS.note`) from `server/services/quotaService.js`, or, to save in turn as snaps do, `addWithinQuota({ items: 1, bytes }, write)`.
+- **One at a time.** Uploads, imports, snaps, notes and rotations ask and save in turn for each tenant, so two can't both take the last place. A new screen is asked inside the same lock as the `MAX_SCREENS` check, so two new screens can't both take the last one. Count what is really stored when you answer, not what you were asked before.
+- **Refusals.** For photos, snaps and notes, `{ ok: false, message }` is answered 413 `QUOTA_EXCEEDED` with your `message`. For a screen, it's 403 `SCREEN_LIMIT` with your `message` (and no `limit`, which only `MAX_SCREENS` sends); the frame shows your `message` as it is, so send it in the person's language. To send your own status and code instead, throw an error with `status` (4xx), `code` and optional `vars`: they reach the browser as they are.
+- **Notes** are files in folders like snaps (see [Notes](#notes)), and ask the same way: a new note `{ items: 1, bytes }`, saving one again only its growth. Moving a note, or the one-time move of old notes into the top folder, isn't asked about.
 
 For example, a plan that counts photos and screens:
 

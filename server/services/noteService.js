@@ -4,7 +4,7 @@ const { UPLOADS_DIR } = require('../config/paths');
 const thumbnails = require('./thumbnailService');
 const { getLibrary } = require('../library');
 const { getDataStore } = require('../store');
-const { addWithinQuota } = require('./quotaService');
+const { addWithinQuota, ITEMS } = require('./quotaService');
 const { canSee, inFolder } = require('../utils/viewerAccess');
 const { toAdminPath, uploadsUrl } = require('../utils/safePath');
 
@@ -57,14 +57,16 @@ class NoteService {
     return data;
   }
 
-  // A new note, or one that grew, needs room in the library like a snap
+  // A new note is 1 item, like a snap; saving one again only asks for its growth
+  // (not when the server itself moves notes in, or keeps them in step with a moved photo)
   async write(fullPath, note, { checkQuota = true } = {}) {
     const buffer = Buffer.from(JSON.stringify(note, null, 2));
     const write = () => getLibrary().writeItem(toAdminPath(fullPath), buffer);
     if (!checkQuota) return write();
+    // Measured in the family's turn, against the note as it is now
     const growth = async () => {
       const current = await getLibrary().readItem(toAdminPath(fullPath)).catch(() => null);
-      return buffer.length - (current ? current.length : 0);
+      return { items: current ? 0 : ITEMS.note, bytes: buffer.length - (current ? current.length : 0) };
     };
     await addWithinQuota(growth, write);
   }

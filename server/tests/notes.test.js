@@ -198,6 +198,44 @@ describe('Notes', () => {
     });
   });
 
+  describe('quota', () => {
+    const { setQuota } = require('../services/quotaService');
+    afterEach(() => setQuota(null));
+
+    test('a new note counts as 1 item, an edit or a move as none, and a full library refuses new notes', async () => {
+      const asked = [];
+      let full = false;
+      setQuota({
+        async canAdd(request) {
+          asked.push(request);
+          return full && request.items > 0 ? { ok: false, message: 'Your library is full' } : { ok: true };
+        }
+      });
+
+      const { body } = await admin.post('/api/notes').send({ folder: 'uploads/family', title: 'Counted' }).expect(201);
+      expect(asked).toHaveLength(1);
+      expect(asked[0]).toMatchObject({ items: 1, screens: 0 });
+      expect(asked[0].bytes).toBeGreaterThan(0);
+
+      asked.length = 0;
+      await admin.put('/api/notes').query({ path: body.path }).send({ message: 'A longer message than before' }).expect(200);
+      expect(asked).toHaveLength(1);
+      expect(asked[0].items).toBe(0);
+      expect(asked[0].bytes).toBeGreaterThan(0);
+
+      asked.length = 0;
+      full = true;
+      // Editing and moving still work when the library is full: they add no item
+      const moved = await admin.put('/api/notes').query({ path: body.path }).send({ message: 'More words still, a bit longer', folder: 'uploads/trips' }).expect(200);
+      expect(moved.body.path).toBe('uploads/trips/counted.note.json');
+      expect(asked.every(r => r.items === 0)).toBe(true);
+
+      const refused = await admin.post('/api/notes').send({ title: 'One too many' }).expect(413);
+      expect(refused.body.code).toBe('QUOTA_EXCEEDED');
+      expect(await noteFiles()).toEqual(['trips/counted.note.json']);
+    });
+  });
+
   describe('folders carry their notes along', () => {
     test('deleting a folder deletes its notes', async () => {
       await fs.ensureDir(path.join(testUploadsDir, 'gone'));

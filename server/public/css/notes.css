@@ -22,11 +22,6 @@
     background: var(--rule);
 }
 
-.group-ended .notes-group-title,
-.group-paused .notes-group-title {
-    color: var(--muted-foreground);
-}
-
 .notes-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
@@ -195,6 +190,13 @@
     width: min(1120px, calc(100vw - 2rem));
     max-width: none;
     max-height: calc(100dvh - 2rem);
+}
+
+/* A form taller than the screen scrolls inside the dialog, so Save stays in reach */
+#noteModal > article > section,
+#photoPicker > article > section {
+    min-height: 0;
+    overflow-y: auto;
 }
 
 .note-editor {

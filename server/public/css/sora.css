@@ -477,7 +477,16 @@ dialog::backdrop {
     font-weight: 700;
     letter-spacing: 0.14em;
     text-transform: uppercase;
-    color: rgb(255 255 255 / 0.72);
+    color: rgb(255 255 255 / 0.85);
+}
+
+/* The light end of the berry banner, and the warm glow in its corner (where
+   the crumbs sit in RTL), are too bright for small white text: a dark chip
+   behind the crumbs keeps them at 4.5:1 or more, hover colour included */
+.library-head .breadcrumb {
+    padding: 4px 10px;
+    border-radius: var(--shape-sm);
+    background: rgb(61 10 38 / 0.45);
 }
 
 .library-head .breadcrumb .text-foreground,

@@ -5,8 +5,15 @@
  * allPhotos returns image and snap entries from the whole library.
  * stat returns { size, mtime, mtimeMs, isFolder } or null for missing paths.
  * The uploads root may be listed and receive photos, but cannot be deleted.
+ * photoUrl returns the address a browser loads the photo from, with each path
+ * segment percent-encoded (folder and file names can hold # ? % and spaces):
+ * PhotoLibrary.uploadsUrl(adminPath) builds that for the /uploads route.
  */
+const { uploadsUrl } = require('../utils/safePath');
+
 class PhotoLibrary {
+  static uploadsUrl(adminPath) { return uploadsUrl(adminPath); }
+
   async listFolder(adminPath) { throw new Error('not implemented'); }
   async createFolder(adminPath) { throw new Error('not implemented'); }
   async renameFolder(adminPath, newName) { throw new Error('not implemented'); }

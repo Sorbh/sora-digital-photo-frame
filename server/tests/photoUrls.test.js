@@ -53,6 +53,12 @@ describe('Photo URLs for names with # and %', () => {
       .toBe('/uploads/50%25%20off%20%231/a%23b%25c.png');
   });
 
+  test('custom libraries get the same URL builder', () => {
+    const PhotoLibrary = require('../library/PhotoLibrary');
+    expect(PhotoLibrary.uploadsUrl(`uploads/${FOLDER}/${FILE}`)).toBe('/uploads/50%25%20off%20%231/a%23b%25c.png');
+    expect(LocalPhotoLibrary.uploadsUrl).toBe(PhotoLibrary.uploadsUrl);
+  });
+
   test('the URL builder splits on / on every platform', () => {
     jest.isolateModules(() => {
       jest.doMock('path', () => jest.requireActual('path').win32);

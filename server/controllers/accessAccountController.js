@@ -418,13 +418,19 @@ class AccessAccountController {
 
             let accounts = [];
             let account = null;
+            let checked = false;
             try {
                 accounts = await this.accountsForSignIn(familyCode);
                 account = await this.findByPin(accounts, pin);
+                checked = true;
+            } catch (error) {
+                // The PIN couldn't be checked (storage down, say): not a try
+                this.forgetAttempt(addressKey);
+                throw error;
             } finally {
                 // No frames to guess at (e.g. a wrong family code): not the family's try.
                 // A wrong one is saved before answering.
-                await this.limiter.end(familyKey, !account && accounts.length > 0);
+                await this.limiter.end(familyKey, checked && !account && accounts.length > 0);
             }
 
             if (!account) {

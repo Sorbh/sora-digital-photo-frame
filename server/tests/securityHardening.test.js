@@ -52,6 +52,80 @@ describe('PIN guessing', () => {
     expect(results.filter(r => r.status === 401).length).toBeLessThanOrEqual(5);
     expect(results.filter(r => r.status === 429).length).toBeGreaterThanOrEqual(7);
   });
+
+  const familyTries = () => [...accessAccounts.limiter.entries].find(([key]) => key.startsWith('family:'))?.[1].attempts || 0;
+  const addressTries = address => accessAccounts.limiter.entries.get(`ip:${address}`)?.attempts || 0;
+
+  test("a right PIN uses up none of the family's tries, and clears the address's own", async () => {
+    const admin = await signedInAdmin(app);
+    await admin.post('/api/access-accounts').send({ name: 'Hall', pin: '482910' }).expect(201);
+
+    await request(app).post('/api/auth/pin').set('X-Forwarded-For', '10.2.0.1').send({ pin: '000001' }).expect(401);
+    await request(app).post('/api/auth/pin').set('X-Forwarded-For', '10.2.0.2').send({ pin: '000002' }).expect(401);
+    expect(familyTries()).toBe(2);
+    expect(addressTries('10.2.0.2')).toBe(1);
+
+    await request(app).post('/api/auth/pin').set('X-Forwarded-For', '10.2.0.2').send({ pin: '482910' }).expect(200);
+    // Neither counted nor cleared for the family: someone who knows one PIN can't reset its count
+    expect(familyTries()).toBe(2);
+    expect(addressTries('10.2.0.2')).toBe(0);
+  });
+
+  test('a storage error while checking the PIN costs neither the address nor the family a try', async () => {
+    const admin = await signedInAdmin(app);
+    await admin.post('/api/access-accounts').send({ name: 'Porch', pin: '593021' }).expect(201);
+    const quiet = jest.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      // The accounts can't be read at all
+      const load = jest.spyOn(accessAccounts, 'loadAccounts').mockRejectedValueOnce(new Error('disk unavailable'));
+      await request(app).post('/api/auth/pin').set('X-Forwarded-For', '10.3.0.1').send({ pin: '000003' }).expect(500);
+      load.mockRestore();
+      // The accounts were read, but comparing the PIN failed
+      const compare = jest.spyOn(accessAccounts, 'findByPin').mockRejectedValueOnce(new Error('compare failed'));
+      await request(app).post('/api/auth/pin').set('X-Forwarded-For', '10.3.0.1').send({ pin: '000003' }).expect(500);
+      compare.mockRestore();
+    } finally {
+      quiet.mockRestore();
+    }
+    expect(addressTries('10.3.0.1')).toBe(0);
+    expect(familyTries()).toBe(0);
+
+    // Wrong PINs from that address still count as before
+    await request(app).post('/api/auth/pin').set('X-Forwarded-For', '10.3.0.1').send({ pin: '000003' }).expect(401);
+    expect(addressTries('10.3.0.1')).toBe(1);
+    expect(familyTries()).toBe(1);
+  });
+
+  test("a storage error lifts a lockout its own try caused, started by a wrong PIN sent alongside", async () => {
+    const admin = await signedInAdmin(app);
+    await admin.post('/api/access-accounts').send({ name: 'Attic', pin: '604182' }).expect(201);
+    const from = address => request(app).post('/api/auth/pin').set('X-Forwarded-For', address);
+    for (let i = 0; i < 3; i++) await from('10.4.0.1').send({ pin: `00000${i}` }).expect(401);
+
+    // The first of two requests sent at once waits on storage, which then fails
+    let failStorage;
+    let inStorage;
+    const reached = new Promise(resolve => { inStorage = resolve; });
+    const quiet = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const load = jest.spyOn(accessAccounts, 'loadAccounts').mockImplementationOnce(() => {
+      inStorage();
+      return new Promise((resolve, reject) => { failStorage = () => reject(new Error('disk unavailable')); });
+    });
+    try {
+      const slow = from('10.4.0.1').send({ pin: '000003' }).then(res => res);
+      await reached;
+      // The other, a wrong PIN, is the fifth try counted for the address: it locks it
+      await from('10.4.0.1').send({ pin: '000004' }).expect(401);
+      expect(accessAccounts.checkRateLimit('ip:10.4.0.1').allowed).toBe(false);
+      failStorage();
+      expect((await slow).status).toBe(500);
+    } finally {
+      load.mockRestore();
+      quiet.mockRestore();
+    }
+    // Four wrong PINs: not locked out, one try left
+    expect(accessAccounts.checkRateLimit('ip:10.4.0.1')).toMatchObject({ allowed: true, attemptsRemaining: 1 });
+  });
 });
 
 describe('the attempt limiter', () => {
@@ -137,6 +211,29 @@ describe('the attempt limiter', () => {
       now = 1001;
       // The wrong try is still counted: its window started when it was made
       expect(limiter.check('k').attemptsRemaining).toBe(1);
+    } finally {
+      Date.now = realNow;
+    }
+  });
+
+  test('forgetting the try that reached the limit lifts the lockout it caused, and only that one', () => {
+    let now = 1000;
+    const realNow = Date.now;
+    Date.now = () => now;
+    try {
+      const saved = [];
+      const limiter = new AttemptLimiter({ maxAttempts: 2, lockoutDuration: 100, onSave: (key, state) => saved.push(state) });
+      limiter.fail('k'); limiter.fail('k');
+      expect(limiter.check('k').allowed).toBe(false); // locked at the second try
+      limiter.forget('k');
+      expect(limiter.check('k')).toMatchObject({ allowed: true, attemptsRemaining: 1 });
+      expect(saved.pop()).toMatchObject({ attempts: 1, lockoutUntil: null, lockouts: 0, lastLockout: null });
+
+      // A lockout reached with tries to spare stays
+      limiter.fail('k'); limiter.fail('k');
+      expect(limiter.check('k').allowed).toBe(false);
+      limiter.forget('k');
+      expect(limiter.check('k').allowed).toBe(false);
     } finally {
       Date.now = realNow;
     }

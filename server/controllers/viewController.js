@@ -43,7 +43,7 @@ class ViewController {
       const modifiedData = data.replace('data-interval="15000"', `data-interval="${defaultInterval}"`);
       
       res.setHeader('Content-Type', 'text/html');
-      // The address can hold a PIN and family code (?pin=, ?family=): never send it on
+      // The address can hold a PIN and family code (#pin=, #family=): never send it on
       res.setHeader('Referrer-Policy', 'no-referrer');
       res.send(modifiedData);
     });

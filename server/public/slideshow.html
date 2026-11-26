@@ -4,9 +4,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="referrer" content="no-referrer">
-    <!-- Before anything else loads: keep the PIN and family code (#pin=...&family=...,
-         or ?pin=...&family=...) in memory only, out of the address, the history and
-         the requests below (see AuthenticationManager). After # they never reach the server. -->
+    <!-- Before anything else loads: keep the PIN and family code (#pin=...&family=...)
+         in memory only, out of the address, the history and the requests below (see
+         AuthenticationManager). After # they never reach the server. A ?pin= or ?family=
+         in the query is not used for sign-in, only taken out of the address. -->
     <script>
         (function () {
             var url = new URL(location.href);
@@ -15,8 +16,8 @@
             var inQuery = query.has('pin') || query.has('family');
             var inFragment = fragment.has('pin') || fragment.has('family');
             if (!inQuery && !inFragment) return;
-            var pick = function (name) { return (fragment.get(name) || query.get(name) || '').trim(); };
-            window.soraUrlSignIn = { pin: pick('pin'), family: pick('family') };
+            var pick = function (name) { return (fragment.get(name) || '').trim(); };
+            if (inFragment) window.soraUrlSignIn = { pin: pick('pin'), family: pick('family') };
             ['pin', 'family'].forEach(function (name) { query.delete(name); fragment.delete(name); });
             var hash = inFragment ? (String(fragment) ? '#' + fragment : '') : url.hash;
             history.replaceState(history.state, '', url.pathname + url.search + hash);

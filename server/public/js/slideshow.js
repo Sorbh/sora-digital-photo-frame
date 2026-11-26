@@ -57,9 +57,10 @@ class AuthenticationManager {
             const pin = this.takeSignInFromUrl();
             if (!pin || this.isAuthenticated) return;
             this.signInGeneration += 1;
+            this.cancelUrlSignIn();
             this.signInFromUrl(pin);
         });
-        // Frames with no keyboard can open /slideshow#pin=123456 or ?pin=123456 (hosted: &family=ABCD-EFGH)
+        // Frames with no keyboard can open /slideshow#pin=123456 (hosted: &family=ABCD-EFGH)
         // and sign in by themselves. A browser that already is a screen uses its token first.
         const urlPin = this.takeSignInFromUrl();
         const deviceToken = localStorage.getItem(DEVICE_TOKEN_KEY);
@@ -83,13 +84,14 @@ class AuthenticationManager {
             return early.pin || undefined;
         }
         // The head script didn't run (e.g. a policy that blocks inline scripts): same
-        // thing here, for #pin=&family= and ?pin=&family=
+        // thing here. Only #pin=&family= signs in; ?pin= and ?family= went to the
+        // server already, so they are only taken out of the address, never used.
         const url = new URL(location.href);
         const query = url.searchParams;
         const fragment = new URLSearchParams(url.hash.slice(1));
         const inQuery = query.has('pin') || query.has('family');
         const inFragment = fragment.has('pin') || fragment.has('family');
-        const pick = name => (fragment.get(name) || query.get(name) || '').trim();
+        const pick = name => (fragment.get(name) || '').trim();
         const pin = pick('pin') || undefined;
         this.urlFamilyCode = pick('family');
         if (inQuery || inFragment) {
@@ -255,8 +257,10 @@ class AuthenticationManager {
         const generation = this.signInGeneration;
         const outdated = () => generation !== this.signInGeneration || this.isAuthenticated;
         const retry = wait => { this.urlRetryTimer = setTimeout(() => this.signInFromUrl(pin, attempt + 1), wait); };
+        const request = new AbortController();
+        this.urlSignIn = request;
         try {
-            const data = await this.requestPin(pin);
+            const data = await this.requestPin(pin, request.signal);
             if (outdated()) return; // signed in, or a PIN was typed, meanwhile
             if (!data.success) {
                 this.showAuthOverlay();
@@ -273,12 +277,26 @@ class AuthenticationManager {
             this.showAuthOverlay();
             this.showErrorKey('errors.connection');
             retry(Math.min(5000 * 2 ** attempt, 60000));
+        } finally {
+            if (this.urlSignIn === request) this.urlSignIn = null;
         }
     }
 
-    async requestPin(pin) {
+    // Stops a sign-in from the address that is still waiting for its reply. Its
+    // reply would set the session cookie as it arrives, before any script can
+    // ignore it, and so replace a sign-in made meanwhile. Aborted, the browser
+    // drops the reply, cookie included. A reply that came before this was already
+    // in place when the newer sign-in was sent, so the newer one's cookie wins.
+    cancelUrlSignIn() {
+        clearTimeout(this.urlRetryTimer);
+        if (this.urlSignIn) this.urlSignIn.abort();
+        this.urlSignIn = null;
+    }
+
+    async requestPin(pin, signal) {
         const response = await fetch('/api/auth/pin', {
             method: 'POST',
+            signal,
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 pin,
@@ -400,9 +418,10 @@ class AuthenticationManager {
         }
 
         this.setLoading(true);
-        // Typed by hand: this outranks a sign-in still retrying from the address
+        // Typed by hand: this outranks a sign-in from the address, still waiting
+        // for its reply or to try again
         this.signInGeneration += 1;
-        clearTimeout(this.urlRetryTimer);
+        this.cancelUrlSignIn();
 
         try {
             const data = await this.requestPin(pin);
@@ -428,7 +447,7 @@ class AuthenticationManager {
     }
 
     handleAuthSuccess(account) {
-        clearTimeout(this.urlRetryTimer);
+        this.cancelUrlSignIn(); // signed in another way (paired, say): its reply must not replace this one
         this.stopRateLimitWait();
         this.isAuthenticated = true;
         this.userAccount = account;

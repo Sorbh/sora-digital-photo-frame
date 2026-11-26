@@ -10,6 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - `MAX_FOLDER_DEPTH` limits how many folder levels the library can have (off by default). With `2`, `Trips` and `Trips/Italy` can be made but nothing inside `Italy`: the library hides "New folder" there, and creating, uploading into or importing from Google Photos to a folder past the limit is refused with `FOLDER_TOO_DEEP`. Deeper folders that already exist keep working ([#88](https://github.com/Sorbh/sora-digital-photo-frame/issues/88)).
 
+### Removed
+- Signing in from the slideshow address with `?pin=` and `?family=`: they reach the server and its proxies' logs before the page can hide them. Use `/slideshow#pin=123456` (hosted: `#pin=123456&family=ABCD-EFGH`). A `?pin=` or `?family=` still in a link is taken out of the address and not used ([#68](https://github.com/Sorbh/sora-digital-photo-frame/issues/68)).
+
+### Fixed
+- A sign-in from the slideshow address whose reply comes after a PIN was typed no longer replaces that sign-in: typing a PIN, or signing in another way, stops it ([#68](https://github.com/Sorbh/sora-digital-photo-frame/issues/68)).
+- The request log shows photo, thumbnail and folder paths as `/uploads/[photo]`, `/api/images/[photo]/thumbnail` and `/api/folders/[folder]`, without album or file names ([#68](https://github.com/Sorbh/sora-digital-photo-frame/issues/68)).
+- A storage error during a PIN sign-in no longer counts as a wrong try for the address or the family ([#67](https://github.com/Sorbh/sora-digital-photo-frame/issues/67)).
+
 ## [2.0.0] - 2026-11-26
 
 ### Upgrading from 1.x
@@ -18,7 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **No example session secret.** An example value is replaced with a secret of the server's own, so everyone signs in again once and Google Photos needs connecting again.
 - **License is now AGPL-3.0** (was ISC).
 - **Custom photo libraries** (`createApp({ library })`): `photoUrl()` must return percent-encoded path segments (see Changed).
-- Slideshow links: prefer `/slideshow#pin=123456`, which never reaches the server or its logs. `?pin=` still works.
+- Slideshow links: use `/slideshow#pin=123456`, which never reaches the server or its logs.
 
 ### Fixed
 - A frame limited to a folder checks and reads the same photo path, so `..` and encoded tricks can't reach other folders ([#42](https://github.com/Sorbh/sora-digital-photo-frame/issues/42)).

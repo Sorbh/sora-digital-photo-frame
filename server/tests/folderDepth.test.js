@@ -176,6 +176,16 @@ describe('MAX_FOLDER_DEPTH', () => {
     answer({ message: 'nope' }, false);
     await loading;
     expect(state()).toEqual({ disabled: true, hidden: true });
+
+    // ...also after another folder was opened in between
+    loading = open('uploads/Trips');
+    answer({ files: [], folders: [], canCreateFolder: true });
+    await loading;
+    expect(state()).toEqual({ disabled: false, hidden: false });
+    loading = open('uploads/Trips/Italy');
+    answer({ message: 'nope' }, false);
+    await loading;
+    expect(state()).toEqual({ disabled: true, hidden: true });
   });
 
   // A library with a photo in a folder made before the limit (level 4)

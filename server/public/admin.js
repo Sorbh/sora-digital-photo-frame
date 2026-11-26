@@ -579,15 +579,14 @@ class PhotoFrameAdmin {
         button.disabled = state !== 'allowed';
         if (state !== 'pending') {
             button.classList.toggle('hidden', state === 'refused');
-            this.createFolderKnown = { path: this.currentPath, state };
+            (this.createFolderKnown = this.createFolderKnown || new Map()).set(this.currentPath, state);
         }
     }
 
-    // A listing that failed: what an earlier one said about this folder, if it was
-    // this folder (a refresh after an upload); otherwise offered, as the server still checks
+    // A listing that failed: what an earlier one said about this folder (a refresh
+    // after an upload, or a folder opened before); otherwise offered, as the server still checks
     knownCreateFolder(path) {
-        const known = this.createFolderKnown;
-        return known && known.path === path ? known.state : 'allowed';
+        return (this.createFolderKnown && this.createFolderKnown.get(path)) || 'allowed';
     }
 
     renderFolderContents(data) {

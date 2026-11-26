@@ -392,10 +392,13 @@ body.is-paused .paused-badge {
     box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08) inset, 0 20px 50px -20px rgba(0, 0, 0, 0.8);
 }
 
+/* The folder picker marks the dock while it is open (js/folderSelector.js).
+   No :has() in this list: a browser that can't read one selector drops the
+   whole rule, and older TVs and tablets would never show the dock. */
 body.chrome-visible .controls,
 .controls:focus-within,
 .controls:hover,
-.controls:has(.open) {
+.controls.picker-open {
     opacity: 1;
     transform: none;
     pointer-events: auto;
@@ -483,8 +486,12 @@ body.chrome-visible .controls,
     color: rgba(244, 239, 230, 0.72);
 }
 
-/* The info card and note pages take the corner while they are up */
-.slideshow-container:has(.info-overlay:not(.hidden)) .photo-caption,
+/* The info card and note pages take the corner while they are up
+   (separate rules, so browsers without :has() still keep the second) */
+.slideshow-container:has(.info-overlay:not(.hidden)) .photo-caption {
+    opacity: 0;
+}
+
 body.note-showing .photo-caption {
     opacity: 0;
 }

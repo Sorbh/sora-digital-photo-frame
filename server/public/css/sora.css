@@ -33,7 +33,7 @@ html:root {
     --paper-sunk: #f4e7d2;
     --ink: #2d1b26;
     --ink-soft: #5b4452;
-    --ink-faint: #917a87;
+    --ink-faint: #735d69;
     --rule: #efe0c9;
     /* --safelight is the historical name of the accent token: now berry */
     --safelight: var(--berry);
@@ -91,7 +91,7 @@ html.dark:root {
     --paper-sunk: #31212b;
     --ink: #fbefe8;
     --ink-soft: #dcc6cf;
-    --ink-faint: #a48c99;
+    --ink-faint: #a8919d;
     --rule: #3a2732;
 
     --input: #4a3340;
@@ -674,7 +674,8 @@ dialog::backdrop {
         padding: 0 6px;
         border: 1px solid var(--rule);
         border-radius: var(--shape-lg);
-        background: color-mix(in oklab, var(--paper-raised) 90%, transparent);
+        /* Solid, so a bright photo scrolling underneath can't wash out the muted labels */
+        background: var(--paper-raised);
         backdrop-filter: blur(18px) saturate(1.4);
         -webkit-backdrop-filter: blur(18px) saturate(1.4);
         box-shadow: 0 20px 40px -18px rgb(90 20 50 / 0.35);

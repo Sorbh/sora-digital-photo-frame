@@ -1,6 +1,33 @@
+const { errorSummary } = require('../utils/errorSummary');
+
+// Errors from express.json()/urlencoded() (body-parser). A parse or verify failure
+// holds the raw body, and its message can quote it.
+const BODY_PARSER_ERRORS = new Set([
+  'entity.parse.failed', 'entity.verify.failed', 'entity.too.large', 'encoding.unsupported',
+  'charset.unsupported', 'parameters.too.many', 'request.aborted', 'request.size.invalid',
+  'stream.encoding.set', 'stream.not.readable'
+]);
+const UNREADABLE_BODY = new Set(['entity.parse.failed', 'entity.verify.failed']);
+
+const isBodyParserError = err => typeof err.type === 'string' && BODY_PARSER_ERRORS.has(err.type) &&
+  Number.isInteger(err.status) && err.status >= 400 && err.status < 500;
+
+// Only what helps find the bug without private data (see utils/errorSummary)
+function logError(err) {
+  if (err && typeof err === 'object' && isBodyParserError(err)) {
+    return console.error(`Error: request body could not be read (${err.type}, ${err.status})`);
+  }
+  console.error(`Error: request failed: ${errorSummary(err)}`);
+}
+
 // Global error handling middleware
 const errorHandler = (err, req, res, next) => {
-  console.error('Error:', err);
+  logError(err);
+
+  // A body that could not be read: answer without echoing it back
+  if (isBodyParserError(err) && UNREADABLE_BODY.has(err.type)) {
+    return res.status(err.status).json({ message: 'Invalid request body.' });
+  }
 
   // Multer errors
   if (err.code === 'LIMIT_FILE_SIZE') {
@@ -53,9 +80,10 @@ const errorHandler = (err, req, res, next) => {
     });
   }
 
-  // Default error response
-  const status = err.status || 500;
-  const message = err.message || 'Internal server error';
+  // Default error response. A client error's message is meant for the user;
+  // a server error's could say anything, so it gets a generic one.
+  const status = Number.isInteger(err.status) && err.status >= 400 && err.status < 600 ? err.status : 500;
+  const message = status < 500 && err.expose !== false && err.message ? err.message : 'Internal server error';
 
   res.status(status).json({
     message: message,
@@ -64,3 +92,4 @@ const errorHandler = (err, req, res, next) => {
 };
 
 module.exports = errorHandler;
+module.exports.isBodyParserError = isBodyParserError;

@@ -194,7 +194,16 @@
     "donePaired": "تم <em>اقتران</em> {name}",
     "expiredHeading": "انتهت <em>صلاحية</em> هذا الرمز",
     "heading": "اعرض الصور على <em>هذا الإطار</em>",
-    "codeMatchHint": "تأكّد من أنه يطابق الرمز على شاشة الإطار"
+    "codeMatchHint": "تأكّد من أنه يطابق الرمز على شاشة الإطار",
+    "enterHeading": "اكتب <em>الرمز</em>",
+    "enterNote": "يظهر الرمز على الإطار أسفل رمز QR، مثل <bdi class=\"code-example\">K7P-4QX</bdi>.",
+    "continue": "متابعة",
+    "codeInvalid": "اكتب الأحرف والأرقام الستة الظاهرة على الإطار.",
+    "typeCode": "كتابة رمز",
+    "unreachableHeading": "تعذّر <em>التحقق</em> من الرمز",
+    "unreachableNote": "لم تستجب المكتبة. تحقّق من اتصال هاتفك، ثم حاول مرة أخرى.",
+    "tryAgain": "حاول مرة أخرى",
+    "foldersFailed": "تعذّر تحميل المجلدات، لذا لا يمكن إنشاء حساب جديد الآن. اختر حسابًا موجودًا، أو حاول مرة أخرى."
   },
   "login": {
     "invalid_password": "كلمة المرور غير صحيحة. يُرجى المحاولة مرة أخرى.",
@@ -352,6 +361,7 @@
     "countSnaps_few": "{count} لقطات",
     "countSnaps_many": "{count} لقطة",
     "folderOptions": "خيارات المجلد",
+    "photoOptions": "خيارات الصورة",
     "selectPhoto": "تحديد الصورة",
     "viewPhoto": "عرض الصورة",
     "deletePhoto": "حذف الصورة",

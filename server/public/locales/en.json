@@ -190,7 +190,16 @@
     "donePaired": "{name} is <em>paired</em>",
     "expiredHeading": "This code has <em>expired</em>",
     "heading": "Show photos on <em>this frame</em>",
-    "codeMatchHint": "Check it matches the frame's screen"
+    "codeMatchHint": "Check it matches the frame's screen",
+    "enterHeading": "Type the <em>code</em>",
+    "enterNote": "The frame shows it under its QR code, like <bdi class=\"code-example\">K7P-4QX</bdi>.",
+    "continue": "Continue",
+    "codeInvalid": "Type the 6 letters and numbers shown on the frame.",
+    "typeCode": "Type a code",
+    "unreachableHeading": "Couldn't <em>check</em> the code",
+    "unreachableNote": "The library didn't answer. Check your phone's connection, then try again.",
+    "tryAgain": "Try again",
+    "foldersFailed": "Couldn't load the folders, so a new account can't be set up right now. Pick an existing account, or try again."
   },
   "login": {
     "invalid_password": "Invalid password. Please try again.",
@@ -328,6 +337,7 @@
     "countSnaps_one": "{count} snap",
     "countSnaps_other": "{count} snaps",
     "folderOptions": "Folder options",
+    "photoOptions": "Photo options",
     "selectPhoto": "Select Photo",
     "viewPhoto": "View Photo",
     "deletePhoto": "Delete Photo",

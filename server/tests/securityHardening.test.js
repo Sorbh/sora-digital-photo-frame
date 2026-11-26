@@ -81,6 +81,67 @@ describe('the attempt limiter', () => {
     }
   });
 
+  test('tries still being checked hold back new ones without locking anyone out', async () => {
+    const limiter = new AttemptLimiter({ maxAttempts: 2 });
+    expect((await limiter.begin('k')).allowed).toBe(true);
+    expect((await limiter.begin('k')).allowed).toBe(true);
+    // A third waits for one of them to finish
+    let third = null;
+    const waiting = limiter.begin('k').then(result => { third = result; });
+    await Promise.resolve();
+    expect(third).toBeNull();
+    limiter.end('k', false); // that one was right
+    await waiting;
+    expect(third.allowed).toBe(true);
+    limiter.end('k', false);
+    limiter.end('k', false);
+    expect(limiter.entries.has('k')).toBe(false);
+
+    // Wrong ones count once they're known to be wrong
+    await limiter.begin('k'); limiter.end('k', true);
+    await limiter.begin('k'); limiter.end('k', true);
+    expect((await limiter.begin('k')).allowed).toBe(false);
+  });
+
+  test('a try that gave up waiting leaves the queue', async () => {
+    const limiter = new AttemptLimiter({ maxAttempts: 1, maxWait: 50 });
+    await limiter.begin('k');
+    const gaveUp = await limiter.begin('k');
+    expect(gaveUp.allowed).toBe(false);
+    expect(limiter.waiting.get('k') || []).toHaveLength(0);
+    limiter.end('k', false);
+  });
+
+  test('a lockout is answered only once it has been saved', async () => {
+    let saved = false;
+    const limiter = new AttemptLimiter({
+      maxAttempts: 1,
+      onSave: () => new Promise(resolve => setTimeout(() => { saved = true; resolve(); }, 20))
+    });
+    await limiter.begin('k');
+    limiter.end('k', true);
+    const locked = await limiter.begin('k');
+    expect(locked.allowed).toBe(false);
+    expect(saved).toBe(true);
+  });
+
+  test('a right try leaves the clock of wrong tries alone', async () => {
+    let now = 0;
+    const realNow = Date.now;
+    Date.now = () => now;
+    try {
+      const limiter = new AttemptLimiter({ maxAttempts: 2, attemptWindow: 1000 });
+      await limiter.begin('k'); limiter.end('k', false);
+      now = 999;
+      await limiter.begin('k'); limiter.end('k', true);
+      now = 1001;
+      // The wrong try is still counted: its window started when it was made
+      expect(limiter.check('k').attemptsRemaining).toBe(1);
+    } finally {
+      Date.now = realNow;
+    }
+  });
+
   test('made-up addresses cannot grow memory without end', () => {
     const limiter = new AttemptLimiter({ maxTracked: 100, keep: key => key.startsWith('family:') });
     limiter.fail('family:default');

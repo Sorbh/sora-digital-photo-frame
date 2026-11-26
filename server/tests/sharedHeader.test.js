@@ -346,7 +346,7 @@ describe('Google Photos is in the Upload menu', () => {
   });
 
   // js/addMenu.js on a small stand-in for the library page
-  async function runMenu(features, scope) {
+  async function runMenu(features, scope, { phone = false } = {}) {
     const made = {};
     const node = (id) => {
       const listeners = {};
@@ -355,6 +355,7 @@ describe('Google Photos is in the Upload menu', () => {
         id, hidden: id === 'googlePhotosBtn', style: {}, popoverOpen: false,
         addEventListener: (type, fn) => { (listeners[type] = listeners[type] || []).push(fn); },
         click() { (listeners.click || []).forEach(fn => fn({ currentTarget: this, target: this })); },
+        emit: (type, event) => (listeners[type] || []).forEach(fn => fn(event)),
         setAttribute: (name, value) => { attrs[name] = String(value); },
         attrs,
         contains: other => other === made[id],
@@ -370,18 +371,29 @@ describe('Google Photos is in the Upload menu', () => {
       };
     };
     ['addMenu', 'uploadBtn', 'addFromDeviceBtn', 'googlePhotosBtn'].forEach(node);
+    const classes = new Set();
+    made.addMenu.classList = { toggle: (name, on) => (on ? classes.add(name) : classes.delete(name)), remove: name => classes.delete(name), contains: name => classes.has(name) };
+    made.addMenu.classes = classes;
+    // On a phone: the + button in the middle of the tab bar near the bottom of a 412px screen
+    made.uploadBtn.getBoundingClientRect = () => (phone ? { left: 176, right: 236, top: 790, bottom: 850 } : { left: 0, top: 0, right: 40, bottom: 40 });
     const uploads = [];
+    const windowListeners = {};
+    const documentListeners = {};
+    const history = { state: null, pushed: [], backs: 0, pushState(state) { this.pushed.push(state); this.state = state; }, back() { this.backs++; } };
     const context = {
       document: {
         readyState: 'complete',
         activeElement: null,
         getElementById: id => made[id] || null,
         querySelectorAll: selector => (selector === '[data-add-menu]' ? [made.uploadBtn] : []),
-        addEventListener() {}
+        querySelector: selector => (selector === '.tabbar' ? { getBoundingClientRect: () => ({ left: 12, right: 400, top: 815, bottom: 881 }) } : null),
+        addEventListener: (type, fn) => { (documentListeners[type] = documentListeners[type] || []).push(fn); }
       },
-      innerWidth: 1440,
-      innerHeight: 900,
-      addEventListener() {},
+      innerWidth: phone ? 412 : 1440,
+      innerHeight: phone ? 915 : 900,
+      matchMedia: () => ({ matches: phone }),
+      history,
+      addEventListener: (type, fn) => { (windowListeners[type] = windowListeners[type] || []).push(fn); },
       SoraPlaceMenu: require('../public/js/placeMenu'),
       photoFrameAdmin: { showUploadModal: () => uploads.push('dialog') },
       SoraScope: {
@@ -395,8 +407,63 @@ describe('Google Photos is in the Upload menu', () => {
     vm.runInContext(read('js/addMenu.js'), context);
     await context.SoraScope.ready;
     await new Promise(resolve => setImmediate(resolve));
-    return { made, uploads };
+    const fire = type => (windowListeners[type] || []).forEach(fn => fn({ type }));
+    // A tap on the page: says whether the page itself still got it
+    const tapPage = () => {
+      const event = { target: { page: true }, stopped: false, preventDefault() {}, stopPropagation() { this.stopped = true; } };
+      (documentListeners.click || []).forEach(fn => fn(event));
+      return !event.stopped;
+    };
+    return { made, uploads, history, fire, tapPage };
   }
+
+  test('on a phone it sits centred just above the + button and the tab bar', () => {
+    const { sheetSpot } = require('../public/js/addMenu');
+    const viewport = { width: 412, height: 915 };
+    const anchor = { left: 176, right: 236, top: 790, bottom: 850 };
+    const bar = { left: 12, right: 400, top: 815, bottom: 881 };
+    // Centred on the button, its bottom 12px above the higher of the button and the bar
+    expect(sheetSpot({ anchor, bar, width: 300, height: 130, viewport })).toEqual({ left: 56, top: 790 - 12 - 130 });
+    // As wide as the screen allows, it keeps a 12px edge
+    expect(sheetSpot({ anchor, bar, width: 388, height: 130, viewport }).left).toBe(12);
+    // A tall menu on a short screen stays on it
+    expect(sheetSpot({ anchor, bar, width: 300, height: 900, viewport }).top).toBe(12);
+  });
+
+  test('on a phone: a sheet with big rows, closed by Back, Escape or a tap outside', async () => {
+    const { made, uploads, history, fire, tapPage } = await runMenu({ googlePhotosEnabled: true }, { canEdit: true, isOwner: true }, { phone: true });
+    made.uploadBtn.click();
+    expect(made.addMenu.popoverOpen).toBe(true);
+    expect(made.addMenu.classes.has('is-sheet')).toBe(true);
+    // offsetWidth 200: centred on the + button (206), above it
+    expect(made.addMenu.style).toMatchObject({ left: '106px', top: `${790 - 12 - 90}px` });
+    expect(history.pushed).toEqual([{ addMenu: true }]);
+
+    // Back: the step is gone already, so it only closes
+    fire('popstate');
+    expect(made.addMenu.popoverOpen).toBe(false);
+    expect(history.backs).toBe(0);
+
+    // Escape, and a tap outside, close it and take its step back out of history
+    made.uploadBtn.click();
+    made.addMenu.emit('keydown', { key: 'Escape', preventDefault() {} });
+    expect(made.addMenu.popoverOpen).toBe(false);
+    expect(history.backs).toBe(1);
+    made.uploadBtn.click();
+    // The tap only closes the sheet: it doesn't press what was under it
+    expect(tapPage()).toBe(false);
+    expect(made.addMenu.popoverOpen).toBe(false);
+    expect(tapPage()).toBe(true);
+    expect(history.backs).toBe(2);
+
+    // Choosing an item does the same
+    made.uploadBtn.click();
+    made.addFromDeviceBtn.click();
+    expect(made.addMenu.popoverOpen).toBe(false);
+    expect(made.addMenu.classes.has('is-sheet')).toBe(false);
+    expect(history.backs).toBe(3);
+    expect(uploads).toEqual(['dialog']);
+  });
 
   test('for the owner, Upload opens the menu with Google Photos in it', async () => {
     const { made, uploads } = await runMenu({ googlePhotosEnabled: true }, { canEdit: true, isOwner: true });

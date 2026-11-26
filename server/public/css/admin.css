@@ -1352,3 +1352,28 @@ html.dark .app.file-dragging .drop-hint {
 .all-notes-link:hover {
     color: var(--berry);
 }
+
+/* The Upload menu on a phone: a sheet with big rows above the tab bar's + button (js/addMenu.js) */
+#addMenu.is-sheet {
+    width: min(calc(100vw - 24px), 380px);
+    border-radius: var(--shape-lg) !important;
+    padding: 8px !important;
+}
+
+#addMenu.is-sheet [role="menu"] {
+    min-width: 0;
+}
+
+#addMenu.is-sheet .menu-item {
+    min-height: 56px;
+    padding: 0 1rem;
+    gap: 0.875rem;
+    font-size: 1rem;
+    font-weight: 600;
+    border-radius: var(--shape-sm);
+}
+
+#addMenu.is-sheet .menu-item .material-symbols-outlined {
+    font-size: 24px;
+    margin-right: 0;
+}

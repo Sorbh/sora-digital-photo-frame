@@ -125,6 +125,17 @@ describe('Error handler', () => {
     expect(logs).toMatch(/logger\.test\.js:\d+:\d+/); // the real frames are still there
   });
 
+  test('a code that does not look like one is not logged', async () => {
+    const err = Object.assign(new Error('x'), { code: 'PLMK-OIJN' });
+    await request(appThrowing(err)).get('/x').expect(500);
+    const logs = output.join('\n');
+    expect(logs).not.toMatch(/PLMK-OIJN/);
+    expect(logs).toMatch(/Error \[redacted\]/);
+    output.length = 0;
+    await request(appThrowing(Object.assign(new Error('y'), { code: 'ERR_STREAM_DESTROYED' }))).get('/x').expect(500);
+    expect(output.join('\n')).toMatch(/ERR_STREAM_DESTROYED/);
+  });
+
   test('a server error message is neither logged nor returned', async () => {
     const err = new Error('No family for code PLMK-OIJN');
     const res = await request(appThrowing(err)).get('/x').expect(500);
@@ -211,5 +222,19 @@ describe('Controller logs', () => {
     const res = { send: () => res, status: () => res, json: () => res, redirect: () => res };
     await google.handleCallback({ query: { error: 'odd-value-XYZ123' }, session: {} }, res, () => {});
     expect(output.join('\n')).not.toMatch(/odd-value-XYZ123/);
+  });
+});
+
+describe('Google sign-in start', () => {
+  test('does not log the address to come back to', () => {
+    const oauth = require('../utils/oauthManager');
+    const lines = [];
+    const spy = jest.spyOn(console, 'log').mockImplementation((...args) => lines.push(args.map(String).join(' ')));
+    try {
+      oauth.getAuthUrl('https://frame.example/back?private=1', 'state-SECRET');
+      expect(lines.join('\n')).not.toMatch(/private=1|state-SECRET/);
+    } finally {
+      spy.mockRestore();
+    }
   });
 });

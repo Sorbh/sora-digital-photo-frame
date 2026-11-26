@@ -21,6 +21,7 @@ function openSlideshow(href, { fetchPin = () => new Promise(() => {}), headScrip
   });
   const requests = [];
   const timers = [];
+  const listeners = {};
   const history = [];
   const store = () => { const m = new Map(); return { getItem: k => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: k => m.delete(k) }; };
   const sandbox = {
@@ -31,7 +32,7 @@ function openSlideshow(href, { fetchPin = () => new Promise(() => {}), headScrip
     clearTimeout() {},
     setInterval: () => 0,
     clearInterval() {},
-    location: { href, search: new URL(href).search },
+    location: { href, search: new URL(href).search, hash: new URL(href).hash },
     localStorage: store(),
     sessionStorage: store(),
     CustomEvent: class { constructor(type, init) { this.type = type; this.detail = init?.detail; } },
@@ -44,6 +45,7 @@ function openSlideshow(href, { fetchPin = () => new Promise(() => {}), headScrip
       dispatchEvent() {},
       documentElement: { dataset: {} }
     },
+    addEventListener: (type, fn) => { listeners[type] = fn; },
     matchMedia: () => ({ matches: false, addEventListener() {}, addListener() {} }),
     fetch: (url, options) => {
       if (url !== '/api/auth/pin') return new Promise(() => {}); // pairing etc.: never answers
@@ -61,6 +63,7 @@ function openSlideshow(href, { fetchPin = () => new Promise(() => {}), headScrip
       history.push(next.href);
       sandbox.location.href = next.href;
       sandbox.location.search = next.search;
+      sandbox.location.hash = next.hash;
     }
   };
   const context = vm.createContext(sandbox);
@@ -69,7 +72,13 @@ function openSlideshow(href, { fetchPin = () => new Promise(() => {}), headScrip
   const source = fs.readFileSync(path.join(__dirname, '../public/js/slideshow.js'), 'utf8');
   const auth = source.slice(0, source.indexOf('class PhotoFrameSlideshow'));
   vm.runInContext(`${auth}\nthis.manager = new AuthenticationManager();`, context);
-  return { location: sandbox.location, addressAfterHead, requests, timers, manager: sandbox.manager, localStorage: sandbox.localStorage };
+  const navigate = (next) => {
+    sandbox.location.href = next;
+    sandbox.location.search = new URL(next).search;
+    sandbox.location.hash = new URL(next).hash;
+    listeners.hashchange?.();
+  };
+  return { location: sandbox.location, addressAfterHead, requests, timers, manager: sandbox.manager, localStorage: sandbox.localStorage, navigate };
 }
 
 const flush = () => new Promise(resolve => setImmediate(resolve));
@@ -135,6 +144,14 @@ describe('Slideshow sign-in from the address', () => {
     const { location, requests } = openSlideshow('https://frame.example/slideshow?lang=de#pin=246810&family=QWER-TYUI', { headScriptRuns: false });
     expect(requests[0].body).toMatchObject({ pin: '246810', familyCode: 'QWER-TYUI' });
     expect(location.href).toBe('https://frame.example/slideshow?lang=de');
+  });
+
+  test('a #pin= opened on the page already showing reads it and clears it', async () => {
+    const { location, requests, navigate } = openSlideshow('https://frame.example/slideshow');
+    expect(requests).toHaveLength(0);
+    navigate('https://frame.example/slideshow#pin=135791');
+    expect(requests.map(r => r.body.pin)).toEqual(['135791']);
+    expect(location.href).toBe('https://frame.example/slideshow');
   });
 
   test('a PIN typed by hand wins over a sign-in from the address still under way', async () => {

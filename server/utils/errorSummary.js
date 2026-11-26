@@ -15,9 +15,16 @@ function errorFrames(err) {
   return err.stack.slice(head.length).split('\n').filter(line => FRAME.test(line)).slice(0, MAX_FRAMES);
 }
 
+// A code is logged only when it looks like one (ENOENT, QUOTA_EXCEEDED, ERR_...):
+// a hook could put anything there, a family code included
+const CODE = /^(?:[A-Z][A-Z0-9_]{1,40}|ERR_[A-Za-z0-9_]{1,60})$/;
+const safeCode = code => (code === undefined || code === null || code === '' ? null : (CODE.test(String(code)) ? String(code) : '[redacted]'));
+const safeName = name => (typeof name === 'string' && /^[A-Za-z][\w$]{0,60}$/.test(name) ? name : 'Error');
+
 function errorSummary(err) {
   if (!err || typeof err !== 'object') return 'unknown error';
-  const label = [err.name || 'Error', err.code, err.status].filter(Boolean).join(' ');
+  const status = Number.isInteger(err.status) ? err.status : null;
+  const label = [safeName(err.name), safeCode(err.code), status].filter(Boolean).join(' ');
   return [label, ...errorFrames(err)].join('\n');
 }
 

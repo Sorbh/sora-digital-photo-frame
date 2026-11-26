@@ -139,7 +139,6 @@ class OAuthManager {
 
   // state: a random value the callback has to bring back (see the controller)
   getAuthUrl(redirectUri, state) {
-    console.log('🔧 [DEBUG] getAuthUrl called with redirectUri:', redirectUri);
     
     const scopes = [
       'https://www.googleapis.com/auth/photospicker.mediaitems.readonly',
@@ -156,7 +155,6 @@ class OAuthManager {
         include_granted_scopes: true,
         state
       });
-      console.log('🔧 [DEBUG] Generated auth URL:', authUrl);
       return authUrl;
     } catch (error) {
       console.error('❌ [DEBUG] Failed to generate auth URL:', error.message);

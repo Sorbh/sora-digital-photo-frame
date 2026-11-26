@@ -31,6 +31,7 @@ class AuthenticationManager {
         if (!this.pairHint) return;
         const url = document.createElement('span');
         url.id = 'pairUrl';
+        url.dir = 'ltr'; // keeps "192.168.1.5:3000/pair" in order inside right-to-left text
         url.textContent = this.pairUrlText || t('slideshow.static_001');
         this.pairHint.innerHTML = t('slideshow.pairHint', { url: url.outerHTML });
     }

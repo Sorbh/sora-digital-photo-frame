@@ -333,6 +333,7 @@
     "countSnaps_one": "{count}件のスナップ",
     "countSnaps_other": "{count}件のスナップ",
     "folderOptions": "フォルダのオプション",
+    "photoOptions": "写真のオプション",
     "selectPhoto": "写真を選択",
     "viewPhoto": "写真を見る",
     "deletePhoto": "写真を削除",

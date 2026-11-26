@@ -333,6 +333,7 @@
     "countSnaps_one": "{count} snap",
     "countSnaps_other": "{count} snaps",
     "folderOptions": "Folder options",
+    "photoOptions": "Photo options",
     "selectPhoto": "Select Photo",
     "viewPhoto": "View Photo",
     "deletePhoto": "Delete Photo",

@@ -12,6 +12,7 @@ class AuthenticationManager {
         this.familyInput = document.getElementById('familyCodeInput');
         this.authSub = document.querySelector('.auth-sub');
         this.familyCodeRequired = false; // hosted: a PIN also needs the family code
+        this.signInGeneration = 0; // a sign-in typed by hand outranks one still retrying from the address
         this.authButton = document.getElementById('authButton');
         this.authErrorAlert = document.getElementById('authErrorAlert');
         this.authErrorMessage = document.getElementById('authErrorMessage');
@@ -31,6 +32,7 @@ class AuthenticationManager {
         if (!this.pairHint) return;
         const url = document.createElement('span');
         url.id = 'pairUrl';
+        url.dir = 'ltr'; // keeps "192.168.1.5:3000/pair" in order inside right-to-left text
         url.textContent = this.pairUrlText || t('slideshow.static_001');
         this.pairHint.innerHTML = t('slideshow.pairHint', { url: url.outerHTML });
     }
@@ -49,9 +51,17 @@ class AuthenticationManager {
 
     init() {
         this.bindEvents();
-        // Frames with no keyboard can open /slideshow?pin=123456 (hosted: &family=ABCD-EFGH)
+        // Opening /slideshow#pin=... on this page again doesn't reload it: read it then too
+        window.addEventListener('hashchange', () => {
+            if (!/(?:^#|&)(?:pin|family)=/.test(location.hash)) return;
+            const pin = this.takeSignInFromUrl();
+            if (!pin || this.isAuthenticated) return;
+            this.signInGeneration += 1;
+            this.signInFromUrl(pin);
+        });
+        // Frames with no keyboard can open /slideshow#pin=123456 or ?pin=123456 (hosted: &family=ABCD-EFGH)
         // and sign in by themselves. A browser that already is a screen uses its token first.
-        const urlPin = new URLSearchParams(location.search).get('pin')?.trim();
+        const urlPin = this.takeSignInFromUrl();
         const deviceToken = localStorage.getItem(DEVICE_TOKEN_KEY);
         if (deviceToken) {
             this.signInAsDevice(deviceToken, urlPin);
@@ -60,6 +70,34 @@ class AuthenticationManager {
         } else {
             this.checkExistingSession();
         }
+    }
+
+    // The PIN and family code from the address, kept in memory only. slideshow.html
+    // takes them out of the address before anything loads; this also covers pages
+    // that open the script without that.
+    takeSignInFromUrl() {
+        const early = window.soraUrlSignIn;
+        if (early) {
+            window.soraUrlSignIn = null;
+            this.urlFamilyCode = early.family || '';
+            return early.pin || undefined;
+        }
+        // The head script didn't run (e.g. a policy that blocks inline scripts): same
+        // thing here, for #pin=&family= and ?pin=&family=
+        const url = new URL(location.href);
+        const query = url.searchParams;
+        const fragment = new URLSearchParams(url.hash.slice(1));
+        const inQuery = query.has('pin') || query.has('family');
+        const inFragment = fragment.has('pin') || fragment.has('family');
+        const pick = name => (fragment.get(name) || query.get(name) || '').trim();
+        const pin = pick('pin') || undefined;
+        this.urlFamilyCode = pick('family');
+        if (inQuery || inFragment) {
+            ['pin', 'family'].forEach(name => { query.delete(name); fragment.delete(name); });
+            const hash = inFragment ? (String(fragment) ? `#${fragment}` : '') : url.hash;
+            history.replaceState(history.state, '', url.pathname + url.search + hash);
+        }
+        return pin;
     }
 
     // Keep a frame that is left running signed in to its account
@@ -100,7 +138,7 @@ class AuthenticationManager {
     // The family code typed in, from the address, or remembered from last time
     familyCodeValue() {
         const typed = this.familyInput?.value.trim();
-        return typed || new URLSearchParams(location.search).get('family')?.trim() || localStorage.getItem(FAMILY_CODE_KEY) || '';
+        return typed || this.urlFamilyCode || localStorage.getItem(FAMILY_CODE_KEY) || '';
     }
 
     // Hosted: show the family code field above the PIN
@@ -162,6 +200,15 @@ class AuthenticationManager {
         try {
             const query = new URLSearchParams({ code: pairing.code, secret: pairing.secret });
             data = await (await fetch(`/api/pair/status?${query}`)).json();
+            if (this.pairing !== pairing) return;
+            // Approved: collect the token, which also signs this browser in
+            if (data?.status === 'ready') {
+                data = await (await fetch('/api/pair/collect', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ code: pairing.code, secret: pairing.secret })
+                })).json();
+            }
         } catch (error) {
             data = null; // offline for a moment: keep waiting
         }
@@ -200,20 +247,32 @@ class AuthenticationManager {
         this.pairing = null;
     }
 
-    async signInFromUrl(pin) {
+    // The address is clean by now, so a frame with no keyboard keeps trying with the
+    // PIN in memory until the network or server is back, or the PIN is refused
+    async signInFromUrl(pin, attempt = 0) {
+        clearTimeout(this.urlRetryTimer);
+        if (this.isAuthenticated) return;
+        const generation = this.signInGeneration;
+        const outdated = () => generation !== this.signInGeneration || this.isAuthenticated;
+        const retry = wait => { this.urlRetryTimer = setTimeout(() => this.signInFromUrl(pin, attempt + 1), wait); };
         try {
             const data = await this.requestPin(pin);
+            if (outdated()) return; // signed in, or a PIN was typed, meanwhile
             if (!data.success) {
                 this.showAuthOverlay();
-                this.handleAuthError(data.error, data.code, data);
+                // Too many tries just now: the form's own wait tries the same PIN again
+                // once it is over, unless a PIN was typed or the frame signed in meanwhile
+                this.handleAuthError(data.error, data.code, data, () => { if (!outdated()) this.signInFromUrl(pin, attempt + 1); });
                 return;
             }
             this.keepScreen(data);
             this.handleAuthSuccess(data.account);
         } catch (error) {
+            if (outdated()) return;
             console.error('Sign-in from the address failed:', error);
             this.showAuthOverlay();
             this.showErrorKey('errors.connection');
+            retry(Math.min(5000 * 2 ** attempt, 60000));
         }
     }
 
@@ -228,6 +287,8 @@ class AuthenticationManager {
                 familyCode: this.familyCodeValue() || undefined
             })
         });
+        // A server error is not an answer about the PIN: try again later
+        if (response.status >= 500) throw new Error(`HTTP ${response.status}`);
         return response.json();
     }
 
@@ -339,6 +400,9 @@ class AuthenticationManager {
         }
 
         this.setLoading(true);
+        // Typed by hand: this outranks a sign-in still retrying from the address
+        this.signInGeneration += 1;
+        clearTimeout(this.urlRetryTimer);
 
         try {
             const data = await this.requestPin(pin);
@@ -357,7 +421,15 @@ class AuthenticationManager {
         }
     }
 
+    // Signed in another way, or signed out: the wait after "too many tries" is over
+    stopRateLimitWait() {
+        clearTimeout(this.rateLimitTimer);
+        this.rateLimitTimer = null;
+    }
+
     handleAuthSuccess(account) {
+        clearTimeout(this.urlRetryTimer);
+        this.stopRateLimitWait();
         this.isAuthenticated = true;
         this.userAccount = account;
 
@@ -371,7 +443,7 @@ class AuthenticationManager {
         }));
     }
 
-    handleAuthError(error, errorCode, data = {}) {
+    handleAuthError(error, errorCode, data = {}, retry = null) {
         // Hosted, a wrong family code and a wrong PIN look the same on purpose
         if (errorCode === 'INVALID_PIN' && this.familyCodeRequired) this.showErrorKey('slideshow.familyOrPinWrong');
         else this.showError(i18n.error({ ...data, code: errorCode, message: error }, 'slideshow.invalidPin'));
@@ -380,6 +452,16 @@ class AuthenticationManager {
             this.pinInput.disabled = true;
             this.pinInput.classList.add('border-destructive');
             this.authButton.disabled = true;
+            // The form comes back when the wait is over (and a bookmarked PIN is tried again)
+            this.stopRateLimitWait();
+            this.rateLimitTimer = setTimeout(() => {
+                this.rateLimitTimer = null;
+                this.pinInput.disabled = false;
+                this.authButton.disabled = false;
+                this.pinInput.classList.remove('border-destructive');
+                this.clearError();
+                if (retry) retry();
+            }, Math.max(1, Number(data.remainingTime) || 1) * 60 * 1000);
         } else {
             this.pinInput.classList.add('border-destructive');
             this.focusPin();
@@ -398,6 +480,7 @@ class AuthenticationManager {
         } finally {
             this.isAuthenticated = false;
             this.userAccount = null;
+            this.stopRateLimitWait();
             clearInterval(this.renewTimer);
             localStorage.removeItem(DEVICE_TOKEN_KEY); // signing out unpairs this browser
             sessionStorage.removeItem('authenticated');
@@ -423,8 +506,10 @@ class AuthenticationManager {
     }
 
     setLoading(loading) {
-        this.authButton.disabled = loading;
-        this.pinInput.disabled = loading;
+        // Still waiting after "too many tries": the form stays off until then
+        const off = loading || Boolean(this.rateLimitTimer);
+        this.authButton.disabled = off;
+        this.pinInput.disabled = off;
 
         if (loading) {
             this.authLoading.classList.remove('hidden');
@@ -469,6 +554,16 @@ class AuthenticationManager {
 }
 
 const LAST_SHOWN_KEY = 'photoframe_last_shown';
+const REQUEST_TIMEOUT_MS = 30 * 1000; // a photo request that takes longer counts as failed
+const KEY_TIMEOUT_MS = 12 * 1000; // decrypting in the browser: after this, the server copy is used
+
+// Aborted after `ms`, so a request the server never answers can't stall the slideshow
+function timeoutSignal(ms) {
+    if (typeof AbortController !== 'function') return undefined;
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(), ms);
+    return controller.signal;
+}
 
 // The element shown fullscreen, whichever prefix this browser uses
 function fullscreenElement() {
@@ -505,6 +600,16 @@ class PhotoFrameSlideshow {
         this.noteHideTimer = null;
         this.fullscreenCheck = null;
         this.screenShift = window.ScreenShift ? new ScreenShift(document.documentElement) : null;
+        // Until a photo shows, a failure leaves the error card up and tries again later
+        this.hasShownPhoto = false;
+        this.recovery = new PhotoRecovery({
+            attempt: (signal, isCurrent) => this.showFirstPhoto(signal, isCurrent),
+            failed: error => this.showFailure(error),
+            // A photo the error card covers (an empty folder picked, say) is not on screen
+            photoOnScreen: () => this.hasShownPhoto && this.errorState.classList.contains('hidden'),
+            schedule: new RetrySchedule(),
+            timeoutMs: REQUEST_TIMEOUT_MS
+        });
 
         // Ken Burns drift spans the slide plus its crossfade
         document.documentElement.style.setProperty('--slide-duration', `${this.interval + 2000}ms`);
@@ -527,6 +632,8 @@ class PhotoFrameSlideshow {
         this.loadingState = document.getElementById('loadingState');
         this.errorState = document.getElementById('errorState');
         this.errorMessage = document.getElementById('errorMessage');
+        this.errorTitle = document.getElementById('errorTitle');
+        this.errorIcon = document.getElementById('errorIcon');
         this.progressBar = document.getElementById('progressBar');
         this.fullscreenBtn = document.getElementById('fullscreenBtn');
         this.infoBtn = document.getElementById('infoBtn');
@@ -544,6 +651,7 @@ class PhotoFrameSlideshow {
         this.noticeSlots = { wake: document.getElementById('wakeNotice'), info: document.getElementById('infoNotice') };
         this.keepAwakeBtn = document.getElementById('keepAwakeBtn');
         this.notices = new FrameNotices({ render: (slot, notice) => this.renderNotice(slot, notice) });
+        this.retryBtn = document.getElementById('retryBtn');
 
         this.errorState.classList.add('hidden');
         this.images.forEach(img => img.removeAttribute('src'));
@@ -557,10 +665,17 @@ class PhotoFrameSlideshow {
         this.nextBtn.addEventListener('click', () => this.nextImage());
         // The tap itself is what lets the browser keep the screen on
         this.keepAwakeBtn.addEventListener('click', () => this.wakeLock?.onGesture());
+        // Retry, and back online: try again now, without waiting out the delay
+        this.recovery.listen(window, this.retryBtn);
 
         document.addEventListener('keydown', (e) => {
             // Typing in a field (the family code, say) is not a slideshow shortcut
             if (e.target.closest?.('input, textarea, select')) return;
+            // Nor are keys in the open folder picker, which has its own (js/folderSelector.js)
+            if (e.target.closest?.('#folderSelector.open')) return;
+            // Space and Enter on a focused button or link (Retry, say) press it
+            if ((e.key === ' ' || e.key === 'Enter') && e.target.closest?.('button, a[href]')) return;
+            if (this.handleDockArrows(e)) return;
             switch (e.key) {
                 case ' ': // Space
                 case 'k':
@@ -618,19 +733,12 @@ class PhotoFrameSlideshow {
                 clearTimeout(this.fullscreenCheck);
                 this.notices.fullscreen('refused');
             }));
-
-        this.images.forEach(img => {
-            img.addEventListener('error', () => {
-                if (this.errorState.classList.contains('hidden')) {
-                    this.showErrorKey('slideshow.loadImageFailed');
-                }
-            });
-        });
     }
 
     // The next picture for the chosen folder. Ordered folders continue from
     // the last one shown, even after the frame restarts.
-    async fetchRandomImage() {
+    // Resolves { image }, or { error } to show on the error card
+    async fetchRandomImage(signal) {
         try {
             const selectedFolderPath = this.folderStorage.getCurrentFolderPath();
             const params = new URLSearchParams();
@@ -638,7 +746,9 @@ class PhotoFrameSlideshow {
             const last = this.lastShown();
             if (last && last.folder === (selectedFolderPath || '')) params.set('after', last.id);
 
-            const response = await fetch(`/api/images/next?${params}`);
+            const response = await fetch(`/api/images/next?${params}`, { signal });
+            // The server or a proxy in trouble is not an empty folder
+            if (response.status >= 500) return { error: { offline: true } };
             if (!response.ok) throw new Error(t('slideshow.fetchImageFailed'));
             const data = await response.json();
 
@@ -647,11 +757,13 @@ class PhotoFrameSlideshow {
             }
 
             localStorage.setItem(LAST_SHOWN_KEY, JSON.stringify({ folder: selectedFolderPath || '', id: data.image.id }));
-            return data.image;
+            return { image: data.image };
         } catch (error) {
             console.error('Error fetching random image:', error);
-            this.showErrorKey('slideshow.loadImageFailedDetail', { detail: error.message });
-            return null;
+            // fetch() itself failed (no network, no server) or took too long
+            if (error instanceof TypeError || error.name === 'AbortError') return { error: { offline: true } };
+            const folder = this.folderStorage.getCurrentFolderPath() && this.folderStorage.getCurrentFolderName();
+            return { error: folder ? { key: 'slideshow.noImagesInFolder', vars: { folder } } : { key: 'slideshow.noImages' } };
         }
     }
 
@@ -666,7 +778,8 @@ class PhotoFrameSlideshow {
     // Key for browser-side decryption, fetched once per key id
     frameKey(id) {
         if (!this.frameKeys.has(id)) {
-            const request = fetch(`/api/frame/keys?ids=${encodeURIComponent(id)}`, { credentials: 'same-origin' })
+            // A key request that hangs is given up and forgotten, so the next try asks again
+            const request = fetch(`/api/frame/keys?ids=${encodeURIComponent(id)}`, { credentials: 'same-origin', signal: timeoutSignal(KEY_TIMEOUT_MS) })
                 .then(response => (response.ok ? response.json() : Promise.reject(new Error(`HTTP ${response.status}`))))
                 .then(({ keys }) => {
                     if (!keys || !keys[id]) throw new Error('Key not available');
@@ -688,7 +801,9 @@ class PhotoFrameSlideshow {
         const cipher = window.SoraPhotoCipher;
         if (imageData.rawUrl && cipher && cipher.supported()) {
             try {
-                return await cipher.loadImage(imageData.rawUrl, id => this.frameKey(id), imageData.mimeType);
+                // Slower than the server copy would be: use that instead
+                return await PhotoRecovery.withTimeout(
+                    cipher.loadImage(imageData.rawUrl, id => this.frameKey(id), imageData.mimeType), KEY_TIMEOUT_MS);
             } catch (error) {
                 console.warn('Decrypting in the browser failed, using the server copy:', error.message);
             }
@@ -696,41 +811,71 @@ class PhotoFrameSlideshow {
         return imageData.url;
     }
 
-    async loadImage(imageData) {
+    // Loads the photo into the hidden slide; false if it failed or `signal` gave up on it
+    // Only the newest load owns the hidden slide: a Retry and a Next loading at
+    // once must not both finish on one load event, and a load overtaken by a
+    // newer one gives up without touching the newer one's picture.
+    async loadImage(imageData, signal) {
         if (!imageData) return false;
+
+        const token = {};
+        this.currentLoad = token;
+        if (this.cancelLoad) this.cancelLoad(); // the older load, if it was already waiting
 
         const src = await this.imageSource(imageData);
         const isObjectUrl = src.startsWith('blob:');
+        if (this.currentLoad !== token) { // overtaken while fetching or decrypting
+            if (isObjectUrl) URL.revokeObjectURL(src);
+            return false;
+        }
 
         return new Promise((resolve) => {
             const nextSlide = (this.currentSlide + 1) % 2;
             const img = this.images[nextSlide];
 
-            const onLoad = () => {
+            const stop = () => {
                 img.removeEventListener('load', onLoad);
                 img.removeEventListener('error', onError);
-                this.hideError();
+                signal?.removeEventListener('abort', onAbort);
+                if (this.cancelLoad === cancel) this.cancelLoad = null;
+            };
+
+            // A newer load took the slide: leave its src alone
+            const cancel = () => {
+                stop();
+                if (isObjectUrl) URL.revokeObjectURL(src);
+                resolve(false);
+            };
+
+            const onLoad = () => {
+                stop();
                 this.ambients[nextSlide].style.backgroundImage = `url(${JSON.stringify(src)})`;
                 // The slide's previous photo is gone from screen; free its decrypted copy
                 if (this.objectUrls[nextSlide]) URL.revokeObjectURL(this.objectUrls[nextSlide]);
                 this.objectUrls[nextSlide] = isObjectUrl ? src : null;
-                this.currentImageData = imageData;
                 resolve(true);
             };
 
-            const onError = (event) => {
-                img.removeEventListener('load', onLoad);
-                img.removeEventListener('error', onError);
+            const onError = () => {
+                stop();
                 if (isObjectUrl) URL.revokeObjectURL(src);
                 console.error('Failed to load image:', imageData.url);
-                if (this.errorState.classList.contains('hidden')) {
-                    this.showErrorKey('slideshow.loadImageFailedDetail', { detail: imageData.filename });
-                }
                 resolve(false);
             };
 
+            // Taking too long, or replaced by a newer try: stop downloading it
+            const onAbort = () => {
+                stop();
+                if (this.currentLoad === token) img.removeAttribute('src');
+                if (isObjectUrl) URL.revokeObjectURL(src);
+                resolve(false);
+            };
+
+            if (signal?.aborted) return onAbort();
+            this.cancelLoad = cancel;
             img.addEventListener('load', onLoad);
             img.addEventListener('error', onError);
+            signal?.addEventListener('abort', onAbort);
             img.src = src;
         });
     }
@@ -754,6 +899,7 @@ class PhotoFrameSlideshow {
         nextSlideEl.classList.add('active');
 
         this.currentSlide = (this.currentSlide + 1) % 2;
+        this.photoShown();
         this.hideNote();
         this.noteScheduler?.photoShown();
         this.updateInfo();
@@ -808,23 +954,33 @@ class PhotoFrameSlideshow {
             return;
         }
 
-        const imageData = await this.fetchRandomImage();
-        if (imageData) await this.present(imageData);
+        // A photo that fails to come is skipped: the last good one stays on screen.
+        // Picking a folder (or signing out) meanwhile makes this one too late to show.
+        const generation = this.recovery.generation;
+        const isCurrent = () => this.recovery.generation === generation;
+        const signal = timeoutSignal(REQUEST_TIMEOUT_MS);
+        const next = await this.fetchRandomImage(signal);
+        if (!isCurrent()) return;
+        if (next.image) await this.present(next.image, { signal, isCurrent });
+        if (!isCurrent()) return;
 
         if (this.isPlaying) {
             this.scheduleNext();
         }
     }
 
-    // Show the next picture: a photo, or a snap (a saved page) drawn on the note layer
-    async present(imageData) {
+    // Show the next picture: a photo, or a snap (a saved page) drawn on the note layer.
+    // `isCurrent` says whether whoever asked still wants it (see PhotoRecovery).
+    async present(imageData, { signal, isCurrent = () => true } = {}) {
         if (imageData.type !== 'snap') {
-            if (!await this.loadImage(imageData)) return false;
+            if (!await this.loadImage(imageData, signal) || !isCurrent()) return false;
+            this.currentImageData = imageData;
             this.showImage();
             return true;
         }
-        if (!await this.showNote(imageData.snap, { scheduled: false })) return false;
+        if (!isCurrent() || !await this.showNote(imageData.snap, { scheduled: false, isCurrent })) return false;
         this.currentImageData = imageData;
+        this.photoShown();
         this.noteScheduler?.photoShown();
         this.updateInfo();
         this.loadingState.classList.add('hidden');
@@ -832,7 +988,7 @@ class PhotoFrameSlideshow {
         return true;
     }
 
-    async showNote(note, { scheduled = true } = {}) {
+    async showNote(note, { scheduled = true, isCurrent = () => true } = {}) {
         if (!this.noteLayer || !window.NotePage) return false;
         try {
             const page = NotePage.render(note);
@@ -840,6 +996,7 @@ class PhotoFrameSlideshow {
             this.noteLayer.classList.remove('is-visible');
             this.noteLayer.replaceChildren(page);
             await NotePage.whenLoaded(page);
+            if (!isCurrent()) return false; // replaced while its pictures loaded
 
             void this.noteLayer.offsetWidth; // restart the entrance animation
             this.noteLayer.classList.add('is-visible');
@@ -975,6 +1132,7 @@ class PhotoFrameSlideshow {
         this.renderPlayPause();
         if (this.currentImageData) this.folder.textContent = this.currentImageData.folder || t('common.library');
         if (this.errorText && !this.errorState.classList.contains('hidden')) this.errorMessage.textContent = t(...this.errorText);
+        if (this.errorTitleKey && !this.errorState.classList.contains('hidden')) this.errorTitle.textContent = t(this.errorTitleKey);
         Object.keys(this.noticeSlots).forEach(slot => this.renderNotice(slot, this.notices.shown[slot]));
     }
 
@@ -999,6 +1157,34 @@ class PhotoFrameSlideshow {
         }
     }
 
+    /**
+     * Arrow keys for TV remotes without Tab: Up or Down from the photo steps
+     * into the dock, Left and Right move along it (js/arrowFocus.js), and Down
+     * steps back out so Right is "next photo" again. True when the key was used.
+     */
+    handleDockArrows(e) {
+        const controls = document.getElementById('controls');
+        if (!controls || !window.SoraArrowFocus || !SoraArrowFocus.DIRECTIONS[e.key]) return false;
+        const inDock = controls.contains(e.target);
+        if (!inDock) {
+            const onPhoto = e.target === document.body || e.target === document.documentElement;
+            if (!onPhoto || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return false;
+            e.preventDefault();
+            this.showControlsTemporarily();
+            this.playPauseBtn.focus();
+            return true;
+        }
+        e.preventDefault();
+        if (e.key === 'ArrowDown') {
+            e.target.blur();
+        } else if (e.key !== 'ArrowUp') {
+            const buttons = [...controls.querySelectorAll('button')].filter(button => !button.closest('.folder-dropdown'));
+            SoraArrowFocus.next(buttons, e.target, e.key)?.focus();
+        }
+        this.showControlsTemporarily();
+        return true;
+    }
+
     showControlsTemporarily() {
         // Clear any existing hide timer
         if (this.controlsHideTimer) {
@@ -1013,22 +1199,56 @@ class PhotoFrameSlideshow {
         }, 3000);
     }
 
-    showError(message) {
+    showError(message, titleKey = 'slideshow.nothing') {
         this.errorText = null;
-        this.errorMessage.removeAttribute('data-i18n'); // the message is set here from now on
+        this.errorTitleKey = titleKey;
+        this.errorTitle.removeAttribute('data-i18n'); // the heading and message are set here from now on
+        this.errorTitle.textContent = t(titleKey);
+        this.errorIcon.textContent = titleKey === 'slideshow.connectionTitle' ? 'wifi_off' : 'photo_library';
+        this.errorMessage.removeAttribute('data-i18n');
         this.errorMessage.textContent = message;
         this.errorState.classList.remove('hidden');
         this.loadingState.classList.add('hidden');
     }
 
     // Same, but kept as a key so it follows a language change
-    showErrorKey(key, vars) {
-        this.showError(t(key, vars));
+    showErrorKey(key, vars, titleKey) {
+        this.showError(t(key, vars), titleKey);
         this.errorText = [key, vars];
     }
 
     hideError() {
         this.errorState.classList.add('hidden');
+    }
+
+    photoShown() {
+        this.hasShownPhoto = true;
+        this.recovery.done(); // a photo is up (the Next button can get there first)
+    }
+
+    // The first photo after starting or picking a folder, and every retry
+    // (see PhotoRecovery for when it runs, and when its result is dropped)
+    async showFirstPhoto(signal, isCurrent) {
+        this.clearTimers();
+        this.resetProgress();
+        const next = await this.fetchRandomImage(signal);
+        if (!isCurrent()) return { ok: false };
+        if (next.error) return { ok: false, error: next.error };
+        if (!await this.present(next.image, { signal, isCurrent })) {
+            return { ok: false, error: signal?.aborted ? { offline: true } : { key: 'slideshow.loadFirstImageFailed', transient: true } };
+        }
+        if (this.isPlaying) this.scheduleNext();
+        return { ok: true };
+    }
+
+    // The error card: for an empty screen, or over a photo when the folder can't
+    // play (PhotoRecovery keeps a photo up through network trouble)
+    showFailure(error) {
+        if (!error || error.offline || error.timeout) {
+            this.showErrorKey('slideshow.unable_images', undefined, 'slideshow.connectionTitle');
+        } else {
+            this.showErrorKey(error.key, error.vars);
+        }
     }
 
     requestWakeLock() {
@@ -1074,26 +1294,15 @@ class PhotoFrameSlideshow {
         }
     }
 
-    async onFolderChanged(folderPath, folderName) {
-        this.clearTimers();
-        this.resetProgress();
-
-        const imageData = await this.fetchRandomImage();
-        if (imageData) {
-            const loaded = await this.present(imageData);
-            if (loaded) {
-                this.scheduleNext();
-            } else {
-                this.showErrorKey('slideshow.loadFolderImageFailed');
-            }
-        } else {
-            if (folderName) this.showErrorKey('slideshow.noImagesInFolder', { folder: folderName });
-            else this.showErrorKey('slideshow.noImagesInAllFolders');
-        }
+    // The new folder's first photo, tried again until it shows. A retry still
+    // pending for the old folder is dropped; a photo on screen stays up meanwhile.
+    onFolderChanged() {
+        return this.recovery.start();
     }
 
     cleanup() {
         this.clearTimers();
+        this.recovery.stop(); // a try still running for this session is dropped
 
         if (this.cursorHideTimer) {
             clearTimeout(this.cursorHideTimer);
@@ -1123,17 +1332,8 @@ class PhotoFrameSlideshow {
         this.requestWakeLock(); // again after signing out and back in (cleanup turned it off)
         this.notices.start();
 
-        const imageData = await this.fetchRandomImage();
-        if (imageData) {
-            const loaded = await this.present(imageData);
-            if (loaded) {
-                this.scheduleNext();
-            } else {
-                this.showErrorKey('slideshow.loadFirstImageFailed');
-            }
-        } else {
-            this.showErrorKey('slideshow.noImages');
-        }
+        this.hasShownPhoto = false; // a new session: until its photo shows, say what's wrong
+        await this.recovery.start();
     }
 }
 
@@ -1364,19 +1564,20 @@ document.addEventListener('DOMContentLoaded', () => {
         window.slideshow.hideError();
         window.slideshow.initializeFolderSelector();
 
-        // Wait for folder selector to load folders before starting slideshow
-        if (window.slideshow && window.slideshow.folderSelector) {
+        // Load the folder list first (it checks the saved folder still exists), but
+        // don't wait on it for ever: the photos come without it, and only the
+        // slideshow's own start can show the error card and keep retrying
+        // Locked (signed out) while waiting: that sign-in is over, don't start
+        const generation = window.slideshow.recovery.generation;
+        if (window.slideshow.folderSelector) {
             try {
-                await window.slideshow.folderSelector.refresh();
-                // Start slideshow only after folders are loaded
-                await window.slideshow.startSlideshow();
+                await PhotoRecovery.withTimeout(window.slideshow.folderSelector.refresh(), REQUEST_TIMEOUT_MS);
             } catch (error) {
-                console.error('Failed to initialize slideshow:', error);
-                window.slideshow.showErrorKey('slideshow.loadFoldersFailed');
+                console.error('Folders did not load; starting the slideshow anyway:', error);
             }
-        } else {
-            window.slideshow.startSlideshow();
         }
+        if (window.slideshow.recovery.generation !== generation || !window.authManager.isAuthenticated) return;
+        window.slideshow.startSlideshow();
     });
 
     window.addEventListener('beforeunload', () => {

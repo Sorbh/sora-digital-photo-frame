@@ -2,11 +2,12 @@ const path = require('path');
 const { UPLOADS_DIR } = require('../config/paths');
 const { getLibrary } = require('../library');
 const { currentTenant } = require('../context');
-const { assertCanAdd } = require('../services/quotaService');
+const { assertCanAdd, addWithinQuota } = require('../services/quotaService');
 const sharp = require('sharp');
 const thumbnails = require('../services/thumbnailService');
 const { sharpInput } = require('../utils/heic');
-const { displayCopy } = require('../utils/displayCopy');
+const { displayCopy, assertImageSize, MAX_PIXELS } = require('../utils/displayCopy');
+const slots = require('../utils/workSlots');
 const { canSee } = require('../utils/viewerAccess');
 const snaps = require('../services/snapService');
 const playOrder = require('../services/playOrderService');
@@ -73,7 +74,11 @@ class ImageController {
   // Get random image endpoint with anti-repeat logic and folder filtering
   async getRandomImage(req, res) {
     try {
-      const folderFilter = req.query.folder;
+      // Already decoded by Express: decoding again breaks folder names with %.
+      // ?folder[]=x still works as before (an array reads as its joined text, and
+      // an empty ?folder[]= is still a filter that matches nothing).
+      const hasFolderFilter = Boolean(req.query.folder);
+      const folderFilter = hasFolderFilter ? String(req.query.folder) : '';
       const allImages = await this.getAllImages();
       
       if (allImages.length === 0) {
@@ -108,8 +113,8 @@ class ImageController {
       }
       
       // Apply folder filter if specified
-      if (folderFilter) {
-        const decodedFolder = decodeURIComponent(folderFilter);
+      if (hasFolderFilter) {
+        const decodedFolder = folderFilter;
 
         availableImages = availableImages.filter(img => {
           const imgFolder = path.dirname(img.relativePath);
@@ -117,7 +122,7 @@ class ImageController {
         });
 
         if (availableImages.length === 0) {
-          console.log('❌ API Filter - No images found in folder:', decodedFolder);
+          console.log('❌ API Filter - No images found in the chosen folder');
           return res.status(404).json({ 
             success: false,
             error: `No images found in folder: ${decodedFolder}`,
@@ -129,7 +134,7 @@ class ImageController {
       // The folder being played decides the order: shuffle, by date, or the
       // order set in the library. Ordered play is stateless: the frame sends
       // the last photo it showed (?after=) and gets the one after it.
-      const baseDir = folderFilter ? resolveAdminPath(path.join('uploads', decodeURIComponent(folderFilter))) : this.uploadsDir;
+      const baseDir = hasFolderFilter ? resolveAdminPath(path.join('uploads', folderFilter)) : this.uploadsDir;
       const { order } = baseDir ? await playOrder.read(baseDir) : { order: 'shuffle' };
       const randomImage = order === 'shuffle'
         ? this.pickShuffled(availableImages)
@@ -231,7 +236,7 @@ class ImageController {
       const imagePath = thumbnails.resolveInUploads(req.params.imageId);
 
       // Photos outside a frame's folders look like they don't exist
-      if (!imagePath || !thumbnails.IMAGE_PATTERN.test(imagePath) || !canSee(req, req.params.imageId) ||
+      if (!imagePath || !thumbnails.IMAGE_PATTERN.test(imagePath) || !canSee(req, path.relative(UPLOADS_DIR, imagePath)) ||
           !await getLibrary().exists(toAdminPath(imagePath))) {
         return res.status(404).json({
           success: false,
@@ -240,7 +245,7 @@ class ImageController {
         });
       }
 
-      thumbnails.send(res, await thumbnails.getThumbnail(imagePath), { versioned: Boolean(req.query.v) });
+      thumbnails.send(res, await thumbnails.getThumbnail(imagePath));
     } catch (error) {
       if (passClientError(res, error)) return;
       console.error('Error generating image thumbnail:', error);
@@ -268,6 +273,8 @@ class ImageController {
   // Upload images
   async uploadImages(req, res) {
     const processedFiles = [];
+    // Hold the upload slot (middleware/upload.js) until the work is done, even if the browser leaves
+    if (req.uploadSlot) req.uploadSlot.started = true;
     try {
       const uploadedFiles = req.files;
       const targetDir = resolveAdminPath(req.body.path || 'uploads', { allowRoot: true });
@@ -283,12 +290,13 @@ class ImageController {
       for (const [index, file] of uploadedFiles.entries()) {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
         const filename = `${file.fieldname}-${uniqueSuffix}.webp`;
+        // No room left at all (the library filled up during this batch)? Then don't convert it
+        await assertCanAdd(1);
         // A display copy sized for frames: upright, WebP, no metadata (GPS stays private)
         const buffer = await displayCopy(file.buffer, { animated: file.mimetype === 'image/gif' });
-        await assertCanAdd(buffer.length);
-        const added = await getLibrary().addPhoto(toAdminPath(targetDir), {
+        const added = await addWithinQuota(buffer.length, () => getLibrary().addPhoto(toAdminPath(targetDir), {
           buffer, originalName: filename, contentType: 'image/webp'
-        });
+        }));
         // Keep when and where it was taken, read from the original before it is dropped
         const storedPath = resolveAdminPath(added.path);
         await photoInfo.rememberUpload(storedPath, path.relative(this.uploadsDir, storedPath), file.buffer, sentInfo[index])
@@ -304,14 +312,24 @@ class ImageController {
         files: processedFiles
       });
     } catch (error) {
+      // Photos before the one that failed are kept: say which, and show them on frames
+      if (processedFiles.length) this.clearImageCache();
       if (error.code === 'QUOTA_EXCEEDED') {
-        // Photos before the one that hit the limit are kept
-        this.clearImageCache();
         return res.status(413).json({ message: error.message, code: error.code, files: processedFiles });
       }
-      if (passClientError(res, error)) return;
+      const status = error && error.status;
+      if (Number.isInteger(status) && status >= 400 && status < 500) {
+        return res.status(status).json({
+          message: error.expose === false ? 'Request failed' : error.message,
+          ...(error.code && { code: error.code }),
+          ...(error.vars && { ...error.vars }),
+          files: processedFiles
+        });
+      }
       console.error('Error uploading images:', error);
-      res.status(500).json({ message: 'Server error' });
+      res.status(500).json({ message: 'Server error', files: processedFiles });
+    } finally {
+      if (req.uploadSlot) req.uploadSlot.finish();
     }
   }
 
@@ -464,15 +482,36 @@ class ImageController {
         return res.status(400).json({ message: 'Angle must be a multiple of 90 degrees' });
       }
       
-      // Rotating drops EXIF, so make sure it's been read before the file changes
-      await photoInfo.get(fullPath, path.relative(this.uploadsDir, fullPath))
-        .catch(error => console.warn('Could not read photo info:', error.message));
-
-      const buffer = await sharp(await getLibrary().readPhoto(toAdminPath(fullPath)))
-        .rotate(angle)
-        .toFormat(this.formatFor(fullPath), { quality: parseInt(process.env.IMAGE_QUALITY) || 85 })
-        .toBuffer();
-      await getLibrary().writeItem(toAdminPath(fullPath), buffer);
+      // Converted like an upload: in turn with the others, and only if not too large
+      const release = await slots.acquire(currentTenant().id);
+      try {
+        // Rotating drops EXIF, so make sure it's been read before the file changes
+        await photoInfo.get(fullPath, path.relative(this.uploadsDir, fullPath))
+          .catch(error => console.warn('Could not read photo info:', error.message));
+        const before = await getLibrary().stat(toAdminPath(fullPath));
+        const original = await getLibrary().readPhoto(toAdminPath(fullPath));
+        await assertImageSize(original);
+        const buffer = await sharp(original, { limitInputPixels: MAX_PIXELS })
+          .rotate(angle)
+          .toFormat(this.formatFor(fullPath), { quality: parseInt(process.env.IMAGE_QUALITY) || 85 })
+          .toBuffer();
+        // A re-encoded photo can come out bigger: that growth needs room too. Checked in
+        // the family's turn, against the photo as it is now: gone or changed meanwhile, it stays so.
+        const sameFile = async () => {
+          const now = await getLibrary().stat(toAdminPath(fullPath));
+          if (!now || now.size !== before.size || now.mtimeMs !== before.mtimeMs) {
+            throw Object.assign(new Error('The photo changed while it was being rotated'), { status: 409, code: 'PHOTO_CHANGED' });
+          }
+        };
+        const growth = async () => { await sameFile(); return buffer.length - original.length; };
+        // Checked once more after the quota hook answered, right before writing
+        await addWithinQuota(growth, async () => {
+          await sameFile();
+          await getLibrary().writeItem(toAdminPath(fullPath), buffer);
+        });
+      } finally {
+        release();
+      }
       await photoInfo.moveUpload(fullPath, fullPath)
         .catch(error => console.warn('Could not keep photo info:', error.message));
 

@@ -81,7 +81,10 @@
     "keepAwakeNeedsTap": "此屏幕可能会进入休眠。轻点以保持常亮。",
     "keepAwakeUnavailable": "此浏览器无法保持屏幕常亮。请在设备的显示设置中关闭休眠。",
     "fullscreenUnavailable": "此浏览器无法全屏显示。请使用浏览器自带的菜单，或将相框添加到主屏幕。",
-    "fullscreenRefused": "浏览器未允许全屏。请再按一次按钮。"
+    "fullscreenRefused": "浏览器未允许全屏。请再按一次按钮。",
+    "retry": "重试",
+    "retryingNote": "相框会自动继续重试。",
+    "connectionTitle": "无法连接到你的照片"
   },
   "accessAccounts": {
     "frames_pins": "相框与 PIN",
@@ -195,7 +198,16 @@
     "donePaired": "{name} <em>已配对</em>",
     "expiredHeading": "此代码<em>已过期</em>",
     "heading": "在<em>这个相框</em>上显示照片",
-    "codeMatchHint": "请核对它与相框屏幕上的代码一致"
+    "codeMatchHint": "请核对它与相框屏幕上的代码一致",
+    "enterHeading": "输入<em>代码</em>",
+    "enterNote": "代码显示在相框的二维码下方，例如 <bdi class=\"code-example\">K7P-4QX</bdi>。",
+    "continue": "继续",
+    "codeInvalid": "请输入相框上显示的 6 位字母和数字。",
+    "typeCode": "输入代码",
+    "unreachableHeading": "无法<em>核对</em>代码",
+    "unreachableNote": "照片库没有响应。请检查手机的网络连接，然后重试。",
+    "tryAgain": "重试",
+    "foldersFailed": "无法加载文件夹，因此现在无法创建新账户。请选择现有账户，或重试。"
   },
   "login": {
     "invalid_password": "密码错误，请重试。",
@@ -227,6 +239,10 @@
     "connection": "连接出错，请重试。",
     "unknown": "出了点问题，请重试。",
     "FILE_TOO_LARGE": "每张照片最大 {size}MB",
+    "IMAGE_TOO_LARGE": "这张照片太大，无法处理。请换一张小一点的照片或短一点的动画。",
+    "UPLOAD_TOO_LARGE": "每次上传最大 {size}MB。",
+    "BUSY": "现在正在上传很多照片，请稍后再试。",
+    "PHOTO_CHANGED": "旋转时这张照片发生了变化，请重试。",
     "UNSUPPORTED_TYPE": "只能上传 JPEG、PNG、GIF、WebP 和 HEIC 照片",
     "SCREEN_LIMIT": "这个家庭已有 {limit} 块屏幕。请先移除一块不再使用的屏幕，再添加这一块。"
   },
@@ -283,6 +299,8 @@
     "static_051": "关闭",
     "static_052": "关闭照片",
     "static_053": "键盘快捷键",
+    "previousPhoto": "上一张照片",
+    "nextPhoto": "下一张照片",
     "static_054": "栏目",
     "static_055": "上传照片",
     "sortShuffle": "随机",
@@ -329,6 +347,7 @@
     "countSnaps_one": "{count} 个回忆页",
     "countSnaps_other": "{count} 个回忆页",
     "folderOptions": "文件夹选项",
+    "photoOptions": "照片选项",
     "selectPhoto": "选择照片",
     "viewPhoto": "查看照片",
     "deletePhoto": "删除照片",
@@ -555,6 +574,8 @@
     "fetchRandomFailed": "无法获取随机照片",
     "everyPhoto": "照片库中的所有照片",
     "browseFolder": "浏览文件夹",
+    "browseNamed": "打开 {name}",
+    "subfoldersOf": "{name} 中的文件夹",
     "photoCount_one": "{count} 张照片",
     "photoCount_other": "{count} 张照片"
   },

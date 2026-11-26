@@ -81,7 +81,10 @@
     "keepAwakeNeedsTap": "Esta tela pode apagar. Toque para mantê-la ligada.",
     "keepAwakeUnavailable": "Este navegador não consegue manter a tela ligada. Desative o modo de espera nas configurações de tela do aparelho.",
     "fullscreenUnavailable": "Este navegador não consegue abrir em tela cheia. Use o menu dele ou adicione o porta-retrato à tela inicial.",
-    "fullscreenRefused": "O navegador não permitiu a tela cheia. Tente o botão de novo."
+    "fullscreenRefused": "O navegador não permitiu a tela cheia. Tente o botão de novo.",
+    "retry": "Tentar de novo",
+    "retryingNote": "O porta-retrato continua tentando sozinho.",
+    "connectionTitle": "Não foi possível acessar suas fotos"
   },
   "accessAccounts": {
     "frames_pins": "Porta-retratos e PINs",
@@ -196,7 +199,16 @@
     "donePaired": "{name} está <em>conectado</em>",
     "expiredHeading": "Este código <em>expirou</em>",
     "heading": "Mostrar fotos <em>neste porta-retrato</em>",
-    "codeMatchHint": "Confira se é igual ao da tela do porta-retrato"
+    "codeMatchHint": "Confira se é igual ao da tela do porta-retrato",
+    "enterHeading": "Digite o <em>código</em>",
+    "enterNote": "O porta-retrato mostra o código abaixo do QR code, como <bdi class=\"code-example\">K7P-4QX</bdi>.",
+    "continue": "Continuar",
+    "codeInvalid": "Digite as 6 letras e números que aparecem no porta-retrato.",
+    "typeCode": "Digitar um código",
+    "unreachableHeading": "Não foi possível <em>verificar</em> o código",
+    "unreachableNote": "A biblioteca não respondeu. Confira a conexão do celular e tente de novo.",
+    "tryAgain": "Tentar de novo",
+    "foldersFailed": "Não foi possível carregar as pastas, então não dá para criar uma conta nova agora. Escolha uma conta existente ou tente de novo."
   },
   "login": {
     "invalid_password": "Senha incorreta. Tente de novo.",
@@ -228,6 +240,10 @@
     "connection": "Erro de conexão. Tente de novo.",
     "unknown": "Algo deu errado. Tente de novo.",
     "FILE_TOO_LARGE": "Cada foto pode ter no máximo {size} MB",
+    "IMAGE_TOO_LARGE": "Esta foto é grande demais para processar. Tente uma foto menor ou uma animação mais curta.",
+    "UPLOAD_TOO_LARGE": "Cada envio pode ter no máximo {size} MB.",
+    "BUSY": "Muitas fotos estão sendo enviadas agora. Tente de novo em instantes.",
+    "PHOTO_CHANGED": "Esta foto mudou enquanto era girada. Tente de novo.",
     "UNSUPPORTED_TYPE": "Só é possível enviar fotos JPEG, PNG, GIF, WebP e HEIC",
     "SCREEN_LIMIT": "Esta família já tem {limit} telas. Remova uma que você não usa mais para adicionar esta."
   },
@@ -284,6 +300,8 @@
     "static_051": "Fechar",
     "static_052": "Fechar foto",
     "static_053": "Atalhos de teclado",
+    "previousPhoto": "Foto anterior",
+    "nextPhoto": "Próxima foto",
     "static_054": "Seções",
     "static_055": "Enviar fotos",
     "sortShuffle": "Aleatória",
@@ -335,6 +353,7 @@
     "countSnaps_other": "{count} snaps",
     "countSnaps_many": "{count} snaps",
     "folderOptions": "Opções da pasta",
+    "photoOptions": "Opções da foto",
     "selectPhoto": "Selecionar foto",
     "viewPhoto": "Ver foto",
     "deletePhoto": "Excluir foto",
@@ -575,6 +594,8 @@
     "fetchRandomFailed": "Não foi possível buscar uma foto aleatória",
     "everyPhoto": "Todas as fotos da biblioteca",
     "browseFolder": "Abrir pasta",
+    "browseNamed": "Abrir {name}",
+    "subfoldersOf": "Pastas de {name}",
     "photoCount_one": "{count} foto",
     "photoCount_other": "{count} fotos",
     "photoCount_many": "{count} fotos"

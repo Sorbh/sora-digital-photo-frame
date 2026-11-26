@@ -82,7 +82,7 @@
             <section id="familyCodeCard" class="family-code-card hidden" aria-labelledby="familyCodeTitle">
                 <div class="family-code-text">
                     <p class="sora-eyebrow" id="familyCodeTitle" data-i18n="accessAccounts.familyCodeTitle">Family code</p>
-                    <p class="family-code sora-mono" id="familyCodeValue">····-····</p>
+                    <p class="family-code sora-mono"><span id="familyCodeValue" dir="ltr">····-····</span></p>
                     <p class="family-code-help" data-i18n="accessAccounts.familyCodeHelp">To sign in a frame with a PIN, type this code and the frame's PIN on its sign-in screen. Each frame that signs in counts as one of your screens.</p>
                 </div>
                 <button id="renewFamilyCodeBtn" class="btn-outline" type="button">
@@ -97,7 +97,7 @@
 
             <div id="emptyState" class="empty-state hidden">
                 <span class="material-symbols-outlined">key</span>
-                <h3 data-i18n="accessAccounts.static_005">No one has a key yet</h3>
+                <h2 data-i18n="accessAccounts.static_005">No one has a key yet</h2>
                 <p data-i18n="accessAccounts.static_006">Create an account to give a frame or a family member their own PIN.</p>
             </div>
         </main>
@@ -127,7 +127,7 @@
 
                                 <div class="grid gap-2">
                                     <label for="accountPin" class="label" data-i18n="accessAccounts.static_010">PIN Code</label>
-                                    <input type="text" id="accountPin" name="pin" class="input" required
+                                    <input type="text" id="accountPin" name="pin" class="input" dir="ltr" required inputmode="numeric" autocomplete="off"
                                         pattern="[0-9]{4,6}" placeholder="4-6 digit PIN" data-i18n-attr="placeholder:accessAccounts.static_024" maxlength="6">
                                     <span class="error-message hidden" id="pinError"></span>
                                     <p class="text-sm text-muted-foreground" data-i18n="accessAccounts.static_011">4-6 digits, must be unique</p>

@@ -81,7 +81,10 @@
     "keepAwakeNeedsTap": "This screen may go to sleep. Tap to keep it on.",
     "keepAwakeUnavailable": "This browser can't keep the screen on. Turn off sleep in the device's display settings.",
     "fullscreenUnavailable": "This browser can't go full screen. Use its own menu, or add the frame to the home screen.",
-    "fullscreenRefused": "The browser didn't allow full screen. Try the button again."
+    "fullscreenRefused": "The browser didn't allow full screen. Try the button again.",
+    "retry": "Retry",
+    "retryingNote": "The frame keeps trying by itself.",
+    "connectionTitle": "Can't reach your photos"
   },
   "accessAccounts": {
     "frames_pins": "Frames & PINs",
@@ -195,7 +198,16 @@
     "donePaired": "{name} is <em>paired</em>",
     "expiredHeading": "This code has <em>expired</em>",
     "heading": "Show photos on <em>this frame</em>",
-    "codeMatchHint": "Check it matches the frame's screen"
+    "codeMatchHint": "Check it matches the frame's screen",
+    "enterHeading": "Type the <em>code</em>",
+    "enterNote": "The frame shows it under its QR code, like <bdi class=\"code-example\">K7P-4QX</bdi>.",
+    "continue": "Continue",
+    "codeInvalid": "Type the 6 letters and numbers shown on the frame.",
+    "typeCode": "Type a code",
+    "unreachableHeading": "Couldn't <em>check</em> the code",
+    "unreachableNote": "The library didn't answer. Check your phone's connection, then try again.",
+    "tryAgain": "Try again",
+    "foldersFailed": "Couldn't load the folders, so a new account can't be set up right now. Pick an existing account, or try again."
   },
   "login": {
     "invalid_password": "Invalid password. Please try again.",
@@ -227,6 +239,10 @@
     "connection": "Connection error. Please try again.",
     "unknown": "Something went wrong. Please try again.",
     "FILE_TOO_LARGE": "Each photo can be up to {size} MB",
+    "IMAGE_TOO_LARGE": "This photo is too large to process. Try a smaller photo or a shorter animation.",
+    "UPLOAD_TOO_LARGE": "Each upload can be up to {size} MB.",
+    "BUSY": "Many photos are being uploaded right now. Please try again in a moment.",
+    "PHOTO_CHANGED": "This photo changed while it was being rotated. Please try again.",
     "UNSUPPORTED_TYPE": "Only JPEG, PNG, GIF, WebP and HEIC photos can be uploaded",
     "SCREEN_LIMIT": "This family already has {limit} screens. Remove one you no longer use to add this one."
   },
@@ -283,6 +299,8 @@
     "static_051": "Close",
     "static_052": "Close Photo",
     "static_053": "Keyboard shortcuts",
+    "previousPhoto": "Previous photo",
+    "nextPhoto": "Next photo",
     "static_054": "Sections",
     "static_055": "Upload photos",
     "sortShuffle": "Shuffle",
@@ -329,6 +347,7 @@
     "countSnaps_one": "{count} snap",
     "countSnaps_other": "{count} snaps",
     "folderOptions": "Folder options",
+    "photoOptions": "Photo options",
     "selectPhoto": "Select Photo",
     "viewPhoto": "View Photo",
     "deletePhoto": "Delete Photo",
@@ -555,6 +574,8 @@
     "fetchRandomFailed": "Failed to fetch random image",
     "everyPhoto": "Every photo in the library",
     "browseFolder": "Browse folder",
+    "browseNamed": "Open {name}",
+    "subfoldersOf": "Folders in {name}",
     "photoCount_one": "{count} photo",
     "photoCount_other": "{count} photos"
   },

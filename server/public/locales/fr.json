@@ -81,7 +81,10 @@
     "keepAwakeNeedsTap": "Cet écran peut se mettre en veille. Touchez-le pour le garder allumé.",
     "keepAwakeUnavailable": "Ce navigateur ne peut pas garder l’écran allumé. Désactivez la mise en veille dans les réglages d’affichage de l’appareil.",
     "fullscreenUnavailable": "Ce navigateur ne peut pas passer en plein écran. Utilisez son propre menu, ou ajoutez le cadre à l’écran d’accueil.",
-    "fullscreenRefused": "Le navigateur a refusé le plein écran. Réessayez avec le bouton."
+    "fullscreenRefused": "Le navigateur a refusé le plein écran. Réessayez avec le bouton.",
+    "retry": "Réessayer",
+    "retryingNote": "Le cadre continue d’essayer tout seul.",
+    "connectionTitle": "Impossible d’accéder à vos photos"
   },
   "accessAccounts": {
     "frames_pins": "Cadres et codes PIN",
@@ -196,7 +199,16 @@
     "donePaired": "{name} est <em>associé</em>",
     "expiredHeading": "Ce code a <em>expiré</em>",
     "heading": "Afficher des photos sur <em>ce cadre</em>",
-    "codeMatchHint": "Vérifiez qu’il correspond à l’écran du cadre"
+    "codeMatchHint": "Vérifiez qu’il correspond à l’écran du cadre",
+    "enterHeading": "Saisissez le <em>code</em>",
+    "enterNote": "Le cadre l’affiche sous son code QR, par exemple <bdi class=\"code-example\">K7P-4QX</bdi>.",
+    "continue": "Continuer",
+    "codeInvalid": "Saisissez les 6 lettres et chiffres affichés sur le cadre.",
+    "typeCode": "Saisir un code",
+    "unreachableHeading": "Impossible de <em>vérifier</em> le code",
+    "unreachableNote": "La bibliothèque n’a pas répondu. Vérifiez la connexion de votre téléphone, puis réessayez.",
+    "tryAgain": "Réessayer",
+    "foldersFailed": "Impossible de charger les dossiers : un nouveau compte ne peut pas être créé pour le moment. Choisissez un compte existant ou réessayez."
   },
   "login": {
     "invalid_password": "Mot de passe incorrect. Veuillez réessayer.",
@@ -228,6 +240,10 @@
     "connection": "Erreur de connexion. Veuillez réessayer.",
     "unknown": "Un problème est survenu. Veuillez réessayer.",
     "FILE_TOO_LARGE": "Chaque photo peut faire au maximum {size} Mo",
+    "IMAGE_TOO_LARGE": "Cette photo est trop grande pour être traitée. Essayez une photo plus petite ou une animation plus courte.",
+    "UPLOAD_TOO_LARGE": "Chaque envoi peut faire au maximum {size} Mo.",
+    "BUSY": "Beaucoup de photos sont en cours d'envoi. Veuillez réessayer dans un instant.",
+    "PHOTO_CHANGED": "Cette photo a changé pendant sa rotation. Veuillez réessayer.",
     "UNSUPPORTED_TYPE": "Seules les photos JPEG, PNG, GIF, WebP et HEIC peuvent être importées",
     "SCREEN_LIMIT": "Cette famille a déjà {limit} écrans. Retirez-en un que vous n’utilisez plus pour ajouter celui-ci."
   },
@@ -284,6 +300,8 @@
     "static_051": "Fermer",
     "static_052": "Fermer la photo",
     "static_053": "Raccourcis clavier",
+    "previousPhoto": "Photo précédente",
+    "nextPhoto": "Photo suivante",
     "static_054": "Sections",
     "static_055": "Importer des photos",
     "sortShuffle": "Aléatoire",
@@ -335,6 +353,7 @@
     "countSnaps_other": "{count} pages souvenir",
     "countSnaps_many": "{count} pages souvenir",
     "folderOptions": "Options du dossier",
+    "photoOptions": "Options de la photo",
     "selectPhoto": "Sélectionner la photo",
     "viewPhoto": "Voir la photo",
     "deletePhoto": "Supprimer la photo",
@@ -575,6 +594,8 @@
     "fetchRandomFailed": "Impossible de récupérer une image au hasard",
     "everyPhoto": "Toutes les photos de la photothèque",
     "browseFolder": "Parcourir le dossier",
+    "browseNamed": "Ouvrir {name}",
+    "subfoldersOf": "Dossiers de {name}",
     "photoCount_one": "{count} photo",
     "photoCount_other": "{count} photos",
     "photoCount_many": "{count} photos"

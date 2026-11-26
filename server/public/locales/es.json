@@ -81,7 +81,10 @@
     "keepAwakeNeedsTap": "Esta pantalla puede apagarse. Tócala para mantenerla encendida.",
     "keepAwakeUnavailable": "Este navegador no puede mantener la pantalla encendida. Desactiva la suspensión en los ajustes de pantalla del dispositivo.",
     "fullscreenUnavailable": "Este navegador no puede mostrar pantalla completa. Usa su propio menú o añade el marco a la pantalla de inicio.",
-    "fullscreenRefused": "El navegador no permitió la pantalla completa. Vuelve a pulsar el botón."
+    "fullscreenRefused": "El navegador no permitió la pantalla completa. Vuelve a pulsar el botón.",
+    "retry": "Reintentar",
+    "retryingNote": "El marco sigue intentándolo por sí solo.",
+    "connectionTitle": "No se puede acceder a tus fotos"
   },
   "accessAccounts": {
     "frames_pins": "Marcos y PIN",
@@ -195,7 +198,16 @@
     "donePaired": "{name} está <em>vinculado</em>",
     "expiredHeading": "Este código ha <em>caducado</em>",
     "heading": "Muestra fotos en <em>este marco</em>",
-    "codeMatchHint": "Comprueba que coincide con la pantalla del marco"
+    "codeMatchHint": "Comprueba que coincide con la pantalla del marco",
+    "enterHeading": "Escribe el <em>código</em>",
+    "enterNote": "El marco lo muestra debajo de su código QR, por ejemplo <bdi class=\"code-example\">K7P-4QX</bdi>.",
+    "continue": "Continuar",
+    "codeInvalid": "Escribe las 6 letras y números que aparecen en el marco.",
+    "typeCode": "Escribir un código",
+    "unreachableHeading": "No se pudo <em>comprobar</em> el código",
+    "unreachableNote": "La biblioteca no respondió. Revisa la conexión de tu teléfono y vuelve a intentarlo.",
+    "tryAgain": "Reintentar",
+    "foldersFailed": "No se pudieron cargar las carpetas, así que ahora no se puede crear una cuenta nueva. Elige una cuenta existente o vuelve a intentarlo."
   },
   "login": {
     "invalid_password": "Contraseña incorrecta. Inténtalo de nuevo.",
@@ -227,6 +239,10 @@
     "connection": "Error de conexión. Inténtalo de nuevo.",
     "unknown": "Algo ha fallado. Inténtalo de nuevo.",
     "FILE_TOO_LARGE": "Cada foto puede pesar como máximo {size} MB",
+    "IMAGE_TOO_LARGE": "Esta foto es demasiado grande para procesarla. Prueba con una foto más pequeña o una animación más corta.",
+    "UPLOAD_TOO_LARGE": "Cada subida puede pesar como máximo {size} MB.",
+    "BUSY": "Se están subiendo muchas fotos ahora mismo. Inténtalo de nuevo en un momento.",
+    "PHOTO_CHANGED": "Esta foto cambió mientras se giraba. Inténtalo de nuevo.",
     "UNSUPPORTED_TYPE": "Solo se pueden subir fotos JPEG, PNG, GIF, WebP y HEIC",
     "SCREEN_LIMIT": "Esta familia ya tiene {limit} pantallas. Quita una que ya no uses para añadir esta."
   },
@@ -283,6 +299,8 @@
     "static_051": "Cerrar",
     "static_052": "Cerrar foto",
     "static_053": "Atajos de teclado",
+    "previousPhoto": "Foto anterior",
+    "nextPhoto": "Siguiente foto",
     "static_054": "Secciones",
     "static_055": "Subir fotos",
     "sortShuffle": "Aleatorio",
@@ -334,6 +352,7 @@
     "countSnaps_other": "{count} recuerdos",
     "countSnaps_many": "{count} recuerdos",
     "folderOptions": "Opciones de la carpeta",
+    "photoOptions": "Opciones de la foto",
     "selectPhoto": "Seleccionar foto",
     "viewPhoto": "Ver foto",
     "deletePhoto": "Eliminar foto",
@@ -572,6 +591,8 @@
     "fetchRandomFailed": "No se pudo obtener una foto al azar",
     "everyPhoto": "Todas las fotos de la biblioteca",
     "browseFolder": "Ver carpeta",
+    "browseNamed": "Abrir {name}",
+    "subfoldersOf": "Carpetas de {name}",
     "photoCount_one": "{count} foto",
     "photoCount_other": "{count} fotos",
     "photoCount_many": "{count} fotos"

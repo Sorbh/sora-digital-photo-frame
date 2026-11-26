@@ -223,6 +223,43 @@ body.note-showing .stage-scrim {
     color: rgba(244, 239, 230, 0.65);
 }
 
+.error-card .error-retry-note {
+    font-size: 0.85rem;
+    color: rgba(244, 239, 230, 0.5);
+}
+
+/* Big enough to hit with a finger or reach with a TV remote */
+.error-retry {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+    padding: 12px 24px;
+    min-height: 48px;
+    border: 0;
+    border-radius: 999px;
+    background: #ff5c8d;
+    color: #1a0b12;
+    font: inherit;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.error-retry .material-icons {
+    font-size: 20px;
+    color: inherit;
+}
+
+.error-retry:focus-visible {
+    outline: 3px solid #fff;
+    outline-offset: 3px;
+}
+
+.error-retry:active {
+    transform: scale(0.97);
+}
+
 .error-card a {
     margin-top: 10px;
     font-size: 0.875rem;
@@ -451,15 +488,23 @@ body.is-paused .paused-badge {
 
 .controls {
     position: absolute;
-    left: 50%;
-    bottom: clamp(1.25rem, 4vh, 2.5rem);
+    /* Centred with auto margins rather than left: 50%, so the dock sizes to its
+       buttons instead of shrinking them to fit half the screen */
+    left: 0;
+    right: 0;
+    width: max-content;
+    max-width: calc(100% - 8px); /* wraps to a second row rather than clipping */
+    margin: 0 auto;
+    flex-wrap: wrap;
+    justify-content: center;
+    bottom: calc(clamp(1.25rem, 4vh, 2.5rem) + env(safe-area-inset-bottom, 0px));
     z-index: 10;
     display: flex;
     align-items: center;
     gap: 2px;
     padding: 6px;
     border-radius: var(--shape-lg);
-    transform: translate(-50%, 12px);
+    transform: translateY(12px);
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.35s ease, transform 0.45s var(--ease-out);
@@ -479,17 +524,21 @@ body.is-paused .paused-badge {
     box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08) inset, 0 20px 50px -20px rgba(0, 0, 0, 0.8);
 }
 
+/* The folder picker marks the dock while it is open (js/folderSelector.js).
+   No :has() in this list: a browser that can't read one selector drops the
+   whole rule, and older TVs and tablets would never show the dock. */
 body.chrome-visible .controls,
 .controls:focus-within,
 .controls:hover,
-.controls:has(.open) {
+.controls.picker-open {
     opacity: 1;
-    transform: translate(-50%, 0);
+    transform: none;
     pointer-events: auto;
 }
 
 .dock-btn {
     display: grid;
+    flex-shrink: 0;
     place-items: center;
     width: 44px;
     height: 44px;
@@ -570,8 +619,12 @@ body.chrome-visible .controls,
     color: rgba(244, 239, 230, 0.72);
 }
 
-/* The info card and note pages take the corner while they are up */
-.slideshow-container:has(.info-overlay:not(.hidden)) .photo-caption,
+/* The info card and note pages take the corner while they are up
+   (separate rules, so browsers without :has() still keep the second) */
+.slideshow-container:has(.info-overlay:not(.hidden)) .photo-caption {
+    opacity: 0;
+}
+
 body.note-showing .photo-caption {
     opacity: 0;
 }
@@ -1098,17 +1151,18 @@ body.note-showing .photo-caption {
         top: 3.75rem;
     }
 
+    /* 44px buttons: tighter gaps and dividers so the dock still fits a 360px phone */
     .controls {
-        bottom: 1rem;
+        bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+        gap: 0;
     }
 
-    .dock-btn {
-        width: 40px;
-        height: 40px;
+    .dock-divider {
+        margin: 0 4px;
     }
 
     .weather-widget {
-        bottom: 5.5rem;
+        bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
     }
 
     .photo-caption {
@@ -1156,6 +1210,18 @@ body.note-showing .photo-caption {
 
     body.is-paused.notice-pill .photo-caption {
         top: 7.5rem;
+    }
+}
+
+/* Phones up to 360px: no dividers and a slimmer frame keep all seven 44px
+   buttons on one row (312px) from 320px up, clear of the date and weather */
+@media (max-width: 360px) {
+    .controls {
+        padding: 4px 2px;
+    }
+
+    .dock-divider {
+        display: none;
     }
 }
 

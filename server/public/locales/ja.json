@@ -81,7 +81,10 @@
     "keepAwakeNeedsTap": "この画面はスリープする可能性があります。タップすると画面がついたままになります。",
     "keepAwakeUnavailable": "このブラウザでは画面をつけたままにできません。端末の画面設定でスリープをオフにしてください。",
     "fullscreenUnavailable": "このブラウザは全画面表示にできません。ブラウザのメニューを使うか、フレームをホーム画面に追加してください。",
-    "fullscreenRefused": "ブラウザが全画面表示を許可しませんでした。もう一度ボタンを押してください。"
+    "fullscreenRefused": "ブラウザが全画面表示を許可しませんでした。もう一度ボタンを押してください。",
+    "retry": "再試行",
+    "retryingNote": "フレームは自動で再試行を続けます。",
+    "connectionTitle": "写真に接続できません"
   },
   "accessAccounts": {
     "frames_pins": "フレームとPIN",
@@ -195,7 +198,16 @@
     "donePaired": "{name}を<em>接続しました</em>",
     "expiredHeading": "このコードは<em>期限切れ</em>です",
     "heading": "<em>このフレーム</em>に写真を表示",
-    "codeMatchHint": "フレームの画面と同じか確認してください"
+    "codeMatchHint": "フレームの画面と同じか確認してください",
+    "enterHeading": "<em>コード</em>を入力",
+    "enterNote": "フレームのQRコードの下に、<bdi class=\"code-example\">K7P-4QX</bdi> のように表示されています。",
+    "continue": "続ける",
+    "codeInvalid": "フレームに表示された6文字の英数字を入力してください。",
+    "typeCode": "コードを入力",
+    "unreachableHeading": "コードを<em>確認</em>できませんでした",
+    "unreachableNote": "ライブラリから応答がありません。スマートフォンの接続を確認してから、もう一度お試しください。",
+    "tryAgain": "もう一度試す",
+    "foldersFailed": "フォルダを読み込めなかったため、今は新しいアカウントを作成できません。既存のアカウントを選ぶか、もう一度お試しください。"
   },
   "login": {
     "invalid_password": "パスワードが正しくありません。もう一度お試しください。",
@@ -227,6 +239,10 @@
     "connection": "接続エラーです。もう一度お試しください。",
     "unknown": "問題が発生しました。もう一度お試しください。",
     "FILE_TOO_LARGE": "写真は1枚{size}MBまでです",
+    "IMAGE_TOO_LARGE": "この写真は大きすぎて処理できません。小さめの写真か短いアニメーションでお試しください。",
+    "UPLOAD_TOO_LARGE": "1回のアップロードは{size}MBまでです。",
+    "BUSY": "現在たくさんの写真がアップロードされています。少し待ってからもう一度お試しください。",
+    "PHOTO_CHANGED": "回転中にこの写真が変更されました。もう一度お試しください。",
     "UNSUPPORTED_TYPE": "アップロードできるのはJPEG、PNG、GIF、WebP、HEICの写真だけです",
     "SCREEN_LIMIT": "このファミリーにはすでに{limit}台の画面があります。追加するには、使わなくなった画面を1台削除してください。"
   },
@@ -283,6 +299,8 @@
     "static_051": "閉じる",
     "static_052": "写真を閉じる",
     "static_053": "キーボードショートカット",
+    "previousPhoto": "前の写真",
+    "nextPhoto": "次の写真",
     "static_054": "セクション",
     "static_055": "写真をアップロード",
     "sortShuffle": "シャッフル",
@@ -329,6 +347,7 @@
     "countSnaps_one": "{count}件のスナップ",
     "countSnaps_other": "{count}件のスナップ",
     "folderOptions": "フォルダのオプション",
+    "photoOptions": "写真のオプション",
     "selectPhoto": "写真を選択",
     "viewPhoto": "写真を見る",
     "deletePhoto": "写真を削除",
@@ -555,6 +574,8 @@
     "fetchRandomFailed": "写真を取得できませんでした",
     "everyPhoto": "ライブラリのすべての写真",
     "browseFolder": "フォルダを見る",
+    "browseNamed": "{name} を開く",
+    "subfoldersOf": "{name} 内のフォルダ",
     "photoCount_one": "{count}枚の写真",
     "photoCount_other": "{count}枚の写真"
   },

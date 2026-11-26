@@ -81,7 +81,10 @@
     "keepAwakeNeedsTap": "Dieser Bildschirm kann sich ausschalten. Tippen Sie, damit er an bleibt.",
     "keepAwakeUnavailable": "Dieser Browser kann den Bildschirm nicht anlassen. Schalten Sie den Ruhezustand in den Anzeigeeinstellungen des Geräts aus.",
     "fullscreenUnavailable": "Dieser Browser kann nicht in den Vollbildmodus wechseln. Nutzen Sie sein eigenes Menü oder legen Sie den Rahmen auf den Startbildschirm.",
-    "fullscreenRefused": "Der Browser hat den Vollbildmodus nicht erlaubt. Versuchen Sie es noch einmal mit der Taste."
+    "fullscreenRefused": "Der Browser hat den Vollbildmodus nicht erlaubt. Versuchen Sie es noch einmal mit der Taste.",
+    "retry": "Erneut versuchen",
+    "retryingNote": "Der Rahmen versucht es von selbst weiter.",
+    "connectionTitle": "Ihre Fotos sind nicht erreichbar"
   },
   "accessAccounts": {
     "frames_pins": "Rahmen & PINs",
@@ -195,7 +198,16 @@
     "donePaired": "{name} ist <em>gekoppelt</em>",
     "expiredHeading": "Dieser Code ist <em>abgelaufen</em>",
     "heading": "Fotos auf <em>diesem Rahmen</em> zeigen",
-    "codeMatchHint": "Prüfen Sie, ob er mit dem Code auf dem Rahmen übereinstimmt"
+    "codeMatchHint": "Prüfen Sie, ob er mit dem Code auf dem Rahmen übereinstimmt",
+    "enterHeading": "Code <em>eingeben</em>",
+    "enterNote": "Der Rahmen zeigt ihn unter seinem QR-Code an, etwa <bdi class=\"code-example\">K7P-4QX</bdi>.",
+    "continue": "Weiter",
+    "codeInvalid": "Geben Sie die 6 Buchstaben und Ziffern vom Rahmen ein.",
+    "typeCode": "Code eingeben",
+    "unreachableHeading": "Code konnte nicht <em>geprüft</em> werden",
+    "unreachableNote": "Die Bibliothek hat nicht geantwortet. Prüfen Sie die Verbindung Ihres Telefons und versuchen Sie es erneut.",
+    "tryAgain": "Erneut versuchen",
+    "foldersFailed": "Die Ordner konnten nicht geladen werden, daher lässt sich gerade kein neues Konto anlegen. Wählen Sie ein vorhandenes Konto oder versuchen Sie es erneut."
   },
   "login": {
     "invalid_password": "Falsches Passwort. Bitte versuchen Sie es noch einmal.",
@@ -227,6 +239,10 @@
     "connection": "Verbindungsfehler. Bitte versuchen Sie es noch einmal.",
     "unknown": "Etwas ist schiefgelaufen. Bitte versuchen Sie es noch einmal.",
     "FILE_TOO_LARGE": "Jedes Foto darf höchstens {size} MB groß sein",
+    "IMAGE_TOO_LARGE": "Dieses Foto ist zu groß zum Verarbeiten. Bitte wählen Sie ein kleineres Foto oder eine kürzere Animation.",
+    "UPLOAD_TOO_LARGE": "Jeder Upload darf höchstens {size} MB groß sein.",
+    "BUSY": "Gerade werden viele Fotos hochgeladen. Bitte versuchen Sie es gleich noch einmal.",
+    "PHOTO_CHANGED": "Dieses Foto wurde beim Drehen geändert. Bitte versuchen Sie es noch einmal.",
     "UNSUPPORTED_TYPE": "Es können nur JPEG-, PNG-, GIF-, WebP- und HEIC-Fotos hochgeladen werden",
     "SCREEN_LIMIT": "Diese Familie hat bereits {limit} Bildschirme. Entfernen Sie einen, den Sie nicht mehr nutzen, um diesen hinzuzufügen."
   },
@@ -283,6 +299,8 @@
     "static_051": "Schließen",
     "static_052": "Foto schließen",
     "static_053": "Tastenkürzel",
+    "previousPhoto": "Vorheriges Foto",
+    "nextPhoto": "Nächstes Foto",
     "static_054": "Bereiche",
     "static_055": "Fotos hochladen",
     "sortShuffle": "Zufällig",
@@ -329,6 +347,7 @@
     "countSnaps_one": "{count} Snap",
     "countSnaps_other": "{count} Snaps",
     "folderOptions": "Ordneroptionen",
+    "photoOptions": "Fotooptionen",
     "selectPhoto": "Foto auswählen",
     "viewPhoto": "Foto ansehen",
     "deletePhoto": "Foto löschen",
@@ -555,6 +574,8 @@
     "fetchRandomFailed": "Es konnte kein zufälliges Bild abgerufen werden",
     "everyPhoto": "Alle Fotos aus der Bibliothek",
     "browseFolder": "Ordner öffnen",
+    "browseNamed": "{name} öffnen",
+    "subfoldersOf": "Ordner in {name}",
     "photoCount_one": "{count} Foto",
     "photoCount_other": "{count} Fotos"
   },

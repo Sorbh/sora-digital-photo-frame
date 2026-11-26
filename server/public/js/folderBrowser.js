@@ -20,6 +20,7 @@ class FolderBrowser {
         this.currentPath = '';
         this.currentFolder = null;
         this.isLoading = false;
+        this.loadRequest = 0; // only the latest load may draw
         
         this.initializeComponent();
         this.loadCurrentFolder();
@@ -39,15 +40,17 @@ class FolderBrowser {
                 
                 <div class="folder-controls">
                     ${this.options.showAllFoldersOption ? `
-                        <button class="folder-option all-folders-btn" data-path="">
-                            <div class="folder-icon">
-                                <span class="material-icons">auto_awesome_mosaic</span>
-                            </div>
-                            <div class="folder-info">
-                                <div class="folder-name" data-i18n="folders.static_005">${t('folders.static_005')}</div>
-                                <div class="folder-count" data-i18n="folders.everyPhoto">${t('folders.everyPhoto')}</div>
-                            </div>
-                        </button>
+                        <div class="folder-option all-folders-btn" data-path="">
+                            <button type="button" class="folder-choice">
+                                <span class="folder-icon" aria-hidden="true">
+                                    <span class="material-icons">auto_awesome_mosaic</span>
+                                </span>
+                                <span class="folder-info">
+                                    <span class="folder-name" data-i18n="folders.static_005">${t('folders.static_005')}</span>
+                                    <span class="folder-count" data-i18n="folders.everyPhoto">${t('folders.everyPhoto')}</span>
+                                </span>
+                            </button>
+                        </div>
                     ` : ''}
                 </div>
                 
@@ -83,30 +86,32 @@ class FolderBrowser {
      * Set up event listeners
      */
     setupEventListeners() {
-        // Folder selection
         this.container.addEventListener('click', (e) => {
-            const folderBtn = e.target.closest('.folder-option');
-            if (folderBtn) {
-                e.preventDefault();
-                const folderPath = folderBtn.dataset.path;
-                const folderName = folderBtn.querySelector('.folder-name')?.textContent || '';
-                this.selectFolder(folderPath, folderName);
-            }
-
-            // Folder navigation (enter subfolder)
+            // Folder navigation (enter subfolder) comes first: browsing doesn't choose the folder
             const navBtn = e.target.closest('.folder-nav');
             if (navBtn) {
                 e.preventDefault();
-                const folderPath = navBtn.dataset.path;
-                this.navigateToFolder(folderPath);
+                this.navigateToFolder(navBtn.dataset.path);
+                return;
             }
 
             // Breadcrumb navigation
             const breadcrumbBtn = e.target.closest('.breadcrumb-item');
             if (breadcrumbBtn) {
                 e.preventDefault();
-                const folderPath = breadcrumbBtn.dataset.path;
-                this.navigateToFolder(folderPath);
+                this.navigateToFolder(breadcrumbBtn.dataset.path);
+                return;
+            }
+
+            // Folder selection: the card's main button
+            const choice = e.target.closest('.folder-choice');
+            if (choice) {
+                e.preventDefault();
+                const folderOption = choice.closest('.folder-option');
+                const folderPath = folderOption.dataset.path;
+                const folderName = folderOption.querySelector('.folder-name')?.textContent || '';
+                this.selectFolder(folderPath, folderName);
+                return;
             }
 
             // Retry button
@@ -115,6 +120,29 @@ class FolderBrowser {
                 e.preventDefault();
                 this.loadCurrentFolder();
             }
+        });
+
+        // Arrow keys move between the page's buttons and links (folders, Retry, the
+        // header and tab bar), for TV remotes without Tab (js/arrowFocus.js).
+        // With nothing focused yet, the first arrow lands on the folder playing now,
+        // or on Retry when the folders failed to load.
+        document.addEventListener('keydown', (e) => {
+            if (!window.SoraArrowFocus || !SoraArrowFocus.DIRECTIONS[e.key]) return;
+            const active = document.activeElement;
+            const buttons = [...document.querySelectorAll('button, a[href]')];
+            let target = null;
+            if (!active || active === document.body) {
+                const retry = this.container.querySelector('.folder-error:not(.hidden) .retry-btn');
+                target = retry
+                    || this.container.querySelector('.folder-option.selected .folder-choice')
+                    || this.container.querySelector('.folder-choice');
+            } else if (buttons.includes(active)) {
+                target = SoraArrowFocus.next(buttons, active, e.key);
+            }
+            // Nothing that way: leave the key to the page (scrolling)
+            if (!target) return;
+            e.preventDefault();
+            target.focus();
         });
     }
 
@@ -184,16 +212,14 @@ class FolderBrowser {
                 position: relative;
                 display: flex;
                 align-items: center;
-                gap: 14px;
+                gap: 8px;
                 width: 100%;
-                padding: 12px 14px 12px 12px;
+                min-width: 0;
+                padding-inline-end: 14px;
                 border: 1.5px solid var(--rule);
                 border-radius: var(--shape-md);
                 background: var(--paper-raised);
                 color: var(--foreground);
-                font: inherit;
-                text-align: left;
-                cursor: pointer;
                 box-shadow: var(--shadow-soft);
                 animation: fb-in 0.45s var(--ease-out) both;
                 transition: transform 0.25s var(--ease-out), border-color 0.2s ease, box-shadow 0.25s ease;
@@ -202,6 +228,30 @@ class FolderBrowser {
             @keyframes fb-in {
                 from { opacity: 0; transform: translateY(8px); }
                 to { opacity: 1; transform: none; }
+            }
+
+            /* Choosing the folder: most of the card */
+            .folder-choice {
+                display: flex;
+                flex: 1;
+                align-items: center;
+                gap: 14px;
+                min-width: 0;
+                padding: 12px;
+                border: 0;
+                border-radius: inherit;
+                background: transparent;
+                color: inherit;
+                font: inherit;
+                text-align: start;
+                cursor: pointer;
+            }
+
+            .folder-choice:focus-visible,
+            .folder-nav:focus-visible,
+            .breadcrumb-item:focus-visible {
+                outline: 2px solid var(--berry);
+                outline-offset: 2px;
             }
 
             .folder-option:hover {
@@ -256,6 +306,11 @@ class FolderBrowser {
             .folder-option:nth-child(3n + 2) .folder-icon { background: var(--teal-soft); color: #4f7f86; }
             .folder-option:nth-child(3n) .folder-icon { background: var(--blush); color: var(--berry); }
 
+            /* No browse arrow here: the button takes the whole card */
+            .folder-option.all-folders-btn {
+                padding-inline-end: 0;
+            }
+
             .all-folders-btn .folder-icon {
                 background: var(--berry-gradient);
                 color: #fff;
@@ -271,6 +326,7 @@ class FolderBrowser {
             }
 
             .folder-name {
+                display: block;
                 overflow: hidden;
                 font-weight: 700;
                 font-size: 1rem;
@@ -280,6 +336,7 @@ class FolderBrowser {
             }
 
             .folder-count {
+                display: block;
                 margin-top: 2px;
                 font-size: 0.8125rem;
                 color: var(--muted-foreground);
@@ -305,6 +362,14 @@ class FolderBrowser {
 
             .folder-nav .material-icons {
                 font-size: 18px;
+            }
+
+            [dir="rtl"] .folder-nav .material-icons {
+                transform: scaleX(-1);
+            }
+
+            [dir="rtl"] .folder-nav:hover {
+                transform: translateX(-2px);
             }
 
             .folder-loading,
@@ -353,7 +418,7 @@ class FolderBrowser {
 
             @media (max-width: 640px) {
                 .folder-grid {
-                    grid-template-columns: 1fr;
+                    grid-template-columns: minmax(0, 1fr);
                 }
             }
         `;
@@ -365,8 +430,17 @@ class FolderBrowser {
      * @param {string} folderPath - Path to navigate to
      */
     async navigateToFolder(folderPath) {
+        // The button that was pressed goes away with the old cards: start the keyboard on the new ones
+        const hadFocus = this.container.contains(document.activeElement);
         this.currentPath = folderPath;
-        await this.loadCurrentFolder();
+        const shown = await this.loadCurrentFolder();
+        // Only if this is still the folder shown and focus went with the old cards,
+        // not if the person moved on (another folder, another part of the page)
+        const lost = !document.activeElement || document.activeElement === document.body;
+        if (shown && hadFocus && lost) {
+            (this.container.querySelector('.folder-grid .folder-choice')
+                || this.container.querySelector('.breadcrumb-item:last-child'))?.focus();
+        }
     }
 
     /**
@@ -395,22 +469,29 @@ class FolderBrowser {
      * Load current folder data from API
      */
     async loadCurrentFolder() {
-        if (this.isLoading) return;
+        // A newer load (browsing again before this one arrived) wins: older answers are dropped.
+        // Resolves true when this load is the one drawn.
+        const request = ++this.loadRequest;
+        const latest = () => request === this.loadRequest;
         
         this.showLoading(true);
         this.hideError();
         
         try {
             const data = await this.folderService.getFolderStructure(this.currentPath);
+            if (!latest()) return false;
             this.currentFolder = data;
             this.renderFolderContent();
             this.updateBreadcrumb();
             this.updateSelectedState();
+            return true;
         } catch (error) {
+            if (!latest()) return false;
             console.error('Error loading folder:', error);
             this.showError(error.message);
+            return false;
         } finally {
-            this.showLoading(false);
+            if (latest()) this.showLoading(false);
         }
     }
 
@@ -426,48 +507,54 @@ class FolderBrowser {
         if (this.currentFolder.folders) {
             // Root level - show all folders
             this.currentFolder.folders.forEach(folder => {
-                grid.appendChild(this.createFolderElement(folder, false));
+                grid.appendChild(this.createFolderElement(folder));
             });
         } else if (this.currentFolder.subfolders) {
             // Specific folder - show subfolders
             this.currentFolder.subfolders.forEach(folder => {
-                grid.appendChild(this.createFolderElement(folder, true));
+                grid.appendChild(this.createFolderElement(folder));
             });
         }
     }
 
     /**
      * Create folder element
+     * A card holds two buttons: the folder itself to choose it, and an arrow
+     * to browse its subfolders (only when it has some)
      * @param {Object} folder - Folder data
-     * @param {boolean} hasSubfolders - Whether folder has subfolders to navigate into
      * @returns {HTMLElement} Folder element
      */
-    createFolderElement(folder, hasSubfolders = false) {
+    createFolderElement(folder) {
         const element = document.createElement('div');
         element.className = 'folder-option';
         element.dataset.path = folder.path;
 
         const thumbnailHtml = folder.thumbnail 
             ? `<img src="${folder.thumbnail}" alt="" class="folder-thumbnail" loading="lazy">`
-            : `<div class="folder-icon"><span class="material-icons">folder</span></div>`;
+            : `<span class="folder-icon" aria-hidden="true"><span class="material-icons">folder</span></span>`;
 
-        const navigationBtn = hasSubfolders && folder.hasSubfolders 
-            ? `<button class="folder-nav" title="${t('folders.browseFolder')}">
-                 <span class="material-icons">arrow_forward</span>
+        const navigationBtn = folder.hasSubfolders 
+            ? `<button type="button" class="folder-nav" title="${t('folders.browseFolder')}">
+                 <span class="material-icons" aria-hidden="true">arrow_forward</span>
                </button>`
             : '';
 
         element.innerHTML = `
-            ${thumbnailHtml}
-            <div class="folder-info">
-                <div class="folder-name"></div>
-                <div class="folder-count">${t('folders.photoCount', { count: folder.imageCount })}</div>
-            </div>
+            <button type="button" class="folder-choice">
+                ${thumbnailHtml}
+                <span class="folder-info">
+                    <span class="folder-name"></span>
+                    <span class="folder-count">${t('folders.photoCount', { count: folder.imageCount })}</span>
+                </span>
+            </button>
             ${navigationBtn}
         `;
         element.querySelector('.folder-name').textContent = folder.name;
         const navBtn = element.querySelector('.folder-nav');
-        if (navBtn) navBtn.dataset.path = folder.path;
+        if (navBtn) {
+            navBtn.dataset.path = folder.path;
+            navBtn.setAttribute('aria-label', t('folders.browseNamed', { name: folder.name }));
+        }
 
         return element;
     }
@@ -517,12 +604,14 @@ class FolderBrowser {
         // Remove previous selection
         this.container.querySelectorAll('.folder-option.selected').forEach(el => {
             el.classList.remove('selected');
+            el.querySelector('.folder-choice')?.removeAttribute('aria-current');
         });
         
         // Add selection to current folder
-        const selectedElement = this.container.querySelector(`[data-path="${selectedPath}"]`);
+        const selectedElement = this.container.querySelector(`.folder-option[data-path="${CSS.escape(selectedPath)}"]`);
         if (selectedElement) {
             selectedElement.classList.add('selected');
+            selectedElement.querySelector('.folder-choice')?.setAttribute('aria-current', 'true');
         }
     }
 

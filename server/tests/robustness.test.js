@@ -22,17 +22,47 @@ const photoInfo = require('../services/photoInfoService');
 // A store that can break on demand, like a database going away
 let storeDown = false;
 let noTenant = false;
+const failingWrites = { name: null, skip: 0, fail: 0 }; // writes of one file to let through, then to fail
 class FlakyStore extends LocalDataStore {
   async get(name, fallback) {
     if (storeDown) throw new Error('store is down');
     if (noTenant) throw Object.assign(new Error('Authentication required'), { status: 401, code: 'AUTH_REQUIRED' });
     return super.get(name, fallback);
   }
+  async update(name, fallback, updater) {
+    if (name === failingWrites.name) {
+      if (failingWrites.skip > 0) failingWrites.skip -= 1;
+      else if (failingWrites.fail > 0) {
+        failingWrites.fail -= 1;
+        throw new Error('store is down');
+      }
+    }
+    return super.update(name, fallback, updater);
+  }
+}
+
+// A session store that can fail to swap a session id, like a database going away
+const session = require('express-session');
+let sessionsDown = false;
+let sessionWritesToFail = 0;
+class FlakySessions extends session.MemoryStore {
+  destroy(sid, callback) {
+    if (sessionsDown) return callback(new Error('sessions are down'));
+    return super.destroy(sid, callback);
+  }
+  set(sid, data, callback) {
+    if (sessionWritesToFail > 0) {
+      sessionWritesToFail -= 1;
+      return callback(new Error('sessions are down'));
+    }
+    return super.set(sid, data, callback);
+  }
 }
 
 let failEvents = false;
 const app = createApp({
   dataStore: new FlakyStore(),
+  sessionStore: new FlakySessions(),
   events: {
     devicesRemoved() {
       if (failEvents) throw new Error('host index is down');
@@ -89,6 +119,16 @@ describe('Robustness', () => {
       const res = await admin.get('/api/folders/family/thumbnail').expect(200);
       expect(res.headers['cache-control']).toMatch(/^private/);
     });
+
+    test('are checked with the server again before the browser reuses them', async () => {
+      for (const url of ['/api/folders/family/thumbnail?v=1', '/api/folders/family/thumbnail']) {
+        const res = await admin.get(url).expect(200);
+        expect(res.headers['cache-control']).toBe('private, no-cache');
+        expect(res.headers.etag).toBeTruthy();
+        // Still signed in and allowed: the browser can keep its copy
+        await admin.get(url).set('If-None-Match', res.headers.etag).expect(304);
+      }
+    });
   });
 
   describe('uploads', () => {
@@ -126,9 +166,10 @@ describe('Robustness', () => {
 
     test('a frame can still collect its pairing on the next poll', async () => {
       await dataStore.set('access-accounts', [{ id: 'acc_pair', name: 'Grandma', pinHash: 'x', assignedFolders: [] }]);
-      const { body: started } = await request(app).post('/api/pair/start').expect(200);
+      const frame = request.agent(app);
+      const { body: started } = await frame.post('/api/pair/start').expect(200);
       await pairing.approve(started.code, { name: 'Tablet', accountId: 'acc_pair' });
-      const poll = () => request(app).get('/api/pair/status').query({ code: started.code, secret: started.secret });
+      const poll = () => frame.post('/api/pair/collect').send({ code: started.code, secret: started.secret });
 
       storeDown = true;
       await poll().expect(500);
@@ -136,6 +177,68 @@ describe('Robustness', () => {
       const { body } = await poll().expect(200);
       expect(body.status).toBe('approved');
       expect(body.token).toBeTruthy();
+    });
+
+    test('a frame can still collect its pairing after the session store failed', async () => {
+      await dataStore.set('access-accounts', [{ id: 'acc_pair', name: 'Grandma', pinHash: 'x', assignedFolders: [] }]);
+      const frame = request.agent(app);
+      const { body: started } = await frame.post('/api/pair/start').expect(200);
+      await frame.get('/api/auth/session'); // the frame has a session whose id is swapped at sign-in
+      await pairing.approve(started.code, { name: 'Tablet', accountId: 'acc_pair' });
+      const poll = () => frame.post('/api/pair/collect').send({ code: started.code, secret: started.secret });
+
+      sessionsDown = true;
+      try {
+        await poll().expect(500);
+      } finally {
+        sessionsDown = false;
+      }
+      const { body } = await poll().expect(200);
+      expect(body.status).toBe('approved');
+      expect(body.token).toBeTruthy();
+    });
+
+    test('a frame can still collect its pairing after the signed-in session failed to save', async () => {
+      await dataStore.set('access-accounts', [{ id: 'acc_pair', name: 'Grandma', pinHash: 'x', assignedFolders: [] }]);
+      const frame = request.agent(app);
+      const { body: started } = await frame.post('/api/pair/start').expect(200);
+      await pairing.approve(started.code, { name: 'Tablet', accountId: 'acc_pair' });
+      const poll = () => frame.post('/api/pair/collect').send({ code: started.code, secret: started.secret });
+
+      // Exactly one write fails: the one saving the signed-in session
+      sessionWritesToFail = 1;
+      let failed;
+      try {
+        failed = await poll();
+      } finally {
+        sessionWritesToFail = 0;
+      }
+      expect(failed.status).toBe(500);
+      // The failed try left this browser signed out, whatever cookie came back
+      expect((await frame.get('/api/auth/session').expect(200)).body.authenticated).toBe(false);
+      const { body } = await poll().expect(200);
+      expect(body.status).toBe('approved');
+      expect((await frame.get('/api/auth/session').expect(200)).body.authenticated).toBe(true);
+    });
+
+    test('an approval whose new account could not be finished fails and is undone', async () => {
+      const devicesBefore = (await admin.get('/api/admin/devices').expect(200)).body.devices.length;
+      const frame = request.agent(app);
+      const { body: started } = await frame.post('/api/pair/start').expect(200);
+      // The account is made, then the write that finishes it fails once
+      Object.assign(failingWrites, { name: 'access-accounts', skip: 1, fail: 1 });
+      let res;
+      try {
+        res = await admin.post(`/api/admin/pair/${started.code}/approve`).send({ name: 'Unfinished', newAccount: {} });
+      } finally {
+        Object.assign(failingWrites, { name: null, skip: 0, fail: 0 });
+      }
+      expect(res.status).toBe(500);
+      expect((await admin.get('/api/admin/devices').expect(200)).body.devices).toHaveLength(devicesBefore);
+      const accounts = (await admin.get('/api/access-accounts').expect(200)).body.accounts;
+      expect(accounts.some(a => a.name === 'Unfinished')).toBe(false);
+      const collected = await frame.post('/api/pair/collect').send({ code: started.code, secret: started.secret }).expect(200);
+      expect(collected.body.status).not.toBe('approved');
     });
 
     test('saved photo info is not replaced after a failed read', async () => {
@@ -158,8 +261,9 @@ describe('Robustness', () => {
     test('a PIN is not counted as wrong', async () => {
       storeDown = true;
       const res = await request(app).post('/api/auth/pin').send({ pin: '482913' });
-      expect(res.status).toBe(500);
-      expect(res.body.code).not.toBe('INVALID_PIN');
+      // The family's saved tries can't be read either: sign-in is refused for now
+      expect(res.status).toBe(503);
+      expect(res.body.code).toBe('SIGN_IN_UNAVAILABLE');
     });
   });
 

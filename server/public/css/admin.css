@@ -295,8 +295,8 @@ body {
 
 .snap-badge {
     position: absolute;
-    top: 10px;
-    right: 10px;
+    top: 13px;
+    inset-inline-start: 46px; /* beside the select circle; the options button has the other corner */
     z-index: 6;
     display: inline-flex;
     align-items: center;
@@ -314,7 +314,36 @@ body {
 }
 
 .snap-badge .material-symbols-outlined {
+    flex: none;
     font-size: 14px;
+}
+
+/* Long names ("Page souvenir") stop short of the options button: start 46px,
+   button and its margins about 56px */
+.snap-badge {
+    max-width: calc(100% - 104px);
+}
+
+.snap-badge-text {
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+/* Too narrow for any of the word (small phones): the book icon alone says snap */
+.file-item.snap {
+    container-type: inline-size;
+}
+
+@container (max-width: 180px) {
+    .snap-badge {
+        padding-inline-end: 7px;
+    }
+
+    .snap-badge-text {
+        display: none;
+    }
 }
 
 .photo-grid-overlay {
@@ -346,7 +375,7 @@ body {
     gap: 6px;
 }
 
-.photo-grid-actions .btn-icon {
+.photo-grid-overlay .btn-icon {
     display: inline-grid;
     place-items: center;
     width: 34px;
@@ -361,23 +390,25 @@ body {
     box-shadow: none;
 }
 
-.photo-grid-actions .btn-icon:hover {
+.photo-grid-overlay .btn-icon:hover {
     background: rgb(255 255 255 / 0.95);
     color: #14120f;
 }
 
-.photo-grid-actions .btn-icon[data-action="delete"]:hover {
+.photo-grid-overlay .btn-icon[data-action="delete"]:hover {
     background: var(--destructive);
     color: #fff;
 }
 
-.photo-grid-actions .btn-icon .material-symbols-outlined {
+.photo-grid-overlay .btn-icon .material-symbols-outlined {
     font-size: 18px;
     line-height: 1;
 }
 
 .photo-grid-overlay-top {
     display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
 }
 
 .photo-grid-checkbox .label {
@@ -440,6 +471,46 @@ body {
 
 .file-item.image.selected {
     box-shadow: 0 0 0 3px var(--background), 0 0 0 5px var(--safelight);
+}
+
+/* Touch screens have no hover: the select circle, the options button and
+   the View and Delete buttons stay in view, at finger size, and holding a
+   photo selects it instead of opening the browser's image callout. Laptops
+   with a touch screen as well as a trackpad count too (any-pointer). */
+@media (hover: none), (pointer: coarse), (any-pointer: coarse) {
+    .file-item.image {
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        user-select: none;
+    }
+
+    .photo-grid-overlay {
+        padding: 6px;
+        opacity: 1;
+    }
+
+    .photo-grid-overlay .btn-icon {
+        width: 44px;
+        height: 44px;
+        background: rgb(0 0 0 / 0.38);
+    }
+
+    .photo-grid-overlay .btn-icon .material-symbols-outlined {
+        font-size: 22px;
+    }
+
+    .photo-grid-checkbox .label {
+        padding: 10px;
+    }
+
+    .photo-grid-info {
+        right: 106px;
+    }
+
+    .snap-badge {
+        top: 17px;
+        inset-inline-start: 48px;
+    }
 }
 
 .file-item.image.selected .admin-photo-image img {
@@ -723,9 +794,12 @@ body {
 
 .photo-modal-dialog {
     width: 100vw;
+    /* dvh: the visible height, so nothing sits under expanded browser bars */
     height: 100vh;
+    height: 100dvh;
     max-width: 100vw;
     max-height: 100vh;
+    max-height: 100dvh;
     margin: 0;
     padding: 0;
     border: none;
@@ -783,6 +857,7 @@ body {
 .modal-photo {
     max-width: calc(100vw - 4rem);
     max-height: calc(100vh - 8rem);
+    max-height: calc(100dvh - 8rem);
     object-fit: contain;
     border-radius: var(--shape-xs);
     box-shadow: 0 30px 80px rgb(0 0 0 / 0.6);
@@ -794,6 +869,52 @@ body {
 .modal-photo.zoomed {
     cursor: zoom-out;
     transform: scale(1.5);
+}
+
+/* Previous / next buttons: shown on phones and touch screens, where the
+   arrow keys and the hover hints aren't available */
+.photo-modal-nav {
+    display: none;
+    gap: 1rem;
+    margin-top: 1rem;
+    z-index: 1001;
+}
+
+.photo-modal-nav[hidden] {
+    display: none !important;
+}
+
+.photo-modal-nav-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    border: 1px solid rgb(255 255 255 / 0.14);
+    border-radius: 50%;
+    background: rgb(255 255 255 / 0.08);
+    color: #fff;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.photo-modal-nav-btn:hover {
+    background: rgb(255 255 255 / 0.16);
+}
+
+.photo-modal-nav-btn .material-symbols-outlined {
+    font-size: 28px;
+}
+
+html[dir="rtl"] .photo-modal-nav-btn .material-symbols-outlined {
+    transform: scaleX(-1);
+}
+
+/* any-pointer: coarse also covers touch-screen laptops with a mouse attached */
+@media (max-width: 640px), (hover: none), (any-pointer: coarse) {
+    .photo-modal-nav {
+        display: flex;
+    }
 }
 
 .photo-modal-hints {
@@ -842,6 +963,12 @@ body {
     gap: 4px;
 }
 
+/* Right-to-left: Right Arrow is previous and Left Arrow next, so the hint
+   lists → first, next to "Previous / next" */
+html[dir="rtl"] .photo-modal-hints .keys {
+    flex-direction: row-reverse;
+}
+
 .photo-modal-hints li > span:last-child {
     align-self: center;
     white-space: nowrap;
@@ -878,13 +1005,20 @@ body {
     .photo-modal-close {
         top: 1rem;
         right: 1rem;
-        width: 40px;
-        height: 40px;
+        width: 44px;
+        height: 44px;
     }
 
     .modal-photo {
         max-width: calc(100vw - 2rem);
         max-height: calc(100vh - 6rem);
+        max-height: calc(100dvh - 6rem);
+    }
+
+    /* Room for the previous / next buttons when they show */
+    .photo-modal-dialog.has-nav .modal-photo {
+        max-height: calc(100vh - 10rem);
+        max-height: calc(100dvh - 10rem);
     }
 
     .photo-modal-hints {
@@ -923,7 +1057,7 @@ body {
     margin-top: 1.5rem;
     padding: 2rem 1rem;
     background: radial-gradient(ellipse 50% 60% at 50% 50%, color-mix(in oklab, var(--berry) 7%, transparent), transparent 75%);
-    color: color-mix(in oklab, var(--muted-foreground) 55%, transparent);
+    color: var(--muted-foreground); /* full strength: help text needs 4.5:1 */
     text-align: center;
     pointer-events: none;
     transition: color 0.25s ease;
@@ -946,10 +1080,14 @@ body {
 
 .drop-hint .drop-hint-sub {
     font-size: 0.8125rem;
-    opacity: 0.8;
 }
 
+/* Deep berry on cream, bright berry on the night album: 4.5:1 or more as text */
 .app.file-dragging .drop-hint {
+    color: var(--berry-deep);
+}
+
+html.dark .app.file-dragging .drop-hint {
     color: var(--berry);
 }
 

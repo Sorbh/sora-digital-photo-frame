@@ -1,6 +1,13 @@
 /**
  * Folder Selector Widget - Compact folder selector for slideshow page
  */
+
+// A folder path inside a CSS attribute selector: names can hold quotes, # and backslashes
+function cssEscape(value) {
+    if (window.CSS && typeof window.CSS.escape === 'function') return window.CSS.escape(value);
+    return String(value).replace(/[\0-\x1f\x7f]|["\\]/g, c => (/["\\]/.test(c) ? `\\${c}` : `\\${c.charCodeAt(0).toString(16)} `));
+}
+
 class FolderSelector {
     constructor(container, options = {}) {
         this.container = container;
@@ -33,7 +40,7 @@ class FolderSelector {
     initializeComponent() {
         this.container.innerHTML = `
             <div class="folder-selector">
-                <button class="folder-selector-btn" title="${t('folders.selectForSlideshow')}" data-i18n-attr="title:folders.selectForSlideshow">
+                <button type="button" class="folder-selector-btn" aria-expanded="false" title="${t('folders.selectForSlideshow')}" data-i18n-attr="title:folders.selectForSlideshow">
                     <span class="material-icons">folder</span>
                     <span class="selected-folder-name">${t('folders.allFoldersTitle')}</span>
                     <span class="material-icons dropdown-arrow">keyboard_arrow_down</span>
@@ -42,7 +49,7 @@ class FolderSelector {
                 <div class="folder-dropdown hidden">
                     <div class="folder-dropdown-header">
                         <span data-i18n="folders.selectFolder">${t('folders.selectFolder')}</span>
-                        <button class="close-dropdown">
+                        <button type="button" class="close-dropdown" aria-label="${t('common.close')}" data-i18n-attr="aria-label:common.close">
                             <span class="material-icons">close</span>
                         </button>
                     </div>
@@ -51,11 +58,13 @@ class FolderSelector {
                         <div class="folder-option all-folders" data-path="">
                             <div class="folder-option-content">
                                 <div class="folder-spacer"></div>
-                                <span class="material-icons folder-icon">photo_library</span>
-                                <div class="folder-details">
-                                    <div class="folder-name" data-i18n="folders.allFoldersTitle">${t('folders.allFoldersTitle')}</div>
-                                    <div class="folder-count" data-i18n="folders.allImages">${t('folders.allImages')}</div>
-                                </div>
+                                <button type="button" class="folder-choice">
+                                    <span class="material-icons folder-icon" aria-hidden="true">photo_library</span>
+                                    <span class="folder-details">
+                                        <span class="folder-name" data-i18n="folders.allFoldersTitle">${t('folders.allFoldersTitle')}</span>
+                                        <span class="folder-count" data-i18n="folders.allImages">${t('folders.allImages')}</span>
+                                    </span>
+                                </button>
                             </div>
                         </div>
                         
@@ -119,13 +128,15 @@ class FolderSelector {
                 return;
             }
 
-            // Handle folder selection
-            const folderOption = e.target.closest('.folder-option');
-            if (folderOption && !e.target.closest('.close-dropdown')) {
+            // Handle folder selection: each choice is a button of its own
+            const choice = e.target.closest('.folder-choice');
+            if (choice) {
                 e.preventDefault();
+                const folderOption = choice.closest('.folder-option');
                 const folderPath = folderOption.dataset.path;
                 const folderName = folderOption.querySelector('.folder-name')?.textContent || '';
                 this.selectFolder(folderPath, folderName);
+                return;
             }
 
             // Retry button
@@ -148,6 +159,25 @@ class FolderSelector {
             if (e.key === 'Escape' && this.isOpen) {
                 this.closeDropdown();
             }
+        });
+
+        // Arrow keys move between the picker's buttons, for TV remotes without Tab
+        // (js/arrowFocus.js); the slideshow doesn't see them
+        this.container.querySelector('.folder-dropdown').addEventListener('keydown', (e) => {
+            if (!window.SoraArrowFocus || !SoraArrowFocus.DIRECTIONS[e.key]) return;
+            e.preventDefault();
+            e.stopPropagation();
+            const buttons = this.container.querySelectorAll('.folder-dropdown button');
+            SoraArrowFocus.next(buttons, document.activeElement, e.key)?.focus();
+        });
+
+        // Up from the folder button opens the panel above it, or steps into it
+        selectorBtn.addEventListener('keydown', (e) => {
+            if (e.key !== 'ArrowUp') return;
+            e.preventDefault();
+            e.stopPropagation();
+            if (this.isOpen) this.focusSelected();
+            else this.openDropdown();
         });
     }
 
@@ -207,13 +237,15 @@ class FolderSelector {
             }
 
             .folder-dropdown {
+                /* Moves the panel off its centre; phones use it to centre on the safe area */
+                --folder-shift: 0px;
                 position: absolute;
                 bottom: calc(100% + 18px);
                 left: 50%;
                 width: 21rem;
                 max-width: calc(100vw - 2rem);
                 padding: 6px;
-                transform: translateX(-50%);
+                transform: translateX(calc(-50% + var(--folder-shift)));
                 transform-origin: 50% 100%;
                 border: 1px solid rgba(255, 255, 255, 0.08);
                 border-radius: var(--shape-lg);
@@ -227,8 +259,8 @@ class FolderSelector {
             }
 
             @keyframes folder-pop {
-                from { opacity: 0; transform: translateX(-50%) translateY(8px) scale(0.97); }
-                to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+                from { opacity: 0; transform: translateX(calc(-50% + var(--folder-shift))) translateY(8px) scale(0.97); }
+                to { opacity: 1; transform: translateX(calc(-50% + var(--folder-shift))) translateY(0) scale(1); }
             }
 
             .folder-dropdown.hidden {
@@ -246,11 +278,13 @@ class FolderSelector {
                 color: rgba(255, 244, 239, 0.55);
             }
 
+            /* 44px target; the negative margins keep the header as tall as before */
             .close-dropdown {
                 display: grid;
                 place-items: center;
-                width: 28px;
-                height: 28px;
+                width: 44px;
+                height: 44px;
+                margin: -8px -8px -8px 0;
                 border: 0;
                 border-radius: 50%;
                 background: transparent;
@@ -267,14 +301,15 @@ class FolderSelector {
                 font-size: 18px;
             }
 
+            /* Fit between the top of the screen and the dock, but always show at
+               least one row. dvh is the height actually visible (phone toolbars
+               shown); older browsers keep the vh line, and very old ones the first. */
             .folder-options {
-                max-height: min(56vh, 30rem);
+                max-height: 56vh;
+                max-height: max(3.75rem, min(56vh, 30rem, calc(100vh - 12rem)));
+                max-height: max(3.75rem, min(56dvh, 30rem, calc(100dvh - 12rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))));
                 overflow-y: auto;
                 overscroll-behavior: contain;
-            }
-
-            .folder-option {
-                cursor: pointer;
             }
 
             .folder-option-content {
@@ -284,6 +319,30 @@ class FolderSelector {
                 padding: 7px 10px 7px 8px;
                 border-radius: var(--shape-sm);
                 transition: background-color 0.15s ease;
+            }
+
+            .folder-choice {
+                display: flex;
+                flex: 1;
+                align-items: center;
+                gap: 12px;
+                min-width: 0;
+                padding: 0;
+                border: 0;
+                border-radius: var(--shape-xs);
+                background: transparent;
+                color: inherit;
+                font: inherit;
+                text-align: start;
+                cursor: pointer;
+            }
+
+            .folder-choice:focus-visible,
+            .expand-btn:focus-visible,
+            .close-dropdown:focus-visible,
+            .folder-selector-btn:focus-visible {
+                outline: 2px solid #ff5c8d;
+                outline-offset: 2px;
             }
 
             .folder-option:hover .folder-option-content {
@@ -306,27 +365,43 @@ class FolderSelector {
                 flex-shrink: 0;
             }
 
+            /* 44px tap target around the 22px chevron. The negative end margin
+               cancels the row gap, so the button ends where the thumbnail starts
+               and the two never overlap. */
             .expand-btn {
                 display: grid;
                 place-items: center;
-                width: 22px;
-                height: 22px;
+                width: 44px;
+                height: 44px;
                 flex-shrink: 0;
-                margin-right: -6px;
+                margin-inline-end: -12px;
+                padding: 0;
                 border: 0;
-                border-radius: var(--shape-xs);
                 background: transparent;
                 color: rgba(255, 244, 239, 0.6);
                 cursor: pointer;
             }
 
+            .expand-btn .material-icons {
+                display: grid;
+                place-items: center;
+                width: 22px;
+                height: 22px;
+                border-radius: var(--shape-xs);
+                font-size: 18px;
+            }
+
             .expand-btn:hover {
-                background: rgba(255, 255, 255, 0.1);
                 color: #fff4ef;
             }
 
-            .expand-btn .material-icons {
-                font-size: 18px;
+            .expand-btn:hover .material-icons {
+                background: rgba(255, 255, 255, 0.1);
+            }
+
+            /* The closed arrow points the way the text reads */
+            html[dir="rtl"] .expand-btn[aria-expanded="false"] .material-icons {
+                transform: scaleX(-1);
             }
 
             .folder-option .folder-icon,
@@ -357,11 +432,13 @@ class FolderSelector {
 
             .folder-details {
                 display: grid;
+                flex: 1;
                 gap: 3px;
                 min-width: 0;
             }
 
             .folder-option .folder-name {
+                display: block;
                 overflow: hidden;
                 font: 500 0.95rem/1.2 var(--font-sans, sans-serif);
                 white-space: nowrap;
@@ -369,6 +446,7 @@ class FolderSelector {
             }
 
             .folder-count {
+                display: block;
                 font: 400 0.6875rem/1 var(--font-sans, sans-serif);
                 letter-spacing: 0.04em;
                 color: rgba(255, 244, 239, 0.5);
@@ -425,8 +503,9 @@ class FolderSelector {
             /* Phones: icon-only so the dock fits the screen */
             @media (max-width: 600px) {
                 .folder-selector-btn {
-                    width: 40px;
-                    height: 40px;
+                    flex-shrink: 0;
+                    width: 44px;
+                    height: 44px;
                     padding: 0;
                     justify-content: center;
                 }
@@ -434,6 +513,34 @@ class FolderSelector {
                 .selected-folder-name,
                 .dropdown-arrow {
                     display: none;
+                }
+            }
+
+            /* Small screens, narrow or short (a phone on its side): the button sits
+               off-centre in the dock, so hang the panel from the dock instead,
+               which is centred on the screen, and keep it inside the safe area
+               (notches, rounded corners) */
+            @media (max-width: 600px), (max-height: 520px) {
+                .controls .folder-selector {
+                    position: static;
+                }
+
+                .folder-dropdown {
+                    --folder-shift: calc((env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)) / 2);
+                    bottom: calc(100% + 12px);
+                    max-width: calc(100vw - 1.5rem - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px));
+                }
+            }
+
+            /* Short screens: a tighter header and gap leave room for the folders */
+            @media (max-height: 520px) {
+                .folder-dropdown {
+                    bottom: calc(100% + 8px);
+                }
+
+                .folder-dropdown-header {
+                    padding-top: 4px;
+                    padding-bottom: 4px;
                 }
             }
         `;
@@ -457,12 +564,31 @@ class FolderSelector {
     openDropdown() {
         this.isOpen = true;
         this.container.classList.add('open');
+        this.container.closest('.controls')?.classList.add('picker-open');
         this.container.querySelector('.folder-dropdown').classList.remove('hidden');
+        this.container.querySelector('.folder-selector-btn').setAttribute('aria-expanded', 'true');
         
-        // Load folders if not already loaded
-        if (this.folders.length === 0 && !this.isLoading) {
-            this.loadFolders();
-        }
+        // Load folders if not already loaded (or wait for the load already running),
+        // then start the keyboard on the chosen folder once the list is there
+        const ready = this.folders.length === 0 || this.loadingFolders ? this.loadFolders() : Promise.resolve();
+        ready.then(() => this.focusSelected());
+    }
+
+    /**
+     * Put focus on the chosen folder, so a keyboard or remote starts there
+     */
+    async focusSelected() {
+        if (!this.isOpen) return;
+        const choices = this.container.querySelector('.folder-options');
+        const selectedPath = this.folderStorage.getCurrentFolderPath();
+        const rowFor = path => choices.querySelector(`.folder-option[data-path="${cssEscape(path)}"] .folder-choice`);
+        // A folder inside a closed one isn't drawn yet: open its parents first
+        if (selectedPath && !rowFor(selectedPath)) await this.expandParentFolders(selectedPath);
+        if (!this.isOpen) return;
+        // Not when the person has moved on while the folders were loading
+        const active = document.activeElement;
+        if (active && active !== document.body && !this.container.contains(active)) return;
+        (rowFor(selectedPath) || choices.querySelector('.folder-choice'))?.focus();
     }
 
     /**
@@ -470,8 +596,15 @@ class FolderSelector {
      */
     closeDropdown() {
         this.isOpen = false;
+        const dropdown = this.container.querySelector('.folder-dropdown');
+        const hadFocus = dropdown.contains(document.activeElement);
         this.container.classList.remove('open');
-        this.container.querySelector('.folder-dropdown').classList.add('hidden');
+        this.container.closest('.controls')?.classList.remove('picker-open');
+        dropdown.classList.add('hidden');
+        const toggle = this.container.querySelector('.folder-selector-btn');
+        toggle.setAttribute('aria-expanded', 'false');
+        // Hand focus back to the button rather than losing it with the hidden panel
+        if (hadFocus) toggle.focus();
     }
 
     /**
@@ -511,8 +644,17 @@ class FolderSelector {
         const list = this.container.querySelector('.folder-list');
         if (!list) return;
 
+        // Redrawing replaces the buttons: keep focus on the same one
+        const active = list.contains(document.activeElement) ? document.activeElement : null;
+        const focusPath = active?.closest('.folder-option')?.dataset.path;
+        const focusPart = active?.classList.contains('expand-btn') ? '.expand-btn' : '.folder-choice';
+
         list.innerHTML = '';
         this.renderFolderLevel(this.folders, list, 0);
+
+        if (focusPath !== undefined) {
+            list.querySelector(`.folder-option[data-path="${cssEscape(focusPath)}"] ${focusPart}`)?.focus();
+        }
     }
 
     /**
@@ -532,24 +674,32 @@ class FolderSelector {
             const hasSubfolders = folder.hasSubfolders;
             const indentPadding = level * 20; // 20px per level
             
+            // Expanding and choosing are separate buttons, so both work from a keyboard or remote
             element.innerHTML = `
-                <div class="folder-option-content" style="padding-left: ${indentPadding}px;">
+                <div class="folder-option-content" style="padding-inline-start: ${indentPadding}px;">
                     ${hasSubfolders ? 
-                        `<button class="expand-btn" data-expanded="${isExpanded}">
-                            <span class="material-icons">${isExpanded ? 'keyboard_arrow_down' : 'keyboard_arrow_right'}</span>
+                        `<button type="button" class="expand-btn" aria-expanded="${isExpanded}">
+                            <span class="material-icons" aria-hidden="true">${isExpanded ? 'keyboard_arrow_down' : 'keyboard_arrow_right'}</span>
                         </button>` : 
                         `<div class="folder-spacer"></div>`
                     }
-                    ${folder.thumbnail
-                        ? `<img class="folder-thumb" src="${folder.thumbnail}" alt="">`
-                        : `<span class="material-icons folder-icon">folder</span>`}
-                    <div class="folder-details">
-                        <div class="folder-name"></div>
-                        ${this.options.showFolderCount ? `<div class="folder-count">${t('folders.imageCount', { count: folder.imageCount })}</div>` : ''}
-                    </div>
+                    <button type="button" class="folder-choice">
+                        ${folder.thumbnail
+                            ? `<img class="folder-thumb" src="${folder.thumbnail}" alt="">`
+                            : `<span class="material-icons folder-icon" aria-hidden="true">folder</span>`}
+                        <span class="folder-details">
+                            <span class="folder-name"></span>
+                            ${this.options.showFolderCount ? `<span class="folder-count">${t('folders.imageCount', { count: folder.imageCount })}</span>` : ''}
+                        </span>
+                    </button>
                 </div>
             `;
             element.querySelector('.folder-name').textContent = folder.name;
+            element.querySelector('.expand-btn')?.setAttribute('aria-label', t('folders.subfoldersOf', { name: folder.name }));
+            if (folder.path === this.folderStorage.getCurrentFolderPath()) {
+                element.classList.add('selected');
+                element.querySelector('.folder-choice').setAttribute('aria-current', 'true');
+            }
 
             container.appendChild(element);
             
@@ -613,12 +763,14 @@ class FolderSelector {
         // Remove previous selection
         this.container.querySelectorAll('.folder-option.selected').forEach(el => {
             el.classList.remove('selected');
+            el.querySelector('.folder-choice')?.removeAttribute('aria-current');
         });
         
         // Add selection to current folder
-        const selectedElement = this.container.querySelector(`[data-path="${selectedPath}"]`);
+        const selectedElement = this.container.querySelector(`.folder-option[data-path="${cssEscape(selectedPath)}"]`);
         if (selectedElement) {
             selectedElement.classList.add('selected');
+            selectedElement.querySelector('.folder-choice')?.setAttribute('aria-current', 'true');
             
             // Auto-expand parent folders if needed
             this.expandParentFolders(selectedPath);
@@ -809,3 +961,4 @@ class FolderSelector {
 
 // Export for use in other scripts
 window.FolderSelector = FolderSelector;
+window.FolderSelector.cssEscape = cssEscape;

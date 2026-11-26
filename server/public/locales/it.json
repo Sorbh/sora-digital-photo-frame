@@ -81,7 +81,10 @@
     "keepAwakeNeedsTap": "Questo schermo potrebbe spegnersi. Toccalo per tenerlo acceso.",
     "keepAwakeUnavailable": "Questo browser non riesce a tenere acceso lo schermo. Disattiva lo standby nelle impostazioni dello schermo del dispositivo.",
     "fullscreenUnavailable": "Questo browser non può andare a schermo intero. Usa il suo menu oppure aggiungi la cornice alla schermata Home.",
-    "fullscreenRefused": "Il browser non ha permesso lo schermo intero. Riprova con il pulsante."
+    "fullscreenRefused": "Il browser non ha permesso lo schermo intero. Riprova con il pulsante.",
+    "retry": "Riprova",
+    "retryingNote": "La cornice continua a riprovare da sola.",
+    "connectionTitle": "Impossibile raggiungere le tue foto"
   },
   "accessAccounts": {
     "frames_pins": "Cornici e PIN",
@@ -196,7 +199,16 @@
     "donePaired": "{name} è <em>abbinata</em>",
     "expiredHeading": "Questo codice è <em>scaduto</em>",
     "heading": "Mostra le foto su <em>questa cornice</em>",
-    "codeMatchHint": "Controlla che sia uguale a quello sullo schermo della cornice"
+    "codeMatchHint": "Controlla che sia uguale a quello sullo schermo della cornice",
+    "enterHeading": "Scrivi il <em>codice</em>",
+    "enterNote": "La cornice lo mostra sotto il codice QR, ad esempio <bdi class=\"code-example\">K7P-4QX</bdi>.",
+    "continue": "Continua",
+    "codeInvalid": "Scrivi le 6 lettere e cifre mostrate sulla cornice.",
+    "typeCode": "Scrivi un codice",
+    "unreachableHeading": "Impossibile <em>verificare</em> il codice",
+    "unreachableNote": "La libreria non ha risposto. Controlla la connessione del telefono e riprova.",
+    "tryAgain": "Riprova",
+    "foldersFailed": "Impossibile caricare le cartelle, quindi ora non si può creare un nuovo account. Scegli un account esistente o riprova."
   },
   "login": {
     "invalid_password": "Password non valida. Riprova.",
@@ -228,6 +240,10 @@
     "connection": "Errore di connessione. Riprova.",
     "unknown": "Qualcosa è andato storto. Riprova.",
     "FILE_TOO_LARGE": "Ogni foto può pesare al massimo {size} MB",
+    "IMAGE_TOO_LARGE": "Questa foto è troppo grande da elaborare. Prova con una foto più piccola o un'animazione più breve.",
+    "UPLOAD_TOO_LARGE": "Ogni caricamento può pesare al massimo {size} MB.",
+    "BUSY": "In questo momento si stanno caricando molte foto. Riprova tra un attimo.",
+    "PHOTO_CHANGED": "Questa foto è cambiata mentre veniva ruotata. Riprova.",
     "UNSUPPORTED_TYPE": "Puoi caricare solo foto JPEG, PNG, GIF, WebP e HEIC",
     "SCREEN_LIMIT": "Questa famiglia ha già {limit} schermi. Rimuovine uno che non usi più per aggiungere questo."
   },
@@ -284,6 +300,8 @@
     "static_051": "Chiudi",
     "static_052": "Chiudi foto",
     "static_053": "Scorciatoie da tastiera",
+    "previousPhoto": "Foto precedente",
+    "nextPhoto": "Foto successiva",
     "static_054": "Sezioni",
     "static_055": "Carica foto",
     "sortShuffle": "Casuale",
@@ -335,6 +353,7 @@
     "countSnaps_other": "{count} snap",
     "countSnaps_many": "{count} snap",
     "folderOptions": "Opzioni cartella",
+    "photoOptions": "Opzioni foto",
     "selectPhoto": "Seleziona foto",
     "viewPhoto": "Guarda foto",
     "deletePhoto": "Elimina foto",
@@ -575,6 +594,8 @@
     "fetchRandomFailed": "Impossibile recuperare un'immagine casuale",
     "everyPhoto": "Tutte le foto della libreria",
     "browseFolder": "Apri la cartella",
+    "browseNamed": "Apri {name}",
+    "subfoldersOf": "Cartelle in {name}",
     "photoCount_one": "{count} foto",
     "photoCount_other": "{count} foto",
     "photoCount_many": "{count} foto"

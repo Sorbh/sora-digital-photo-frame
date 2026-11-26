@@ -81,7 +81,10 @@
     "keepAwakeNeedsTap": "Dit scherm kan in slaap vallen. Tik om het aan te laten.",
     "keepAwakeUnavailable": "Deze browser kan het scherm niet aan laten. Zet de slaapstand uit in de scherminstellingen van het apparaat.",
     "fullscreenUnavailable": "Deze browser kan niet schermvullend tonen. Gebruik het eigen menu, of zet de fotolijst op het beginscherm.",
-    "fullscreenRefused": "De browser stond volledig scherm niet toe. Probeer de knop nog eens."
+    "fullscreenRefused": "De browser stond volledig scherm niet toe. Probeer de knop nog eens.",
+    "retry": "Opnieuw proberen",
+    "retryingNote": "De fotolijst blijft het zelf opnieuw proberen.",
+    "connectionTitle": "Je foto's zijn niet bereikbaar"
   },
   "accessAccounts": {
     "frames_pins": "Fotolijsten en pincodes",
@@ -195,7 +198,16 @@
     "donePaired": "{name} is <em>gekoppeld</em>",
     "expiredHeading": "Deze code is <em>verlopen</em>",
     "heading": "Foto's tonen op <em>deze fotolijst</em>",
-    "codeMatchHint": "Controleer of hij overeenkomt met het scherm van de fotolijst"
+    "codeMatchHint": "Controleer of hij overeenkomt met het scherm van de fotolijst",
+    "enterHeading": "Typ de <em>code</em>",
+    "enterNote": "De fotolijst toont hem onder de QR-code, bijvoorbeeld <bdi class=\"code-example\">K7P-4QX</bdi>.",
+    "continue": "Doorgaan",
+    "codeInvalid": "Typ de 6 letters en cijfers die op de fotolijst staan.",
+    "typeCode": "Code typen",
+    "unreachableHeading": "Code kon niet worden <em>gecontroleerd</em>",
+    "unreachableNote": "De bibliotheek gaf geen antwoord. Controleer de verbinding van je telefoon en probeer het opnieuw.",
+    "tryAgain": "Opnieuw proberen",
+    "foldersFailed": "De mappen konden niet worden geladen, dus een nieuw account kan nu niet worden aangemaakt. Kies een bestaand account of probeer het opnieuw."
   },
   "login": {
     "invalid_password": "Onjuist wachtwoord. Probeer het opnieuw.",
@@ -227,6 +239,10 @@
     "connection": "Verbindingsfout. Probeer het opnieuw.",
     "unknown": "Er ging iets mis. Probeer het opnieuw.",
     "FILE_TOO_LARGE": "Elke foto mag maximaal {size} MB zijn",
+    "IMAGE_TOO_LARGE": "Deze foto is te groot om te verwerken. Probeer een kleinere foto of een kortere animatie.",
+    "UPLOAD_TOO_LARGE": "Elke upload mag maximaal {size} MB zijn.",
+    "BUSY": "Er worden nu veel foto's geüpload. Probeer het zo opnieuw.",
+    "PHOTO_CHANGED": "Deze foto is veranderd tijdens het draaien. Probeer het opnieuw.",
     "UNSUPPORTED_TYPE": "Je kunt alleen JPEG-, PNG-, GIF-, WebP- en HEIC-foto's uploaden",
     "SCREEN_LIMIT": "Deze familie heeft al {limit} schermen. Verwijder er een die je niet meer gebruikt om dit scherm toe te voegen."
   },
@@ -283,6 +299,8 @@
     "static_051": "Sluiten",
     "static_052": "Foto sluiten",
     "static_053": "Sneltoetsen",
+    "previousPhoto": "Vorige foto",
+    "nextPhoto": "Volgende foto",
     "static_054": "Onderdelen",
     "static_055": "Foto's uploaden",
     "sortShuffle": "Willekeurig",
@@ -329,6 +347,7 @@
     "countSnaps_one": "{count} herinnering",
     "countSnaps_other": "{count} herinneringen",
     "folderOptions": "Mapopties",
+    "photoOptions": "Foto-opties",
     "selectPhoto": "Foto selecteren",
     "viewPhoto": "Foto bekijken",
     "deletePhoto": "Foto verwijderen",
@@ -555,6 +574,8 @@
     "fetchRandomFailed": "Er kon geen willekeurige foto worden opgehaald",
     "everyPhoto": "Elke foto in de bibliotheek",
     "browseFolder": "Map bekijken",
+    "browseNamed": "{name} openen",
+    "subfoldersOf": "Mappen in {name}",
     "photoCount_one": "{count} foto",
     "photoCount_other": "{count} foto's"
   },

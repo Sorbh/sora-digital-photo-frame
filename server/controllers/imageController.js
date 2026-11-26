@@ -8,7 +8,7 @@ const thumbnails = require('../services/thumbnailService');
 const { sharpInput } = require('../utils/heic');
 const { displayCopy, assertImageSize, MAX_PIXELS } = require('../utils/displayCopy');
 const slots = require('../utils/workSlots');
-const { canSee, inFolder, realVisiblePath } = require('../utils/viewerAccess');
+const { assignedFolders, canSee, inFolder, realVisiblePath } = require('../utils/viewerAccess');
 const snaps = require('../services/snapService');
 const notes = require('../services/noteService');
 const playOrder = require('../services/playOrderService');
@@ -93,15 +93,15 @@ class ImageController {
       
       let availableImages = allImages;
       
-      // Apply access account folder restrictions if user is PIN authenticated (not admin)
-      if (req.session && req.session.accessAccount && req.session.accessAccount.assignedFolders && req.session.accessAccount.assignedFolders.length > 0 && !req.session.authenticated) {
-        const assignedFolders = req.session.accessAccount.assignedFolders;
-
+      // A PIN account with assigned folders, or a signed-in person limited to some
+      // (their scope): only photos in those folders or their subfolders
+      const limitedTo = assignedFolders(req);
+      if (limitedTo) {
         // In an assigned folder or one of its subfolders, whatever the separators
         availableImages = allImages.filter(img => canSee(req, img.relativePath));
 
         if (availableImages.length === 0) {
-          console.log('❌ Access Control - No accessible images found for assigned folders:', assignedFolders);
+          console.log('❌ Access Control - No accessible images found for assigned folders:', limitedTo);
           return res.status(403).json({ 
             success: false,
             error: 'No images accessible with your account permissions',
@@ -138,7 +138,7 @@ class ImageController {
 
       // A snap is drawn by the frame itself, from its page data
       if (randomImage.type === 'snap') {
-        const snap = await snaps.forFrame(randomImage.path, req.session);
+        const snap = await snaps.forFrame(randomImage.path, req.session, photo => canSee(req, photo));
         return res.json({
           success: true,
           image: {

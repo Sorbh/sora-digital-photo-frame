@@ -7,7 +7,7 @@ const vm = require('vm');
 const publicDir = path.join(__dirname, '..', 'public');
 const html = fs.readFileSync(path.join(publicDir, 'admin.html'), 'utf8');
 
-function loadMenu() {
+function loadMenu(page = {}) {
   const document = { activeElement: null, body: null, addEventListener() {} };
   const node = (attrs = {}) => {
     const attributes = new Map(Object.entries(attrs));
@@ -56,7 +56,8 @@ function loadMenu() {
     SoraPlaceMenu: require('../public/js/placeMenu'),
     innerWidth: 1280,
     innerHeight: 800,
-    t: key => key
+    t: key => key,
+    ...page
   };
   context.window = context;
   vm.createContext(context);
@@ -305,5 +306,39 @@ describe('a menu action that redraws the grid', () => {
     expect(before.isConnected).toBe(false);
     expect(document.activeElement).toBe(after);
     expect(after.isConnected).toBe(true);
+  });
+});
+
+describe('for someone who can only view (js/scope.js)', () => {
+  const viewOnly = { SoraScope: { canEdit: () => false } };
+
+  test('the options menu does not open', () => {
+    const { admin, node, isOpen } = loadMenu(viewOnly);
+    admin.showContextMenu({ type: 'click', currentTarget: node(), preventDefault() {} }, { name: 'a.jpg', type: 'image' });
+    expect(isOpen()).toBe(false);
+  });
+
+  test('photos are not selected, moved or uploaded', () => {
+    const { admin } = loadMenu(viewOnly);
+    admin.selectedItems = new Set();
+    admin.toggleSelection({ path: 'uploads/Family/a.jpg' });
+    expect(admin.selectedItems.size).toBe(0);
+
+    const done = [];
+    admin.movePhotos = () => done.push('move');
+    admin.uploadFilesDirectly = () => done.push('upload');
+    admin.moveDroppedPhotos({ dataTransfer: { getData: () => '["uploads/Family/a.jpg"]' } }, 'uploads/Family/Sub');
+    admin.uploadDroppedFiles({ dataTransfer: { files: [{ type: 'image/jpeg', name: 'a.jpg' }] } }, 'uploads/Family');
+    expect(done).toEqual([]);
+  });
+
+  test('someone who can edit still can', () => {
+    const { admin } = loadMenu({ SoraScope: { canEdit: () => true } });
+    const done = [];
+    admin.movePhotos = () => done.push('move');
+    admin.uploadFilesDirectly = () => done.push('upload');
+    admin.moveDroppedPhotos({ dataTransfer: { getData: () => '["uploads/Family/a.jpg"]' } }, 'uploads/Family/Sub');
+    admin.uploadDroppedFiles({ dataTransfer: { files: [{ type: 'image/jpeg', name: 'a.jpg' }] } }, 'uploads/Family');
+    expect(done).toEqual(['move', 'upload']);
   });
 });

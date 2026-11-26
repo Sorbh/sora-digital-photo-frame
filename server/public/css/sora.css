@@ -766,3 +766,10 @@ dialog::backdrop {
         transition-duration: 0.01ms !important;
     }
 }
+
+/* A library shared with someone (js/scope.js): what they can't use isn't shown */
+.view-only [data-edit-only],
+.read-only-folder [data-edit-only],
+.not-owner [data-owner-only] {
+    display: none !important;
+}

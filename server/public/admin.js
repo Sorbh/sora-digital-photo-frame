@@ -58,6 +58,12 @@ class PhotoFrameAdmin {
         this.checkFeatureFlags();
     }
 
+    // Someone a library is shared with "can view" only: no uploads, moves,
+    // deletes or edits (js/scope.js hides those controls; the server refuses them)
+    canEdit() {
+        return !window.SoraScope || window.SoraScope.canEdit();
+    }
+
     // Handle API responses and check for session expiration
     async handleApiResponse(response) {
         if (response.status === 401) {
@@ -508,6 +514,7 @@ class PhotoFrameAdmin {
     }
 
     uploadDroppedFiles(e, targetPath) {
+        if (!this.canEdit()) return;
         const files = Array.from(e.dataTransfer.files).filter(isImageFile);
         if (files.length > 0) {
             this.uploadFilesDirectly(files, targetPath);
@@ -517,6 +524,7 @@ class PhotoFrameAdmin {
     }
 
     moveDroppedPhotos(e, destination) {
+        if (!this.canEdit()) return;
         let paths = [];
         try {
             paths = JSON.parse(e.dataTransfer.getData(PHOTO_DRAG_TYPE));
@@ -634,6 +642,8 @@ class PhotoFrameAdmin {
         this.updatePhotoModalNav();
 
         this.updateLibraryHeading(data);
+        // A folder that only leads to the ones shared with this person: look, don't add
+        document.documentElement?.classList.toggle('read-only-folder', data.canChange === false);
         this.playOrder = data.order || 'shuffle';
         this.fileNames = data.files.map(file => file.name);
         this.showPlayOrder();
@@ -759,7 +769,7 @@ class PhotoFrameAdmin {
             </div>
             <div class="folder-meta">
                 <div class="folder-name"></div>
-                <button type="button" class="folder-more" aria-label="${escapeHtml(t('admin.folderOptions'))}" aria-haspopup="menu" aria-expanded="false">
+                <button type="button" class="folder-more" data-edit-only aria-label="${escapeHtml(t('admin.folderOptions'))}" aria-haspopup="menu" aria-expanded="false">
                     <span class="material-symbols-outlined">more_vert</span>
                 </button>
                 <span class="folder-kind material-symbols-outlined" aria-hidden="true">chevron_right</span>
@@ -826,13 +836,13 @@ class PhotoFrameAdmin {
             </div>
             <div class="photo-grid-overlay">
                 <div class="photo-grid-overlay-top">
-                    <div class="photo-grid-checkbox">
+                    <div class="photo-grid-checkbox" data-edit-only>
                         <label class="label">
                             <input type="checkbox" class="input" aria-label="${escapeHtml(t('admin.selectPhoto'))}">
                             <span class="sr-only">${escapeHtml(t('admin.selectPhoto'))}</span>
                         </label>
                     </div>
-                    <button type="button" class="btn-icon photo-more" data-action="more" aria-haspopup="menu" aria-expanded="false" aria-label="${escapeHtml(t('admin.photoOptions'))}">
+                    <button type="button" class="btn-icon photo-more" data-edit-only data-action="more" aria-haspopup="menu" aria-expanded="false" aria-label="${escapeHtml(t('admin.photoOptions'))}">
                         <span class="material-symbols-outlined">more_vert</span>
                     </button>
                 </div>
@@ -841,7 +851,7 @@ class PhotoFrameAdmin {
                         <button class="btn-icon" data-tooltip="${escapeHtml(t('admin.viewPhoto'))}" data-action="view" aria-label="${escapeHtml(t('admin.viewPhoto'))}">
                             <span class="material-symbols-outlined">visibility</span>
                         </button>
-                        <button class="btn-icon" data-tooltip="${escapeHtml(t('admin.deletePhoto'))}" data-action="delete" aria-label="${escapeHtml(t('admin.deletePhoto'))}">
+                        <button class="btn-icon" data-edit-only data-tooltip="${escapeHtml(t('admin.deletePhoto'))}" data-action="delete" aria-label="${escapeHtml(t('admin.deletePhoto'))}">
                             <span class="material-symbols-outlined">delete</span>
                         </button>
                     </div>
@@ -888,6 +898,10 @@ class PhotoFrameAdmin {
         div.querySelectorAll('img').forEach(img => { img.draggable = false; });
         div.addEventListener('dragstart', (e) => {
             div.classList.remove('selecting');
+            if (!this.canEdit()) {
+                e.preventDefault(); // nothing to move it with
+                return;
+            }
             const paths = this.selectedItems.has(file.path) ? [...this.selectedItems] : [file.path];
             e.dataTransfer.setData(PHOTO_DRAG_TYPE, JSON.stringify(paths));
             this.draggingPaths = paths;
@@ -979,6 +993,8 @@ class PhotoFrameAdmin {
     createGooglePhotosImportElement() {
         const div = document.createElement('div');
         div.className = 'file-item google-photos-import';
+        div.dataset.editOnly = '';
+        div.dataset.ownerOnly = '';
         div.dataset.type = 'google-photos-import';
         div.innerHTML = `
             <span class="material-icons">add</span>
@@ -1204,6 +1220,11 @@ class PhotoFrameAdmin {
         const shared = (await PhotoUpload.takeShared()).filter(isImageFile);
         if (new URLSearchParams(location.search).has('shared')) history.replaceState(null, '', location.pathname + location.hash);
         if (!shared.length) return;
+        await window.SoraScope?.ready;
+        if (!this.canEdit()) {
+            this.showToast(t('errors.VIEW_ONLY'), 'error');
+            return;
+        }
         this.showUploadModal();
         this.selectedFiles = shared;
         this.updateUploadButton();
@@ -1275,6 +1296,7 @@ class PhotoFrameAdmin {
 
     showContextMenu(event, item) {
         event.preventDefault();
+        if (!this.canEdit()) return; // every item in it changes something
         console.log('Context menu triggered for:', item);
         console.log('Item type:', typeof item, 'Has name:', item?.name);
         
@@ -1624,16 +1646,14 @@ class PhotoFrameAdmin {
 
     async checkFeatureFlags() {
         try {
-            const response = await this.authenticatedFetch('/api/features');
-            
-            if (response && response.ok) {
-                const features = await response.json();
-                
-                // Hide Google Photos button if disabled
-                const googlePhotosBtn = document.getElementById('googlePhotosBtn');
-                if (googlePhotosBtn && !features.googlePhotosEnabled) {
-                    googlePhotosBtn.style.display = 'none';
-                }
+            // Read once by js/scope.js, with what this person may do
+            const features = await window.SoraScope.ready;
+            if (!features) throw new Error('Feature flags unavailable');
+
+            // Hide Google Photos button if disabled
+            const googlePhotosBtn = document.getElementById('googlePhotosBtn');
+            if (googlePhotosBtn && !features.googlePhotosEnabled) {
+                googlePhotosBtn.style.display = 'none';
             }
         } catch (error) {
             console.error('Error checking feature flags:', error);
@@ -1816,6 +1836,7 @@ class PhotoFrameAdmin {
 
     // Selection Management Methods
     toggleSelection(file) {
+        if (!this.canEdit()) return; // selecting is for deleting and moving
         const filePath = file.path;
         const fileElement = document.querySelector(`[data-path="${filePath}"]`);
         const checkbox = fileElement.querySelector('input[type="checkbox"]');

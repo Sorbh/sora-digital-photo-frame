@@ -44,7 +44,7 @@
                     <span class="material-symbols-outlined">photo_library</span>
                     <span class="tb-label" data-i18n="common.library">Library</span>
                 </a>
-                <a href="/access-accounts" class="tb-btn tb-desktop" title="Manage access accounts" data-i18n-attr="title:notes.static_020">
+                <a href="/access-accounts" class="tb-btn tb-desktop" data-owner-only title="Manage access accounts" data-i18n-attr="title:notes.static_020">
                     <span class="material-symbols-outlined">key</span>
                     <span class="tb-label" data-i18n="common.access">Access</span>
                 </a>
@@ -67,7 +67,7 @@
                 <p class="page-meta sora-mono"><span class="material-symbols-outlined" style="font-size:16px;font-variation-settings:'FILL' 1">favorite</span><span id="notesMetaText" data-i18n="notes.static_004">Loading notes</span></p>
             </div>
             <div class="library-actions">
-                <button id="createNoteBtn" class="btn mobile-hide" title="New note" data-i18n-attr="title:notes.static_024">
+                <button id="createNoteBtn" class="btn mobile-hide" data-edit-only title="New note" data-i18n-attr="title:notes.static_024">
                     <span class="material-symbols-outlined">edit_note</span>
                     <span data-i18n="notes.static_008">New note</span>
                 </button>
@@ -87,7 +87,7 @@
                 <div>
                     <h2 data-i18n="notes.static_006">Slip a note into the slideshow</h2>
                     <p data-i18n="notes.static_007">Remind someone about a visit, a call or an outing. Every few minutes the frame shows your note as a page from a photo album, then goes back to the photos.</p>
-                    <button class="btn" data-proxy="createNoteBtn">
+                    <button class="btn" data-proxy="createNoteBtn" data-edit-only>
                         <span class="material-symbols-outlined">edit_note</span>
                         <span data-i18n="notes.writeFirstNote">Write the first note</span>
                     </button>
@@ -206,7 +206,7 @@
                 </section>
                 <footer>
                     <button type="button" id="cancelNoteBtn" class="btn-outline" data-i18n="common.cancel">Cancel</button>
-                    <button type="submit" id="saveNoteBtn" class="btn" form="noteForm">
+                    <button type="submit" id="saveNoteBtn" class="btn" data-edit-only form="noteForm">
                         <span class="material-symbols-outlined">check</span>
                         <span data-i18n="notes.saveNote">Save note</span>
                     </button>
@@ -259,10 +259,10 @@
         <a href="/admin" class="tab">
             <span class="material-symbols-outlined">photo_library</span><span data-i18n="common.library">Library</span>
         </a>
-        <a href="/access-accounts" class="tab">
+        <a href="/access-accounts" class="tab" data-owner-only>
             <span class="material-symbols-outlined">key</span><span data-i18n="common.access">Access</span>
         </a>
-        <button class="tab-fab" data-proxy="createNoteBtn" aria-label="New note" data-i18n-attr="aria-label:notes.static_040">
+        <button class="tab-fab" data-proxy="createNoteBtn" data-edit-only aria-label="New note" data-i18n-attr="aria-label:notes.static_040">
             <span class="material-symbols-outlined">edit_note</span>
         </button>
         <a href="/slideshow" class="tab">
@@ -278,6 +278,7 @@
         });
     </script>
     <script src="/js/i18n.js"></script>
+    <script src="/js/scope.js"></script>
     <script src="/js/notePage.js"></script>
     <script src="/js/pageEditor.js"></script>
     <script src="/js/notes.js"></script>

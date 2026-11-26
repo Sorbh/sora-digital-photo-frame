@@ -3,6 +3,7 @@ const snaps = require('../services/snapService');
 const imageController = require('./imageController');
 const { resolveAdminPath, toAdminPath } = require('../utils/safePath');
 const { passClientError } = require('../utils/httpError');
+const { canSee } = require('../utils/viewerAccess');
 
 // Snaps are addressed like photos: ?path=uploads/Family/visit.snap.json
 class SnapController {
@@ -17,7 +18,7 @@ class SnapController {
       if (!fullPath || !await getLibrary().exists(toAdminPath(fullPath))) {
         return res.status(404).json({ success: false, error: 'Snap not found' });
       }
-      res.json({ success: true, path: toAdminPath(fullPath), snap: await snaps.load(fullPath) });
+      res.json({ success: true, path: toAdminPath(fullPath), snap: await snaps.load(fullPath, photo => canSee(req, photo)) });
     } catch (error) {
       if (passClientError(res, error)) return;
       console.error('Error reading snap:', error);

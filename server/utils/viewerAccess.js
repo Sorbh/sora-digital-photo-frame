@@ -1,9 +1,12 @@
 // Which photos a viewer may see. The admin, and PIN accounts or frames with no
 // folders assigned, see everything. An account with assigned folders sees those
 // folders and everything inside them; folders above them can be opened to get
-// there, but show only what leads to the assigned ones.
+// there, but show only what leads to the assigned ones. A signed-in person whose
+// scope (the auth provider's scope(req), see middleware/auth) lists folders is
+// limited the same way.
 const path = require('path');
 const { getLibrary } = require('../library');
+const { scopeFor } = require('../middleware/auth');
 
 // Folders are split where the photo storage splits them: on Windows at a
 // backslash too, elsewhere a backslash is just part of a name
@@ -13,8 +16,11 @@ const segments = (value) => String(value || '').split(SEPARATORS);
 // family/x/../y -> family/y, so ".." can't step out of an assigned folder
 const norm = (value) => path.posix.normalize('/' + segments(value).join('/')).replace(/^\/+|\/+$/g, '');
 
-// The assigned folders, or null for no limit
+// The assigned folders, or null for no limit. A scope with folders: those (an
+// empty list sees nothing). Otherwise a PIN account's, never the admin's.
 function assignedFolders(req) {
+  const scope = scopeFor(req);
+  if (scope && scope.folders) return scope.folders.map(norm).filter(Boolean);
   const session = req.session;
   if (!session || session.authenticated) return null;
   const folders = session.accessAccount?.assignedFolders;
@@ -38,9 +44,10 @@ function foldersBelow(req, relativePath) {
   return [...new Set(outermost)].filter(folder => target === '' || folder.startsWith(target + '/'));
 }
 
-// A folder that can be opened: inside an assigned one, or on the way to one
+// A folder that can be opened: inside an assigned one, or on the way to one.
+// The top always opens, empty for a scope with no folders.
 function canOpen(req, relativePath) {
-  return canSee(req, relativePath) || foldersBelow(req, relativePath).length > 0;
+  return norm(relativePath) === '' || canSee(req, relativePath) || foldersBelow(req, relativePath).length > 0;
 }
 
 // A photo (relative to uploads) in this folder or one inside it. Either may use

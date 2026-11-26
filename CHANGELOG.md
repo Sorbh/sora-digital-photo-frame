@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 These changes are for **3.0.0**: the quota hook changed (see below).
 
 ### Added
+- **People can be limited to some folders, and to viewing.** A new optional auth hook, `scope(req)`, returns `{ folders, canEdit, isOwner }` for the signed-in person (see HOOKS.md, Scope). Every route checks it: reads outside their folders answer 404, changes there 403 `OUTSIDE_FOLDERS`, "can view" people get 403 `VIEW_ONLY` for every change, and Access, pairing and the Google Photos connection answer 403 `OWNER_ONLY` for anyone but the owner. The library, notes and snap pages hide what the person can't use. With no hook, as self-hosted, nothing changes.
 - `MAX_FOLDER_DEPTH` limits how many folder levels the library can have (off by default). With `2`, `Trips` and `Trips/Italy` can be made but nothing inside `Italy`: the library hides "New folder" there, and creating or importing from Google Photos to a folder past the limit is refused with `FOLDER_TOO_DEEP`. Deeper folders that already exist keep working ([#88](https://github.com/Sorbh/sora-digital-photo-frame/issues/88)). A symlinked folder counts where it really is ([#59](https://github.com/Sorbh/sora-digital-photo-frame/issues/59)).
 
 ### Changed

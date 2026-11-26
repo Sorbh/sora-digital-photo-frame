@@ -9,8 +9,20 @@ const snapController = require('../controllers/snapController');
 const pairingController = require('../controllers/pairingController');
 const frameKeyController = require('../controllers/frameKeyController');
 const upload = require('../middleware/upload');
-const { requireAuth, requireViewer, requirePhotoViewer } = require('../middleware/auth');
+const { requireAuth, requireViewer, requirePhotoViewer, scopeFor } = require('../middleware/auth');
+const { requireEditor, requireOwner, writeInFolders, readInFolders, photoRefs } = require('../middleware/scope');
 const { keepTenant } = require('../context');
+
+// Every route decides what a signed-in person's scope (auth provider scope(req))
+// allows: reads outside their folders answer 404, changes there 403, "can view"
+// people can't change anything (VIEW_ONLY), and Access, pairing and the Google
+// Photos connection are the owner's (OWNER_ONLY). tests/peopleScope.test.js
+// fails for a route added here without a decision.
+const editor = requireEditor;
+const owner = requireOwner;
+const body = (field) => (req) => req.body?.[field];
+const query = (field) => (req) => req.query?.[field];
+const list = (field) => (req) => (Array.isArray(req.body?.[field]) ? req.body[field] : []);
 
 // Health check endpoint
 router.get('/health', (req, res) => {
@@ -30,45 +42,64 @@ router.get('/folders/:folderPath(*)/thumbnail', requirePhotoViewer, folderContro
 router.get('/folders/:folderPath(*)', requirePhotoViewer, folderController.getFolderStructure.bind(folderController));
 
 // Protected routes (authentication required)
-router.post('/upload', requireAuth, upload.limitedArray('images'), keepTenant, imageController.uploadImages.bind(imageController));
-router.delete('/images', requireAuth, imageController.deleteImage.bind(imageController));
-router.delete('/images/batch', requireAuth, imageController.batchDeleteImages.bind(imageController));
-router.post('/images/rotate', requireAuth, imageController.rotateImage.bind(imageController));
-router.post('/images/move', requireAuth, imageController.moveImages.bind(imageController));
+// (can-edit checked before the photos are read, their folder once the form is)
+router.post('/upload', requireAuth, editor, upload.limitedArray('images'), keepTenant,
+  writeInFolders(req => req.body?.path || 'uploads', { allowRoot: true }), imageController.uploadImages.bind(imageController));
+router.delete('/images', requireAuth, editor, writeInFolders(query('path')), imageController.deleteImage.bind(imageController));
+router.delete('/images/batch', requireAuth, editor, writeInFolders(list('paths')), imageController.batchDeleteImages.bind(imageController));
+router.post('/images/rotate', requireAuth, editor, writeInFolders(body('path')), imageController.rotateImage.bind(imageController));
+// A move needs both ends inside the person's folders
+router.post('/images/move', requireAuth, editor,
+  writeInFolders(req => [...list('paths')(req), req.body?.destination || 'uploads'], { allowRoot: true }),
+  imageController.moveImages.bind(imageController));
 
 // Folder management routes (protected)
 router.get('/admin/folders', requireAuth, folderController.getFolderContents.bind(folderController));
-router.post('/admin/folders', requireAuth, folderController.createFolder.bind(folderController));
-router.delete('/admin/folders', requireAuth, folderController.deleteFolder.bind(folderController));
-router.put('/admin/folders/order', requireAuth, folderController.setPlayOrder.bind(folderController));
+router.post('/admin/folders', requireAuth, editor, writeInFolders(req => req.body?.path || 'uploads', { allowRoot: true }), folderController.createFolder.bind(folderController));
+// Inside one of their folders, never one of those folders itself
+router.delete('/admin/folders', requireAuth, editor, writeInFolders(query('path'), { below: true }), folderController.deleteFolder.bind(folderController));
+router.put('/admin/folders/order', requireAuth, editor, writeInFolders(req => req.query?.path || 'uploads', { allowRoot: true }), folderController.setPlayOrder.bind(folderController));
 
 // Access account management routes (admin only)
-router.get('/access-accounts', requireAuth, accessAccountController.getAllAccounts.bind(accessAccountController));
-router.post('/access-accounts', requireAuth, accessAccountController.createAccount.bind(accessAccountController));
-router.put('/access-accounts/:id', requireAuth, accessAccountController.updateAccount.bind(accessAccountController));
-router.delete('/access-accounts/:id', requireAuth, accessAccountController.deleteAccount.bind(accessAccountController));
-router.get('/admin/family-code', requireAuth, accessAccountController.getFamilyCode.bind(accessAccountController));
-router.post('/admin/family-code', requireAuth, accessAccountController.renewFamilyCode.bind(accessAccountController));
+router.get('/access-accounts', requireAuth, owner, accessAccountController.getAllAccounts.bind(accessAccountController));
+router.post('/access-accounts', requireAuth, owner, accessAccountController.createAccount.bind(accessAccountController));
+router.put('/access-accounts/:id', requireAuth, owner, accessAccountController.updateAccount.bind(accessAccountController));
+router.delete('/access-accounts/:id', requireAuth, owner, accessAccountController.deleteAccount.bind(accessAccountController));
+router.get('/admin/family-code', requireAuth, owner, accessAccountController.getFamilyCode.bind(accessAccountController));
+router.post('/admin/family-code', requireAuth, owner, accessAccountController.renewFamilyCode.bind(accessAccountController));
 
-// Notes shown in the slideshow (admin manages, frames read their active ones)
-router.get('/notes', requireAuth, noteController.list.bind(noteController));
-router.post('/notes', requireAuth, noteController.create.bind(noteController));
+// Notes shown in the slideshow (admin manages, frames read their active ones).
+// Notes are files in folders, so they're scoped like photos: reads see only
+// notes in the person's folders, changes need "can edit" and the note's folder
+// (both ends of a move), and a note's photos must be ones they can see.
+router.get('/notes', requireAuth, readInFolders(query('folder')), noteController.list.bind(noteController));
+router.post('/notes', requireAuth, editor,
+  writeInFolders(req => [req.body?.folder || 'uploads', ...photoRefs(req.body?.photos)], { allowRoot: true }),
+  noteController.create.bind(noteController));
 router.get('/notes/active', requirePhotoViewer, noteController.active.bind(noteController));
 // One note, by its file: ?path=uploads/Family/visit.note.json
-router.get('/notes/note', requireAuth, noteController.get.bind(noteController));
-router.put('/notes', requireAuth, noteController.update.bind(noteController));
-router.delete('/notes', requireAuth, noteController.remove.bind(noteController));
+router.get('/notes/note', requireAuth, readInFolders(query('path')), noteController.get.bind(noteController));
+router.put('/notes', requireAuth, editor,
+  writeInFolders(req => [req.query?.path, ...(req.body?.folder !== undefined ? [req.body.folder] : []), ...photoRefs(req.body?.photos)], { allowRoot: true }),
+  noteController.update.bind(noteController));
+router.delete('/notes', requireAuth, editor, writeInFolders(query('path')), noteController.remove.bind(noteController));
 
 // Snaps: memory-book pages saved in a folder and played like photos
 // (moved and deleted with the photo endpoints)
-router.get('/snaps', requireAuth, snapController.get.bind(snapController));
-router.post('/snaps', requireAuth, snapController.create.bind(snapController));
-router.put('/snaps', requireAuth, snapController.update.bind(snapController));
+// (a snap's photos must be ones the person can see too)
+router.get('/snaps', requireAuth, readInFolders(query('path')), snapController.get.bind(snapController));
+router.post('/snaps', requireAuth, editor,
+  writeInFolders(req => [req.body?.folder || 'uploads', ...photoRefs(req.body?.photos)], { allowRoot: true }),
+  snapController.create.bind(snapController));
+router.put('/snaps', requireAuth, editor,
+  writeInFolders(req => [req.query?.path, ...photoRefs(req.body?.photos)]),
+  snapController.update.bind(snapController));
 
-// Feature flags
+// Feature flags, and what this person may do (null: everything), so pages hide the rest
 router.get('/features', requireAuth, (req, res) => {
     res.json({
-        googlePhotosEnabled: process.env.ENABLE_GOOGLE_PHOTOS === 'true'
+        googlePhotosEnabled: process.env.ENABLE_GOOGLE_PHOTOS === 'true',
+        scope: scopeFor(req)
     });
 });
 
@@ -85,24 +116,26 @@ router.post('/pair/start', pairingController.start.bind(pairingController));
 router.post('/pair/status', pairingController.status.bind(pairingController));
 router.post('/pair/collect', pairingController.collect.bind(pairingController));
 router.post('/auth/device', pairingController.signIn.bind(pairingController));
-router.get('/admin/pair/:code', requireAuth, pairingController.show.bind(pairingController));
-router.post('/admin/pair/:code/approve', requireAuth, pairingController.approve.bind(pairingController));
-router.get('/admin/devices', requireAuth, pairingController.listDevices.bind(pairingController));
-router.put('/admin/devices/:id/language', requireAuth, pairingController.setDeviceLanguage.bind(pairingController));
+router.get('/admin/pair/:code', requireAuth, owner, pairingController.show.bind(pairingController));
+router.post('/admin/pair/:code/approve', requireAuth, owner, pairingController.approve.bind(pairingController));
+router.get('/admin/devices', requireAuth, owner, pairingController.listDevices.bind(pairingController));
+router.put('/admin/devices/:id/language', requireAuth, owner, pairingController.setDeviceLanguage.bind(pairingController));
 router.put('/device/language', requireViewer, pairingController.setOwnLanguage.bind(pairingController));
-router.delete('/admin/devices/:id', requireAuth, pairingController.removeDevice.bind(pairingController));
+router.delete('/admin/devices/:id', requireAuth, owner, pairingController.removeDevice.bind(pairingController));
 
 // Google Photos routes (admin only) - conditionally enabled
 if (process.env.ENABLE_GOOGLE_PHOTOS === 'true') {
     router.get('/admin/google-photos/status', requireAuth, googlePhotosController.getAuthStatus);
-    router.post('/admin/google-photos/auth', requireAuth, googlePhotosController.initiateAuth);
+    // Connecting and disconnecting Google Photos is the owner's
+    router.post('/admin/google-photos/auth', requireAuth, owner, googlePhotosController.initiateAuth);
     router.get('/admin/google-photos/callback', googlePhotosController.handleCallback);
-    router.delete('/admin/google-photos/auth', requireAuth, googlePhotosController.revokeAccess);
-    router.post('/admin/google-photos/picker-session', requireAuth, googlePhotosController.createPickerSession);
+    router.delete('/admin/google-photos/auth', requireAuth, owner, googlePhotosController.revokeAccess);
+    // Importing is a change: into one of the person's folders
+    router.post('/admin/google-photos/picker-session', requireAuth, editor, writeInFolders(body('destinationPath'), { allowRoot: true }), googlePhotosController.createPickerSession);
     router.get('/admin/google-photos/session/:sessionId', requireAuth, googlePhotosController.getPickerSession);
     router.get('/admin/google-photos/session/:sessionId/media-items', requireAuth, googlePhotosController.getSessionMediaItems);
     router.get('/admin/google-photos/thumbnail', requireAuth, googlePhotosController.proxyThumbnail);
-    router.post('/admin/google-photos/import', requireAuth, googlePhotosController.importPhotos);
+    router.post('/admin/google-photos/import', requireAuth, editor, writeInFolders(body('destinationPath'), { allowRoot: true }), googlePhotosController.importPhotos);
     router.get('/admin/google-photos/job/:jobId', requireAuth, googlePhotosController.getJobStatus);
 } else {
     // Return 404 for all Google Photos routes when disabled

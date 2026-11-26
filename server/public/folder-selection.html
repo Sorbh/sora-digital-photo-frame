@@ -162,7 +162,7 @@
         <a href="/admin" class="tab">
             <span class="material-symbols-outlined">photo_library</span><span data-i18n="common.library">Library</span>
         </a>
-        <a href="/access-accounts" class="tab">
+        <a href="/access-accounts" class="tab" data-owner-only>
             <span class="material-symbols-outlined">key</span><span data-i18n="common.access">Access</span>
         </a>
         <a href="/slideshow" class="tab-fab" aria-label="Start slideshow" data-i18n-attr="aria-label:folders.static_013">
@@ -178,6 +178,7 @@
 
     <!-- Load required scripts -->
     <script src="/js/i18n.js"></script>
+    <script src="/js/scope.js"></script>
     <script src="/js/folderService.js"></script>
     <script src="/js/folderStorage.js"></script>
     <script src="/js/arrowFocus.js"></script>

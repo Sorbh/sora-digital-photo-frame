@@ -32,16 +32,19 @@ class SnapService {
     return data && typeof data === 'object' ? data : null;
   }
 
-  // Snap plus photo URLs, for the admin grid and editor
-  async load(fullPath) {
+  // Snap plus photo URLs, for the admin grid and editor. visible(photo) keeps
+  // out photos (relative to uploads) the person can't see.
+  async load(fullPath, visible = () => true) {
     const snap = await this.read(fullPath);
-    return { ...snap, photoUrls: notes.photoUrls(snap.photos || []) };
+    const photos = (snap.photos || []).filter(visible);
+    return { ...snap, photos, photoUrls: notes.photoUrls(photos) };
   }
 
   // The page a frame shows, with photos limited to what this frame may see
-  async forFrame(fullPath, session = {}) {
+  // (and, for a signed-in person, to visible(photo))
+  async forFrame(fullPath, session = {}, visible = () => true) {
     const snap = await this.read(fullPath);
-    const photos = await notes.visiblePhotos(snap.photos || [], session);
+    const photos = (await notes.visiblePhotos(snap.photos || [], session)).filter(visible);
     return {
       title: snap.title,
       message: snap.message,

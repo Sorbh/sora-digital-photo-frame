@@ -246,7 +246,10 @@
     "UNSUPPORTED_TYPE": "アップロードできるのはJPEG、PNG、GIF、WebP、HEICの写真だけです",
     "SCREEN_LIMIT": "このファミリーにはすでに{limit}台の画面があります。追加するには、使わなくなった画面を1台削除してください。",
     "FOLDER_TOO_DEEP": "ここには新しいフォルダを作成できません。フォルダは最大{limit}階層までです。",
-    "FOLDER_NOT_FOUND": "このフォルダはもうありません。削除された可能性があります。"
+    "FOLDER_NOT_FOUND": "このフォルダはもうありません。削除された可能性があります。",
+    "VIEW_ONLY": "これらの写真は見ることはできますが、変更はできません。",
+    "OWNER_ONLY": "この操作はライブラリの持ち主だけができます。",
+    "OUTSIDE_FOLDERS": "変更できるのは、共有されたフォルダだけです。"
   },
   "admin": {
     "static_001": "ライブラリ · Sora Frame",
@@ -671,5 +674,11 @@
     "unknownError": "不明なエラー",
     "importing": "写真をフォルダに取り込んでいます…",
     "mayTakeMoments": "少し時間がかかることがあります"
+  },
+  "ownerOnly": {
+    "title": "持ち主専用 · Sora Frame",
+    "heading": "このページは持ち主だけが開けます",
+    "body": "写真を共有してくれた人に頼んでください。",
+    "back": "ライブラリに戻る"
   }
 }

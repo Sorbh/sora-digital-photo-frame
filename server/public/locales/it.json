@@ -247,7 +247,10 @@
     "UNSUPPORTED_TYPE": "Puoi caricare solo foto JPEG, PNG, GIF, WebP e HEIC",
     "SCREEN_LIMIT": "Questa famiglia ha già {limit} schermi. Rimuovine uno che non usi più per aggiungere questo.",
     "FOLDER_TOO_DEEP": "Qui non si può creare una nuova cartella: le cartelle possono avere al massimo {limit} livelli di profondità.",
-    "FOLDER_NOT_FOUND": "Questa cartella non esiste più. Potrebbe essere stata eliminata."
+    "FOLDER_NOT_FOUND": "Questa cartella non esiste più. Potrebbe essere stata eliminata.",
+    "VIEW_ONLY": "Puoi guardare queste foto, ma non modificarle.",
+    "OWNER_ONLY": "Solo il proprietario di questa libreria può farlo.",
+    "OUTSIDE_FOLDERS": "Puoi modificare solo le cartelle condivise con te."
   },
   "admin": {
     "static_001": "Libreria · Sora Frame",
@@ -700,5 +703,11 @@
     "unknownError": "Errore sconosciuto",
     "importing": "Importazione delle foto nella cartella...",
     "mayTakeMoments": "Può volerci qualche istante"
+  },
+  "ownerOnly": {
+    "title": "Solo per il proprietario · Sora Frame",
+    "heading": "Solo il proprietario può aprire questa pagina",
+    "body": "Chiedi alla persona che ha condiviso queste foto con te.",
+    "back": "Torna alla libreria"
   }
 }

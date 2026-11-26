@@ -158,8 +158,9 @@ describe('Robustness', () => {
     test('a PIN is not counted as wrong', async () => {
       storeDown = true;
       const res = await request(app).post('/api/auth/pin').send({ pin: '482913' });
-      expect(res.status).toBe(500);
-      expect(res.body.code).not.toBe('INVALID_PIN');
+      // The family's saved tries can't be read either: sign-in is refused for now
+      expect(res.status).toBe(503);
+      expect(res.body.code).toBe('SIGN_IN_UNAVAILABLE');
     });
   });
 

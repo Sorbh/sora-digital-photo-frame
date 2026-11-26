@@ -17,9 +17,11 @@ class AttemptLimiter {
         maxTracked = 10000, // keys remembered at once, so made-up addresses can't grow memory forever
         keep = () => false, // keys never dropped to make room
         maxWait = 10 * 1000, // how long begin() waits for tries being checked
-        onLockout = () => {} // (key, { lockoutUntil, lockouts, lastLockout }) when a lockout starts; may return a promise
+        // (key, state) when a key's wrong tries or lockout change through end(), or
+        // a lockout starts; state is what restore() takes back. May return a promise.
+        onSave = () => {}
     } = {}) {
-        Object.assign(this, { maxAttempts, attemptWindow, lockoutDuration, maxLockout, strikeMemory, maxTracked, keep, maxWait, onLockout });
+        Object.assign(this, { maxAttempts, attemptWindow, lockoutDuration, maxLockout, strikeMemory, maxTracked, keep, maxWait, onSave });
         this.entries = new Map();
         this.pending = new Map(); // key -> tries being checked
         this.waiting = new Map(); // key -> callbacks for when one finishes
@@ -55,21 +57,38 @@ class AttemptLimiter {
         }
 
         if (record.attempts >= this.maxAttempts) {
-            const duration = Math.min(this.lockoutDuration * 2 ** (record.lockouts || 0), this.maxLockout);
-            record.lockouts = (record.lockouts || 0) + 1;
-            record.lockoutUntil = now + duration;
-            record.lastLockout = now;
-            // begin() answers only once this is done (saving the lockout, say)
-            record.saving = new Promise(resolve => resolve(
-                this.onLockout(key, { lockoutUntil: record.lockoutUntil, lockouts: record.lockouts, lastLockout: now })
-            )).catch(() => {});
-            return this.locked(duration);
+            return this.locked(this.lockOut(key, record, now));
         }
 
         return {
             allowed: true,
             attemptsRemaining: this.maxAttempts - record.attempts
         };
+    }
+
+    // Starts a lockout and saves it; returns how long it lasts
+    lockOut(key, record, now) {
+        const duration = Math.min(this.lockoutDuration * 2 ** (record.lockouts || 0), this.maxLockout);
+        record.lockouts = (record.lockouts || 0) + 1;
+        record.lockoutUntil = now + duration;
+        record.lastLockout = now;
+        this.save(key);
+        return duration;
+    }
+
+    // Hands the key's state to onSave. begin() answers a lockout only once this is done.
+    save(key) {
+        const record = this.entries.get(key);
+        const state = record ? {
+            attempts: record.attempts,
+            firstAttempt: record.firstAttempt,
+            lockoutUntil: record.lockoutUntil,
+            lockouts: record.lockouts,
+            lastLockout: record.lastLockout
+        } : null;
+        const saving = new Promise(resolve => resolve(this.onSave(key, state))).catch(() => {});
+        if (record) record.saving = saving;
+        return saving;
     }
 
     locked(ms) {
@@ -140,21 +159,32 @@ class AttemptLimiter {
         }
     }
 
-    // Finishes a try from begin(): counted only if it was wrong
+    // Finishes a try from begin(): counted only if it was wrong, and then saved
+    // (a lockout starts right at the last try allowed). Returns the save to await.
     end(key, wrong) {
-        if (wrong) this.fail(key);
+        let saving = Promise.resolve();
+        if (wrong) {
+            this.fail(key);
+            const record = this.entries.get(key);
+            const now = Date.now();
+            if (record.attempts >= this.maxAttempts && !(record.lockoutUntil > now)) this.lockOut(key, record, now);
+            else this.save(key);
+            saving = record.saving;
+        }
         const pending = (this.pending.get(key) || 1) - 1;
         if (pending) this.pending.set(key, pending);
         else this.pending.delete(key);
         const waiting = this.waiting.get(key);
         this.waiting.delete(key);
         if (waiting) waiting.forEach(wake => wake());
+        return saving;
     }
 
-    // A lockout kept from before a restart
-    restore(key, { lockoutUntil, lockouts, lastLockout }) {
-        if (this.entries.has(key)) return;
-        this.entries.set(key, { attempts: this.maxAttempts, firstAttempt: lastLockout, lockoutUntil, lockouts, lastLockout });
+    // State saved before a restart (see onSave)
+    restore(key, state) {
+        if (this.entries.has(key) || !state || !Number.isFinite(state.attempts)) return;
+        const { attempts, firstAttempt = null, lockoutUntil = null, lockouts = 0, lastLockout = null } = state;
+        this.entries.set(key, { attempts, firstAttempt, lockoutUntil, lockouts, lastLockout });
     }
 
     // Many made-up addresses must not grow memory without end

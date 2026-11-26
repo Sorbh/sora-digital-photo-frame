@@ -13,6 +13,7 @@ process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
 process.env.ADMIN_PASSWORD = 'pin-test-admin';
 
 const { createApp } = require('../app');
+const LocalDataStore = require('../store/LocalDataStore');
 
 const accountsFile = path.join(testDataDir, 'access-accounts.json');
 const stored = () => fs.readJson(accountsFile);
@@ -118,7 +119,7 @@ describe("the family's limit on wrong PINs", () => {
   });
   beforeEach(async () => {
     restart();
-    await fs.remove(path.join(testDataDir, 'pin-lockout.json'));
+    await fs.remove(path.join(testDataDir, 'pin-attempts.json'));
   });
   afterAll(async () => {
     accessAccounts.limiter.entries.clear();
@@ -159,12 +160,49 @@ describe("the family's limit on wrong PINs", () => {
     expect(statuses.filter(s => s === 429)).toHaveLength(7);
   });
 
-  test('a lockout lasts through a restart, for every request arriving at once', async () => {
+  test('a lockout lasts through a restart right after the fifth wrong PIN, for every request at once', async () => {
     for (let i = 0; i < 5; i++) await tryPin('000000').expect(401);
-    await tryPin('7351').expect(429); // answered only once the lockout is saved
     restart();
     const results = await Promise.all([tryPin('000000'), tryPin('7351'), tryPin('000000')]);
     expect(results.map(r => r.status)).toEqual([429, 429, 429]);
+  });
+
+  test('wrong PINs so far last through a restart', async () => {
+    for (let i = 0; i < 4; i++) await tryPin('000000').expect(401);
+    restart();
+    await tryPin('000000').expect(401);
+    await tryPin('7351').expect(429);
+  });
+
+  test("a failed read after a restart isn't taken for no lockout", async () => {
+    for (let i = 0; i < 5; i++) await tryPin('000000').expect(401);
+    restart();
+    const get = LocalDataStore.prototype.get;
+    const spy = jest.spyOn(LocalDataStore.prototype, 'get').mockImplementation(function (name, fallback) {
+      if (name === 'pin-attempts') {
+        spy.mockRestore();
+        return Promise.reject(new Error('store is down'));
+      }
+      return get.call(this, name, fallback);
+    });
+    await tryPin('7351').expect(503);
+    await tryPin('7351').expect(429);
+  });
+
+  test('a lockout that failed to save is saved by the next try', async () => {
+    for (let i = 0; i < 4; i++) await tryPin('000000').expect(401);
+    const set = LocalDataStore.prototype.set;
+    const spy = jest.spyOn(LocalDataStore.prototype, 'set').mockImplementation(function (name, value) {
+      if (name === 'pin-attempts') {
+        spy.mockRestore();
+        return Promise.reject(new Error('store is down'));
+      }
+      return set.call(this, name, value);
+    });
+    await tryPin('000000').expect(401); // the fifth: its lockout isn't saved yet
+    await tryPin('7351').expect(429); // saved now
+    restart();
+    await tryPin('7351').expect(429);
   });
 
   test("one address can't go over its own limit by sending tries at once", async () => {

@@ -24,27 +24,42 @@ class AccessAccountController {
         this.pinSignIn = true; // createApp({ pinSignIn: false }) turns it off
         this.familyCode = false; // createApp({ familyCode: true }): PIN sign-in also needs the family code (hosted)
         // 5 wrong tries in 5 minutes locks for 15 minutes, then 30, 60... up to a day.
-        // A family's lockout is saved with its data, so a restart doesn't lift it.
+        // A family's wrong tries and lockout are saved with its data, so a restart
+        // doesn't give it a fresh set.
         this.limiter = new AttemptLimiter({
             keep: key => key.startsWith('family:'),
-            onLockout: (key, lockout) => {
-                if (!key.startsWith('family:')) return null;
-                return getDataStore().set('pin-lockout', lockout)
-                    .catch(error => console.error('Could not save the PIN lockout:', error.message));
-            }
+            onSave: (key, state) => (key.startsWith('family:') ? this.saveAttempts(key, state) : null)
         });
-        this.restoredLockouts = new Map(); // family -> reading its saved lockout, once since starting
+        this.restoredLockouts = new Map(); // family -> reading its saved tries, once since starting
+        this.unsavedAttempts = new Set(); // families whose last save failed, saved again on their next try
     }
 
-    // Reads a family's saved lockout once after a restart. Every request for the
-    // family waits for the same read, so none gets in before it's back.
+    async saveAttempts(familyKey, state) {
+        try {
+            await getDataStore().set('pin-attempts', state);
+            this.unsavedAttempts.delete(familyKey);
+        } catch (error) {
+            console.error('Could not save PIN attempts, will try again:', error.message);
+            this.unsavedAttempts.add(familyKey);
+        }
+    }
+
+    // Reads a family's saved tries once after a restart. Every request for the
+    // family waits for the same read, so none gets in before it's back. A read
+    // that fails is tried again by the next request.
     restoreLockout(familyKey) {
         if (!this.restoredLockouts.has(familyKey)) {
-            this.restoredLockouts.set(familyKey, getDataStore().get('pin-lockout', null)
-                .catch(() => null)
-                .then((lockout) => {
-                    if (lockout && Number.isFinite(lockout.lockoutUntil)) this.limiter.restore(familyKey, lockout);
-                }));
+            const reading = getDataStore().get('pin-attempts', null)
+                .catch((error) => {
+                    // No family to look in (a client error): nothing saved for it
+                    if (error.status >= 400 && error.status < 500) return null;
+                    throw error;
+                })
+                .then(state => this.limiter.restore(familyKey, state));
+            this.restoredLockouts.set(familyKey, reading);
+            reading.catch(() => {
+                if (this.restoredLockouts.get(familyKey) === reading) this.restoredLockouts.delete(familyKey);
+            });
         }
         return this.restoredLockouts.get(familyKey);
     }
@@ -360,7 +375,18 @@ class AccessAccountController {
             // counted for the family, once known: a right one, from someone who knows
             // one PIN, uses nothing up and clears nothing (see AttemptLimiter.begin).
             const familyKey = `family:${currentTenant().id}`;
-            await this.restoreLockout(familyKey);
+            try {
+                await this.restoreLockout(familyKey);
+            } catch (error) {
+                // Can't tell whether the family is locked out: refuse for now
+                console.error('Could not read PIN attempts:', error.message);
+                return res.status(503).json({
+                    success: false,
+                    error: 'Sign-in is not available right now. Try again in a moment.',
+                    code: 'SIGN_IN_UNAVAILABLE'
+                });
+            }
+            if (this.unsavedAttempts.has(familyKey)) await this.limiter.save(familyKey);
             const familyCheck = await this.limiter.begin(familyKey);
             if (!familyCheck.allowed) {
                 return res.status(429).json({
@@ -392,8 +418,9 @@ class AccessAccountController {
                 accounts = await this.accountsForSignIn(familyCode);
                 account = await this.findByPin(accounts, pin);
             } finally {
-                // No frames to guess at (e.g. a wrong family code): not the family's try
-                this.limiter.end(familyKey, !account && accounts.length > 0);
+                // No frames to guess at (e.g. a wrong family code): not the family's try.
+                // A wrong one is saved before answering.
+                await this.limiter.end(familyKey, !account && accounts.length > 0);
             }
 
             if (!account) {

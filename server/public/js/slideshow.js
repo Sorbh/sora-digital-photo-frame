@@ -358,7 +358,14 @@ class AuthenticationManager {
         }
     }
 
+    // Signed in another way, or signed out: the wait after "too many tries" is over
+    stopRateLimitWait() {
+        clearTimeout(this.rateLimitTimer);
+        this.rateLimitTimer = null;
+    }
+
     handleAuthSuccess(account) {
+        this.stopRateLimitWait();
         this.isAuthenticated = true;
         this.userAccount = account;
 
@@ -382,8 +389,9 @@ class AuthenticationManager {
             this.pinInput.classList.add('border-destructive');
             this.authButton.disabled = true;
             // The form comes back when the wait is over (and a bookmarked PIN is tried again)
-            clearTimeout(this.rateLimitTimer);
+            this.stopRateLimitWait();
             this.rateLimitTimer = setTimeout(() => {
+                this.rateLimitTimer = null;
                 this.pinInput.disabled = false;
                 this.authButton.disabled = false;
                 this.pinInput.classList.remove('border-destructive');
@@ -408,6 +416,7 @@ class AuthenticationManager {
         } finally {
             this.isAuthenticated = false;
             this.userAccount = null;
+            this.stopRateLimitWait();
             clearInterval(this.renewTimer);
             localStorage.removeItem(DEVICE_TOKEN_KEY); // signing out unpairs this browser
             sessionStorage.removeItem('authenticated');
@@ -433,8 +442,10 @@ class AuthenticationManager {
     }
 
     setLoading(loading) {
-        this.authButton.disabled = loading;
-        this.pinInput.disabled = loading;
+        // Still waiting after "too many tries": the form stays off until then
+        const off = loading || Boolean(this.rateLimitTimer);
+        this.authButton.disabled = off;
+        this.pinInput.disabled = off;
 
         if (loading) {
             this.authLoading.classList.remove('hidden');

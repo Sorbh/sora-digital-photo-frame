@@ -116,7 +116,7 @@ describe('the attempt limiter', () => {
     let saved = false;
     const limiter = new AttemptLimiter({
       maxAttempts: 1,
-      onLockout: () => new Promise(resolve => setTimeout(() => { saved = true; resolve(); }, 20))
+      onSave: () => new Promise(resolve => setTimeout(() => { saved = true; resolve(); }, 20))
     });
     await limiter.begin('k');
     limiter.end('k', true);

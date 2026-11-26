@@ -710,11 +710,22 @@ class PhotoFrameSlideshow {
     }
 
     // Loads the photo into the hidden slide; false if it failed or `signal` gave up on it
+    // Only the newest load owns the hidden slide: a Retry and a Next loading at
+    // once must not both finish on one load event, and a load overtaken by a
+    // newer one gives up without touching the newer one's picture.
     async loadImage(imageData, signal) {
         if (!imageData) return false;
 
+        const token = {};
+        this.currentLoad = token;
+        if (this.cancelLoad) this.cancelLoad(); // the older load, if it was already waiting
+
         const src = await this.imageSource(imageData);
         const isObjectUrl = src.startsWith('blob:');
+        if (this.currentLoad !== token) { // overtaken while fetching or decrypting
+            if (isObjectUrl) URL.revokeObjectURL(src);
+            return false;
+        }
 
         return new Promise((resolve) => {
             const nextSlide = (this.currentSlide + 1) % 2;
@@ -724,6 +735,14 @@ class PhotoFrameSlideshow {
                 img.removeEventListener('load', onLoad);
                 img.removeEventListener('error', onError);
                 signal?.removeEventListener('abort', onAbort);
+                if (this.cancelLoad === cancel) this.cancelLoad = null;
+            };
+
+            // A newer load took the slide: leave its src alone
+            const cancel = () => {
+                stop();
+                if (isObjectUrl) URL.revokeObjectURL(src);
+                resolve(false);
             };
 
             const onLoad = () => {
@@ -745,12 +764,13 @@ class PhotoFrameSlideshow {
             // Taking too long, or replaced by a newer try: stop downloading it
             const onAbort = () => {
                 stop();
-                img.removeAttribute('src');
+                if (this.currentLoad === token) img.removeAttribute('src');
                 if (isObjectUrl) URL.revokeObjectURL(src);
                 resolve(false);
             };
 
             if (signal?.aborted) return onAbort();
+            this.cancelLoad = cancel;
             img.addEventListener('load', onLoad);
             img.addEventListener('error', onError);
             signal?.addEventListener('abort', onAbort);
@@ -1385,6 +1405,8 @@ document.addEventListener('DOMContentLoaded', () => {
         // Load the folder list first (it checks the saved folder still exists), but
         // don't wait on it for ever: the photos come without it, and only the
         // slideshow's own start can show the error card and keep retrying
+        // Locked (signed out) while waiting: that sign-in is over, don't start
+        const generation = window.slideshow.recovery.generation;
         if (window.slideshow.folderSelector) {
             try {
                 await PhotoRecovery.withTimeout(window.slideshow.folderSelector.refresh(), REQUEST_TIMEOUT_MS);
@@ -1392,6 +1414,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.error('Folders did not load; starting the slideshow anyway:', error);
             }
         }
+        if (window.slideshow.recovery.generation !== generation || !window.authManager.isAuthenticated) return;
         window.slideshow.startSlideshow();
     });
 

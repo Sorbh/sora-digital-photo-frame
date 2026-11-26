@@ -54,6 +54,8 @@ class EncryptedPhotoLibrary extends PhotoLibrary {
   deletePhoto(adminPath) { return this.inner.deletePhoto(adminPath); }
   stat(adminPath) { return this.inner.stat(adminPath); }
   exists(adminPath) { return this.inner.exists(adminPath); }
+  // Symlinks are checked like the inner library checks them (optional, see PhotoLibrary)
+  async realPath(adminPath) { return typeof this.inner.realPath === 'function' ? this.inner.realPath(adminPath) : adminPath; }
   allPhotos() { return this.inner.allPhotos(); }
 
   async readItem(adminPath) { return this.open(await this.inner.readItem(adminPath)); }

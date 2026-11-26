@@ -115,7 +115,8 @@ body {
 .account-actions {
     display: flex;
     gap: 8px;
-    margin: -10px -12px 0 0;
+    margin-block: -10px 0;
+    margin-inline: 0 -12px; /* pulled into the card's end corner, either direction */
 }
 
 /* 44px tap targets, with room between edit and delete */

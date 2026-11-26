@@ -48,6 +48,15 @@ describe('left-to-right codes in right-to-left pages', () => {
     expect(base.body).toMatch(/inset-inline-start:\s*40%/);
   });
 
+  test('the note photo remove circle and the account buttons sit in the end corner in RTL too', () => {
+    const remove = rulesOf(read('css/notes.css')).find(r => r.selector === '.nf-photo-remove');
+    expect(remove.body).toMatch(/inset-inline-end:\s*0/);
+    expect(remove.body).not.toMatch(/(^|[\s;])(left|right)\s*:/);
+    const actions = rulesOf(read('css/access-accounts.css')).find(r => r.selector === '.account-actions');
+    expect(actions.body).toMatch(/margin-inline:\s*0 -12px/);
+    expect(actions.body).not.toMatch(/(^|[\s;])margin\s*:/);
+  });
+
   test('nested folders indent from the inline start', () => {
     const source = read('js/folderSelector.js');
     expect(source).toMatch(/padding-inline-start: \$\{indentPadding\}px/);

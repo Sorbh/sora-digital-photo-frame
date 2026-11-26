@@ -184,12 +184,18 @@ class FolderBrowser {
                 cursor: pointer;
             }
 
+            /* Deep berry on the light page, bright berry at night: 4.5:1 or more */
             .breadcrumb-item:last-child {
                 background: var(--blush);
-                color: var(--berry);
+                color: var(--berry-deep);
             }
 
             .breadcrumb-item:hover {
+                color: var(--berry-deep);
+            }
+
+            html.dark .breadcrumb-item:last-child,
+            html.dark .breadcrumb-item:hover {
                 color: var(--berry);
             }
 
@@ -351,7 +357,7 @@ class FolderBrowser {
                 border: 0;
                 border-radius: 50%;
                 background: var(--blush);
-                color: var(--berry);
+                color: var(--berry-deep);
                 cursor: pointer;
                 transition: transform 0.2s var(--ease-out);
             }

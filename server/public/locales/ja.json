@@ -245,7 +245,8 @@
     "PHOTO_CHANGED": "回転中にこの写真が変更されました。もう一度お試しください。",
     "UNSUPPORTED_TYPE": "アップロードできるのはJPEG、PNG、GIF、WebP、HEICの写真だけです",
     "SCREEN_LIMIT": "このファミリーにはすでに{limit}台の画面があります。追加するには、使わなくなった画面を1台削除してください。",
-    "FOLDER_TOO_DEEP": "ここには新しいフォルダを作成できません。フォルダは最大{limit}階層までです。"
+    "FOLDER_TOO_DEEP": "ここには新しいフォルダを作成できません。フォルダは最大{limit}階層までです。",
+    "FOLDER_NOT_FOUND": "このフォルダはもうありません。削除された可能性があります。"
   },
   "admin": {
     "static_001": "ライブラリ · Sora Frame",

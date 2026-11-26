@@ -2,9 +2,19 @@ const path = require('path');
 const fs = require('fs-extra');
 const PhotoLibrary = require('./PhotoLibrary');
 const { resolveAdminPath, toAdminPath, uploadsUrl, UPLOADS_DIR } = require('../utils/safePath');
+const { folderNotFoundError } = require('../utils/httpError');
 
 const IMAGE_PATTERN = /\.(jpg|jpeg|png|gif|webp)$/i;
 const SNAP_PATTERN = /\.snap\.json$/i;
+
+const isFolder = (dir) => fs.stat(dir).then(stat => stat.isDirectory(), () => false);
+
+// A write into dir failed: FOLDER_NOT_FOUND when that's because the folder is
+// gone, so the caller can say so; any other error as it was
+async function folderGoneOr(dir, error) {
+  if (['ENOENT', 'ENOTDIR'].includes(error.code) && !await isFolder(dir)) throw folderNotFoundError();
+  throw error;
+}
 
 class LocalPhotoLibrary extends PhotoLibrary {
   constructor(root = UPLOADS_DIR) {
@@ -61,12 +71,14 @@ class LocalPhotoLibrary extends PhotoLibrary {
 
   async deleteFolder(adminPath) { await fs.remove(this.resolve(adminPath)); }
 
+  // Saves into a folder that exists: a missing one (deleted meanwhile, even while
+  // this was writing) is FOLDER_NOT_FOUND, never made again. Writing a file never
+  // creates the folders above it.
   async addPhoto(folderAdminPath, { buffer, originalName, contentType }) {
     const dir = this.resolve(folderAdminPath, true);
     const name = path.basename(originalName);
     const target = this.resolve(path.join(folderAdminPath, name));
-    await fs.ensureDir(dir);
-    await fs.writeFile(target, buffer);
+    await fs.writeFile(target, buffer).catch(error => folderGoneOr(dir, error));
     return { name, path: this.admin(target), size: buffer.length, contentType };
   }
 
@@ -78,14 +90,23 @@ class LocalPhotoLibrary extends PhotoLibrary {
     return uploadsUrl(adminPath);
   }
 
+  // Into a folder that exists (fs-extra's move would make a missing one again)
   async movePhoto(adminPath, toFolderAdminPath) {
     const source = this.resolve(adminPath);
     const dest = this.resolve(toFolderAdminPath, true);
+    if (!await isFolder(dest)) throw folderNotFoundError();
     const ext = SNAP_PATTERN.test(source) ? '.snap.json' : path.extname(source);
     const base = path.basename(source, ext);
     let target = path.join(dest, base + ext);
     for (let n = 1; await fs.pathExists(target); n++) target = path.join(dest, `${base}-${n}${ext}`);
-    await fs.move(source, target);
+    try {
+      await fs.rename(source, target);
+    } catch (error) {
+      if (error.code !== 'EXDEV') return folderGoneOr(dest, error);
+      // Another disk (a mounted folder): copy, then remove the original
+      await fs.copyFile(source, target, fs.constants.COPYFILE_EXCL).catch(copyError => folderGoneOr(dest, copyError));
+      await fs.remove(source);
+    }
     return { path: this.admin(target) };
   }
 
@@ -97,6 +118,30 @@ class LocalPhotoLibrary extends PhotoLibrary {
     return stat && { size: stat.size, mtime: stat.mtime, mtimeMs: stat.mtimeMs, isFolder: stat.isDirectory() };
   }
   async exists(adminPath) { return Boolean(await this.stat(adminPath)); }
+
+  // Where a path really is, following symlinks: its admin path, or null when it
+  // leads out of the library. Parts that don't exist yet are kept as given,
+  // below the real place of the part that does.
+  async realPath(adminPath) {
+    const full = this.resolve(adminPath, true);
+    const root = await fs.realpath(this.staticDir);
+    const missing = [];
+    let existing = full;
+    let real;
+    for (;;) {
+      try {
+        real = await fs.realpath(existing);
+        break;
+      } catch (error) {
+        if (!['ENOENT', 'ENOTDIR'].includes(error.code) || existing === this.staticDir) throw error;
+        missing.unshift(path.basename(existing));
+        existing = path.dirname(existing);
+      }
+    }
+    const resolved = path.join(real, ...missing);
+    if (resolved !== root && !resolved.startsWith(root + path.sep)) return null;
+    return this.admin(path.join(this.staticDir, path.relative(root, resolved)));
+  }
 
   async allPhotos() {
     const found = [];
@@ -110,11 +155,17 @@ class LocalPhotoLibrary extends PhotoLibrary {
   }
 
   async readItem(adminPath) { return fs.readFile(this.resolve(adminPath)); }
+  // Like addPhoto, only into a folder that exists
   async writeItem(adminPath, buffer) {
     const full = this.resolve(adminPath);
     const tmp = `${full}.${process.pid}.tmp`;
-    await fs.writeFile(tmp, buffer);
-    await fs.move(tmp, full, { overwrite: true });
+    try {
+      await fs.writeFile(tmp, buffer);
+      await fs.rename(tmp, full);
+    } catch (error) {
+      await fs.remove(tmp).catch(() => {});
+      await folderGoneOr(path.dirname(full), error);
+    }
   }
   async listItems(adminPath) {
     const { folders, photos } = await this.listFolder(adminPath);

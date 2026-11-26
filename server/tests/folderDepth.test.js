@@ -114,11 +114,50 @@ describe('MAX_FOLDER_DEPTH', () => {
     // A folder made deeper before the limit is still listed
     expect(await listing('uploads/Trips/Italy/Rome')).toMatchObject({ canCreateFolder: false });
 
-    const adminJs = await fs.readFile(path.join(__dirname, '../public/admin.js'), 'utf8');
-    expect(adminJs).toMatch(/createFolderBtn\.classList\.toggle\('hidden', data\.canCreateFolder === false\)/);
-    // Not usable while a folder's listing is on its way (it may be at the limit)
-    expect(adminJs).toMatch(/getElementById\('createFolderBtn'\)\.disabled = true;/);
-    expect(adminJs).toMatch(/createFolderBtn\.disabled = data\.canCreateFolder === false;/);
+  });
+
+  // The real admin.js methods, with a stand-in for the page's New folder button
+  function libraryPage() {
+    const vm = require('vm');
+    const hiddenClasses = new Set();
+    const button = { disabled: false, classList: { toggle: (name, on) => (on ? hiddenClasses.add(name) : hiddenClasses.delete(name)) } };
+    const other = { classList: { add() {}, remove() {}, toggle() {} }, style: {} };
+    const context = { console, document: { getElementById: id => (id === 'createFolderBtn' ? button : other), querySelector: () => other, addEventListener() {} }, t: key => key, i18n: { error: (_, key) => key } };
+    context.window = context;
+    vm.createContext(context);
+    vm.runInContext(`${require('fs').readFileSync(path.join(__dirname, '../public/admin.js'), 'utf8')}\n;this.PhotoFrameAdmin = PhotoFrameAdmin;`, context);
+    const page = Object.create(context.PhotoFrameAdmin.prototype);
+    Object.assign(page, { clearSelection() {}, updateBreadcrumb() {}, updateBackButton() {}, showToast() {}, renderFolderContents() {} });
+    const pending = [];
+    page.authenticatedFetch = () => new Promise(resolve => pending.push(resolve));
+    const open = adminPath => { page.currentPath = adminPath; return page.loadFolderContents(); };
+    const answer = (body, ok = true) => pending.shift()({ ok, json: async () => body });
+    const state = () => ({ disabled: button.disabled, hidden: hiddenClasses.has('hidden') });
+    return { page, open, answer, state };
+  }
+
+  test('New folder: off while a listing loads, hidden at the limit, back after a failed listing', async () => {
+    const { page, open, answer, state } = libraryPage();
+
+    let loading = open('uploads/Trips/Italy');
+    expect(state().disabled).toBe(true); // can't be used before the listing says
+    answer({ files: [], folders: [], canCreateFolder: false });
+    await loading;
+    expect(state()).toEqual({ disabled: true, hidden: true });
+
+    // Back to a folder that allows it, but its listing fails: offered again (the server still checks)
+    loading = open('uploads/Trips');
+    answer({ message: 'nope' }, false);
+    await loading;
+    expect(state()).toEqual({ disabled: false, hidden: false });
+
+    // Redrawing a cached listing (a language change) while a deeper one loads doesn't turn it back on
+    loading = open('uploads/Trips/Italy');
+    page.renderFolderContents({ files: [], folders: [], canCreateFolder: true });
+    expect(state().disabled).toBe(true);
+    answer({ files: [], folders: [], canCreateFolder: false });
+    await loading;
+    expect(state()).toEqual({ disabled: true, hidden: true });
   });
 
   // A library with a photo in a folder made before the limit (level 4)

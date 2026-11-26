@@ -128,7 +128,7 @@ class JobManager {
         console.log('🔧 [DEBUG] Processing item', i + 1, 'of', mediaItems.length, ':', item.id);
         // Room left, and a turn among the photos being converted, before downloading it
         await assertCanAdd(1);
-        release = await slots.acquire(currentTenant().id);
+        release = await slots.acquire(currentTenant().id, { kind: 'import' });
         await assertCanAdd(1); // the library may have filled up while this waited
 
         // Get download URL

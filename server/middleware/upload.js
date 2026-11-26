@@ -42,10 +42,12 @@ const upload = multer({
 
 /**
  * Runs before multer reads anything: refuses a request bigger than
- * MAX_UPLOAD_SIZE, one from a family whose library is already full, and one
- * that would go over the uploads held and converted at once (503, which the
- * admin page retries). The slot is kept until the upload is processed:
- * the route's handler calls req.uploadSlot.finish() when it is done.
+ * MAX_UPLOAD_SIZE and one from a family whose library is already full, then
+ * waits for one of the slots for photos held and converted at once
+ * (utils/workSlots.js). Only an upload that waited settings.waitMs, or found the
+ * queue full, is answered 503 BUSY (which the admin page retries). The slot is
+ * kept until the upload is processed: the route's handler calls
+ * req.uploadSlot.finish() when it is done.
  */
 async function uploadLimits(req, res, next) {
   const size = Math.round(MAX_UPLOAD_SIZE / (1024 * 1024));
@@ -78,14 +80,40 @@ async function uploadLimits(req, res, next) {
   }
 
   if (closed) return; // gone already: nothing to read or answer
-  release = slots.tryAcquire((req.tenant && req.tenant.id) || 'default');
-  if (!release) {
-    return res.status(503).set({ 'Retry-After': '2', Connection: 'close' })
+  // Wait in turn for a slot, before the body is read. Only a long wait or a full
+  // queue is answered "busy"; a browser that leaves gives up its place.
+  const gone = new AbortController();
+  const onGone = () => gone.abort();
+  res.once('close', onGone);
+  const granted = await slots.acquire((req.tenant && req.tenant.id) || 'default', {
+    timeoutMs: slots.settings.waitMs, signal: gone.signal, bounded: true
+  });
+  res.off('close', onGone);
+  if (closed) {
+    if (granted) granted(); // given a slot just as the browser left
+    return;
+  }
+  if (!granted) {
+    return res.status(503).set({ 'Retry-After': '5', Connection: 'close' })
       .json({ code: 'BUSY', message: 'Too many uploads at once. Try again in a moment.' });
   }
+  release = granted;
 
   // Given back when the handler finishes, or when the request ends before it starts
   req.uploadSlot = slot;
+
+  // A browser that stops sending keeps no slot: dropped after settings.idleMs of silence
+  let idle = null;
+  const quiet = () => { clearTimeout(idle); idle = null; };
+  const awake = () => {
+    quiet();
+    idle = setTimeout(() => { if (!slot.started) req.destroy(); }, slots.settings.idleMs);
+    idle.unref();
+  };
+  req.on('data', awake);
+  req.once('end', () => { req.off('data', awake); quiet(); });
+  res.once('close', () => { req.off('data', awake); quiet(); });
+  awake();
 
   // Sent without a length (chunked): count the bytes as they come, and stop at the cap.
   // Added right before multer pipes the request, so both see every chunk.

@@ -301,6 +301,81 @@ describe('Upload limits', () => {
     }
   });
 
+  test('two parallel uploads while an import holds a slot both succeed, and a third waits its turn', async () => {
+    const importing = await slots.acquire('default', { kind: 'import' });
+    const library = getLibrary();
+    const realAdd = library.addPhoto.bind(library);
+    let most = 0;
+    // Slow writes, so the uploads surely overlap
+    const spy = jest.spyOn(library, 'addPhoto').mockImplementation(async (...args) => {
+      most = Math.max(most, slots.running.total);
+      await new Promise(resolve => setTimeout(resolve, 100));
+      return realAdd(...args);
+    });
+    try {
+      const send = async name => request(app).post('/api/upload').field('path', 'uploads/family')
+        .attach('images', await png(8, 8), name);
+      const answers = await Promise.all([send('one.png'), send('two.png'), send('three.png')]);
+      expect(answers.map(r => r.status)).toEqual([200, 200, 200]);
+      expect(most).toBe(1 + slots.PER_FAMILY); // the import and two uploads, never more
+    } finally {
+      spy.mockRestore();
+      importing();
+    }
+    expect(slots.running.total).toBe(0);
+  });
+
+  describe('over a real connection', () => {
+    const http = require('http');
+    let server;
+    let port;
+    beforeAll(done => { server = app.listen(0, () => { port = server.address().port; done(); }); });
+    afterAll(done => { server.closeAllConnections(); server.close(() => done()); });
+    const until = async (check, ms = 2000) => {
+      const end = Date.now() + ms;
+      while (!check()) {
+        if (Date.now() > end) throw new Error('timed out');
+        await new Promise(resolve => setTimeout(resolve, 10));
+      }
+    };
+    // Headers and the start of a body, then nothing: the test decides what happens next
+    const open = () => {
+      const req = http.request({ port, method: 'POST', path: '/api/upload', headers: {
+        'Content-Type': 'multipart/form-data; boundary=b', 'Content-Length': '1000'
+      } });
+      req.on('error', () => {});
+      req.write('--b\r\nContent-Disposition: form-data; name="path"\r\n\r\nuploads/family\r\n');
+      return req;
+    };
+
+    test('a waiting upload whose browser leaves frees its place', async () => {
+      const held = [slots.tryAcquire('default'), slots.tryAcquire('default')];
+      const req = open();
+      await until(() => slots.waiting.length === 1);
+      req.destroy();
+      await until(() => slots.waiting.length === 0);
+      held.forEach(release => release());
+      expect(slots.running.total).toBe(0);
+      // Nothing is left behind: the next upload goes straight through
+      await request(app).post('/api/upload').field('path', 'uploads/family')
+        .attach('images', await png(8, 8), 'after.png').expect(200);
+      expect(slots.running.total).toBe(0);
+    });
+
+    test('an upload that stops sending is dropped and gives back its slot', async () => {
+      const idleMs = slots.settings.idleMs;
+      slots.settings.idleMs = 100;
+      try {
+        const req = open();
+        await until(() => slots.running.total === 1);
+        await until(() => slots.running.total === 0);
+        req.destroy();
+      } finally {
+        slots.settings.idleMs = idleMs;
+      }
+    });
+  });
+
   test('an unexpected quota hook error gets a generic answer', async () => {
     const appQuota = quotaService.getQuota();
     quotaService.setQuota({ canAdd: async () => { throw new Error('database down at db-SECRET-host'); } });
@@ -383,26 +458,122 @@ describe('Upload limits', () => {
       expect(res.body.code).toBe('QUOTA_EXCEEDED');
     });
 
-    test('only a few uploads run at once, per family and overall', async () => {
+    // Started, not awaited: an upload may wait for its turn
+    const start = (headers, tenant) => {
+      const res = new EventEmitter();
+      res.statusCode = 200;
+      res.status = code => { res.statusCode = code; return res; };
+      res.set = () => res;
+      res.json = body => { res.body = body; return res; };
+      const next = jest.fn();
+      const req = Object.assign(new EventEmitter(), { headers, tenant, unpipe() {}, destroy() {} });
+      const done = uploadLimits(req, res, next);
+      return { req, res, next, done };
+    };
+    const tick = () => new Promise(resolve => setImmediate(resolve));
+
+    test('only a few uploads run at once, per family and overall; the rest wait their turn', async () => {
       const a1 = await call(ok, { id: 'a' });
       const a2 = await call(ok, { id: 'a' });
-      const a3 = await call(ok, { id: 'a' });
+      const a3 = start(ok, { id: 'a' });
+      await tick();
       expect([a1, a2].every(c => c.next.mock.calls.length === 1)).toBe(true);
-      expect(a3.res.statusCode).toBe(503);
+      expect(a3.next).not.toHaveBeenCalled(); // waiting, not refused
+      expect(a3.res.body).toBeUndefined();
 
       const b1 = await call(ok, { id: 'b' });
       const b2 = await call(ok, { id: 'b' });
-      const c1 = await call(ok, { id: 'c' });
+      const c1 = start(ok, { id: 'c' });
+      await tick();
       expect(b1.next).toHaveBeenCalled();
       expect(b2.next).toHaveBeenCalled();
-      expect(c1.res.statusCode).toBe(503); // four running in all
+      expect(c1.next).not.toHaveBeenCalled(); // four running in all
+      expect(slots.running.total).toBe(slots.TOTAL);
 
-      // A request that ends before it is processed frees its place
+      // Whoever waited longest goes first: a's own third upload, then c
       a1.res.emit('close');
-      const c2 = await call(ok, { id: 'c' });
-      expect(c2.next).toHaveBeenCalled();
-      [a2, b1, b2, c2].forEach(c => c.res.emit('close'));
+      await a3.done;
+      expect(a3.next).toHaveBeenCalled();
+      expect(c1.next).not.toHaveBeenCalled();
+      b1.res.emit('close');
+      await c1.done;
+      expect(c1.next).toHaveBeenCalled();
+      [a2, a3, b2, c1].forEach(c => c.res.emit('close'));
       expect(slots.running.total).toBe(0);
+    });
+
+    test('an upload is answered busy only after a real wait', async () => {
+      const waitMs = slots.settings.waitMs;
+      slots.settings.waitMs = 80;
+      try {
+        const held = [await call(ok, { id: 'h' }), await call(ok, { id: 'h' })];
+        const startedAt = Date.now();
+        const late = start(ok, { id: 'h' });
+        await late.done;
+        expect(Date.now() - startedAt).toBeGreaterThanOrEqual(70);
+        expect(late.next).not.toHaveBeenCalled();
+        expect(late.res.statusCode).toBe(503);
+        expect(late.res.body.code).toBe('BUSY');
+        expect(slots.waiting).toHaveLength(0);
+        held.forEach(c => c.res.emit('close'));
+        expect(slots.running.total).toBe(0);
+      } finally {
+        slots.settings.waitMs = waitMs;
+      }
+    });
+
+    test('a browser that leaves while waiting gives up its place', async () => {
+      const held = [await call(ok, { id: 'w' }), await call(ok, { id: 'w' })];
+      const leaving = start(ok, { id: 'w' });
+      const staying = start(ok, { id: 'w' });
+      await tick();
+      expect(slots.waiting).toHaveLength(2);
+      leaving.res.emit('close');
+      await leaving.done;
+      expect(slots.waiting).toHaveLength(1);
+      held[0].res.emit('close');
+      await staying.done;
+      expect(staying.next).toHaveBeenCalled(); // the place went to the one still there
+      expect(leaving.next).not.toHaveBeenCalled();
+      expect(slots.running.total).toBe(2);
+      [held[1], staying].forEach(c => c.res.emit('close'));
+      expect(slots.running.total).toBe(0);
+    });
+
+    test('the cap holds under a flood, and the queue is bounded', async () => {
+      const { maxWaiting, maxWaitingPerFamily } = slots.settings;
+      slots.settings.maxWaiting = 6;
+      slots.settings.maxWaitingPerFamily = 3;
+      try {
+        let most = 0;
+        const families = ['f1', 'f2', 'f3', 'f4'];
+        const calls = [];
+        for (let i = 0; i < 40; i += 1) {
+          calls.push(start(ok, { id: families[i % families.length] }));
+          await tick();
+          most = Math.max(most, slots.running.total);
+          for (const family of families) expect(slots.running.byFamily.get(`upload:${family}`) || 0).toBeLessThanOrEqual(slots.PER_FAMILY);
+        }
+        expect(most).toBe(slots.TOTAL);
+        expect(slots.waiting.length).toBeLessThanOrEqual(6);
+        const refused = calls.filter(c => c.res.statusCode === 503);
+        expect(refused.length).toBe(40 - slots.TOTAL - slots.waiting.length);
+        refused.forEach(c => expect(c.res.body.code).toBe('BUSY'));
+
+        // Each one done lets one waiting in, never more than the cap
+        while (calls.some(c => c.next.mock.calls.length && !c.closed)) {
+          const runningNow = calls.find(c => c.next.mock.calls.length && !c.closed);
+          runningNow.closed = true;
+          runningNow.res.emit('close');
+          await tick();
+          expect(slots.running.total).toBeLessThanOrEqual(slots.TOTAL);
+        }
+        expect(slots.running.total).toBe(0);
+        expect(slots.waiting).toHaveLength(0);
+        expect(calls.filter(c => c.next.mock.calls.length).length).toBe(40 - refused.length);
+      } finally {
+        Object.assign(slots.settings, { maxWaiting, maxWaitingPerFamily });
+      }
     });
 
     test('a browser that leaves while the quota is checked takes no place', async () => {
@@ -432,17 +603,20 @@ describe('Upload limits', () => {
       expect(slots.running.total).toBe(0);
     });
 
-    test('imports wait for a free place', async () => {
-      const held = [await call(ok, { id: 'e' }), await call(ok, { id: 'e' })];
+    test("imports don't use up a family's uploads, and wait for a free place overall", async () => {
+      const importing = await slots.acquire('e', { kind: 'import' });
+      const uploads = [await call(ok, { id: 'e' }), await call(ok, { id: 'e' })];
+      uploads.forEach(c => expect(c.next).toHaveBeenCalled());
+      const other = await call(ok, { id: 'x' }); // the fourth slot
       let started = false;
-      const waiting = slots.acquire('e').then(release => { started = true; return release; });
-      await new Promise(resolve => setImmediate(resolve));
+      const second = slots.acquire('y', { kind: 'import' }).then(release => { started = true; return release; });
+      await tick();
       expect(started).toBe(false);
-      held[0].res.emit('close');
-      const release = await waiting;
+      importing();
+      const release = await second;
       expect(started).toBe(true);
       release();
-      held[1].res.emit('close');
+      [...uploads, other].forEach(c => c.res.emit('close'));
       expect(slots.running.total).toBe(0);
     });
   });

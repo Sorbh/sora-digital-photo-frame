@@ -659,8 +659,11 @@ class PhotoFrameSlideshow {
         document.addEventListener('keydown', (e) => {
             // Typing in a field (the family code, say) is not a slideshow shortcut
             if (e.target.closest?.('input, textarea, select')) return;
-            // Space on a focused button (Retry, say) presses that button
-            if (e.key === ' ' && e.target.closest?.('button, a[href]')) return;
+            // Nor are keys in the open folder picker, which has its own (js/folderSelector.js)
+            if (e.target.closest?.('#folderSelector.open')) return;
+            // Space and Enter on a focused button or link (Retry, say) press it
+            if ((e.key === ' ' || e.key === 'Enter') && e.target.closest?.('button, a[href]')) return;
+            if (this.handleDockArrows(e)) return;
             switch (e.key) {
                 case ' ': // Space
                 case 'k':
@@ -1119,6 +1122,34 @@ class PhotoFrameSlideshow {
         if (window.authManager) {
             window.authManager.logout();
         }
+    }
+
+    /**
+     * Arrow keys for TV remotes without Tab: Up or Down from the photo steps
+     * into the dock, Left and Right move along it (js/arrowFocus.js), and Down
+     * steps back out so Right is "next photo" again. True when the key was used.
+     */
+    handleDockArrows(e) {
+        const controls = document.getElementById('controls');
+        if (!controls || !window.SoraArrowFocus || !SoraArrowFocus.DIRECTIONS[e.key]) return false;
+        const inDock = controls.contains(e.target);
+        if (!inDock) {
+            const onPhoto = e.target === document.body || e.target === document.documentElement;
+            if (!onPhoto || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return false;
+            e.preventDefault();
+            this.showControlsTemporarily();
+            this.playPauseBtn.focus();
+            return true;
+        }
+        e.preventDefault();
+        if (e.key === 'ArrowDown') {
+            e.target.blur();
+        } else if (e.key !== 'ArrowUp') {
+            const buttons = [...controls.querySelectorAll('button')].filter(button => !button.closest('.folder-dropdown'));
+            SoraArrowFocus.next(buttons, e.target, e.key)?.focus();
+        }
+        this.showControlsTemporarily();
+        return true;
     }
 
     showControlsTemporarily() {

@@ -40,7 +40,7 @@ class FolderSelector {
     initializeComponent() {
         this.container.innerHTML = `
             <div class="folder-selector">
-                <button class="folder-selector-btn" title="${t('folders.selectForSlideshow')}" data-i18n-attr="title:folders.selectForSlideshow">
+                <button type="button" class="folder-selector-btn" aria-expanded="false" title="${t('folders.selectForSlideshow')}" data-i18n-attr="title:folders.selectForSlideshow">
                     <span class="material-icons">folder</span>
                     <span class="selected-folder-name">${t('folders.allFoldersTitle')}</span>
                     <span class="material-icons dropdown-arrow">keyboard_arrow_down</span>
@@ -49,7 +49,7 @@ class FolderSelector {
                 <div class="folder-dropdown hidden">
                     <div class="folder-dropdown-header">
                         <span data-i18n="folders.selectFolder">${t('folders.selectFolder')}</span>
-                        <button class="close-dropdown">
+                        <button type="button" class="close-dropdown" aria-label="${t('common.close')}" data-i18n-attr="aria-label:common.close">
                             <span class="material-icons">close</span>
                         </button>
                     </div>
@@ -58,11 +58,13 @@ class FolderSelector {
                         <div class="folder-option all-folders" data-path="">
                             <div class="folder-option-content">
                                 <div class="folder-spacer"></div>
-                                <span class="material-icons folder-icon">photo_library</span>
-                                <div class="folder-details">
-                                    <div class="folder-name" data-i18n="folders.allFoldersTitle">${t('folders.allFoldersTitle')}</div>
-                                    <div class="folder-count" data-i18n="folders.allImages">${t('folders.allImages')}</div>
-                                </div>
+                                <button type="button" class="folder-choice">
+                                    <span class="material-icons folder-icon" aria-hidden="true">photo_library</span>
+                                    <span class="folder-details">
+                                        <span class="folder-name" data-i18n="folders.allFoldersTitle">${t('folders.allFoldersTitle')}</span>
+                                        <span class="folder-count" data-i18n="folders.allImages">${t('folders.allImages')}</span>
+                                    </span>
+                                </button>
                             </div>
                         </div>
                         
@@ -126,13 +128,15 @@ class FolderSelector {
                 return;
             }
 
-            // Handle folder selection
-            const folderOption = e.target.closest('.folder-option');
-            if (folderOption && !e.target.closest('.close-dropdown')) {
+            // Handle folder selection: each choice is a button of its own
+            const choice = e.target.closest('.folder-choice');
+            if (choice) {
                 e.preventDefault();
+                const folderOption = choice.closest('.folder-option');
                 const folderPath = folderOption.dataset.path;
                 const folderName = folderOption.querySelector('.folder-name')?.textContent || '';
                 this.selectFolder(folderPath, folderName);
+                return;
             }
 
             // Retry button
@@ -155,6 +159,25 @@ class FolderSelector {
             if (e.key === 'Escape' && this.isOpen) {
                 this.closeDropdown();
             }
+        });
+
+        // Arrow keys move between the picker's buttons, for TV remotes without Tab
+        // (js/arrowFocus.js); the slideshow doesn't see them
+        this.container.querySelector('.folder-dropdown').addEventListener('keydown', (e) => {
+            if (!window.SoraArrowFocus || !SoraArrowFocus.DIRECTIONS[e.key]) return;
+            e.preventDefault();
+            e.stopPropagation();
+            const buttons = this.container.querySelectorAll('.folder-dropdown button');
+            SoraArrowFocus.next(buttons, document.activeElement, e.key)?.focus();
+        });
+
+        // Up from the folder button opens the panel above it, or steps into it
+        selectorBtn.addEventListener('keydown', (e) => {
+            if (e.key !== 'ArrowUp') return;
+            e.preventDefault();
+            e.stopPropagation();
+            if (this.isOpen) this.focusSelected();
+            else this.openDropdown();
         });
     }
 
@@ -289,10 +312,6 @@ class FolderSelector {
                 overscroll-behavior: contain;
             }
 
-            .folder-option {
-                cursor: pointer;
-            }
-
             .folder-option-content {
                 display: flex;
                 align-items: center;
@@ -300,6 +319,30 @@ class FolderSelector {
                 padding: 7px 10px 7px 8px;
                 border-radius: var(--shape-sm);
                 transition: background-color 0.15s ease;
+            }
+
+            .folder-choice {
+                display: flex;
+                flex: 1;
+                align-items: center;
+                gap: 12px;
+                min-width: 0;
+                padding: 0;
+                border: 0;
+                border-radius: var(--shape-xs);
+                background: transparent;
+                color: inherit;
+                font: inherit;
+                text-align: start;
+                cursor: pointer;
+            }
+
+            .folder-choice:focus-visible,
+            .expand-btn:focus-visible,
+            .close-dropdown:focus-visible,
+            .folder-selector-btn:focus-visible {
+                outline: 2px solid #ff5c8d;
+                outline-offset: 2px;
             }
 
             .folder-option:hover .folder-option-content {
@@ -356,8 +399,8 @@ class FolderSelector {
                 background: rgba(255, 255, 255, 0.1);
             }
 
-            /* A collapsed folder's chevron points to where its text starts */
-            html[dir="rtl"] .expand-btn[data-expanded="false"] .material-icons {
+            /* The closed arrow points the way the text reads */
+            html[dir="rtl"] .expand-btn[aria-expanded="false"] .material-icons {
                 transform: scaleX(-1);
             }
 
@@ -389,11 +432,13 @@ class FolderSelector {
 
             .folder-details {
                 display: grid;
+                flex: 1;
                 gap: 3px;
                 min-width: 0;
             }
 
             .folder-option .folder-name {
+                display: block;
                 overflow: hidden;
                 font: 500 0.95rem/1.2 var(--font-sans, sans-serif);
                 white-space: nowrap;
@@ -401,6 +446,7 @@ class FolderSelector {
             }
 
             .folder-count {
+                display: block;
                 font: 400 0.6875rem/1 var(--font-sans, sans-serif);
                 letter-spacing: 0.04em;
                 color: rgba(255, 244, 239, 0.5);
@@ -520,11 +566,29 @@ class FolderSelector {
         this.container.classList.add('open');
         this.container.closest('.controls')?.classList.add('picker-open');
         this.container.querySelector('.folder-dropdown').classList.remove('hidden');
+        this.container.querySelector('.folder-selector-btn').setAttribute('aria-expanded', 'true');
         
-        // Load folders if not already loaded
-        if (this.folders.length === 0 && !this.isLoading) {
-            this.loadFolders();
-        }
+        // Load folders if not already loaded (or wait for the load already running),
+        // then start the keyboard on the chosen folder once the list is there
+        const ready = this.folders.length === 0 || this.loadingFolders ? this.loadFolders() : Promise.resolve();
+        ready.then(() => this.focusSelected());
+    }
+
+    /**
+     * Put focus on the chosen folder, so a keyboard or remote starts there
+     */
+    async focusSelected() {
+        if (!this.isOpen) return;
+        const choices = this.container.querySelector('.folder-options');
+        const selectedPath = this.folderStorage.getCurrentFolderPath();
+        const rowFor = path => choices.querySelector(`.folder-option[data-path="${cssEscape(path)}"] .folder-choice`);
+        // A folder inside a closed one isn't drawn yet: open its parents first
+        if (selectedPath && !rowFor(selectedPath)) await this.expandParentFolders(selectedPath);
+        if (!this.isOpen) return;
+        // Not when the person has moved on while the folders were loading
+        const active = document.activeElement;
+        if (active && active !== document.body && !this.container.contains(active)) return;
+        (rowFor(selectedPath) || choices.querySelector('.folder-choice'))?.focus();
     }
 
     /**
@@ -532,9 +596,15 @@ class FolderSelector {
      */
     closeDropdown() {
         this.isOpen = false;
+        const dropdown = this.container.querySelector('.folder-dropdown');
+        const hadFocus = dropdown.contains(document.activeElement);
         this.container.classList.remove('open');
         this.container.closest('.controls')?.classList.remove('picker-open');
-        this.container.querySelector('.folder-dropdown').classList.add('hidden');
+        dropdown.classList.add('hidden');
+        const toggle = this.container.querySelector('.folder-selector-btn');
+        toggle.setAttribute('aria-expanded', 'false');
+        // Hand focus back to the button rather than losing it with the hidden panel
+        if (hadFocus) toggle.focus();
     }
 
     /**
@@ -574,8 +644,17 @@ class FolderSelector {
         const list = this.container.querySelector('.folder-list');
         if (!list) return;
 
+        // Redrawing replaces the buttons: keep focus on the same one
+        const active = list.contains(document.activeElement) ? document.activeElement : null;
+        const focusPath = active?.closest('.folder-option')?.dataset.path;
+        const focusPart = active?.classList.contains('expand-btn') ? '.expand-btn' : '.folder-choice';
+
         list.innerHTML = '';
         this.renderFolderLevel(this.folders, list, 0);
+
+        if (focusPath !== undefined) {
+            list.querySelector(`.folder-option[data-path="${cssEscape(focusPath)}"] ${focusPart}`)?.focus();
+        }
     }
 
     /**
@@ -595,24 +674,32 @@ class FolderSelector {
             const hasSubfolders = folder.hasSubfolders;
             const indentPadding = level * 20; // 20px per level
             
+            // Expanding and choosing are separate buttons, so both work from a keyboard or remote
             element.innerHTML = `
                 <div class="folder-option-content" style="padding-inline-start: ${indentPadding}px;">
                     ${hasSubfolders ? 
-                        `<button class="expand-btn" data-expanded="${isExpanded}">
-                            <span class="material-icons">${isExpanded ? 'keyboard_arrow_down' : 'keyboard_arrow_right'}</span>
+                        `<button type="button" class="expand-btn" aria-expanded="${isExpanded}">
+                            <span class="material-icons" aria-hidden="true">${isExpanded ? 'keyboard_arrow_down' : 'keyboard_arrow_right'}</span>
                         </button>` : 
                         `<div class="folder-spacer"></div>`
                     }
-                    ${folder.thumbnail
-                        ? `<img class="folder-thumb" src="${folder.thumbnail}" alt="">`
-                        : `<span class="material-icons folder-icon">folder</span>`}
-                    <div class="folder-details">
-                        <div class="folder-name"></div>
-                        ${this.options.showFolderCount ? `<div class="folder-count">${t('folders.imageCount', { count: folder.imageCount })}</div>` : ''}
-                    </div>
+                    <button type="button" class="folder-choice">
+                        ${folder.thumbnail
+                            ? `<img class="folder-thumb" src="${folder.thumbnail}" alt="">`
+                            : `<span class="material-icons folder-icon" aria-hidden="true">folder</span>`}
+                        <span class="folder-details">
+                            <span class="folder-name"></span>
+                            ${this.options.showFolderCount ? `<span class="folder-count">${t('folders.imageCount', { count: folder.imageCount })}</span>` : ''}
+                        </span>
+                    </button>
                 </div>
             `;
             element.querySelector('.folder-name').textContent = folder.name;
+            element.querySelector('.expand-btn')?.setAttribute('aria-label', t('folders.subfoldersOf', { name: folder.name }));
+            if (folder.path === this.folderStorage.getCurrentFolderPath()) {
+                element.classList.add('selected');
+                element.querySelector('.folder-choice').setAttribute('aria-current', 'true');
+            }
 
             container.appendChild(element);
             
@@ -676,12 +763,14 @@ class FolderSelector {
         // Remove previous selection
         this.container.querySelectorAll('.folder-option.selected').forEach(el => {
             el.classList.remove('selected');
+            el.querySelector('.folder-choice')?.removeAttribute('aria-current');
         });
         
         // Add selection to current folder
-        const selectedElement = this.container.querySelector(`[data-path="${cssEscape(selectedPath)}"]`);
+        const selectedElement = this.container.querySelector(`.folder-option[data-path="${cssEscape(selectedPath)}"]`);
         if (selectedElement) {
             selectedElement.classList.add('selected');
+            selectedElement.querySelector('.folder-choice')?.setAttribute('aria-current', 'true');
             
             // Auto-expand parent folders if needed
             this.expandParentFolders(selectedPath);

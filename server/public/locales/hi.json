@@ -565,6 +565,8 @@
     "fetchRandomFailed": "कोई भी फोटो नहीं मिल सकी",
     "everyPhoto": "लाइब्रेरी की हर फोटो",
     "browseFolder": "फ़ोल्डर खोलें",
+    "browseNamed": "{name} खोलें",
+    "subfoldersOf": "{name} के फ़ोल्डर",
     "photoCount_one": "{count} फोटो",
     "photoCount_other": "{count} फोटो"
   },

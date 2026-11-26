@@ -565,6 +565,8 @@
     "fetchRandomFailed": "Es konnte kein zufälliges Bild abgerufen werden",
     "everyPhoto": "Alle Fotos aus der Bibliothek",
     "browseFolder": "Ordner öffnen",
+    "browseNamed": "{name} öffnen",
+    "subfoldersOf": "Ordner in {name}",
     "photoCount_one": "{count} Foto",
     "photoCount_other": "{count} Fotos"
   },

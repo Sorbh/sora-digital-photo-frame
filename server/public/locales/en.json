@@ -565,6 +565,8 @@
     "fetchRandomFailed": "Failed to fetch random image",
     "everyPhoto": "Every photo in the library",
     "browseFolder": "Browse folder",
+    "browseNamed": "Open {name}",
+    "subfoldersOf": "Folders in {name}",
     "photoCount_one": "{count} photo",
     "photoCount_other": "{count} photos"
   },

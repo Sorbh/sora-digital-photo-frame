@@ -582,6 +582,8 @@
     "fetchRandomFailed": "No se pudo obtener una foto al azar",
     "everyPhoto": "Todas las fotos de la biblioteca",
     "browseFolder": "Ver carpeta",
+    "browseNamed": "Abrir {name}",
+    "subfoldersOf": "Carpetas de {name}",
     "photoCount_one": "{count} foto",
     "photoCount_other": "{count} fotos",
     "photoCount_many": "{count} fotos"

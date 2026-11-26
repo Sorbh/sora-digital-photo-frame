@@ -565,6 +565,8 @@
     "fetchRandomFailed": "无法获取随机照片",
     "everyPhoto": "照片库中的所有照片",
     "browseFolder": "浏览文件夹",
+    "browseNamed": "打开 {name}",
+    "subfoldersOf": "{name} 中的文件夹",
     "photoCount_one": "{count} 张照片",
     "photoCount_other": "{count} 张照片"
   },

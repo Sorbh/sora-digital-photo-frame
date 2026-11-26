@@ -645,6 +645,8 @@
     "fetchRandomFailed": "تعذّر جلب صورة عشوائية",
     "everyPhoto": "كل الصور في المكتبة",
     "browseFolder": "تصفّح المجلد",
+    "browseNamed": "فتح {name}",
+    "subfoldersOf": "المجلدات داخل {name}",
     "photoCount_one": "{count} صورة",
     "photoCount_other": "{count} صورة",
     "photoCount_zero": "لا توجد صور",

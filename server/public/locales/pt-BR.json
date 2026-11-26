@@ -585,6 +585,8 @@
     "fetchRandomFailed": "Não foi possível buscar uma foto aleatória",
     "everyPhoto": "Todas as fotos da biblioteca",
     "browseFolder": "Abrir pasta",
+    "browseNamed": "Abrir {name}",
+    "subfoldersOf": "Pastas de {name}",
     "photoCount_one": "{count} foto",
     "photoCount_other": "{count} fotos",
     "photoCount_many": "{count} fotos"

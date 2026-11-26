@@ -470,6 +470,7 @@ class AuthenticationManager {
 
 const LAST_SHOWN_KEY = 'photoframe_last_shown';
 const REQUEST_TIMEOUT_MS = 30 * 1000; // a photo request that takes longer counts as failed
+const KEY_TIMEOUT_MS = 12 * 1000; // decrypting in the browser: after this, the server copy is used
 
 // Aborted after `ms`, so a request the server never answers can't stall the slideshow
 function timeoutSignal(ms) {
@@ -644,6 +645,8 @@ class PhotoFrameSlideshow {
             if (last && last.folder === (selectedFolderPath || '')) params.set('after', last.id);
 
             const response = await fetch(`/api/images/next?${params}`, { signal });
+            // The server or a proxy in trouble is not an empty folder
+            if (response.status >= 500) return { error: { offline: true } };
             if (!response.ok) throw new Error(t('slideshow.fetchImageFailed'));
             const data = await response.json();
 
@@ -673,7 +676,8 @@ class PhotoFrameSlideshow {
     // Key for browser-side decryption, fetched once per key id
     frameKey(id) {
         if (!this.frameKeys.has(id)) {
-            const request = fetch(`/api/frame/keys?ids=${encodeURIComponent(id)}`, { credentials: 'same-origin' })
+            // A key request that hangs is given up and forgotten, so the next try asks again
+            const request = fetch(`/api/frame/keys?ids=${encodeURIComponent(id)}`, { credentials: 'same-origin', signal: timeoutSignal(KEY_TIMEOUT_MS) })
                 .then(response => (response.ok ? response.json() : Promise.reject(new Error(`HTTP ${response.status}`))))
                 .then(({ keys }) => {
                     if (!keys || !keys[id]) throw new Error('Key not available');
@@ -695,7 +699,9 @@ class PhotoFrameSlideshow {
         const cipher = window.SoraPhotoCipher;
         if (imageData.rawUrl && cipher && cipher.supported()) {
             try {
-                return await cipher.loadImage(imageData.rawUrl, id => this.frameKey(id), imageData.mimeType);
+                // Slower than the server copy would be: use that instead
+                return await PhotoRecovery.withTimeout(
+                    cipher.loadImage(imageData.rawUrl, id => this.frameKey(id), imageData.mimeType), KEY_TIMEOUT_MS);
             } catch (error) {
                 console.warn('Decrypting in the browser failed, using the server copy:', error.message);
             }
@@ -826,10 +832,15 @@ class PhotoFrameSlideshow {
             return;
         }
 
-        // A photo that fails to come is skipped: the last good one stays on screen
+        // A photo that fails to come is skipped: the last good one stays on screen.
+        // Picking a folder (or signing out) meanwhile makes this one too late to show.
+        const generation = this.recovery.generation;
+        const isCurrent = () => this.recovery.generation === generation;
         const signal = timeoutSignal(REQUEST_TIMEOUT_MS);
         const next = await this.fetchRandomImage(signal);
-        if (next.image) await this.present(next.image, { signal });
+        if (!isCurrent()) return;
+        if (next.image) await this.present(next.image, { signal, isCurrent });
+        if (!isCurrent()) return;
 
         if (this.isPlaying) {
             this.scheduleNext();
@@ -845,7 +856,7 @@ class PhotoFrameSlideshow {
             this.showImage();
             return true;
         }
-        if (!isCurrent() || !await this.showNote(imageData.snap, { scheduled: false })) return false;
+        if (!isCurrent() || !await this.showNote(imageData.snap, { scheduled: false, isCurrent })) return false;
         this.currentImageData = imageData;
         this.photoShown();
         this.noteScheduler?.photoShown();
@@ -855,7 +866,7 @@ class PhotoFrameSlideshow {
         return true;
     }
 
-    async showNote(note, { scheduled = true } = {}) {
+    async showNote(note, { scheduled = true, isCurrent = () => true } = {}) {
         if (!this.noteLayer || !window.NotePage) return false;
         try {
             const page = NotePage.render(note);
@@ -863,6 +874,7 @@ class PhotoFrameSlideshow {
             this.noteLayer.classList.remove('is-visible');
             this.noteLayer.replaceChildren(page);
             await NotePage.whenLoaded(page);
+            if (!isCurrent()) return false; // replaced while its pictures loaded
 
             void this.noteLayer.offsetWidth; // restart the entrance animation
             this.noteLayer.classList.add('is-visible');
@@ -1370,19 +1382,17 @@ document.addEventListener('DOMContentLoaded', () => {
         window.slideshow.hideError();
         window.slideshow.initializeFolderSelector();
 
-        // Wait for folder selector to load folders before starting slideshow
-        if (window.slideshow && window.slideshow.folderSelector) {
+        // Load the folder list first (it checks the saved folder still exists), but
+        // don't wait on it for ever: the photos come without it, and only the
+        // slideshow's own start can show the error card and keep retrying
+        if (window.slideshow.folderSelector) {
             try {
-                await window.slideshow.folderSelector.refresh();
-                // Start slideshow only after folders are loaded
-                await window.slideshow.startSlideshow();
+                await PhotoRecovery.withTimeout(window.slideshow.folderSelector.refresh(), REQUEST_TIMEOUT_MS);
             } catch (error) {
-                console.error('Failed to initialize slideshow:', error);
-                window.slideshow.showErrorKey('slideshow.loadFoldersFailed');
+                console.error('Folders did not load; starting the slideshow anyway:', error);
             }
-        } else {
-            window.slideshow.startSlideshow();
         }
+        window.slideshow.startSlideshow();
     });
 
     window.addEventListener('beforeunload', () => {

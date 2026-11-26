@@ -159,6 +159,28 @@ describe('A frame that could not show its first photo', () => {
     expect(f.tries).toHaveLength(2);
   });
 
+  test('picking a folder or signing out makes earlier slideshow work too late to count; Retry does not', async () => {
+    const f = frame();
+    const before = f.recovery.generation;
+    f.recovery.start(); // folder B picked while a Next for folder A is still loading
+    expect(f.recovery.generation).not.toBe(before);
+    const forB = f.recovery.generation;
+    f.tries[0].resolve(offline);
+    await settle();
+    f.retryButton.dispatchEvent(new Event('click'));
+    expect(f.recovery.generation).toBe(forB); // a Next pressed now still counts for B
+    f.recovery.stop();
+    expect(f.recovery.generation).not.toBe(forB);
+  });
+
+  test('withTimeout gives up on a promise that never settles', async () => {
+    const never = new Promise(() => {});
+    const result = PhotoRecovery.withTimeout(never, 12000).catch(error => error.name);
+    jest.advanceTimersByTime(12000);
+    await expect(result).resolves.toBe('TimeoutError');
+    await expect(PhotoRecovery.withTimeout(Promise.resolve('key'), 12000)).resolves.toBe('key');
+  });
+
   test('a photo shown another way (the Next button) ends the retrying', async () => {
     const f = frame();
     f.recovery.start();

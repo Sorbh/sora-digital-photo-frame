@@ -31,6 +31,9 @@
       this.current = null; // the try running now: { controller }
       this.retryTimer = null;
       this.active = false; // between start() and a photo showing (or stop())
+      // Goes up on every start() and stop(): slideshow work begun under an older
+      // number (a Next for the previous folder, say) must not count any more
+      this.generation = 0;
     }
 
     get recovering() {
@@ -38,6 +41,7 @@
     }
 
     start() {
+      this.generation += 1;
       this.schedule.reset();
       this.active = true;
       return this.run();
@@ -57,6 +61,7 @@
     }
 
     stop() {
+      this.generation += 1;
       this.active = false;
       this.cancel();
     }
@@ -115,6 +120,16 @@
       return 'failed';
     }
   }
+
+  // `promise`, or a rejection after `ms` if it hasn't settled by then
+  PhotoRecovery.withTimeout = function (promise, ms, timers) {
+    const t = timers || { setTimeout: (fn, wait) => setTimeout(fn, wait), clearTimeout: id => clearTimeout(id) };
+    let timer;
+    const timeout = new Promise((_, reject) => {
+      timer = t.setTimeout(() => reject(Object.assign(new Error('Timed out'), { name: 'TimeoutError' })), ms);
+    });
+    return Promise.race([promise, timeout]).finally(() => t.clearTimeout(timer));
+  };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = PhotoRecovery;
   else root.PhotoRecovery = PhotoRecovery;

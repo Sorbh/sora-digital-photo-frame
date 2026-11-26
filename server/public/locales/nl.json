@@ -190,7 +190,16 @@
     "donePaired": "{name} is <em>gekoppeld</em>",
     "expiredHeading": "Deze code is <em>verlopen</em>",
     "heading": "Foto's tonen op <em>deze fotolijst</em>",
-    "codeMatchHint": "Controleer of hij overeenkomt met het scherm van de fotolijst"
+    "codeMatchHint": "Controleer of hij overeenkomt met het scherm van de fotolijst",
+    "enterHeading": "Typ de <em>code</em>",
+    "enterNote": "De fotolijst toont hem onder de QR-code, bijvoorbeeld <bdi class=\"code-example\">K7P-4QX</bdi>.",
+    "continue": "Doorgaan",
+    "codeInvalid": "Typ de 6 letters en cijfers die op de fotolijst staan.",
+    "typeCode": "Code typen",
+    "unreachableHeading": "Code kon niet worden <em>gecontroleerd</em>",
+    "unreachableNote": "De bibliotheek gaf geen antwoord. Controleer de verbinding van je telefoon en probeer het opnieuw.",
+    "tryAgain": "Opnieuw proberen",
+    "foldersFailed": "De mappen konden niet worden geladen, dus een nieuw account kan nu niet worden aangemaakt. Kies een bestaand account of probeer het opnieuw."
   },
   "login": {
     "invalid_password": "Onjuist wachtwoord. Probeer het opnieuw.",
@@ -324,6 +333,7 @@
     "countSnaps_one": "{count} herinnering",
     "countSnaps_other": "{count} herinneringen",
     "folderOptions": "Mapopties",
+    "photoOptions": "Foto-opties",
     "selectPhoto": "Foto selecteren",
     "viewPhoto": "Foto bekijken",
     "deletePhoto": "Foto verwijderen",

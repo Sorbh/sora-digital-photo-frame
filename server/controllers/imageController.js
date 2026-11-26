@@ -231,7 +231,7 @@ class ImageController {
       const imagePath = thumbnails.resolveInUploads(req.params.imageId);
 
       // Photos outside a frame's folders look like they don't exist
-      if (!imagePath || !thumbnails.IMAGE_PATTERN.test(imagePath) || !canSee(req, req.params.imageId) ||
+      if (!imagePath || !thumbnails.IMAGE_PATTERN.test(imagePath) || !canSee(req, path.relative(UPLOADS_DIR, imagePath)) ||
           !await getLibrary().exists(toAdminPath(imagePath))) {
         return res.status(404).json({
           success: false,

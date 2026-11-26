@@ -29,15 +29,16 @@
     font-family: var(--font-sans, 'Figtree', sans-serif);
 }
 
-/* The spine between the two "pages" */
+/* The spine between the two "pages", placed from the inline start so it
+   follows the columns when the page is right-to-left */
 .note-page:not(.layout-cover)::before {
     content: '';
     position: absolute;
     top: 0;
     bottom: 0;
-    left: 40%;
+    inset-inline-start: 40%;
     width: 5cqw;
-    transform: translateX(-50%);
+    margin-inline-start: -2.5cqw;
     background: linear-gradient(90deg, transparent, var(--np-gutter) 50%, transparent);
     pointer-events: none;
 }
@@ -262,7 +263,7 @@
 }
 
 .note-page.tpl::before {
-    left: 50%;
+    inset-inline-start: 50%;
 }
 
 .np-sheet {

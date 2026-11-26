@@ -4,8 +4,13 @@
 // there, but show only what leads to the assigned ones.
 const path = require('path');
 
-// family\\x/../y -> family/y, so ".." can't step out of an assigned folder
-const norm = (value) => path.posix.normalize('/' + String(value || '').replace(/\\/g, '/')).replace(/^\/+|\/+$/g, '');
+// Folders are split where the photo storage splits them: on Windows at a
+// backslash too, elsewhere a backslash is just part of a name
+const SEPARATORS = path.sep === '\\' ? /[\\/]/ : /\//;
+const segments = (value) => String(value || '').split(SEPARATORS);
+
+// family/x/../y -> family/y, so ".." can't step out of an assigned folder
+const norm = (value) => path.posix.normalize('/' + segments(value).join('/')).replace(/^\/+|\/+$/g, '');
 
 // The assigned folders, or null for no limit
 function assignedFolders(req) {
@@ -37,16 +42,57 @@ function canOpen(req, relativePath) {
   return canSee(req, relativePath) || foldersBelow(req, relativePath).length > 0;
 }
 
-// For /uploads: photos outside the account's folders look like they don't exist
-function requireVisiblePhoto(req, res, next) {
+// The photo an /uploads request asks for (relative to uploads), or null when it
+// can't be decoded or has "." or ".." segments
+function photoPath(req) {
   let relativePath;
   try {
     relativePath = decodeURIComponent(req.path);
   } catch {
-    return res.status(400).end();
+    return null;
   }
-  if (canSee(req, relativePath)) return next();
-  return res.status(404).json({ message: 'Not found', code: 'NOT_FOUND' });
+  const parts = segments(relativePath);
+  if (parts.some(part => part === '.' || part === '..')) return null;
+  return parts.filter(Boolean).join('/');
 }
 
-module.exports = { assignedFolders, canSee, canOpen, foldersBelow, requireVisiblePhoto };
+// The request ends in a slash, plain or encoded (%2F): a folder, never a photo
+function isFolderUrl(req) {
+  try {
+    return SEPARATORS.test(decodeURIComponent(req.path).slice(-1));
+  } catch {
+    return false;
+  }
+}
+
+// For /uploads: photos outside the account's folders look like they don't exist.
+// The request goes on with the path that was checked in req.photoPath, for
+// whatever reads the file (see atPhotoPath).
+function requireVisiblePhoto(req, res, next) {
+  const relativePath = photoPath(req);
+  if (relativePath === null || !canSee(req, relativePath)) {
+    return res.status(404).json({ message: 'Not found', code: 'NOT_FOUND' });
+  }
+  req.photoPath = relativePath;
+  return next();
+}
+
+// Runs a file reader that goes by the URL (express.static, webpFallback) on the
+// path requireVisiblePhoto checked, so it reads that same photo. The URL is put
+// back before anything after it runs, such as routes added with beforeRoutes.
+function atPhotoPath(reader) {
+  return (req, res, next) => {
+    const original = req.url;
+    const query = original.indexOf('?');
+    // A folder URL keeps its slash, so express.static passes it on as before
+    const folder = req.photoPath && isFolderUrl(req) ? '/' : '';
+    req.url = '/' + req.photoPath.split('/').map(encodeURIComponent).join('/') + folder
+      + (query === -1 ? '' : original.slice(query));
+    reader(req, res, (error) => {
+      req.url = original;
+      next(error);
+    });
+  };
+}
+
+module.exports = { assignedFolders, canSee, canOpen, foldersBelow, photoPath, isFolderUrl, requireVisiblePhoto, atPhotoPath };

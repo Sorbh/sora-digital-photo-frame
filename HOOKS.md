@@ -24,10 +24,13 @@ These options are a public contract. Treat a change to a name, an argument or a 
 
 Each handler is awaited. If it throws, the action that sent it fails and is undone, so an index kept by the host never misses a change.
 
-One removal can't be undone that way: a device made by an approval that ends after its code expired (or whose new account couldn't be finished) is removed even if `devicesRemoved` throws, since no frame can ever use it. Its id is then kept in the library's data store, in the `device-removals` document, and `devicesRemoved` is sent again:
+One removal can't be undone that way: a device made by an approval that ends after its code expired (including while its new account was being finished), or whose new account couldn't be finished, is removed even if `devicesRemoved` throws, since no frame can ever use it. Its id is first kept in the library's data store, in the `device-removals` document; then the device is removed and `devicesRemoved` is sent. Until the host takes it, it's sent again:
 
 - after 30 seconds, 2 minutes, 10 minutes and 1 hour, while the server keeps running;
-- and after the library's next `devicePaired` or `devicesRemoved` that goes through, which also covers a restart.
+- after the library's next `devicePaired` or `devicesRemoved` that goes through, which also covers a restart. This runs in the background, so a slow host never holds up a pairing, a PIN sign-in or a removal;
+- with the next discarded device, which sends every id still kept.
+
+If the `device-removals` document can't be written, `devicesRemoved` is sent first and the device is removed only once the host has it; if that throws too, the device stays.
 
 So `devicesRemoved` may arrive late, more than once for the same device, and with several devices from earlier removals at once. Treat it as "these ids are gone": removing an id the index doesn't have must succeed. A custom `dataStore` must accept the `device-removals` document.
 

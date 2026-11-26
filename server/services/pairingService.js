@@ -42,6 +42,7 @@ class PairingService {
   constructor() {
     this.pairings = new Map(); // code -> { code, secret, expiresAt, address, claimed, approved }
     this.retries = new Map(); // tenant id -> { timer, attempt }, for reportRemovals
+    this.reporting = new Map(); // tenant id -> { running, again }, so reports don't pile up
     this.retryDelays = RETRY_DELAYS_MS;
   }
 
@@ -138,11 +139,12 @@ class PairingService {
   async approve(codeOrPairing, { name, accountId, beforeReady = null }) {
     const pairing = typeof codeOrPairing === 'object' ? codeOrPairing : this.claim(codeOrPairing);
     if (!pairing || pairing.approved || this.pairings.get(pairing.code) !== pairing) return null;
+    // The code ran out, or was replaced, while waiting: the frame has moved on to
+    // a new code and could never collect this one
+    const lapsed = () => pairing.expiresAt <= Date.now() || this.pairings.get(pairing.code) !== pairing;
     try {
       const { device, token } = await this.addDevice({ name, accountId, via: 'qr' });
-      // The code ran out while the device was being made: the frame has moved on
-      // to a new code and could never collect this one, so undo it
-      if (pairing.expiresAt <= Date.now() || this.pairings.get(pairing.code) !== pairing) {
+      if (lapsed()) {
         await this.discardDevice(device.id);
         return null;
       }
@@ -153,7 +155,13 @@ class PairingService {
           await this.discardDevice(device.id);
           throw error;
         }
+        // Checked again: finishing the account may have taken past the deadline
+        if (lapsed()) {
+          await this.discardDevice(device.id);
+          return null;
+        }
       }
+      // Nothing is awaited from here on, so the frame can collect what this returns.
       // The frame collects this without a session; it runs as the approving tenant
       pairing.approved = { token, device, tenant: currentTenant() };
       return device;
@@ -191,7 +199,9 @@ class PairingService {
       await getDataStore().update('devices', [], devices => devices.filter(d => d.id !== id));
       throw error;
     }
-    await this.reportRemovals(); // the host answered, so it can take any it missed
+    // The host answered, so it can take any removals it missed. In the background:
+    // a host slow with those must not hold up this sign-in.
+    this.reportRemovals();
     return { device, token };
   }
 
@@ -277,31 +287,57 @@ class PairingService {
 
   // Removes a device nobody ever got the token for. It goes even if the host's
   // devicesRemoved hook fails, so it never counts toward the screen limit; the
-  // host then hears about it later (see reportRemovals).
+  // host then hears about it later. Kept to report before it's removed, so the
+  // removal can't be lost between the two (see reportRemovals).
   async discardDevice(id) {
-    await getDataStore().update('devices', [], devices => devices.filter(d => d.id !== id));
     try {
+      await getDataStore().update(REMOVALS_OUTBOX, [], pending => [...new Set([...pending, id])]);
+    } catch (saveError) {
+      // Nowhere to keep it: tell the host first and only then remove it here, so
+      // the two never disagree. If the host can't hear it either, the device stays.
+      console.error('Could not keep a discarded device to report:', saveError);
       await emit('devicesRemoved', { deviceIds: [id], tenantId: currentTenant().id });
-    } catch (error) {
-      console.error('Could not report a discarded device, will try again:', error);
-      try {
-        await getDataStore().update(REMOVALS_OUTBOX, [], pending => [...new Set([...pending, id])]);
-      } catch (saveError) {
-        console.error('Could not keep the discarded device to report later:', saveError);
-        return;
-      }
-      this.retryLater();
+      await getDataStore().update('devices', [], devices => devices.filter(d => d.id !== id));
+      return;
     }
+    await this.reportRemovals();
   }
 
-  // Sends devicesRemoved for the ones the host missed, if any. Never throws:
-  // what's still unreported stays kept and is tried again later.
-  async reportRemovals() {
+  // Removes the devices kept in the outbox and sends devicesRemoved for them,
+  // along with any earlier ones the host missed. Never throws: what's still
+  // unreported stays kept and is tried again later. One report at a time per
+  // library; calls during one share a single follow-up.
+  reportRemovals() {
     const tenant = currentTenant();
+    let state = this.reporting.get(tenant.id);
+    if (!state) {
+      state = { running: null, again: null };
+      this.reporting.set(tenant.id, state);
+    }
+    if (!state.running) {
+      state.running = this.sendRemovals(tenant).finally(() => {
+        state.running = null;
+        if (!state.again) this.reporting.delete(tenant.id);
+      });
+      return state.running;
+    }
+    if (!state.again) {
+      state.again = state.running.then(() => {
+        state.again = null;
+        return runWithTenant(tenant, () => this.reportRemovals());
+      });
+    }
+    return state.again;
+  }
+
+  async sendRemovals(tenant) {
     let left;
     try {
       const pending = await getDataStore().get(REMOVALS_OUTBOX, []);
       if (!Array.isArray(pending) || !pending.length) return;
+      // Gone here first (again, after a restart in between), so they never
+      // count toward the screen limit while the host is away
+      await getDataStore().update('devices', [], devices => devices.filter(d => !pending.includes(d.id)));
       await emit('devicesRemoved', { deviceIds: pending, tenantId: tenant.id });
       await getDataStore().update(REMOVALS_OUTBOX, [], current => {
         left = current.filter(id => !pending.includes(id));
@@ -352,7 +388,7 @@ class PairingService {
       await getDataStore().update('devices', [], devices => [...devices, ...removed]);
       throw error;
     }
-    await this.reportRemovals();
+    this.reportRemovals(); // in the background, as in addDevice
     return removed.length;
   }
 }

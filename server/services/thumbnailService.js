@@ -40,8 +40,9 @@ class ThumbnailService {
 
   cachePathFor(sourcePath) {
     // Tenants share admin paths ("uploads/Family/..."), so their thumbnails must not
+    // (the default one included: its "family/a.jpg" must never be tenant "family"'s "a.jpg")
     const { id } = currentTenant();
-    const scope = id === DEFAULT_TENANT.id ? '' : `${id}/`;
+    const scope = id === DEFAULT_TENANT.id ? '__default__/' : `t/${encodeURIComponent(id)}/`;
     const key = crypto.createHash('sha1')
       .update(`${scope}${path.relative(UPLOADS_DIR, sourcePath)}:${THUMB_SIZE}`)
       .digest('hex');

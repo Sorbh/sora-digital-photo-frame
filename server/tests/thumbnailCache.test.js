@@ -121,3 +121,41 @@ describe('Protected thumbnails', () => {
     expect(a.headers.etag).toBeTruthy();
   });
 });
+
+describe('Thumbnail cache keys', () => {
+  test("the default family's family/beach.png is never family \"family\"'s beach.png", () => {
+    const fromDefault = runWithTenant({ id: 'default' }, () => thumbnails.cachePathFor(path.join(testUploadsDir, 'family', 'beach.png')));
+    const fromFamily = runWithTenant({ id: 'family' }, () => thumbnails.cachePathFor(path.join(testUploadsDir, 'beach.png')));
+    expect(fromDefault).not.toBe(fromFamily);
+    const nested = runWithTenant({ id: 'a/b' }, () => thumbnails.cachePathFor(path.join(testUploadsDir, 'c.png')));
+    const flat = runWithTenant({ id: 'a' }, () => thumbnails.cachePathFor(path.join(testUploadsDir, 'b', 'c.png')));
+    expect(nested).not.toBe(flat);
+  });
+});
+
+describe('Google Photos picker thumbnails', () => {
+  test('are checked again before the browser reuses them', async () => {
+    const google = require('../controllers/googlePhotosController');
+    const oauth = require('../utils/oauthManager');
+    const realFetch = global.fetch;
+    const spies = [
+      jest.spyOn(oauth, 'getStoredTokens').mockReturnValue({ access_token: 'token' }),
+      jest.spyOn(oauth, 'isTokenExpired').mockReturnValue(false)
+    ];
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true, status: 200, headers: new Map([['content-type', 'image/jpeg']]), arrayBuffer: async () => new ArrayBuffer(3)
+    });
+    const headers = {};
+    let answered;
+    const done = new Promise(resolve => { answered = resolve; });
+    const res = { set: h => Object.assign(headers, h), send: () => answered(), status: () => res, json: body => answered(body) };
+    try {
+      google.proxyThumbnail({ query: { url: 'https://lh3.googleusercontent.com/abc' }, session: {} }, res, answered);
+      await done;
+      expect(headers['Cache-Control']).toBe('private, no-cache');
+    } finally {
+      global.fetch = realFetch;
+      spies.forEach(spy => spy.mockRestore());
+    }
+  });
+});

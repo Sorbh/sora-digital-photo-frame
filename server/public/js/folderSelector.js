@@ -511,24 +511,27 @@ class FolderSelector {
         this.container.querySelector('.folder-dropdown').classList.remove('hidden');
         this.container.querySelector('.folder-selector-btn').setAttribute('aria-expanded', 'true');
         
-        // Load folders if not already loaded
-        if (this.folders.length === 0 && !this.isLoading) {
-            this.loadFolders().then(() => this.focusSelected());
-        } else {
-            this.focusSelected();
-        }
+        // Load folders if not already loaded (or wait for the load already running),
+        // then start the keyboard on the chosen folder once the list is there
+        const ready = this.folders.length === 0 || this.loadingFolders ? this.loadFolders() : Promise.resolve();
+        ready.then(() => this.focusSelected());
     }
 
     /**
      * Put focus on the chosen folder, so a keyboard or remote starts there
      */
-    focusSelected() {
+    async focusSelected() {
+        if (!this.isOpen) return;
+        const choices = this.container.querySelector('.folder-options');
+        const selectedPath = this.folderStorage.getCurrentFolderPath();
+        const rowFor = path => choices.querySelector(`.folder-option[data-path="${CSS.escape(path)}"] .folder-choice`);
+        // A folder inside a closed one isn't drawn yet: open its parents first
+        if (selectedPath && !rowFor(selectedPath)) await this.expandParentFolders(selectedPath);
         if (!this.isOpen) return;
         // Not when the person has moved on while the folders were loading
         const active = document.activeElement;
         if (active && active !== document.body && !this.container.contains(active)) return;
-        const choices = this.container.querySelector('.folder-options');
-        (choices.querySelector('.folder-option.selected .folder-choice') || choices.querySelector('.folder-choice'))?.focus();
+        (rowFor(selectedPath) || choices.querySelector('.folder-choice'))?.focus();
     }
 
     /**

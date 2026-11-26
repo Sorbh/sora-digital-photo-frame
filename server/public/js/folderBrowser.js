@@ -122,17 +122,21 @@ class FolderBrowser {
             }
         });
 
-        // Arrow keys move between folders, for TV remotes without Tab (js/arrowFocus.js).
-        // With nothing focused yet, the first arrow lands on the folder playing now.
+        // Arrow keys move between the page's buttons and links (folders, Retry, the
+        // header and tab bar), for TV remotes without Tab (js/arrowFocus.js).
+        // With nothing focused yet, the first arrow lands on the folder playing now,
+        // or on Retry when the folders failed to load.
         document.addEventListener('keydown', (e) => {
             if (!window.SoraArrowFocus || !SoraArrowFocus.DIRECTIONS[e.key]) return;
             const active = document.activeElement;
-            const buttons = this.container.querySelectorAll('.folder-choice, .folder-nav, .breadcrumb-item');
+            const buttons = [...document.querySelectorAll('button, a[href]')];
             let target = null;
             if (!active || active === document.body) {
-                target = this.container.querySelector('.folder-option.selected .folder-choice')
+                const retry = this.container.querySelector('.folder-error:not(.hidden) .retry-btn');
+                target = retry
+                    || this.container.querySelector('.folder-option.selected .folder-choice')
                     || this.container.querySelector('.folder-choice');
-            } else if (this.container.contains(active)) {
+            } else if (buttons.includes(active)) {
                 target = SoraArrowFocus.next(buttons, active, e.key);
             }
             // Nothing that way: leave the key to the page (scrolling)

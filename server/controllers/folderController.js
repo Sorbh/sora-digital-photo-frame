@@ -8,6 +8,7 @@ const imageController = require('./imageController');
 const { resolveAdminPath, toAdminPath, uploadsUrl } = require('../utils/safePath');
 const { passClientError } = require('../utils/httpError');
 const { canSee, canOpen, foldersBelow } = require('../utils/viewerAccess');
+const { maxFolderDepth, allowsFolderIn, folderTooDeepError } = require('../utils/folderDepth');
 
 class FolderController {
   constructor() {
@@ -360,6 +361,9 @@ class FolderController {
       res.json({
         currentPath: folderPath,
         order,
+        // MAX_FOLDER_DEPTH: the library hides "New folder" where one can't be made
+        maxFolderDepth: maxFolderDepth(),
+        canCreateFolder: allowsFolderIn(fullPath),
         folders: folders.sort((a, b) => a.name.localeCompare(b.name)),
         files: sorted.map(entry => entry.file)
       });
@@ -417,6 +421,9 @@ class FolderController {
       if (!parentDir) {
         return res.status(400).json({ message: 'Invalid parent folder' });
       }
+
+      // MAX_FOLDER_DEPTH: no new folder past the deepest level
+      if (!allowsFolderIn(parentDir)) throw folderTooDeepError();
 
       const fullPath = path.join(parentDir, name.trim());
       if (await getLibrary().exists(toAdminPath(fullPath))) {

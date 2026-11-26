@@ -10,6 +10,8 @@ services:
       - SESSION_SECRET=${SESSION_SECRET:-}
       # Unset: the server makes up a password and prints it in `docker compose logs`
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
+      # Folder levels below the library root (0 = no limit)
+      - MAX_FOLDER_DEPTH=${MAX_FOLDER_DEPTH:-0}
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
       - GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI}

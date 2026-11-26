@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `MAX_FOLDER_DEPTH` limits how many folder levels the library can have (off by default). With `2`, `Trips` and `Trips/Italy` can be made but nothing inside `Italy`: the library hides "New folder" there, and creating, uploading into or importing from Google Photos to a folder past the limit is refused with `FOLDER_TOO_DEEP`. Deeper folders that already exist keep working ([#88](https://github.com/Sorbh/sora-digital-photo-frame/issues/88)).
+
 ## [2.0.0] - 2026-11-26
 
 ### Upgrading from 1.x

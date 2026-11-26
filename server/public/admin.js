@@ -543,6 +543,9 @@ class PhotoFrameAdmin {
         const request = this.folderRequest = (this.folderRequest || 0) + 1;
         const path = this.currentPath;
         const isCurrent = () => request === this.folderRequest && path === this.currentPath;
+        // Until this folder's listing says whether it may hold new folders (it may be
+        // at MAX_FOLDER_DEPTH), "New folder" can't be used
+        this.setCreateFolder('pending');
 
         try {
             const response = await this.authenticatedFetch(`/api/admin/folders?path=${encodeURIComponent(path)}`);
@@ -552,17 +555,38 @@ class PhotoFrameAdmin {
             if (!isCurrent()) return;
             
             if (response.ok) {
+                this.setCreateFolder(data.canCreateFolder === false ? 'refused' : 'allowed');
                 this.renderFolderContents(data);
                 this.updateBreadcrumb();
                 this.updateBackButton();
             } else {
+                this.setCreateFolder(this.knownCreateFolder(path));
                 this.showToast(i18n.error(data, 'admin.loadFolderFailed'), 'error');
             }
         } catch (error) {
             if (!isCurrent()) return;
+            this.setCreateFolder(this.knownCreateFolder(path));
             console.error('Error loading folder contents:', error);
             this.showToast(t('admin.loadFolderFailed'), 'error');
         }
+    }
+
+    // "New folder" for the folder being opened: 'pending' while its listing loads,
+    // then 'allowed', or 'refused' at MAX_FOLDER_DEPTH. Set only when a listing
+    // answers, so redrawing a cached one (a language change) can't turn it back on.
+    setCreateFolder(state) {
+        const button = document.getElementById('createFolderBtn');
+        button.disabled = state !== 'allowed';
+        if (state !== 'pending') {
+            button.classList.toggle('hidden', state === 'refused');
+            (this.createFolderKnown = this.createFolderKnown || new Map()).set(this.currentPath, state);
+        }
+    }
+
+    // A listing that failed: what an earlier one said about this folder (a refresh
+    // after an upload, or a folder opened before); otherwise offered, as the server still checks
+    knownCreateFolder(path) {
+        return (this.createFolderKnown && this.createFolderKnown.get(path)) || 'allowed';
     }
 
     renderFolderContents(data) {
@@ -584,6 +608,7 @@ class PhotoFrameAdmin {
         this.playOrder = data.order || 'shuffle';
         this.fileNames = data.files.map(file => file.name);
         this.showPlayOrder();
+        // MAX_FOLDER_DEPTH: no "New folder" in a folder at the deepest level
         
         // Background hint under the grid; the empty state has its own upload box
         const isEmpty = data.folders.length === 0 && data.files.length === 0;

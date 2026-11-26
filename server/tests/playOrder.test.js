@@ -14,6 +14,7 @@ process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
 process.env.ADMIN_PASSWORD = 'test-admin-pass';
 
 const app = require('../server');
+const photoInfo = require('../services/photoInfoService');
 
 // A tiny JPEG with a camera date and, optionally, a GPS position
 const photo = (taken, gps) => {
@@ -36,6 +37,8 @@ describe('Play order and photo details', () => {
   };
 
   beforeAll(async () => {
+    // Start from nothing: a place cached by an earlier run would skip the lookup this file counts
+    await Promise.all([testUploadsDir, testCacheDir, testDataDir].map(dir => fs.remove(dir)));
     const trip = path.join(testUploadsDir, 'trip');
     await fs.ensureDir(path.join(trip, 'day2'));
     await fs.writeFile(path.join(trip, 'a.jpg'), await photo('2019:03:12 18:04:00', GOA));
@@ -53,6 +56,8 @@ describe('Play order and photo details', () => {
 
   afterAll(async () => {
     global.fetch = realFetch;
+    // The cache saves 2 s later; written now, so it can't land in the folders after they are removed
+    await photoInfo.flush();
     await fs.remove(testUploadsDir);
     await fs.remove(testCacheDir);
     await fs.remove(testDataDir);

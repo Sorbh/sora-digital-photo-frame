@@ -45,6 +45,7 @@ describe('Upload pipeline', () => {
   });
 
   afterAll(async () => {
+    await photoInfo.flush(); // a save still waiting would bring the folders back
     await Promise.all([testUploadsDir, testCacheDir, testDataDir].map(dir => fs.remove(dir)));
   });
 

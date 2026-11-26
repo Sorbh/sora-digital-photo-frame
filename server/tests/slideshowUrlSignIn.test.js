@@ -8,7 +8,7 @@ const headScript = /<head>[\s\S]*?<script>([\s\S]*?)<\/script>/.exec(html)[1];
 
 // Runs slideshow.html's first script, then the slideshow's sign-in class, in a bare
 // sandbox opened at the given address. fetchPin answers each PIN request.
-function openSlideshow(href, { fetchPin = () => new Promise(() => {}) } = {}) {
+function openSlideshow(href, { fetchPin = () => new Promise(() => {}), headScriptRuns = true } = {}) {
   const element = () => new Proxy({}, {
     get: (target, prop) => {
       if (prop in target) return target[prop];
@@ -64,7 +64,7 @@ function openSlideshow(href, { fetchPin = () => new Promise(() => {}) } = {}) {
     }
   };
   const context = vm.createContext(sandbox);
-  vm.runInContext(headScript, context);
+  if (headScriptRuns) vm.runInContext(headScript, context);
   const addressAfterHead = sandbox.location.href;
   const source = fs.readFileSync(path.join(__dirname, '../public/js/slideshow.js'), 'utf8');
   const auth = source.slice(0, source.indexOf('class PhotoFrameSlideshow'));
@@ -129,6 +129,12 @@ describe('Slideshow sign-in from the address', () => {
     const { addressAfterHead, requests } = openSlideshow('https://frame.example/slideshow?lang=de#pin=246810&family=QWER-TYUI');
     expect(addressAfterHead).toBe('https://frame.example/slideshow?lang=de');
     expect(requests[0].body).toMatchObject({ pin: '246810', familyCode: 'QWER-TYUI' });
+  });
+
+  test('reads #pin= itself when the head script was blocked', () => {
+    const { location, requests } = openSlideshow('https://frame.example/slideshow?lang=de#pin=246810&family=QWER-TYUI', { headScriptRuns: false });
+    expect(requests[0].body).toMatchObject({ pin: '246810', familyCode: 'QWER-TYUI' });
+    expect(location.href).toBe('https://frame.example/slideshow?lang=de');
   });
 
   test('a PIN typed by hand wins over a sign-in from the address still under way', async () => {

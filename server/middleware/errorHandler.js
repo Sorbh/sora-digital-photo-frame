@@ -1,3 +1,5 @@
+const { errorSummary } = require('../utils/errorSummary');
+
 // Errors from express.json()/urlencoded() (body-parser). A parse or verify failure
 // holds the raw body, and its message can quote it.
 const BODY_PARSER_ERRORS = new Set([
@@ -10,15 +12,12 @@ const UNREADABLE_BODY = new Set(['entity.parse.failed', 'entity.verify.failed'])
 const isBodyParserError = err => typeof err.type === 'string' && BODY_PARSER_ERRORS.has(err.type) &&
   Number.isInteger(err.status) && err.status >= 400 && err.status < 500;
 
-// Only what helps find the bug without private data: the error's name, code and
-// status and where it was thrown. Never its message (a hook's error can quote a PIN
-// or family code) or its own fields (a request or response body a library attached).
+// Only what helps find the bug without private data (see utils/errorSummary)
 function logError(err) {
-  if (!err || typeof err !== 'object') return console.error('Error: request failed');
-  if (isBodyParserError(err)) return console.error(`Error: request body could not be read (${err.type}, ${err.status})`);
-  const label = [err.name || 'Error', err.code, err.status].filter(Boolean).join(' ');
-  const frames = typeof err.stack === 'string' ? err.stack.split('\n').filter(line => /^\s+at /.test(line)) : [];
-  console.error([`Error: request failed (${label})`, ...frames].join('\n'));
+  if (err && typeof err === 'object' && isBodyParserError(err)) {
+    return console.error(`Error: request body could not be read (${err.type}, ${err.status})`);
+  }
+  console.error(`Error: request failed: ${errorSummary(err)}`);
 }
 
 // Global error handling middleware

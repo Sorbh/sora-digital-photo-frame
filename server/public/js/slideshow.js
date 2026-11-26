@@ -73,13 +73,20 @@ class AuthenticationManager {
             this.urlFamilyCode = early.family || '';
             return early.pin || undefined;
         }
+        // The head script didn't run (e.g. a policy that blocks inline scripts): same
+        // thing here, for #pin=&family= and ?pin=&family=
         const url = new URL(location.href);
-        const pin = url.searchParams.get('pin')?.trim();
-        this.urlFamilyCode = url.searchParams.get('family')?.trim() || '';
-        if (url.searchParams.has('pin') || url.searchParams.has('family')) {
-            url.searchParams.delete('pin');
-            url.searchParams.delete('family');
-            history.replaceState(history.state, '', url.pathname + url.search + url.hash);
+        const query = url.searchParams;
+        const fragment = new URLSearchParams(url.hash.slice(1));
+        const inQuery = query.has('pin') || query.has('family');
+        const inFragment = fragment.has('pin') || fragment.has('family');
+        const pick = name => (fragment.get(name) || query.get(name) || '').trim();
+        const pin = pick('pin') || undefined;
+        this.urlFamilyCode = pick('family');
+        if (inQuery || inFragment) {
+            ['pin', 'family'].forEach(name => { query.delete(name); fragment.delete(name); });
+            const hash = inFragment ? (String(fragment) ? `#${fragment}` : '') : url.hash;
+            history.replaceState(history.state, '', url.pathname + url.search + hash);
         }
         return pin;
     }

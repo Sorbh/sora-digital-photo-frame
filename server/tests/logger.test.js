@@ -112,9 +112,17 @@ describe('Error handler', () => {
     const err = Object.assign(new Error('Tenant lookup failed'), { code: 'LOOKUP', requestBody: { pin: '246813', familyCode: 'PLMK-OIJN' } });
     await request(appThrowing(err)).get('/x').expect(500);
     const logs = output.join('\n');
-    expect(logs).toMatch(/request failed \(Error LOOKUP\)/);
+    expect(logs).toMatch(/request failed: Error LOOKUP/);
     expect(logs).toMatch(/^\s+at /m); // where it was thrown
     expect(logs).not.toMatch(/246813|PLMK-OIJN/);
+  });
+
+  test('a message spread over lines that look like stack frames is not logged', async () => {
+    const err = new Error('Lookup failed for request:\n    at /api/auth/pin (/secret/PLMK-OIJN.js:1:1)\n    at 246813 (/x.js:2:2)');
+    await request(appThrowing(err)).get('/x').expect(500);
+    const logs = output.join('\n');
+    expect(logs).not.toMatch(/PLMK-OIJN|246813/);
+    expect(logs).toMatch(/logger\.test\.js:\d+:\d+/); // the real frames are still there
   });
 
   test('a server error message is neither logged nor returned', async () => {
@@ -158,5 +166,50 @@ describe('Google Photos token check', () => {
       global.fetch = realFetch;
       spies.forEach(spy => spy.mockRestore());
     }
+  });
+});
+
+describe('Controller logs', () => {
+  let output;
+  let spies;
+  beforeEach(() => {
+    output = [];
+    const capture = (...args) => output.push(args.map(a => (typeof a === 'string' ? a : JSON.stringify(a))).join(' '));
+    spies = ['log', 'info', 'warn', 'error'].map(method => jest.spyOn(console, method).mockImplementation(capture));
+  });
+  afterEach(() => spies.forEach(spy => spy.mockRestore()));
+
+  test('a failing family code hook does not get the new code logged', async () => {
+    const familyCodes = require('../services/familyCodeService');
+    const accessAccounts = require('../controllers/accessAccountController');
+    const spy = jest.spyOn(familyCodes, 'renew').mockRejectedValue(new Error('Index update failed for ZXCV-QWER'));
+    const was = accessAccounts.familyCode;
+    accessAccounts.familyCode = true;
+    try {
+      const res = { status: () => res, json: () => res };
+      await accessAccounts.renewFamilyCode({}, res);
+      expect(output.join('\n')).not.toMatch(/ZXCV-QWER/);
+      expect(output.join('\n')).toMatch(/Error renewing the family code/);
+    } finally {
+      accessAccounts.familyCode = was;
+      spy.mockRestore();
+    }
+  });
+
+  test('a folder name from the address is not logged', async () => {
+    const app = createApp();
+    const agent = request.agent(app);
+    await agent.post('/api/auth/login').send({ password: 'correct-horse-battery' }).expect(200);
+    await fs.ensureDir(path.join(testUploadsDir, 'family'));
+    await fs.writeFile(path.join(testUploadsDir, 'family', 'a.png'), Buffer.from('x'));
+    await agent.get('/api/images/next').query({ folder: 'Private-Folder-Name' });
+    expect(output.join('\n')).not.toMatch(/Private-Folder-Name/);
+  });
+
+  test('a Google sign-in error from the address is not logged', async () => {
+    const google = require('../controllers/googlePhotosController');
+    const res = { send: () => res, status: () => res, json: () => res, redirect: () => res };
+    await google.handleCallback({ query: { error: 'odd-value-XYZ123' }, session: {} }, res, () => {});
+    expect(output.join('\n')).not.toMatch(/odd-value-XYZ123/);
   });
 });

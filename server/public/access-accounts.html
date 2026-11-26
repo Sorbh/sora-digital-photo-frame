@@ -32,27 +32,7 @@
 
 <body>
     <div class="app">
-        <header class="topbar">
-            <div class="topbar-brand">
-                <a href="/admin" class="sora-wordmark" aria-label="Sora library home" data-i18n-attr="aria-label:accessAccounts.static_016">Sora</a>
-                <span class="topbar-divider"></span>
-                <span class="sora-eyebrow" data-i18n="common.access">Access</span>
-            </div>
-            <div class="topbar-actions">
-                <a href="/admin" class="tb-btn tb-desktop" title="Back to the library" data-i18n-attr="title:accessAccounts.static_017">
-                    <span class="material-symbols-outlined">photo_library</span>
-                    <span class="tb-label" data-i18n="common.library">Library</span>
-                </a>
-                <a href="/notes" class="tb-btn" title="Notes shown on the frame" data-i18n-attr="title:accessAccounts.static_018">
-                    <span class="material-symbols-outlined">sticky_note_2</span>
-                    <span class="tb-label" data-i18n="common.notes">Notes</span>
-                </a>
-                <a href="/slideshow" class="tb-btn tb-desktop" title="Open the slideshow" data-i18n-attr="title:accessAccounts.static_019">
-                    <span class="material-symbols-outlined">slideshow</span>
-                    <span class="tb-label" data-i18n="common.slideshow">Slideshow</span>
-                </a>
-            </div>
-        </header>
+        <!-- sora:header -->
 
         <section class="library-head">
             <div class="library-title">
@@ -258,30 +238,9 @@
         <div id="toastContainer" class="toast-container" popover="manual"></div>
     </div>
 
-    <!-- Mobile tab bar -->
-    <nav class="tabbar" aria-label="Sections" data-i18n-attr="aria-label:accessAccounts.static_025">
-        <a href="/admin" class="tab">
-            <span class="material-symbols-outlined">photo_library</span><span data-i18n="common.library">Library</span>
-        </a>
-        <a href="/access-accounts" class="tab active" aria-current="page">
-            <span class="material-symbols-outlined">key</span><span data-i18n="common.access">Access</span>
-        </a>
-        <button class="tab-fab" data-proxy="addScreenBtn" aria-label="Add a screen" data-i18n-attr="aria-label:accessAccounts.addScreen">
-            <span class="material-symbols-outlined">add_to_queue</span>
-        </button>
-        <a href="/slideshow" class="tab">
-            <span class="material-symbols-outlined">slideshow</span><span data-i18n="common.slideshow">Slideshow</span>
-        </a>
-        <a href="/folder-selection" class="tab">
-            <span class="material-symbols-outlined">folder_special</span><span data-i18n="common.folders">Folders</span>
-        </a>
-    </nav>
-    <script>
-        document.querySelectorAll('[data-proxy]').forEach(btn => {
-            btn.addEventListener('click', () => document.getElementById(btn.dataset.proxy)?.click());
-        });
-    </script>
+    <!-- sora:tabbar -->
     <script src="/js/i18n.js"></script>
+    <script src="/js/appHeader.js"></script>
     <script src="/js/toastLayer.js"></script>
     <script src="/js/pairFlow.js"></script>
     <script src="access-accounts.js"></script>

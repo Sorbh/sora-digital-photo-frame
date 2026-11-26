@@ -33,27 +33,7 @@
 
 <body>
     <div class="app">
-        <header class="topbar">
-            <div class="topbar-brand">
-                <a href="/admin" class="sora-wordmark" aria-label="Sora library home" data-i18n-attr="aria-label:notes.static_018">Sora</a>
-                <span class="topbar-divider"></span>
-                <span class="sora-eyebrow" data-i18n="common.notes">Notes</span>
-            </div>
-            <div class="topbar-actions">
-                <a href="/admin" class="tb-btn tb-desktop" title="Back to the library" data-i18n-attr="title:notes.static_019">
-                    <span class="material-symbols-outlined">photo_library</span>
-                    <span class="tb-label" data-i18n="common.library">Library</span>
-                </a>
-                <a href="/access-accounts" class="tb-btn tb-desktop" data-owner-only title="Manage access accounts" data-i18n-attr="title:notes.static_020">
-                    <span class="material-symbols-outlined">key</span>
-                    <span class="tb-label" data-i18n="common.access">Access</span>
-                </a>
-                <a href="/slideshow" class="tb-btn tb-desktop" title="Open the slideshow" data-i18n-attr="title:notes.static_021">
-                    <span class="material-symbols-outlined">slideshow</span>
-                    <span class="tb-label" data-i18n="common.slideshow">Slideshow</span>
-                </a>
-            </div>
-        </header>
+        <!-- sora:header -->
 
         <section class="library-head">
             <div class="library-title">
@@ -254,30 +234,9 @@
         <div id="toastContainer" class="toast-container"></div>
     </div>
 
-    <!-- Mobile tab bar -->
-    <nav class="tabbar" aria-label="Sections" data-i18n-attr="aria-label:notes.static_039">
-        <a href="/admin" class="tab">
-            <span class="material-symbols-outlined">photo_library</span><span data-i18n="common.library">Library</span>
-        </a>
-        <a href="/access-accounts" class="tab" data-owner-only>
-            <span class="material-symbols-outlined">key</span><span data-i18n="common.access">Access</span>
-        </a>
-        <button class="tab-fab" data-proxy="createNoteBtn" data-edit-only aria-label="New note" data-i18n-attr="aria-label:notes.static_040">
-            <span class="material-symbols-outlined">edit_note</span>
-        </button>
-        <a href="/slideshow" class="tab">
-            <span class="material-symbols-outlined">slideshow</span><span data-i18n="common.slideshow">Slideshow</span>
-        </a>
-        <a href="/folder-selection" class="tab">
-            <span class="material-symbols-outlined">folder_special</span><span data-i18n="common.folders">Folders</span>
-        </a>
-    </nav>
-    <script>
-        document.querySelectorAll('[data-proxy]').forEach(btn => {
-            btn.addEventListener('click', () => document.getElementById(btn.dataset.proxy)?.click());
-        });
-    </script>
+    <!-- sora:tabbar -->
     <script src="/js/i18n.js"></script>
+    <script src="/js/appHeader.js"></script>
     <script src="/js/scope.js"></script>
     <script src="/js/notePage.js"></script>
     <script src="/js/pageEditor.js"></script>

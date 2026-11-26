@@ -55,6 +55,7 @@ COPY --from=builder --chown=photoframe:nodejs /app/routes ./routes
 COPY --from=builder --chown=photoframe:nodejs /app/services ./services
 COPY --from=builder --chown=photoframe:nodejs /app/store ./store
 COPY --from=builder --chown=photoframe:nodejs /app/utils ./utils
+COPY --from=builder --chown=photoframe:nodejs /app/views ./views
 COPY --from=builder --chown=photoframe:nodejs /app/public ./public
 
 # Create necessary directories and set permissions

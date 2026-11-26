@@ -359,7 +359,12 @@ describe('Notes', () => {
     // The real admin.js, with stand-ins for the page around it
     function libraryPage() {
       const vm = require('vm');
-      const elements = { folderTitle: {}, folderMeta: {}, notesLink: { href: '/notes' } };
+      const hidden = new Set(['allNotesLink']);
+      const elements = {
+        folderTitle: {},
+        folderMeta: {},
+        allNotesLink: { href: '/notes', classList: { toggle: (name, on) => (on ? hidden.add('allNotesLink') : hidden.delete('allNotesLink')) }, hidden }
+      };
       const context = {
         console,
         document: { getElementById: id => elements[id] || null, querySelector: () => null, querySelectorAll: () => [], addEventListener() {} },
@@ -382,8 +387,11 @@ describe('Notes', () => {
         files: [{ type: 'image', name: 'a.jpg' }, { type: 'snap', name: 'b.snap.json' }, { type: 'note', name: 'c.note.json' }]
       });
       expect(elements.folderMeta.textContent).toBe('admin.countPhotos:1 · admin.countSnaps:1 · admin.countNotes:1');
-      // Notes opened from the library start in its folder
-      expect(elements.notesLink.href).toBe('/notes?folder=uploads%2Ffamily');
+      // "All notes" shows beside the counts, and the Notes page it opens starts in this folder
+      expect(elements.allNotesLink.href).toBe('/notes?folder=uploads%2Ffamily');
+      expect(elements.allNotesLink.hidden.has('allNotesLink')).toBe(false);
+      page.updateLibraryHeading({ folders: [], files: [{ type: 'image', name: 'a.jpg' }] });
+      expect(elements.allNotesLink.hidden.has('allNotesLink')).toBe(true);
 
       page.openTile({ type: 'note', path: 'uploads/family/c.note.json' });
       expect(context.location.href).toBe('/notes?folder=uploads%2Ffamily&edit=uploads%2Ffamily%2Fc.note.json');

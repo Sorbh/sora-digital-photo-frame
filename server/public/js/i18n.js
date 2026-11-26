@@ -3,6 +3,9 @@
   const supported = ['en', 'es', 'fr', 'de', 'pt-BR', 'it', 'nl', 'hi', 'ja', 'zh-CN', 'ar'];
   const names = { en: 'English', es: 'Español', fr: 'Français', de: 'Deutsch', 'pt-BR': 'Português (Brasil)', it: 'Italiano', nl: 'Nederlands', hi: 'हिन्दी', ja: '日本語', 'zh-CN': '简体中文', ar: 'العربية' };
   const cache = new Map();
+  const brandName = () => {
+    try { return document.documentElement.dataset.brand || 'Sora Frame'; } catch (_) { return 'Sora Frame'; }
+  };
   const get = (object, key) => key.split('.').reduce((value, part) => value && value[part], object);
   const match = (value) => {
     if (!value) return null;
@@ -27,6 +30,8 @@
   const api = {
     supported, names, locale: 'en', messages: {}, fallback: {},
     t(key, vars = {}) {
+      // {brand}: the product's name, as the server put it on the page (<html data-brand>)
+      vars = { brand: brandName(), ...vars };
       let value = get(this.messages, key) || get(this.fallback, key) || key;
       if (Object.prototype.hasOwnProperty.call(vars, 'count')) {
         const suffix = new Intl.PluralRules(this.locale).select(Number(vars.count));

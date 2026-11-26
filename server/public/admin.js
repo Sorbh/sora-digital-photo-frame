@@ -69,7 +69,6 @@ class PhotoFrameAdmin {
         this.updateURL(); // Ensure URL reflects current path
         this.loadFolderContents();
         this.takeSharedPhotos();
-        this.checkFeatureFlags();
     }
 
     // Someone a library is shared with "can view" only: no uploads, moves,
@@ -181,11 +180,6 @@ class PhotoFrameAdmin {
         document.getElementById('backBtn').addEventListener('click', () => this.navigateBack());
         window.addEventListener('popstate', () => this.handleHistory());
         
-        // Access Accounts
-        document.getElementById('accessAccountsBtn').addEventListener('click', () => {
-            window.location.href = '/access-accounts';
-        });
-        
         // Breadcrumb navigation
         document.getElementById('breadcrumbContainer').addEventListener('click', (e) => {
             if (e.target.classList.contains('breadcrumb-item')) {
@@ -196,44 +190,18 @@ class PhotoFrameAdmin {
         // Create folder
         document.getElementById('createFolderBtn').addEventListener('click', () => this.showCreateFolderModal());
         document.getElementById('createSnapBtn').addEventListener('click', () => this.createSnap());
+        document.getElementById('createNoteBtn').addEventListener('click', () => this.createNote());
         document.getElementById('playOrderSelect').addEventListener('change', (e) => this.setPlayOrder(e.target.value));
         document.getElementById('confirmCreateBtn').addEventListener('click', () => this.createFolder());
         document.getElementById('cancelCreateBtn').addEventListener('click', () => this.hideCreateFolderModal());
         document.getElementById('closeCreateFolderModal').addEventListener('click', () => this.hideCreateFolderModal());
 
         // Upload
-        document.getElementById('uploadBtn').addEventListener('click', () => this.showUploadModal());
+        // Upload opens the add menu, or the upload dialog when it's the only choice (js/addMenu.js)
         document.getElementById('closeUploadModal').addEventListener('click', () => this.hideUploadModal());
         
-        // Logout
-        document.getElementById('logoutBtn').addEventListener('click', () => this.logout());
-        
-        // Theme toggle with system option
-        document.getElementById('themeToggle').addEventListener('click', () => {
-            const currentMode = localStorage.getItem('themeMode') || 'system';
-            let nextMode;
-            
-            // Cycle through: light → dark → system → light
-            switch (currentMode) {
-                case 'light':
-                    nextMode = 'dark';
-                    break;
-                case 'dark':
-                    nextMode = 'system';
-                    break;
-                case 'system':
-                default:
-                    nextMode = 'light';
-                    break;
-            }
-            
-            document.dispatchEvent(new CustomEvent('basecoat:theme', {
-                detail: { mode: nextMode }
-            }));
-            
-            this.updateThemeButton(nextMode);
-        });
-        
+        // Log out and the theme button are the shared header's (js/appHeader.js)
+
         document.getElementById('confirmUploadBtn').addEventListener('click', () => this.uploadFiles());
         document.getElementById('cancelUploadBtn').addEventListener('click', () => this.hideUploadModal());
         document.getElementById('uploadDropZone').addEventListener('click', () => document.getElementById('fileInput').click());
@@ -388,29 +356,6 @@ class PhotoFrameAdmin {
                 window.googlePhotosSync.createPickerSession();
             }
         });
-        
-        // Initialize theme button on page load
-        this.updateThemeButton(localStorage.getItem('themeMode') || 'system');
-    }
-
-    updateThemeButton(mode) {
-        const themeButton = document.getElementById('themeToggle');
-        const themeIcon = document.getElementById('themeIcon');
-        
-        switch (mode) {
-            case 'light':
-                themeIcon.textContent = 'light_mode';
-                themeButton.title = t('admin.themeToDark');
-                break;
-            case 'dark':
-                themeIcon.textContent = 'dark_mode';
-                themeButton.title = t('admin.themeToSystem');
-                break;
-            case 'system':
-                themeIcon.textContent = 'brightness_auto';
-                themeButton.title = t('admin.themeToLight');
-                break;
-        }
     }
 
     setupUploadDragAndDrop() {
@@ -731,7 +676,6 @@ class PhotoFrameAdmin {
 
     // Redraw what this script wrote, after i18n.apply() has re-translated the static page
     onLanguageChange() {
-        this.updateThemeButton(localStorage.getItem('themeMode') || 'system');
         this.updateUploadButton();
         this.updateEmptyStateUploadButton();
         if (!this.folderData) return;
@@ -754,9 +698,13 @@ class PhotoFrameAdmin {
         const meta = document.getElementById('folderMeta');
 
         if (title) title.textContent = parts.length > 1 ? parts[parts.length - 1] : t('common.library');
-        // Notes opened from here start in this folder
-        const notesLink = document.getElementById('notesLink');
-        if (notesLink) notesLink.href = this.currentPath === 'uploads' ? '/notes' : `/notes?folder=${encodeURIComponent(this.currentPath)}`;
+        // "All notes" beside the counts when this folder has notes; the Notes page
+        // it opens starts new notes in this folder
+        const allNotes = document.getElementById('allNotesLink');
+        if (allNotes) {
+            allNotes.href = this.currentPath === 'uploads' ? '/notes' : `/notes?folder=${encodeURIComponent(this.currentPath)}`;
+            allNotes.classList.toggle('hidden', !data.files.some(file => file.type === 'note'));
+        }
         if (meta) {
             const folders = data.folders.length;
             const snaps = data.files.filter(file => file.type === 'snap').length;
@@ -1596,6 +1544,12 @@ class PhotoFrameAdmin {
         this.updatePhotoModalNav();
     }
 
+    // "New note": the note editor, writing into the folder that is open, and back
+    // here when it's saved or closed (js/notes.js)
+    createNote() {
+        window.location.href = `/notes?${new URLSearchParams({ folder: this.currentPath, new: '1' })}`;
+    }
+
     createSnap(photoPath = null) {
         const params = new URLSearchParams({ folder: this.currentPath });
         if (photoPath) params.set('photo', photoPath);
@@ -1694,47 +1648,6 @@ class PhotoFrameAdmin {
         } else {
             // Fallback: reload entire folder contents
             this.loadFolderContents();
-        }
-    }
-
-    async checkFeatureFlags() {
-        try {
-            // Read once by js/scope.js, with what this person may do
-            const features = await window.SoraScope.ready;
-            if (!features) throw new Error('Feature flags unavailable');
-
-            // Hide Google Photos button if disabled
-            const googlePhotosBtn = document.getElementById('googlePhotosBtn');
-            if (googlePhotosBtn && !features.googlePhotosEnabled) {
-                googlePhotosBtn.style.display = 'none';
-            }
-        } catch (error) {
-            console.error('Error checking feature flags:', error);
-            // Hide Google Photos button on error to be safe
-            const googlePhotosBtn = document.getElementById('googlePhotosBtn');
-            if (googlePhotosBtn) {
-                googlePhotosBtn.style.display = 'none';
-            }
-        }
-    }
-
-    async logout() {
-        try {
-            const response = await this.authenticatedFetch('/api/auth/logout', {
-                method: 'POST'
-            });
-            
-            if (response && response.ok) {
-                this.showToast(t('admin.loggingOut'), 'info');
-                setTimeout(() => {
-                    window.location.href = '/login';
-                }, 1000);
-            } else {
-                this.showToast(t('admin.logoutFailed'), 'error');
-            }
-        } catch (error) {
-            console.error('Error during logout:', error);
-            this.showToast(t('admin.logoutFailed'), 'error');
         }
     }
 

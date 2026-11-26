@@ -74,7 +74,8 @@ function loadMenu(page = {}) {
 
 describe('the photo options menu with a keyboard', () => {
   test('its items are buttons the page can focus', () => {
-    const menu = html.slice(html.indexOf('<div role="menu"'), html.indexOf('</div>', html.indexOf('<div role="menu"')));
+    const start = html.indexOf('<div role="menu"', html.indexOf('id="contextMenuPopover"'));
+    const menu = html.slice(start, html.indexOf('</div>', start));
     expect(menu).not.toMatch(/<div role="menuitem"/);
     expect(menu.match(/<button type="button" role="menuitem" tabindex="-1"/g)).toHaveLength(8);
   });

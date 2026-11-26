@@ -103,21 +103,29 @@ class GooglePhotosSync {
       console.log('Setting authenticated state'); // Debug log
       googlePhotosBtn.title = t('googlePhotos.connectedAs', { email: this.userInfo.email });
       googlePhotosBtn.classList.add('authenticated');
-      googlePhotosBtn.innerHTML = `<span class="material-symbols-outlined">check_circle</span><span class="tb-label">${escapeHtml(t('admin.static_002'))}</span>`;
+      googlePhotosBtn.innerHTML = this.itemHtml('check_circle', t('admin.addFromGooglePhotos'));
     } else if (!this.justAuthenticated) {
       // Only set to unauthenticated if we haven't just authenticated
       console.log('Setting unauthenticated state'); // Debug log
       googlePhotosBtn.title = t('googlePhotos.connect');
       googlePhotosBtn.classList.remove('authenticated');
-      googlePhotosBtn.innerHTML = `<span class="material-symbols-outlined">add_photo_alternate</span><span class="tb-label">${escapeHtml(t('admin.static_002'))}</span>`;
+      googlePhotosBtn.innerHTML = this.itemHtml('add_photo_alternate', t('admin.addFromGooglePhotos'));
     } else {
       console.log('Preserving button state - just authenticated'); // Debug log
     }
   }
 
+  // "From Google Photos" in the library's Upload menu (js/addMenu.js)
+  itemHtml(icon, label) {
+    return `<span class="material-symbols-outlined mr-2" aria-hidden="true">${icon}</span><span class="add-menu-label">${escapeHtml(label)}</span>`;
+  }
+
+  // Not connected yet: connect. Connected: choose photos for the folder that is open.
   handleGooglePhotosAction() {
     if (!this.isAuthenticated) {
       this.startAuthentication();
+    } else if (window.photoFrameAdmin) {
+      window.photoFrameAdmin.openGooglePhotosImport();
     } else {
       this.showMessage(t('googlePhotos.connected'));
     }
@@ -133,7 +141,7 @@ class GooglePhotosSync {
       const googlePhotosBtn = document.getElementById('googlePhotosBtn');
       if (googlePhotosBtn) {
         googlePhotosBtn.disabled = true;
-        googlePhotosBtn.innerHTML = `<span class="material-symbols-outlined">hourglass_empty</span><span class="tb-label">${escapeHtml(t('googlePhotos.connecting'))}</span>`;
+        googlePhotosBtn.innerHTML = this.itemHtml('hourglass_empty', t('googlePhotos.connecting'));
         console.log('🔧 [DEBUG] Button set to loading state');
       }
 

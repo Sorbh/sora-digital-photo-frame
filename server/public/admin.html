@@ -63,41 +63,7 @@
 
 <body>
     <div class="app">
-        <header class="topbar">
-            <div class="topbar-brand">
-                <a href="/admin" class="sora-wordmark" aria-label="Sora library home" data-i18n-attr="aria-label:admin.static_032">Sora</a>
-                <span class="topbar-divider"></span>
-                <span class="sora-eyebrow" data-i18n="common.library">Library</span>
-            </div>
-            <div class="topbar-actions">
-                <button id="accessAccountsBtn" class="tb-btn tb-desktop" data-owner-only title="Manage access accounts" data-i18n-attr="title:admin.static_033">
-                    <span class="material-symbols-outlined">key</span>
-                    <span class="tb-label" data-i18n="common.access">Access</span>
-                </button>
-                <a href="/notes" id="notesLink" class="tb-btn" title="Notes shown on the frame" data-i18n-attr="title:admin.static_034">
-                    <span class="material-symbols-outlined">sticky_note_2</span>
-                    <span class="tb-label" data-i18n="common.notes">Notes</span>
-                </a>
-                <button id="googlePhotosBtn" class="tb-btn" data-owner-only data-edit-only title="Sync Google Photos" data-i18n-attr="title:admin.static_035">
-                    <span class="material-symbols-outlined">add_photo_alternate</span>
-                    <span class="tb-label" data-i18n="admin.static_002">Google Photos</span>
-                </button>
-                <a href="/slideshow" class="tb-btn tb-desktop" title="Open the slideshow" data-i18n-attr="title:admin.static_036">
-                    <span class="material-symbols-outlined">slideshow</span>
-                    <span class="tb-label" data-i18n="common.slideshow">Slideshow</span>
-                </a>
-                <span class="topbar-divider tb-desktop"></span>
-                <button id="settingsBtn" class="tb-btn icon tb-desktop" title="Settings" data-i18n-attr="title:admin.static_037">
-                    <span class="material-symbols-outlined">tune</span>
-                </button>
-                <button id="themeToggle" class="tb-btn icon" title="Switch to dark mode" data-i18n-attr="title:admin.static_038">
-                    <span class="material-symbols-outlined" id="themeIcon">brightness_auto</span>
-                </button>
-                <button id="logoutBtn" class="tb-btn icon" title="Log out" data-i18n-attr="title:admin.static_039">
-                    <span class="material-symbols-outlined">logout</span>
-                </button>
-            </div>
-        </header>
+        <!-- sora:header -->
 
         <section class="library-head">
             <div class="library-title">
@@ -114,7 +80,7 @@
                     </nav>
                 </div>
                 <h1 id="folderTitle" class="page-title sora-display"></h1>
-                <p id="folderMeta" class="page-meta sora-mono">&nbsp;</p>
+                <p class="page-meta sora-mono"><span id="folderMeta">&nbsp;</span><a id="allNotesLink" class="all-notes-link hidden" href="/notes" data-i18n="admin.allNotes">All notes</a></p>
             </div>
             <div class="library-actions">
                 <label class="play-order" data-edit-only title="How this folder plays on the frame" data-i18n-attr="title:admin.static_043">
@@ -136,10 +102,29 @@
                     <span class="material-symbols-outlined">auto_stories</span>
                     <span data-i18n="admin.newSnap">New snap</span>
                 </button>
-                <button id="uploadBtn" class="btn mobile-hide" data-edit-only title="Upload images" data-i18n-attr="title:admin.static_046">
+                <button id="createNoteBtn" class="btn-outline" data-edit-only title="Write a note for this folder" data-i18n-attr="title:admin.newNoteTitle">
+                    <span class="material-symbols-outlined">sticky_note_2</span>
+                    <span data-i18n="notes.static_008">New note</span>
+                </button>
+                <button id="uploadBtn" class="btn mobile-hide" data-edit-only data-add-menu aria-haspopup="menu" title="Upload images" data-i18n-attr="title:admin.static_046">
                     <span class="material-symbols-outlined">upload</span>
                     <span data-i18n="admin.upload">Upload</span>
                 </button>
+            </div>
+            <!-- Upload: from this device, or from Google Photos (js/addMenu.js). With only
+                 the first to offer, Upload goes straight to it. -->
+            <div popover="manual" id="addMenu" class="add-menu border rounded bg-background shadow-lg p-1">
+                <div role="menu" class="min-w-48" aria-label="Upload photos" data-i18n-attr="aria-label:admin.static_055">
+                    <button type="button" role="menuitem" tabindex="-1" class="menu-item" id="addFromDeviceBtn" data-add="device">
+                        <span class="material-symbols-outlined mr-2" aria-hidden="true">upload</span>
+                        <span data-i18n="admin.addFromDevice">From this device</span>
+                    </button>
+                    <!-- Connecting Google Photos is the owner's, importing is a change -->
+                    <button type="button" role="menuitem" tabindex="-1" class="menu-item" id="googlePhotosBtn" data-add="googlePhotos" data-owner-only data-edit-only hidden>
+                        <span class="material-symbols-outlined mr-2" aria-hidden="true">add_photo_alternate</span>
+                        <span class="add-menu-label" data-i18n="admin.addFromGooglePhotos">From Google Photos</span>
+                    </button>
+                </div>
             </div>
         </section>
 
@@ -439,38 +424,17 @@
         <div id="toaster" class="toaster fixed bottom-4 right-4 z-50" data-align="end" popover="manual"></div>
     </div>
 
-    <!-- Mobile tab bar -->
-    <nav class="tabbar" aria-label="Sections" data-i18n-attr="aria-label:admin.static_054">
-        <a href="/admin" class="tab active" aria-current="page">
-            <span class="material-symbols-outlined">photo_library</span><span data-i18n="common.library">Library</span>
-        </a>
-        <a href="/access-accounts" class="tab" data-owner-only>
-            <span class="material-symbols-outlined">key</span><span data-i18n="common.access">Access</span>
-        </a>
-        <button class="tab-fab" data-proxy="uploadBtn" data-edit-only aria-label="Upload photos" data-i18n-attr="aria-label:admin.static_055">
-            <span class="material-symbols-outlined">add</span>
-        </button>
-        <a href="/slideshow" class="tab">
-            <span class="material-symbols-outlined">slideshow</span><span data-i18n="common.slideshow">Slideshow</span>
-        </a>
-        <button class="tab" data-proxy="settingsBtn">
-            <span class="material-symbols-outlined">tune</span><span data-i18n="common.settings">Settings</span>
-        </button>
-    </nav>
-    <script>
-        // Tab bar buttons forward to the (desktop) controls that own the behaviour
-        document.querySelectorAll('[data-proxy]').forEach(btn => {
-            btn.addEventListener('click', () => document.getElementById(btn.dataset.proxy)?.click());
-        });
-    </script>
+    <!-- sora:tabbar -->
 
     <script src="/js/i18n.js"></script>
+    <script src="/js/appHeader.js"></script>
     <script src="/js/scope.js"></script>
     <script src="/js/toastLayer.js"></script>
     <script src="js/notePage.js"></script>
     <script src="/js/photoUpload.js"></script>
     <script src="/js/longPress.js"></script>
     <script src="/js/placeMenu.js"></script>
+    <script src="/js/addMenu.js"></script>
     <script src="admin.js"></script>
     <script src="js/settings.js"></script>
     <script src="js/googlePhotosSync.js"></script>

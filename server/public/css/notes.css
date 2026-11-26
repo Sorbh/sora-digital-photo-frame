@@ -308,8 +308,9 @@
 
 .nf-photo-remove {
     position: absolute;
-    top: 0;
-    right: 0;
+    /* Logical, like place-items: the circle sits in the end corner in RTL too */
+    inset-block-start: 0;
+    inset-inline-end: 0;
     display: grid;
     place-items: start end;
     width: 44px;

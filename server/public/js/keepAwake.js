@@ -26,6 +26,8 @@ class KeepAwake {
 
         this.lastGesture = 0; // when the user last tapped or pressed a key
         this.epoch = 0; // goes up on disable(), so a late answer from before is dropped
+        this.requesting = false; // a wakeLock.request is waiting for its answer
+        this.askAgain = false; // something asked meanwhile; ask again if that answer was no
         this.status = 'pending';
         this.onchange = null;
 
@@ -107,11 +109,36 @@ class KeepAwake {
 
         const fresh = this.freshGesture();
         if (!this.useVideo) {
+            // One tap fires both the button's click and the gesture listener: ask once,
+            // and try again when the answer comes if it wasn't a yes
+            if (this.requesting) {
+                this.askAgain = true;
+                return;
+            }
             const epoch = this.epoch;
+            this.requesting = true;
+            this.askAgain = false;
+            let sentinel = null;
+            let error = null;
             try {
-                const sentinel = await navigator.wakeLock.request('screen');
-                if (epoch !== this.epoch || !this.enabled) {
-                    // Granted after the frame was locked: not wanted any more
+                sentinel = await navigator.wakeLock.request('screen');
+            } catch (err) {
+                error = err;
+            }
+            this.requesting = false;
+            const again = this.askAgain;
+            this.askAgain = false;
+
+            if (epoch !== this.epoch || !this.enabled) {
+                // Granted after the frame was locked: not wanted any more
+                if (sentinel) sentinel.release().catch(() => {});
+                // ...but it may have been unlocked again while we waited
+                if (again) this.reacquire();
+                return;
+            }
+            if (sentinel) {
+                if (this.sentinel && this.sentinel !== sentinel && !this.sentinel.released) {
+                    // Already held: a second lock would never be released
                     sentinel.release().catch(() => {});
                     return;
                 }
@@ -124,14 +151,16 @@ class KeepAwake {
                     if (this.enabled) this.reacquire();
                 });
                 return;
-            } catch (err) {
-                // Before the first gesture a refusal is expected and the gesture listeners
-                // retry. Refused after a gesture (permission policy, power saving), or any
-                // other error, means the API won't help here - switch to the video.
-                if (epoch !== this.epoch || !this.enabled) return;
-                if (err.name === 'NotAllowedError' && !fresh) return this.setStatus('needs-tap');
-                this.useVideo = true;
             }
+            // Before the first gesture a refusal is expected and the gesture listeners
+            // retry. Refused after a gesture (permission policy, power saving), or any
+            // other error, means the API won't help here - switch to the video.
+            if (error && error.name === 'NotAllowedError' && !fresh) {
+                // A tap came in while this was being refused: ask again with it
+                if (again) return this.reacquire();
+                return this.setStatus('needs-tap');
+            }
+            this.useVideo = true;
         }
 
         this.playVideo(fresh);

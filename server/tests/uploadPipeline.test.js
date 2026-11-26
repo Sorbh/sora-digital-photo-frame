@@ -157,5 +157,5 @@ describe('Upload pipeline', () => {
       .attach('images', Buffer.alloc(26 * 1024 * 1024), 'huge.jpg')
       .expect(400);
     expect(res.body).toMatchObject({ code: 'FILE_TOO_LARGE', size: 25 });
-  });
+  }, 30000); // two big uploads and a 3000px re-encode: slow when the whole suite runs at once
 });

@@ -90,6 +90,32 @@ describe('Request logging keeps secrets out of the logs', () => {
     expect(safePath('/g/AbCdEfGhIj.sometoken/upload')).toBe('/g/[redacted]/upload');
     expect(safePath('/api/folders')).toBe('/api/folders');
   });
+
+  test('photo, thumbnail and folder paths are logged as their route only', () => {
+    expect(safePath('/uploads/Grandmas%20Birthday/IMG_1234.jpg')).toBe('/uploads/[photo]');
+    expect(safePath('/UPLOADS/Album/photo.jpg?w=300')).toBe('/uploads/[photo]');
+    expect(safePath('/api/images/Album%2FIMG_1234.jpg/thumbnail')).toBe('/api/images/[photo]/thumbnail');
+    expect(safePath('/api/folders/Trips/Italy/thumbnail')).toBe('/api/folders/[folder]/thumbnail');
+    expect(safePath('/api/folders/Trips/Italy')).toBe('/api/folders/[folder]');
+    expect(safePath('/g/AbCdEfGhIj.sometoken/uploads/Album/photo.jpg')).toBe('/g/[redacted]/uploads/[photo]');
+    // Other paths stay as they are
+    expect(safePath('/uploads')).toBe('/uploads');
+    expect(safePath('/api/images/next')).toBe('/api/images/next');
+    expect(safePath('/api/notes/active')).toBe('/api/notes/active');
+  });
+
+  test('requests for photos and folders keep album and file names out of the log', async () => {
+    await request(app).get('/uploads/Grandmas%20Birthday/IMG_1234.jpg');
+    await request(app).get('/api/images/Grandmas%20Birthday%2FIMG_1234.jpg/thumbnail');
+    await request(app).get('/api/folders/Grandmas%20Birthday/thumbnail');
+    await request(app).get('/api/folders/Grandmas%20Birthday');
+    const logs = output.join('\n');
+    expect(logs).toMatch(/GET \/uploads\/\[photo\] \d{3} \d+ms/);
+    expect(logs).toMatch(/GET \/api\/images\/\[photo\]\/thumbnail \d{3} \d+ms/);
+    expect(logs).toMatch(/GET \/api\/folders\/\[folder\]\/thumbnail \d{3} \d+ms/);
+    expect(logs).toMatch(/GET \/api\/folders\/\[folder\] \d{3} \d+ms/);
+    expect(logs).not.toMatch(/Grandma|IMG_1234/);
+  });
 });
 
 describe('Error handler', () => {

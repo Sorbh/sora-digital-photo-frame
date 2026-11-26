@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - `MAX_FOLDER_DEPTH` limits how many folder levels the library can have (off by default). With `2`, `Trips` and `Trips/Italy` can be made but nothing inside `Italy`: the library hides "New folder" there, and creating, uploading into or importing from Google Photos to a folder past the limit is refused with `FOLDER_TOO_DEEP`. Deeper folders that already exist keep working ([#88](https://github.com/Sorbh/sora-digital-photo-frame/issues/88)).
 
+### Fixed
+- Pairing follow-ups ([#66](https://github.com/Sorbh/sora-digital-photo-frame/issues/66)): a frame polls `POST /api/pair/status` with the secret in the body, so it never sits in a URL a proxy logs (the `GET` is gone); changes are refused from an `http://` page to an `https://` site, as the whole origin is compared; and a device discarded after a late approval is reported to `devicesRemoved` again until the host takes it (see HOOKS.md, Events).
+
 ## [2.0.0] - 2026-11-26
 
 ### Upgrading from 1.x

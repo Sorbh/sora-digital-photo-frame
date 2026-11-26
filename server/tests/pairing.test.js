@@ -276,8 +276,57 @@ describe('Pairing a frame by QR code', () => {
       setEvents({});
     }
     expect((await admin.get('/api/admin/devices').expect(200)).body.devices).toHaveLength(before);
+    // Kept to tell the host once it's back
+    expect(await fs.readJson(path.join(testDataDir, 'device-removals.json'))).toHaveLength(1);
     // The account made for it is gone too
     expect((await admin.get('/api/access-accounts').expect(200)).body.accounts).toHaveLength(accountsBefore);
+  });
+
+  test("a removal the host's index missed is reported again until it takes it (#66)", async () => {
+    const service = require('../services/pairingService');
+    const { setEvents } = require('../events');
+    const outbox = () => fs.readJson(path.join(testDataDir, 'device-removals.json')).catch(() => []);
+    const until = async (check) => {
+      for (let i = 0; i < 100 && !(await check()); i++) await new Promise(r => setTimeout(r, 10));
+    };
+    await service.reportRemovals(); // the one left by the test before, reported to no one
+    expect(await outbox()).toEqual([]);
+    let down = true;
+    const reported = [];
+    setEvents({ devicesRemoved({ deviceIds }) { if (down) throw new Error('host index is down'); reported.push(...deviceIds); } });
+    const delays = service.retryDelays;
+    service.retryDelays = [20, 20];
+    const quiet = jest.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      // Discarded while the host is down: gone here, kept to report
+      const { device: first } = await service.addDevice({ name: 'Late one', accountId: 'acc_none', via: 'qr' });
+      await service.discardDevice(first.id);
+      expect((await service.listDevices()).map(d => d.id)).not.toContain(first.id);
+      expect(await outbox()).toEqual([first.id]);
+
+      // Tried again a little later, and once the host is back, it hears about it
+      down = false;
+      await until(async () => reported.includes(first.id) && !(await outbox()).length);
+      expect(reported).toEqual([first.id]);
+      expect(await outbox()).toEqual([]);
+
+      // The host stays down past the last retry: the library's next change reports it
+      down = true;
+      const { device: second } = await service.addDevice({ name: 'Late two', accountId: 'acc_none', via: 'qr' });
+      await service.discardDevice(second.id);
+      await until(() => !service.retries.size);
+      expect(service.retries.size).toBe(0);
+      expect(await outbox()).toEqual([second.id]);
+      down = false;
+      const { device: third } = await service.addDevice({ name: 'Back', accountId: 'acc_none', via: 'qr' });
+      expect(reported).toEqual([first.id, second.id]);
+      expect(await outbox()).toEqual([]);
+      await service.removeDevices(d => d.id === third.id);
+    } finally {
+      service.retryDelays = delays;
+      setEvents({});
+      quiet.mockRestore();
+    }
   });
 
   test('two approvals at the same time pair the frame once', async () => {

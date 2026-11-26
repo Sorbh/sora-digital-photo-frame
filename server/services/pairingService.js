@@ -1,6 +1,6 @@
 const crypto = require('crypto');
 const { getDataStore } = require('../store');
-const { currentTenant } = require('../context');
+const { currentTenant, runWithTenant } = require('../context');
 const { emit } = require('../events');
 const PAIRING_TTL_MS = 10 * 60 * 1000;
 // Shared by every tenant on a hosted server. Each address keeps at most
@@ -9,6 +9,10 @@ const PAIRING_TTL_MS = 10 * 60 * 1000;
 const MAX_PENDING = 2000;
 const MAX_PER_ADDRESS = 5;
 const SEEN_WRITE_GAP_MS = 60 * 60 * 1000;
+// Removals the host's devicesRemoved hook missed, kept per library until it takes them
+const REMOVALS_OUTBOX = 'device-removals';
+// How long to wait before each try again; after the last, the next device change tries
+const RETRY_DELAYS_MS = [30 * 1000, 2 * 60 * 1000, 10 * 60 * 1000, 60 * 60 * 1000];
 // No 0/O, 1/I/L: the code is read off a frame across the room
 const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 
@@ -37,6 +41,8 @@ const deviceIdFromToken = token => (typeof token === 'string' && TOKEN_PATTERN.e
 class PairingService {
   constructor() {
     this.pairings = new Map(); // code -> { code, secret, expiresAt, address, claimed, approved }
+    this.retries = new Map(); // tenant id -> { timer, attempt }, for reportRemovals
+    this.retryDelays = RETRY_DELAYS_MS;
   }
 
   normalize(code) {
@@ -185,6 +191,7 @@ class PairingService {
       await getDataStore().update('devices', [], devices => devices.filter(d => d.id !== id));
       throw error;
     }
+    await this.reportRemovals(); // the host answered, so it can take any it missed
     return { device, token };
   }
 
@@ -269,14 +276,66 @@ class PairingService {
   }
 
   // Removes a device nobody ever got the token for. It goes even if the host's
-  // devicesRemoved hook fails, so it never counts toward the screen limit.
+  // devicesRemoved hook fails, so it never counts toward the screen limit; the
+  // host then hears about it later (see reportRemovals).
   async discardDevice(id) {
     await getDataStore().update('devices', [], devices => devices.filter(d => d.id !== id));
     try {
       await emit('devicesRemoved', { deviceIds: [id], tenantId: currentTenant().id });
     } catch (error) {
-      console.error('Could not report a discarded device:', error);
+      console.error('Could not report a discarded device, will try again:', error);
+      try {
+        await getDataStore().update(REMOVALS_OUTBOX, [], pending => [...new Set([...pending, id])]);
+      } catch (saveError) {
+        console.error('Could not keep the discarded device to report later:', saveError);
+        return;
+      }
+      this.retryLater();
     }
+  }
+
+  // Sends devicesRemoved for the ones the host missed, if any. Never throws:
+  // what's still unreported stays kept and is tried again later.
+  async reportRemovals() {
+    const tenant = currentTenant();
+    let left;
+    try {
+      const pending = await getDataStore().get(REMOVALS_OUTBOX, []);
+      if (!Array.isArray(pending) || !pending.length) return;
+      await emit('devicesRemoved', { deviceIds: pending, tenantId: tenant.id });
+      await getDataStore().update(REMOVALS_OUTBOX, [], current => {
+        left = current.filter(id => !pending.includes(id));
+        return left;
+      });
+    } catch (error) {
+      console.error('Could not report removed devices yet:', error);
+      this.retryLater();
+      return;
+    }
+    const retry = this.retries.get(tenant.id);
+    if (retry) clearTimeout(retry.timer);
+    this.retries.delete(tenant.id);
+    if (left.length) this.retryLater();
+  }
+
+  // Tries reportRemovals again for this library after the next delay, unless one
+  // is already waiting. After the last delay, the library's next device change does.
+  retryLater() {
+    const tenant = currentTenant();
+    const retry = this.retries.get(tenant.id) || { timer: null, attempt: 0 };
+    if (retry.timer) return;
+    const delay = this.retryDelays[retry.attempt];
+    if (delay === undefined) {
+      this.retries.delete(tenant.id);
+      return;
+    }
+    retry.timer = setTimeout(() => {
+      retry.timer = null;
+      retry.attempt += 1;
+      runWithTenant(tenant, () => this.reportRemovals());
+    }, delay);
+    retry.timer.unref?.();
+    this.retries.set(tenant.id, retry);
   }
 
   async removeDevices(match) {
@@ -293,6 +352,7 @@ class PairingService {
       await getDataStore().update('devices', [], devices => [...devices, ...removed]);
       throw error;
     }
+    await this.reportRemovals();
     return removed.length;
   }
 }

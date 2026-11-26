@@ -11,7 +11,7 @@ These options are a public contract. Treat a change to a name, an argument or a 
 | `resolveTenant` | `async (req) => ({ id, plan })` or `null` | One `default` tenant | `server/context.js` |
 | `auth` | `{ requireAuth, requireGuest, requireViewer }` middleware, all optional | Admin password session | `server/middleware/auth.js` |
 | `quota` | `{ canAdd(bytes) => ({ ok, message }) }` for the current tenant | Unlimited | `server/services/quotaService.js` |
-| `events` | `{ devicePaired, devicesRemoved, familyCodeSet }`, may be async; if one throws, the action fails | None | `server/events.js` |
+| `events` | `{ devicePaired, devicesRemoved, familyCodeSet }`, may be async; if one throws, the action fails, with one exception (see [Events](#events)) | None | `server/events.js` |
 | `keys` | `{ currentKey(), getKey(id) }`, may return promises | `PHOTO_ENCRYPTION_KEY`, or no encryption | `server/crypto/keys.js` |
 | `sessionStore` | `express-session` store | In memory | `server/app.js` |
 | `pinSignIn` | `false` turns off PIN sign-in for frames | On | `server/app.js` |
@@ -19,6 +19,17 @@ These options are a public contract. Treat a change to a name, an argument or a 
 | `publicPhotos` | `true` serves photos, thumbnails, folders and notes without a viewer check (`requireViewer`) | Off (`PUBLIC_PHOTOS=true` turns it on) | `server/app.js` |
 | `familyCode` | `true`: a PIN sign-in also sends the family's code (shown on the Access page), so `resolveTenant` can find the family from it. `familyCodeSet({ code, previous, tenantId })` keeps the host's index | Off | `server/services/familyCodeService.js` |
 | `beforeRoutes` | `(app) => {}`, runs after core middleware and before core routes | None | `server/app.js` |
+
+## Events
+
+Each handler is awaited. If it throws, the action that sent it fails and is undone, so an index kept by the host never misses a change.
+
+One removal can't be undone that way: a device made by an approval that ends after its code expired (or whose new account couldn't be finished) is removed even if `devicesRemoved` throws, since no frame can ever use it. Its id is then kept in the library's data store, in the `device-removals` document, and `devicesRemoved` is sent again:
+
+- after 30 seconds, 2 minutes, 10 minutes and 1 hour, while the server keeps running;
+- and after the library's next `devicePaired` or `devicesRemoved` that goes through, which also covers a restart.
+
+So `devicesRemoved` may arrive late, more than once for the same device, and with several devices from earlier removals at once. Treat it as "these ids are gone": removing an id the index doesn't have must succeed. A custom `dataStore` must accept the `device-removals` document.
 
 ## Adding a hook
 

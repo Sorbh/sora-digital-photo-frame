@@ -76,8 +76,13 @@
             location.href = `/login?next=${encodeURIComponent(location.pathname + location.search)}`;
             throw Object.assign(new Error('Signed out'), { signedOut: true });
         }
-        // A proxy's error page is not JSON; the status still says what happened
-        return { ok: response.ok, status: response.status, data: await response.json().catch(() => ({})) };
+        // A proxy's error page (or a sign-in page) is not JSON: `json` is false then
+        let data = null;
+        try {
+            data = await response.json();
+        } catch (_) { /* not JSON */ }
+        const json = Boolean(data) && typeof data === 'object';
+        return { ok: response.ok, status: response.status, json, data: json ? data : {} };
     }
 
     function showEnter() {
@@ -90,15 +95,18 @@
         show('stateLoading');
         try {
             const pairing = await getJson(`/api/admin/pair/${encodeURIComponent(code)}`);
-            // Only a definite "no such code" means expired; anything else (a 503, a
-            // restarting server) is worth another try with the same code
-            if (pairing.status === 404 || pairing.status === 410 || (pairing.ok && pairing.data.approved)) return show('stateExpired');
-            if (!pairing.ok) return show('stateUnreachable');
+            // Only the server's own "no such code" means expired; anything else (a 503,
+            // a proxy's 404 page, a restarting server) is worth another try
+            if (pairing.json && (pairing.data.code === 'PAIRING_EXPIRED' || (pairing.ok && pairing.data.approved))) return show('stateExpired');
+            if (!pairing.ok || !pairing.json || typeof pairing.data.code !== 'string') return show('stateUnreachable');
 
+            // Without the real lists, a new account would look like "no folders" and
+            // get every folder: stop here rather than guess
             const [accounts, folders] = await Promise.all([getJson('/api/access-accounts'), getJson('/api/folders')]);
-            if (!accounts.ok || !folders.ok) return show('stateUnreachable');
+            const listed = (reply, key) => reply.ok && reply.json && Array.isArray(reply.data[key]);
+            if (!listed(accounts, 'accounts') || !listed(folders, 'folders')) return show('stateUnreachable');
             $('codeShown').textContent = pretty(pairing.data.code);
-            loaded = { accounts: accounts.data.accounts || [], folders: folders.data.folders || [] };
+            loaded = { accounts: accounts.data.accounts, folders: folders.data.folders };
             renderAccounts(loaded.accounts);
             renderFolders(loaded.folders);
             show('pairForm');
@@ -122,7 +130,9 @@
         $('codeError').classList.add('hidden');
         code = typed;
         // So a reload, or signing in again, comes back to this code
-        history.replaceState(null, '', `/pair?code=${encodeURIComponent(code)}`);
+        const query = new URLSearchParams(location.search); // keeps ?lang= and the like
+        query.set('code', code);
+        history.replaceState(null, '', `/pair?${query}`);
         load();
     });
 

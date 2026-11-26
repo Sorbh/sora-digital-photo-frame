@@ -85,6 +85,7 @@ describe('The /pair page', () => {
     await flush();
     expect(page.requests[0]).toBe('/api/admin/pair/K7P4QX');
     expect(page.location.search).toBe('?code=K7P4QX');
+    expect(page.requests.slice(1).sort()).toEqual(['/api/access-accounts', '/api/folders']);
     expect(page.visible()).toEqual(['pairForm']);
     expect(page.el('codeShown').textContent).toBe('K7P-4QX');
   });
@@ -122,6 +123,29 @@ describe('The /pair page', () => {
     page.el('retryCheck').fire('click');
     await flush();
     expect(page.visible()).toEqual(['pairForm']);
+  });
+
+  test("a proxy's own 404 page is not the server saying the code expired", async () => {
+    const page = openPage('?code=K7P4QX', () => ({ status: 404 }));
+    await flush();
+    expect(page.visible()).toEqual(['stateUnreachable']);
+  });
+
+  test('a folder list that is not JSON (a sign-in page, say) stops before the form', async () => {
+    const working = library('K7P4QX');
+    const page = openPage('?code=K7P4QX', url => (url === '/api/folders' ? { status: 200 } : working(url)));
+    await flush();
+    // Going on would offer a new account "every folder" by mistake
+    expect(page.visible()).toEqual(['stateUnreachable']);
+  });
+
+  test('the chosen language stays in the address after typing a code', async () => {
+    const page = openPage('?lang=ar', library('K7P4QX'));
+    page.el('codeInput').value = 'k7p-4qx';
+    page.el('stateEnter').fire('submit');
+    await flush();
+    expect(new URLSearchParams(page.location.search).get('lang')).toBe('ar');
+    expect(new URLSearchParams(page.location.search).get('code')).toBe('K7P4QX');
   });
 
   test('losing the connection while loading the accounts is not "expired" either', async () => {

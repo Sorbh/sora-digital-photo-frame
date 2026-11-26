@@ -6,8 +6,8 @@ These options are a public contract. Treat a change to a name, an argument or a 
 
 | Option | Shape | Default | Defined in |
 |---|---|---|---|
-| `library` | `PhotoLibrary` subclass. Its `photoUrl(adminPath)` must return a URL with each path segment percent-encoded, since folder and file names can hold `#`, `?` and `%` (`PhotoLibrary.uploadsUrl(adminPath)` builds one for the `/uploads` route). May also offer `rawUrl(adminPath)`, which lets frames fetch encrypted photos from remote storage and decrypt them in the browser. Only `createFolder` makes folders: `addPhoto`, `movePhoto` and `writeItem` into a missing folder (deleted meanwhile, even mid-write) must throw `PhotoLibrary.folderNotFoundError()` (404 `FOLDER_NOT_FOUND`) and leave it missing. Storage with symlinks should offer `realPath(adminPath)`: the admin path a path really leads to, or `null` when it leads out of the library; frames' folder limits and `MAX_FOLDER_DEPTH` are checked there | Local uploads folder | `server/library/PhotoLibrary.js` |
-| `dataStore` | `DataStore` subclass: `get`, `set`, `update`. `folder-settings:<folder>` documents (a folder's play order) belong to that photo folder: writing one must not create the folder, and throws 404 `FOLDER_NOT_FOUND` when it is gone | Local data files | `server/store/DataStore.js` |
+| `library` | `PhotoLibrary` subclass. Its `photoUrl(adminPath)` must return a URL with each path segment percent-encoded, since folder and file names can hold `#`, `?` and `%` (`PhotoLibrary.uploadsUrl(adminPath)` builds one for the `/uploads` route). May also offer `rawUrl(adminPath)`, which lets frames fetch encrypted photos from remote storage and decrypt them in the browser. Only `createFolder` makes folders: `addPhoto`, `movePhoto` and `writeItem` into a missing folder (deleted meanwhile, even mid-write) must throw `PhotoLibrary.folderNotFoundError()` (404 `FOLDER_NOT_FOUND`) and leave it missing. Storage with symlinks should offer `realPath(adminPath)`: the admin path a path really leads to, or `null` when it leads out of the library; frames' folder limits and `MAX_FOLDER_DEPTH` are checked there. Notes are `*.note.json` files in folders, stored like snaps (`*.snap.json`): `listItems`, `readItem`, `writeItem`, `movePhoto` and `deletePhoto` must handle them, and so must moving, renaming and deleting a folder. `listFolder` should give them type `'note'`, and `allPhotos` must never return them: a note is not a photo (see [Notes](#notes)) | Local uploads folder | `server/library/PhotoLibrary.js` |
+| `dataStore` | `DataStore` subclass: `get`, `set`, `update`. `folder-settings:<folder>` documents (a folder's play order) belong to that photo folder: writing one must not create the folder, and throws 404 `FOLDER_NOT_FOUND` when it is gone. Notes are not kept here any more but in the library, as `*.note.json` files like `*.snap.json`; the old `notes` document is read once at start, then emptied, with a copy in `notes-before-folders` (see [Notes](#notes)) | Local data files | `server/store/DataStore.js` |
 | `resolveTenant` | `async (req) => ({ id, plan })` or `null` | One `default` tenant | `server/context.js` |
 | `auth` | `{ requireAuth, requireGuest, requireViewer }` middleware, all optional | Admin password session | `server/middleware/auth.js` |
 | `quota` | `{ canAdd({ items, bytes, screens }, context) => ({ ok, message }) }` for the current tenant. **Changed in 3.0.0** (it took `bytes` alone): see [Quota](#quota) | Unlimited | `server/services/quotaService.js` |
@@ -108,6 +108,16 @@ One removal can't be undone that way: a device made by an approval that ends aft
 If the `device-removals` document can't be written, `devicesRemoved` is sent first and the device is removed only once the host has it; if that throws too, the device stays.
 
 So `devicesRemoved` may arrive late, more than once for the same device, and with several devices from earlier removals at once. Treat it as "these ids are gone": removing an id the index doesn't have must succeed. A custom `dataStore` must accept the `device-removals` document.
+
+## Notes
+
+A note is a `<name>.note.json` file in a library folder, the same way a snap is a `<name>.snap.json` file. A custom `library` must store, list, move and delete these files as it does snaps, and moving, renaming or deleting a folder must take them along.
+
+- **Notes in the top folder** (`uploads/`) show on every frame.
+- **A note in another folder** shows only on frames that may see that folder (the helpers in `server/utils/viewerAccess.js`), and, when a frame plays one chosen folder, only if it is in that folder.
+- **A note is never a photo:** it is not in `allPhotos`, the frame's rotation or a folder's photo count. The library grid shows it as its own tile (`type: 'note'`).
+
+**Upgrading:** before 3.0, notes were one list in the `notes` data document, each with an `audience` (all frames, or some access accounts). At start, `initializeUploads()` moves that list into the top folder, one file per note, keeps a copy in the `notes-before-folders` document and empties `notes`, so it runs once; running it again does nothing, and a note already moved (same id) is never doubled. `audience` is dropped. A note that was shown only on some frames is logged with its title, so the admin can move it into a folder only those frames show. A host that doesn't call `initializeUploads()` can call `migrateNotes()` from `server/app.js` for each tenant, inside `runWithTenant` (`server/context.js`).
 
 ## Adding a hook
 

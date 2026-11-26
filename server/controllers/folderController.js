@@ -3,6 +3,7 @@ const { UPLOADS_DIR } = require('../config/paths');
 const { getLibrary } = require('../library');
 const thumbnails = require('../services/thumbnailService');
 const snaps = require('../services/snapService');
+const notes = require('../services/noteService');
 const playOrder = require('../services/playOrderService');
 const imageController = require('./imageController');
 const { resolveAdminPath, toAdminPath, uploadsUrl } = require('../utils/safePath');
@@ -315,6 +316,19 @@ class FolderController {
             snap
           })).catch(error => {
             console.error('Skipping unreadable snap:', snapPath, error.message);
+            return null;
+          }));
+        } else if (item.isFile() && notes.isNote(item.name)) {
+          // A note gets its own tile, which opens the note editor. It is not a
+          // photo: the frame shows it on its schedule, not in the rotation.
+          const notePath = path.join(fullPath, item.name);
+          fileJobs.push(notes.load(notePath).then(note => ({
+            name: item.name,
+            type: 'note',
+            path: path.join(folderPath, item.name),
+            note
+          })).catch(error => {
+            console.error('Skipping unreadable note:', notePath, error.message);
             return null;
           }));
         }

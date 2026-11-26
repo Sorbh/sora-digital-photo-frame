@@ -626,8 +626,8 @@ class PhotoFrameAdmin {
         this.folderData = data; // kept to redraw the grid when the language changes
         
         // Update available images for navigation
-        // Snaps open in their own editor, so the photo viewer steps over them
-        this.availableImages = data.files.filter(file => file.type !== 'snap').map((file, index) => ({
+        // Snaps and notes open in their own editors, so the photo viewer steps over them
+        this.availableImages = data.files.filter(file => file.type !== 'snap' && file.type !== 'note').map((file, index) => ({
             ...file,
             index: index
         }));
@@ -718,14 +718,20 @@ class PhotoFrameAdmin {
         const meta = document.getElementById('folderMeta');
 
         if (title) title.textContent = parts.length > 1 ? parts[parts.length - 1] : t('common.library');
+        // Notes opened from here start in this folder
+        const notesLink = document.getElementById('notesLink');
+        if (notesLink) notesLink.href = this.currentPath === 'uploads' ? '/notes' : `/notes?folder=${encodeURIComponent(this.currentPath)}`;
         if (meta) {
             const folders = data.folders.length;
             const snaps = data.files.filter(file => file.type === 'snap').length;
-            const photos = data.files.length - snaps;
+            // Notes are not photos: counted on their own
+            const notes = data.files.filter(file => file.type === 'note').length;
+            const photos = data.files.length - snaps - notes;
             const counts = [];
             if (folders) counts.push(t('admin.countFolders', { count: folders }));
             counts.push(t('admin.countPhotos', { count: photos }));
             if (snaps) counts.push(t('admin.countSnaps', { count: snaps }));
+            if (notes) counts.push(t('admin.countNotes', { count: notes }));
             meta.textContent = counts.join(' · ');
         }
     }
@@ -794,11 +800,24 @@ class PhotoFrameAdmin {
         window.location.href = `/snap?path=${encodeURIComponent(file.path)}`;
     }
 
+    // A note in this folder opens in the note editor on the Notes page
+    openNote(file) {
+        window.location.href = `/notes?folder=${encodeURIComponent(this.currentPath)}&edit=${encodeURIComponent(file.path)}`;
+    }
+
+    // Snaps and notes open in their editors; photos in the photo viewer
+    openTile(file) {
+        if (file.type === 'snap') this.openSnap(file);
+        else if (file.type === 'note') this.openNote(file);
+        else this.showPhotoModal(file.url, file.name);
+    }
+
     createFileElement(file) {
         const isSnap = file.type === 'snap';
-        const type = isSnap ? 'snap' : 'image';
+        const isNote = file.type === 'note';
+        const type = isSnap || isNote ? file.type : 'image';
         const div = document.createElement('div');
-        div.className = isSnap ? 'file-item image snap' : 'file-item image';
+        div.className = isSnap ? 'file-item image snap' : isNote ? 'file-item image snap note' : 'file-item image';
         div.dataset.path = file.path;
         div.dataset.type = type;
         div.innerHTML = `
@@ -836,6 +855,7 @@ class PhotoFrameAdmin {
         div.querySelector('img').alt = file.name;
         div.querySelector('.photo-grid-name').textContent = file.name;
         if (isSnap) this.dressSnapTile(div, file);
+        if (isNote) this.dressNoteTile(div, file);
         div.querySelector('input[type="checkbox"]').dataset.path = file.path;
         
         // Handle checkbox selection
@@ -852,8 +872,7 @@ class PhotoFrameAdmin {
                 e.stopPropagation(); // Prevent cell selection
                 const action = button.getAttribute('data-action');
                 if (action === 'view') {
-                    if (isSnap) this.openSnap(file);
-                    else this.showPhotoModal(file.url, file.name);
+                    this.openTile(file);
                 } else if (action === 'delete') {
                     this.deleteItem({...file, type});
                 } else if (action === 'more') {
@@ -910,8 +929,7 @@ class PhotoFrameAdmin {
             // Don't open modal if clicking on checkbox or action buttons
             if (e.target.closest('.photo-grid-checkbox') || e.target.closest('.btn-icon')) return;
             e.preventDefault();
-            if (isSnap) this.openSnap(file);
-            else this.showPhotoModal(file.url, file.name);
+            this.openTile(file);
         });
         
         return div;
@@ -942,6 +960,20 @@ class PhotoFrameAdmin {
         const del = div.querySelector('[data-action="delete"]');
         del.dataset.tooltip = t('admin.deleteSnap');
         del.setAttribute('aria-label', t('admin.deleteSnap'));
+    }
+
+    // A note gets the same drawn page as a snap, with a note badge: it is not a
+    // photo, and the frame shows it on its schedule rather than in the rotation
+    dressNoteTile(div, file) {
+        this.dressSnapTile(div, { ...file, snap: file.note });
+        div.querySelector('.snap-badge .material-symbols-outlined').textContent = 'sticky_note_2';
+        div.querySelector('.snap-badge-text').textContent = t('admin.noteBadge');
+        const view = div.querySelector('[data-action="view"]');
+        view.dataset.tooltip = t('notes.editNote');
+        view.setAttribute('aria-label', t('notes.editNote'));
+        const del = div.querySelector('[data-action="delete"]');
+        del.dataset.tooltip = t('notes.static_017');
+        del.setAttribute('aria-label', t('notes.static_017'));
     }
 
     createGooglePhotosImportElement() {
@@ -1358,6 +1390,9 @@ class PhotoFrameAdmin {
             case 'edit-snap':
                 this.openSnap(targetItem);
                 break;
+            case 'edit-note':
+                this.openNote(targetItem);
+                break;
             case 'move-earlier':
             case 'move-later':
                 this.nudge(targetItem, action === 'move-earlier' ? -1 : 1);
@@ -1506,7 +1541,7 @@ class PhotoFrameAdmin {
         if (!confirmDelete) return;
         
         try {
-            const endpoint = item.type === 'folder' ? '/api/admin/folders' : '/api/images';
+            const endpoint = { folder: '/api/admin/folders', note: '/api/notes' }[item.type] || '/api/images';
             console.log('Delete endpoint:', endpoint, 'Path:', item.path);
             const response = await this.authenticatedFetch(`${endpoint}?path=${encodeURIComponent(item.path)}`, {
                 method: 'DELETE'
@@ -1517,7 +1552,7 @@ class PhotoFrameAdmin {
             console.log('Delete response:', data);
             
             if (response.ok) {
-                this.showToast({ folder: t('admin.folderDeleted'), snap: t('admin.snapDeleted') }[item.type] || t('admin.imageDeleted'), 'success');
+                this.showToast({ folder: t('admin.folderDeleted'), snap: t('admin.snapDeleted'), note: t('notes.noteDeleted') }[item.type] || t('admin.imageDeleted'), 'success');
                 this.loadFolderContents();
             } else {
                 this.showToast(i18n.error(data, 'admin.deleteFailed'), 'error');
@@ -1900,7 +1935,7 @@ class PhotoFrameAdmin {
 
     // Enhanced confirmation dialog for single item deletion
     async showDeleteConfirmation(itemName, itemType = 'image') {
-        const deleteLabel = escapeHtml({ folder: t('admin.deleteFolder'), snap: t('admin.deleteSnap') }[itemType] || t('admin.deletePhoto'));
+        const deleteLabel = escapeHtml({ folder: t('admin.deleteFolder'), snap: t('admin.deleteSnap'), note: t('notes.static_017') }[itemType] || t('admin.deletePhoto'));
         return new Promise((resolve) => {
             // Create a custom confirmation dialog
             const dialogHtml = `

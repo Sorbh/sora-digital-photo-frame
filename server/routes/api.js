@@ -54,8 +54,10 @@ router.post('/admin/family-code', requireAuth, accessAccountController.renewFami
 router.get('/notes', requireAuth, noteController.list.bind(noteController));
 router.post('/notes', requireAuth, noteController.create.bind(noteController));
 router.get('/notes/active', requirePhotoViewer, noteController.active.bind(noteController));
-router.put('/notes/:id', requireAuth, noteController.update.bind(noteController));
-router.delete('/notes/:id', requireAuth, noteController.remove.bind(noteController));
+// One note, by its file: ?path=uploads/Family/visit.note.json
+router.get('/notes/note', requireAuth, noteController.get.bind(noteController));
+router.put('/notes', requireAuth, noteController.update.bind(noteController));
+router.delete('/notes', requireAuth, noteController.remove.bind(noteController));
 
 // Snaps: memory-book pages saved in a folder and played like photos
 // (moved and deleted with the photo endpoints)

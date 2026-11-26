@@ -1,8 +1,11 @@
 /**
  * Storage contract. Paths are always admin paths such as uploads/Family/a.jpg.
  * listFolder returns { folders, photos }; entries have name and path, and
- * photos also have type ('image', 'snap', 'item'), size, mtime and mtimeMs.
- * allPhotos returns image and snap entries from the whole library.
+ * photos also have type ('image', 'snap', 'note', 'item'), size, mtime and mtimeMs.
+ * allPhotos returns image and snap entries from the whole library, never notes
+ * (*.note.json): notes are not photos.
+ * movePhoto also moves snaps and notes, keeping their .snap.json or .note.json
+ * ending when it makes a name free (a-1.note.json, not a.note-1.json).
  * stat returns { size, mtime, mtimeMs, isFolder } or null for missing paths.
  * The uploads root may be listed and receive photos, but cannot be deleted.
  * photoUrl returns the address a browser loads the photo from, with each path
@@ -38,7 +41,7 @@ class PhotoLibrary {
   async exists(adminPath) { throw new Error('not implemented'); }
   async allPhotos() { throw new Error('not implemented'); }
 
-  // Snaps and folder settings live beside photos in the uploads tree.
+  // Snaps, notes and folder settings live beside photos in the uploads tree.
   // readItem/writeItem transfer their raw bytes; listItems also marks folders.
   async readItem(adminPath) { throw new Error('not implemented'); }
   async writeItem(adminPath, buffer) { throw new Error('not implemented'); }

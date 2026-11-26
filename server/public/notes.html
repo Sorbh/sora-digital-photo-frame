@@ -58,7 +58,7 @@
         <section class="library-head">
             <div class="library-title">
                 <div class="crumb-row">
-                    <a href="/admin" class="back-btn" title="Back to library" aria-label="Back to library" data-i18n-attr="title:notes.static_022; aria-label:notes.static_023">
+                    <a href="/admin" id="backLink" class="back-btn" title="Back to library" aria-label="Back to library" data-i18n-attr="title:notes.static_022; aria-label:notes.static_023">
                         <span class="material-symbols-outlined">arrow_back</span>
                     </a>
                     <p class="sora-eyebrow" style="margin: 0;" data-i18n="notes.static_002">On the frame</p>
@@ -187,11 +187,12 @@
                             </div>
                         </div>
 
-                        <div class="nf-field">
-                            <span class="nf-label" data-i18n="notes.static_014">Show on</span>
-                            <div class="nf-chips" id="audienceChips"></div>
-                            <span class="nf-error" data-error-for="audience"></span>
-                        </div>
+                        <label class="nf-field">
+                            <span class="nf-label" data-i18n="notes.labelFolder">Folder</span>
+                            <select class="select" name="folder" id="noteFolder"></select>
+                            <span class="nf-hint" data-i18n="notes.folderHint">Notes in the top folder show on every frame. Notes in another folder show only on frames that show that folder.</span>
+                            <span class="nf-error" data-error-for="folder"></span>
+                        </label>
                     </form>
 
                     <aside class="note-preview-pane">

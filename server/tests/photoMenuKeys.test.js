@@ -75,7 +75,7 @@ describe('the photo options menu with a keyboard', () => {
   test('its items are buttons the page can focus', () => {
     const menu = html.slice(html.indexOf('<div role="menu"'), html.indexOf('</div>', html.indexOf('<div role="menu"')));
     expect(menu).not.toMatch(/<div role="menuitem"/);
-    expect(menu.match(/<button type="button" role="menuitem" tabindex="-1"/g)).toHaveLength(7);
+    expect(menu.match(/<button type="button" role="menuitem" tabindex="-1"/g)).toHaveLength(8);
   });
 
   test('the options button opens it on the first item, and arrows move round it', () => {

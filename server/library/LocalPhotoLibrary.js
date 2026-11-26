@@ -6,6 +6,10 @@ const { folderNotFoundError } = require('../utils/httpError');
 
 const IMAGE_PATTERN = /\.(jpg|jpeg|png|gif|webp)$/i;
 const SNAP_PATTERN = /\.snap\.json$/i;
+const NOTE_PATTERN = /\.note\.json$/i;
+// Snaps and notes keep their double extension when a name is made free
+const PAGE_EXT = /\.(snap|note)\.json$/i;
+const typeOf = (name) => SNAP_PATTERN.test(name) ? 'snap' : NOTE_PATTERN.test(name) ? 'note' : IMAGE_PATTERN.test(name) ? 'image' : 'item';
 
 const isFolder = (dir) => fs.stat(dir).then(stat => stat.isDirectory(), () => false);
 
@@ -49,7 +53,7 @@ class LocalPhotoLibrary extends PhotoLibrary {
         });
         if (!stat) continue;
         photos.push({ ...entry, size: stat.size, mtime: stat.mtime, mtimeMs: stat.mtimeMs,
-          type: SNAP_PATTERN.test(item.name) ? 'snap' : IMAGE_PATTERN.test(item.name) ? 'image' : 'item' });
+          type: typeOf(item.name) });
       }
     }
     return { folders, photos };
@@ -95,7 +99,7 @@ class LocalPhotoLibrary extends PhotoLibrary {
     const source = this.resolve(adminPath);
     const dest = this.resolve(toFolderAdminPath, true);
     if (!await isFolder(dest)) throw folderNotFoundError();
-    const ext = SNAP_PATTERN.test(source) ? '.snap.json' : path.extname(source);
+    const ext = source.match(PAGE_EXT)?.[0] || path.extname(source);
     const base = path.basename(source, ext);
     let target = path.join(dest, base + ext);
     for (let n = 1; await fs.pathExists(target); n++) target = path.join(dest, `${base}-${n}${ext}`);

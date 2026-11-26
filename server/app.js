@@ -159,6 +159,19 @@ async function initializeUploads() {
     }
     await fs.ensureDir(fullPath);
   }
+
+  await migrateNotes();
 }
 
-module.exports = { createApp, initializeUploads };
+// Notes used to be one list for the whole library; they are files in folders now.
+// Moves an old list into the top folder once. A failure is logged and tried
+// again at the next start, never stopping the server.
+async function migrateNotes() {
+  try {
+    await require('./services/noteService').migrateFromStore();
+  } catch (error) {
+    console.error('Could not move notes into the library folders:', error.message);
+  }
+}
+
+module.exports = { createApp, initializeUploads, migrateNotes };

@@ -2,9 +2,13 @@
  * Decides when the slideshow should show a note instead of the next photo.
  * A note is due once `everyMinutes` have passed since this frame last showed
  * it. Never two notes in a row, and never before the first photo.
+ *
+ * currentFolder() gives the folder the frame plays, if one was chosen: the
+ * server then sends the top folder's notes and that folder's, not others'.
  */
 class NoteScheduler {
-    constructor() {
+    constructor(currentFolder = () => null) {
+        this.currentFolder = currentFolder;
         this.notes = [];
         this.storageKey = 'sora.notes.lastShown';
         this.lastShown = this.loadLastShown();
@@ -39,7 +43,8 @@ class NoteScheduler {
 
     async refresh() {
         try {
-            const response = await fetch('/api/notes/active');
+            const folder = this.currentFolder();
+            const response = await fetch('/api/notes/active' + (folder ? `?${new URLSearchParams({ folder })}` : ''));
             if (!response.ok) return;
             const data = await response.json();
             this.notes = data.notes || [];

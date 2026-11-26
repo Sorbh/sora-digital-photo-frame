@@ -70,7 +70,7 @@ class SnapEditor extends PageEditor {
         return {
             path: rel,
             url: `/uploads/${rel.split('/').map(encodeURIComponent).join('/')}`,
-            thumbnail: `/api/images/${encodeURIComponent(rel)}/thumbnail`
+            thumbnail: `/api/images/${encodeURIComponent(rel)}/thumbnail?revalidate=1` // as noteService.photoUrls
         };
     }
 

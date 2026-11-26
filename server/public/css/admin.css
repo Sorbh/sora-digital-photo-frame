@@ -295,8 +295,8 @@ body {
 
 .snap-badge {
     position: absolute;
-    top: 10px;
-    right: 10px;
+    top: 13px;
+    inset-inline-start: 46px; /* beside the select circle; the options button has the other corner */
     z-index: 6;
     display: inline-flex;
     align-items: center;
@@ -314,7 +314,36 @@ body {
 }
 
 .snap-badge .material-symbols-outlined {
+    flex: none;
     font-size: 14px;
+}
+
+/* Long names ("Page souvenir") stop short of the options button: start 46px,
+   button and its margins about 56px */
+.snap-badge {
+    max-width: calc(100% - 104px);
+}
+
+.snap-badge-text {
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+/* Too narrow for any of the word (small phones): the book icon alone says snap */
+.file-item.snap {
+    container-type: inline-size;
+}
+
+@container (max-width: 180px) {
+    .snap-badge {
+        padding-inline-end: 7px;
+    }
+
+    .snap-badge-text {
+        display: none;
+    }
 }
 
 .photo-grid-overlay {
@@ -346,7 +375,7 @@ body {
     gap: 6px;
 }
 
-.photo-grid-actions .btn-icon {
+.photo-grid-overlay .btn-icon {
     display: inline-grid;
     place-items: center;
     width: 34px;
@@ -361,23 +390,25 @@ body {
     box-shadow: none;
 }
 
-.photo-grid-actions .btn-icon:hover {
+.photo-grid-overlay .btn-icon:hover {
     background: rgb(255 255 255 / 0.95);
     color: #14120f;
 }
 
-.photo-grid-actions .btn-icon[data-action="delete"]:hover {
+.photo-grid-overlay .btn-icon[data-action="delete"]:hover {
     background: var(--destructive);
     color: #fff;
 }
 
-.photo-grid-actions .btn-icon .material-symbols-outlined {
+.photo-grid-overlay .btn-icon .material-symbols-outlined {
     font-size: 18px;
     line-height: 1;
 }
 
 .photo-grid-overlay-top {
     display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
 }
 
 .photo-grid-checkbox .label {
@@ -440,6 +471,46 @@ body {
 
 .file-item.image.selected {
     box-shadow: 0 0 0 3px var(--background), 0 0 0 5px var(--safelight);
+}
+
+/* Touch screens have no hover: the select circle, the options button and
+   the View and Delete buttons stay in view, at finger size, and holding a
+   photo selects it instead of opening the browser's image callout. Laptops
+   with a touch screen as well as a trackpad count too (any-pointer). */
+@media (hover: none), (pointer: coarse), (any-pointer: coarse) {
+    .file-item.image {
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        user-select: none;
+    }
+
+    .photo-grid-overlay {
+        padding: 6px;
+        opacity: 1;
+    }
+
+    .photo-grid-overlay .btn-icon {
+        width: 44px;
+        height: 44px;
+        background: rgb(0 0 0 / 0.38);
+    }
+
+    .photo-grid-overlay .btn-icon .material-symbols-outlined {
+        font-size: 22px;
+    }
+
+    .photo-grid-checkbox .label {
+        padding: 10px;
+    }
+
+    .photo-grid-info {
+        right: 106px;
+    }
+
+    .snap-badge {
+        top: 17px;
+        inset-inline-start: 48px;
+    }
 }
 
 .file-item.image.selected .admin-photo-image img {
@@ -986,7 +1057,7 @@ html[dir="rtl"] .photo-modal-hints .keys {
     margin-top: 1.5rem;
     padding: 2rem 1rem;
     background: radial-gradient(ellipse 50% 60% at 50% 50%, color-mix(in oklab, var(--berry) 7%, transparent), transparent 75%);
-    color: color-mix(in oklab, var(--muted-foreground) 55%, transparent);
+    color: var(--muted-foreground); /* full strength: help text needs 4.5:1 */
     text-align: center;
     pointer-events: none;
     transition: color 0.25s ease;
@@ -1009,10 +1080,14 @@ html[dir="rtl"] .photo-modal-hints .keys {
 
 .drop-hint .drop-hint-sub {
     font-size: 0.8125rem;
-    opacity: 0.8;
 }
 
+/* Deep berry on cream, bright berry on the night album: 4.5:1 or more as text */
 .app.file-dragging .drop-hint {
+    color: var(--berry-deep);
+}
+
+html.dark .app.file-dragging .drop-hint {
     color: var(--berry);
 }
 

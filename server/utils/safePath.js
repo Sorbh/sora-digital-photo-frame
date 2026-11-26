@@ -29,4 +29,14 @@ function toAdminPath(fullPath) {
   return path.join('uploads', path.relative(UPLOADS_DIR, fullPath));
 }
 
-module.exports = { resolveAdminPath, toAdminPath, UPLOADS_DIR };
+/**
+ * The browser URL of a file inside uploads, from its admin path ("uploads/...").
+ * Each segment is percent-encoded, so names with # ? % or spaces stay part of the path.
+ */
+function uploadsUrl(adminPath) {
+  // "/" separates folders everywhere; on Windows "\\" does too
+  const segments = path.sep === '/' ? adminPath.split('/') : adminPath.split(/[\\/]/);
+  return '/' + segments.map(encodeURIComponent).join('/');
+}
+
+module.exports = { resolveAdminPath, toAdminPath, uploadsUrl, UPLOADS_DIR };

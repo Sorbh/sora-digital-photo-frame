@@ -190,7 +190,16 @@
     "donePaired": "{name} está <em>vinculado</em>",
     "expiredHeading": "Este código ha <em>caducado</em>",
     "heading": "Muestra fotos en <em>este marco</em>",
-    "codeMatchHint": "Comprueba que coincide con la pantalla del marco"
+    "codeMatchHint": "Comprueba que coincide con la pantalla del marco",
+    "enterHeading": "Escribe el <em>código</em>",
+    "enterNote": "El marco lo muestra debajo de su código QR, por ejemplo <bdi class=\"code-example\">K7P-4QX</bdi>.",
+    "continue": "Continuar",
+    "codeInvalid": "Escribe las 6 letras y números que aparecen en el marco.",
+    "typeCode": "Escribir un código",
+    "unreachableHeading": "No se pudo <em>comprobar</em> el código",
+    "unreachableNote": "La biblioteca no respondió. Revisa la conexión de tu teléfono y vuelve a intentarlo.",
+    "tryAgain": "Reintentar",
+    "foldersFailed": "No se pudieron cargar las carpetas, así que ahora no se puede crear una cuenta nueva. Elige una cuenta existente o vuelve a intentarlo."
   },
   "login": {
     "invalid_password": "Contraseña incorrecta. Inténtalo de nuevo.",
@@ -331,6 +340,7 @@
     "countSnaps_other": "{count} recuerdos",
     "countSnaps_many": "{count} recuerdos",
     "folderOptions": "Opciones de la carpeta",
+    "photoOptions": "Opciones de la foto",
     "selectPhoto": "Seleccionar foto",
     "viewPhoto": "Ver foto",
     "deletePhoto": "Eliminar foto",

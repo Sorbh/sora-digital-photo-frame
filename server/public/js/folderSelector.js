@@ -256,6 +256,15 @@ class FolderSelector {
                 color: #fff4ef;
                 z-index: 40;
                 animation: folder-pop 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+                /* The whole panel fits above the dock, so an error under the list
+                   can't push the header and close button off the top of the screen.
+                   The list shrinks first; if even that isn't enough, the panel scrolls. */
+                display: flex;
+                flex-direction: column;
+                max-height: calc(100vh - 8rem);
+                max-height: calc(100dvh - 8rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+                overflow-y: auto;
+                overscroll-behavior: contain;
             }
 
             @keyframes folder-pop {
@@ -310,6 +319,14 @@ class FolderSelector {
                 max-height: max(3.75rem, min(56dvh, 30rem, calc(100dvh - 12rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))));
                 overflow-y: auto;
                 overscroll-behavior: contain;
+                flex: 0 1 auto;
+                min-height: 0;
+            }
+
+            .folder-dropdown-header,
+            .folder-loading,
+            .folder-error {
+                flex-shrink: 0;
             }
 
             .folder-option-content {
@@ -536,6 +553,8 @@ class FolderSelector {
             @media (max-height: 520px) {
                 .folder-dropdown {
                     bottom: calc(100% + 8px);
+                    max-height: calc(100vh - 6rem);
+                    max-height: calc(100dvh - 6rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
                 }
 
                 .folder-dropdown-header {

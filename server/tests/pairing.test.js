@@ -18,7 +18,7 @@ describe('Pairing a frame by QR code', () => {
   const admin = request.agent(app);
   const start = async (frame) => (await frame.post('/api/pair/start').expect(200)).body;
   const status = (frame, pairing, secret = pairing.secret) =>
-    frame.get('/api/pair/status').query({ code: pairing.code, secret }).expect(200).then(r => r.body);
+    frame.post('/api/pair/status').send({ code: pairing.code, secret }).expect(200).then(r => r.body);
   const collect = (frame, pairing, secret = pairing.secret) =>
     frame.post('/api/pair/collect').send({ code: pairing.code, secret }).expect(200).then(r => r.body);
 
@@ -185,12 +185,28 @@ describe('Pairing a frame by QR code', () => {
     const frame = request.agent(app);
     const pairing = await start(frame);
     await admin.post(`/api/admin/pair/${pairing.code}/approve`).send({ name: 'Polling page', newAccount: {} }).expect(200);
-    const polled = await frame.get('/api/pair/status').set('Sec-Fetch-Site', 'same-origin')
-      .query({ code: pairing.code, secret: pairing.secret }).expect(200);
+    const polled = await frame.post('/api/pair/status').set('Sec-Fetch-Site', 'same-origin')
+      .send({ code: pairing.code, secret: pairing.secret }).expect(200);
     expect(polled.body).toEqual({ success: true, status: 'ready' });
     expect(polled.headers['set-cookie'] || []).toEqual([]);
     expect((await frame.get('/api/auth/session').expect(200)).body.authenticated).toBe(false);
     expect((await collect(frame, pairing)).status).toBe('approved');
+  });
+
+  test('the secret is never sent in a URL, where a proxy could log it (#66)', async () => {
+    const frame = request.agent(app);
+    // From its own address, so this file stays under the per-address start limit
+    const pairing = (await frame.post('/api/pair/start').set('X-Forwarded-For', '10.66.0.1').expect(200)).body;
+    // Status is a POST with the secret in the body; there's no GET to put it in a query
+    const asGet = await frame.get('/api/pair/status').query({ code: pairing.code, secret: pairing.secret });
+    expect(asGet.body.status).toBeUndefined();
+    // Another site can't poll it either
+    await frame.post('/api/pair/status').set('Sec-Fetch-Site', 'cross-site')
+      .send({ code: pairing.code, secret: pairing.secret }).expect(403);
+    // And the slideshow sends it in the body
+    const slideshow = fs.readFileSync(path.join(__dirname, '../public/js/slideshow.js'), 'utf8');
+    expect(slideshow).not.toMatch(/pair\/status\?/);
+    expect(slideshow).not.toMatch(/URLSearchParams\(\{[^}]*secret/);
   });
 
   test("an account made for an approval can't be picked by another until that frame is paired", async () => {

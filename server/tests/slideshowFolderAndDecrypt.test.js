@@ -106,6 +106,23 @@ describe('a saved folder that was deleted', () => {
     expect(checks).toBe(3);
   });
 
+  test('a restricted frame whose only folder was deleted falls back too (403, not 404)', async () => {
+    const asked = [];
+    const { slideshow, save, saved } = load({
+      fetch: async (url) => {
+        asked.push(url);
+        // The server limits all folders to the frame's own too: nothing left to see there either
+        if (url.startsWith('/api/images/next')) return reply(403, { success: false, code: 'ACCESS_RESTRICTED' });
+        return reply(404, { success: false, code: 'FOLDER_NOT_FOUND' });
+      }
+    });
+    save('Goa', 'Goa');
+    expect(await slideshow.fetchRandomImage()).toEqual({ error: { key: 'slideshow.noImages' } });
+    expect(saved().path).toBe('');
+    // Not checked again, and no loop: all folders has nothing to drop
+    expect(asked).toEqual(['/api/images/next?folder=Goa', '/api/folders/Goa', '/api/images/next?']);
+  });
+
   test('a folder picked while the check ran is not replaced', async () => {
     let state;
     const { slideshow, save, saved } = load({

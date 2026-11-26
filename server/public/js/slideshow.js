@@ -749,8 +749,10 @@ class PhotoFrameSlideshow {
             const response = await fetch(`/api/images/next?${params}`, { signal });
             // The server or a proxy in trouble is not an empty folder
             if (response.status >= 500) return { error: { offline: true } };
-            // Nothing to show from the saved folder: if it was deleted, play all folders instead
-            if (response.status === 404 && selectedFolderPath && await this.dropMissingFolder(selectedFolderPath, signal)) {
+            // Nothing to show from the saved folder (404), or nothing this frame may see (403:
+            // its only folder was deleted, say): if the folder is gone, play all folders
+            // instead, which the server still limits to the frame's own folders
+            if ((response.status === 404 || response.status === 403) && selectedFolderPath && await this.dropMissingFolder(selectedFolderPath, signal)) {
                 return this.fetchRandomImage(signal);
             }
             if (!response.ok) throw new Error(t('slideshow.fetchImageFailed'));

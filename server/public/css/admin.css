@@ -590,6 +590,21 @@ body {
     transform: scale(0.98);
 }
 
+/* An upload refused or failed: said inside the upload dialog too */
+.upload-error {
+    margin: 0;
+    padding: 10px 14px;
+    border-radius: var(--shape-sm);
+    background: color-mix(in oklab, var(--berry) 10%, var(--paper-raised));
+    color: var(--berry-deep);
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+.upload-error:focus {
+    outline: none;
+}
+
 /* ---------- Context menu ---------------------------------------- */
 
 #contextMenuPopover {
@@ -1294,5 +1309,32 @@ html.dark .app.file-dragging .drop-hint {
 
     .library-actions > .play-order {
         flex-basis: 100%;
+    }
+}
+
+/* Toasts: a popover in the top layer (js/toastLayer.js), so an open dialog's
+   backdrop can't cover them. Undo the browser's popover box: no frame, no
+   background, pinned to the corner rather than stretched over the page. */
+#toaster[popover] {
+    top: auto;
+    left: auto;
+    height: auto;
+    margin: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    overflow: visible;
+}
+
+/* Phones: above the tab bar, not under it */
+@media (max-width: 640px) {
+    body:has(.tabbar) #toaster {
+        bottom: calc(78px + env(safe-area-inset-bottom));
+    }
+
+    /* Full width here, so across the screen rather than pushed off its left edge */
+    #toaster[popover] {
+        left: 0;
+        right: 0;
     }
 }

@@ -156,6 +156,17 @@
     margin-top: 6px;
 }
 
+/* A subfolder, under its folder. Inside a ticked folder it shows ticked and can't be unticked alone. */
+.pair-flow .folder.folder-sub {
+    margin-inline-start: 28px;
+    padding-block: 10px;
+}
+
+.pair-flow .folder:has(input:disabled) {
+    cursor: default;
+    opacity: 0.75;
+}
+
 .pair-flow .folder .material-icons {
     font-size: 20px;
     color: var(--berry);
@@ -167,12 +178,17 @@
 
 .pair-flow .pair-error {
     margin: 0;
+    scroll-margin: 1rem;
     padding: 10px 14px;
     border-radius: var(--shape-sm);
     background: color-mix(in oklab, var(--berry) 10%, var(--paper-raised));
     color: var(--berry-deep);
     font-size: 0.875rem;
     font-weight: 600;
+}
+
+.pair-flow .pair-error:focus {
+    outline: none;
 }
 
 .pair-flow .pair-submit {

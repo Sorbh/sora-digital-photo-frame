@@ -10,6 +10,7 @@ const webpFallback = require('./middleware/webpFallback');
 const media = require('./middleware/media');
 const sameOrigin = require('./middleware/sameOrigin');
 const freshViewer = require('./middleware/freshViewer');
+const noStore = require('./middleware/noStore');
 const { requireVisiblePhoto, atPhotoPath } = require('./utils/viewerAccess');
 const EncryptedPhotoLibrary = require('./library/EncryptedPhotoLibrary');
 const EncryptedDataStore = require('./store/EncryptedDataStore');
@@ -103,6 +104,9 @@ function createApp({ sessionStore, beforeRoutes, library, dataStore, resolveTena
   }));
 
   app.use(logger);
+  // API answers are never kept by the browser (see middleware/noStore); photos
+  // and thumbnails keep their own caching
+  app.use('/api', noStore);
   // Changes only from this site's own pages (see middleware/sameOrigin)
   app.use(sameOrigin);
   app.use(tenantMiddleware(resolveTenant));

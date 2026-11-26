@@ -9,6 +9,7 @@ const { getDataStore } = require('../store');
 const pairing = require('../services/pairingService');
 const accessAccounts = require('./accessAccountController');
 const { passClientError } = require('../utils/httpError');
+const { screenPaused } = require('../middleware/auth');
 
 const START_LIMIT = 20; // new codes per IP in START_WINDOW_MS
 const START_WINDOW_MS = 10 * 60 * 1000;
@@ -163,7 +164,7 @@ class PairingController {
       try {
         account = await runWithTenant(result.tenant, async () => {
           const found = (await accessAccounts.loadAccounts()).find(a => a.id === result.device.accountId);
-          if (found) await pairing.markSeen(result.device.id);
+          if (found) await pairing.noteUse({ account: found, device: result.device });
           return found;
         });
         if (!account) return res.json({ success: true, status: 'expired' });
@@ -278,6 +279,8 @@ class PairingController {
         return res.status(401).json({ success: false, error: 'This frame is no longer paired', code: 'DEVICE_UNKNOWN' });
       }
       accessAccounts.recordSuccessfulAttempt(ip);
+      // "Last used" on Access (the screen's own lastSeen was noted by signIn)
+      await pairing.noteUse({ account });
       await rotateSession(req);
       req.session.accessAccount = this.sessionAccount(account);
       req.session.deviceId = device.id;
@@ -295,7 +298,12 @@ class PairingController {
     try {
       const [devices, accounts] = await Promise.all([pairing.listDevices(), accessAccounts.loadAccounts()]);
       const names = new Map(accounts.map(a => [a.id, a.name]));
-      res.json({ success: true, devices: devices.map(d => ({ ...d, accountName: names.get(d.accountId) || null })) });
+      // paused: true for a screen the host has paused (auth isScreenPaused), shown on Access
+      const paused = await Promise.all(devices.map(d => screenPaused(d.id)));
+      res.json({
+        success: true,
+        devices: devices.map((d, i) => ({ ...d, accountName: names.get(d.accountId) || null, ...(paused[i] ? { paused: true } : {}) }))
+      });
     } catch (error) {
       if (passClientError(res, error)) return;
       console.error('Error listing devices:', error);

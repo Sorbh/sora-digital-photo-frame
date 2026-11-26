@@ -214,6 +214,28 @@ body {
     color: var(--muted-foreground);
 }
 
+/* A screen the host paused (a plan with fewer screens): the line under it says why */
+.paused-badge {
+    justify-self: start;
+    margin: 2px 0;
+    padding: 1px 8px;
+    border-radius: 999px;
+    background: var(--blush);
+    color: var(--berry-deep);
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+}
+
+.paired-frame.is-paused .paired-seen {
+    white-space: normal;
+    color: var(--ink-soft, var(--muted-foreground));
+}
+
+.paired-frame.is-paused > .material-symbols-outlined {
+    color: var(--muted-foreground);
+}
+
 .folder-tags {
     display: flex;
     flex-wrap: wrap;
@@ -498,5 +520,25 @@ html[dir="rtl"] #screenCodeBtn .material-symbols-outlined {
 
     .add-screen-buttons .btn-outline {
         height: 44px;
+    }
+}
+
+/* Toasts: a popover in the top layer (js/toastLayer.js), so an open dialog's
+   backdrop can't cover them; the browser's popover box undone */
+.toast-container[popover] {
+    inset: auto 1.5rem 1.5rem auto;
+    width: auto;
+    height: auto;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    overflow: visible;
+}
+
+@media (max-width: 640px) {
+    .toast-container[popover] {
+        inset: auto 1rem calc(96px + env(safe-area-inset-bottom)) 1rem;
     }
 }

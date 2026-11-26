@@ -193,6 +193,23 @@ describe('The /pair page', () => {
     expect(page.el('folderList').innerHTML).toContain('pair.foldersFailed');
   });
 
+  test('a refusal (the plan\'s screen limit, say) is brought into view and focused, not left under the button', async () => {
+    const working = library('K7P4QX', [{ id: 'acc_1', name: 'Kitchen', assignedFolders: [] }]);
+    const page = openPage('?code=K7P4QX', url => (url.endsWith('/approve')
+      ? { status: 403, body: { success: false, code: 'SCREEN_LIMIT', message: 'Your plan allows 1 screen.' } }
+      : working(url)), { account: 'acc_1' });
+    await flush();
+    const error = page.el('pairError');
+    const seen = { focused: 0, scrolled: 0 };
+    error.focus = () => { seen.focused += 1; };
+    error.scrollIntoView = () => { seen.scrolled += 1; };
+    page.el('frameName').value = 'Hall TV';
+    page.el('pairForm').fire('submit');
+    await flush();
+    expect(error.classList.contains('hidden')).toBe(false);
+    expect(seen).toEqual({ focused: 1, scrolled: 1 });
+  });
+
   test('"Type a code" keeps the chosen language', async () => {
     const page = openPage('?lang=ar', library('K7P4QX'));
     await flush();

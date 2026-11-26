@@ -334,6 +334,8 @@
                             </div>
                             <span class="progress-text text-sm text-muted-foreground mt-2" data-i18n="admin.static_020">Uploading...</span>
                         </div>
+                        <!-- What happened to the last upload, when it was refused or failed -->
+                        <p id="uploadError" class="upload-error hidden" role="alert" tabindex="-1"></p>
                     </div>
                 </section>
                 <footer>
@@ -434,7 +436,7 @@
         </dialog>
 
         <!-- Basecoat Toast Container -->
-        <div id="toaster" class="toaster fixed bottom-4 right-4 z-50" data-align="end"></div>
+        <div id="toaster" class="toaster fixed bottom-4 right-4 z-50" data-align="end" popover="manual"></div>
     </div>
 
     <!-- Mobile tab bar -->
@@ -464,6 +466,7 @@
 
     <script src="/js/i18n.js"></script>
     <script src="/js/scope.js"></script>
+    <script src="/js/toastLayer.js"></script>
     <script src="js/notePage.js"></script>
     <script src="/js/photoUpload.js"></script>
     <script src="/js/longPress.js"></script>

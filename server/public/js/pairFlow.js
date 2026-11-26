@@ -5,6 +5,8 @@
  *   SoraPairFlow.normalize(' k7p - 4qx ')  'K7P4QX' (any case, dashes and spaces dropped)
  *   SoraPairFlow.lookup(code, getJson)     { state: 'ready', code, accounts, folders, pinSignIn }
  *                                          | { state: 'expired' } | { state: 'unreachable' }
+ *                                          folders: the top two levels, as sharing offers them:
+ *                                          [{ name, path, children: [{ name, path }] }]
  *   SoraPairFlow.approve(code, body, getJson)
  *                                          { state: 'done', device } | { state: 'expired' }
  *                                          | { state: 'failed', data }
@@ -39,6 +41,36 @@
         return { ok: response.ok, status: response.status, json, data: json ? data : {} };
     }
 
+    // A folder's subfolders as { name, path }, or [] when they can't be read
+    // (the folder can still be ticked as a whole)
+    async function subfolders(folder, getJson) {
+        const address = String(folder.path).split('/').map(encodeURIComponent).join('/');
+        try {
+            const reply = await getJson(`/api/folders/${address}`);
+            // A folder's own listing calls them subfolders
+            const list = reply.ok && reply.json && Array.isArray(reply.data.subfolders) ? reply.data.subfolders : [];
+            return list.map(child => ({ name: child.name, path: child.path }));
+        } catch (error) {
+            if (error.signedOut) throw error;
+            return [];
+        }
+    }
+
+    // The top folders with their subfolders (two levels, as MAX_FOLDER_DEPTH allows
+    // on the hosted service), a few at a time. Only folders that have some are asked.
+    async function withSubfolders(top, getJson) {
+        const tree = top.map(folder => ({ name: folder.name, path: folder.path, children: [] }));
+        const queue = tree.filter((folder, i) => top[i].hasSubfolders !== false);
+        const worker = async () => {
+            while (queue.length) {
+                const folder = queue.shift();
+                folder.children = await subfolders(folder, getJson);
+            }
+        };
+        await Promise.all(Array.from({ length: Math.min(4, queue.length) }, worker));
+        return tree;
+    }
+
     // The code, and what a frame can be given: the accounts, and the folders for a new one
     async function lookup(code, getJson) {
         const pairing = await getJson(`/api/admin/pair/${encodeURIComponent(code)}`);
@@ -51,7 +83,7 @@
         // would mean every folder. Existing accounts can still be chosen.
         const [accounts, folders] = await Promise.all([getJson('/api/access-accounts'), getJson('/api/folders')]);
         const listed = (reply, key) => reply.ok && reply.json && Array.isArray(reply.data[key]);
-        const folderList = listed(folders, 'folders') ? folders.data.folders : null;
+        const folderList = listed(folders, 'folders') ? await withSubfolders(folders.data.folders, getJson) : null;
         if (!listed(accounts, 'accounts')) return { state: 'unreachable' };
         if (!folderList && !accounts.data.accounts.length) return { state: 'unreachable' }; // nothing to choose
         return {
@@ -75,8 +107,20 @@
     }
 
     // The "Which photos" choice. `name` is the radio group's name (one per page).
+    // Ticking a folder takes in everything inside it: what's ticked under it is dropped
+    function tick(chosen, path, on) {
+        const next = new Set([...chosen].filter(other => !(on && other.startsWith(`${path}/`))));
+        if (on) next.add(path);
+        else next.delete(path);
+        return next;
+    }
+
+    // A folder inside a ticked one shows ticked, and can't be unticked alone
+    const covered = (chosen, path) => [...chosen].some(other => other !== path && path.startsWith(`${other}/`));
+
     function choices({ accountList, newAccount, folderList, name = 'account' }) {
         let loaded = null; // { accounts, folders, screens }
+        let chosen = new Set(); // ticked folder paths
         const selected = () => document.querySelector(`input[name="${name}"]:checked`)?.value;
         const folderSummary = folders => (folders && folders.length ? folders.join(', ') : t('pair.all_folders'));
 
@@ -108,9 +152,8 @@
             update();
         }
 
-        function renderFolders(keepTicks) {
+        function renderFolders() {
             const { folders } = loaded;
-            if (keepTicks && folderList.querySelector('input')) return; // folder names need no translation, keep the ticks
             folderList.innerHTML = '';
             if (!folders) {
                 // Without the list, "no ticks" would mean every folder: a new account waits for it
@@ -121,13 +164,28 @@
                 folderList.innerHTML = `<p class="pair-note">${t('pair.no_folders')}</p>`;
                 return;
             }
-            folders.forEach(folder => {
+            const box = (folder, sub) => {
                 const label = document.createElement('label');
-                label.className = 'folder';
-                label.innerHTML = '<input type="checkbox"><span class="material-icons">folder</span><span class="folder-name"></span>';
-                label.querySelector('input').value = folder.path;
+                label.className = sub ? 'folder folder-sub' : 'folder';
+                label.innerHTML = `<input type="checkbox"><span class="material-icons">${sub ? 'subdirectory_arrow_right' : 'folder'}</span><span class="folder-name"></span>`;
+                const input = label.querySelector('input');
+                const inherited = covered(chosen, folder.path);
+                input.value = folder.path;
+                input.checked = inherited || chosen.has(folder.path);
+                input.disabled = inherited;
+                input.addEventListener('change', () => {
+                    chosen = tick(chosen, folder.path, input.checked);
+                    renderFolders();
+                    // The same box again, redrawn with its subfolders ticked or not
+                    const again = [...folderList.querySelectorAll('input')].find(other => other.value === folder.path);
+                    if (again) again.focus();
+                });
                 label.querySelector('.folder-name').textContent = folder.name;
                 folderList.appendChild(label);
+            };
+            folders.forEach(folder => {
+                box(folder, false);
+                (folder.children || []).forEach(child => box(child, true));
             });
         }
 
@@ -137,15 +195,16 @@
             // A new lookup: fresh lists (and folder ticks)
             show(found) {
                 loaded = { accounts: found.accounts, folders: found.folders, screens: found.pinSignIn === false };
+                chosen = new Set();
                 accountList.innerHTML = '';
                 renderAccounts();
-                renderFolders(false);
+                renderFolders();
             },
             // The language changed: same choices, ticks kept
             render() {
                 if (!loaded) return;
                 renderAccounts();
-                renderFolders(true);
+                renderFolders();
             },
             // What to approve with, or { error } (a translation key)
             body(frameName) {
@@ -153,12 +212,12 @@
                 if (account === NEW && !loaded?.folders) return { error: 'pair.foldersFailed' };
                 return {
                     body: account === NEW
-                        ? { name: frameName, newAccount: { assignedFolders: [...folderList.querySelectorAll('input:checked')].map(i => i.value) } }
+                        ? { name: frameName, newAccount: { assignedFolders: [...chosen] } }
                         : { name: frameName, accountId: account }
                 };
             }
         };
     }
 
-    root.SoraPairFlow = { NEW, CODE_LENGTH, normalize, pretty, request, lookup, approve, choices };
+    root.SoraPairFlow = { NEW, CODE_LENGTH, normalize, pretty, request, lookup, approve, choices, tick, covered };
 })(typeof window !== 'undefined' ? window : this);

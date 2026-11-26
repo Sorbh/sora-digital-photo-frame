@@ -65,12 +65,18 @@ class AddScreenDialog {
         element.classList.toggle('hidden', !key);
     }
 
-    // A translation key, or the server's own words (i18n.error) as text
-    showPairError(key, text) {
+    // A translation key, or the server's own words (i18n.error) as text. It sits at
+    // the top of the form and is brought into view: on a phone the list of folders
+    // can push anything lower off the screen. focus: false leaves the focus where
+    // it is (a field that needs filling in, or a language change).
+    showPairError(key, text, { focus = true } = {}) {
         this.pairError = key || text ? [key, text] : null;
         const element = this.$('screenPairError');
         element.textContent = key ? t(key) : (text || '');
         element.classList.toggle('hidden', !(key || text));
+        if (!(key || text)) return;
+        if (typeof element.scrollIntoView === 'function') element.scrollIntoView({ block: 'nearest' });
+        if (focus) element.focus({ preventScroll: true });
     }
 
     renderDone() {
@@ -81,7 +87,7 @@ class AddScreenDialog {
 
     renderLanguage() {
         if (this.codeError) this.showCodeError(this.codeError);
-        if (this.pairError?.[0]) this.showPairError(this.pairError[0]);
+        if (this.pairError?.[0]) this.showPairError(this.pairError[0], null, { focus: false });
         if (this.doneName) this.renderDone();
         this.choices.render();
     }
@@ -121,7 +127,7 @@ class AddScreenDialog {
     async approve() {
         const name = this.$('screenName').value.trim();
         if (!name) {
-            this.showPairError('accessAccounts.screenNameRequired');
+            this.showPairError('accessAccounts.screenNameRequired', null, { focus: false });
             this.$('screenName').focus();
             return;
         }
@@ -389,8 +395,9 @@ class AccessAccountsManager {
                 </span>`).join('')
             : `<span class="folder-tag no-folders-tag">${esc(t('accessAccounts.noFoldersAssigned'))}</span>`;
 
-        const lastAccessed = account.lastAccessed
-            ? new Date(account.lastAccessed).toLocaleDateString(window.i18n?.locale, { month: 'short', day: 'numeric', year: 'numeric' })
+        const lastUsed = this.lastUsed(account);
+        const lastAccessed = lastUsed
+            ? new Date(lastUsed).toLocaleDateString(window.i18n?.locale, { month: 'short', day: 'numeric', year: 'numeric' })
             : t('accessAccounts.lastUsedNever');
         const folderCount = account.assignedFolders.length;
 
@@ -426,7 +433,16 @@ class AccessAccountsManager {
         `;
     }
 
-    // Screens of this account, paired by QR code or signed in with its PIN
+    // When the account was last used: its own sign-in, or any of its screens seen since
+    lastUsed(account) {
+        const times = [account.lastAccessed, ...this.devices.filter(device => device.accountId === account.id).map(device => device.lastSeen)]
+            .map(time => (time ? Date.parse(time) : NaN))
+            .filter(Number.isFinite);
+        return times.length ? new Date(Math.max(...times)).toISOString() : null;
+    }
+
+    // Screens of this account, paired by QR code or signed in with its PIN.
+    // A screen the host paused (paused: true) says so, and why.
     renderDevices(account) {
         const esc = (value) => this.escapeHtml(value);
         const devices = this.devices.filter(device => device.accountId === account.id);
@@ -439,11 +455,12 @@ class AccessAccountsManager {
             <div class="paired-frames">
                 <span class="paired-label">${esc(t('accessAccounts.pairedFrames'))}</span>
                 ${devices.map(device => `
-                    <div class="paired-frame">
+                    <div class="paired-frame${device.paused ? ' is-paused' : ''}">
                         <span class="material-symbols-outlined" title="${esc(t(device.via === 'pin' ? 'accessAccounts.viaPin' : 'accessAccounts.viaQr'))}">${device.via === 'pin' ? 'dialpad' : 'tv'}</span>
                         <span class="paired-text">
                             <span class="paired-name">${esc(device.name)}</span>
-                            <span class="paired-seen">${esc(seen(device))}</span>
+                            ${device.paused ? `<span class="paused-badge">${esc(t('accessAccounts.screenPaused'))}</span>` : ''}
+                            <span class="paired-seen">${esc(device.paused ? t('accessAccounts.screenPausedNote') : seen(device))}</span>
                         </span>
                         <label class="sr-only" for="language-${esc(device.id)}">${esc(t('accessAccounts.screen_language'))}</label>
                         <select class="device-language input" id="language-${esc(device.id)}" data-device-id="${esc(device.id)}">
@@ -793,6 +810,14 @@ class AccessAccountsManager {
         // Messages can include server text, so never parse them as HTML
         toast.querySelector('.toast-message').textContent = message;
         
+        // In front of an open dialog's backdrop (js/toastLayer.js)
+        if (window.SoraToastLayer) {
+            if (!container.dataset.followed) {
+                container.dataset.followed = 'true';
+                window.SoraToastLayer.follow(container);
+            }
+            window.SoraToastLayer.raise(container);
+        }
         container.appendChild(toast);
         
         setTimeout(() => {
@@ -802,7 +827,7 @@ class AccessAccountsManager {
         setTimeout(() => {
             toast.classList.remove('show');
             setTimeout(() => {
-                container.removeChild(toast);
+                toast.remove();
             }, 300);
         }, 3000);
     }

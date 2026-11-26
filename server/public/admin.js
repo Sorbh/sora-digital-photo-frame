@@ -8,11 +8,25 @@ const toastTitle = (category) => ({
     info: t('admin.toastInfo')
 })[category];
 
+// In front of open dialogs and the phone's tab bar (js/toastLayer.js)
+function raiseToaster() {
+    const toaster = document.getElementById('toaster');
+    if (!toaster || !window.SoraToastLayer) return;
+    if (!toaster.dataset.followed) {
+        toaster.dataset.followed = 'true';
+        window.SoraToastLayer.follow(toaster);
+    }
+    window.SoraToastLayer.raise(toaster);
+}
+
+// Basecoat puts the description in as HTML: messages can hold a folder's name or
+// the server's words, so they go in as text
 function showToast(message, type = 'info') {
     const category = ['success', 'error', 'warning', 'info'].includes(type) ? type : 'info';
+    raiseToaster();
     document.dispatchEvent(new CustomEvent('basecoat:toast', {
         detail: {
-            config: { category, title: toastTitle(category), description: message, duration: 5000 }
+            config: { category, title: toastTitle(category), description: escapeHtml(message), duration: 5000 }
         }
     }));
 }
@@ -85,12 +99,13 @@ class PhotoFrameAdmin {
     // Handle session expiration
     handleSessionExpired() {
         // Use Basecoat error toast for session expiration
+        raiseToaster();
         document.dispatchEvent(new CustomEvent('basecoat:toast', {
             detail: {
                 config: {
                     category: 'error',
                     title: t('admin.sessionExpiredTitle'),
-                    description: t('admin.sessionExpired'),
+                    description: escapeHtml(t('admin.sessionExpired')),
                     duration: 8000 // Longer duration for important message
                 }
             }
@@ -225,7 +240,9 @@ class PhotoFrameAdmin {
 
         // File input
         document.getElementById('fileInput').addEventListener('change', (e) => {
+            if (this.uploading) return; // the photos on their way stay the ones shown
             this.selectedFiles = Array.from(e.target.files);
+            this.showUploadError(null);
             this.updateUploadButton();
             this.updateSelectedFilesDisplay();
         });
@@ -412,8 +429,10 @@ class PhotoFrameAdmin {
             e.preventDefault();
             dropZone.classList.remove('dragover');
             
+            if (this.uploading) return;
             const files = Array.from(e.dataTransfer.files).filter(isImageFile);
             this.selectedFiles = files;
+            this.showUploadError(null);
             this.updateUploadButton();
             this.updateSelectedFilesDisplay();
         });
@@ -1138,6 +1157,7 @@ class PhotoFrameAdmin {
         const modal = document.getElementById('uploadModal');
         modal.showModal();
         this.selectedFiles = [];
+        this.showUploadError(null);
         this.updateUploadButton();
         this.updateSelectedFilesDisplay();
     }
@@ -1147,14 +1167,29 @@ class PhotoFrameAdmin {
         modal.close();
         document.getElementById('fileInput').value = '';
         this.selectedFiles = [];
+        this.showUploadError(null);
         this.hideUploadProgress();
         this.updateSelectedFilesDisplay();
+    }
+
+    // Inside the upload dialog, what happened to the photos (a full library, say),
+    // in view and read out; null clears it
+    showUploadError(message) {
+        const box = document.getElementById('uploadError');
+        if (!box) return;
+        box.textContent = message || '';
+        box.classList.toggle('hidden', !message);
+        if (message) {
+            box.scrollIntoView?.({ block: 'nearest' });
+            box.focus?.({ preventScroll: true });
+        }
     }
 
     updateUploadButton() {
         const btn = document.getElementById('confirmUploadBtn');
         const btnText = document.getElementById('uploadBtnText');
-        btn.disabled = this.selectedFiles.length === 0;
+        // Not again while photos are on their way: one upload, one answer
+        btn.disabled = this.selectedFiles.length === 0 || Boolean(this.uploading);
         
         if (this.selectedFiles.length > 0) {
             btnText.textContent = t('admin.uploadFilesButton', { count: this.selectedFiles.length });
@@ -1209,7 +1244,10 @@ class PhotoFrameAdmin {
         return { ok: false, json: async () => ({
             ...failed,
             code: undefined, // already translated into message
-            message: result.files.length ? t('admin.uploadPartial', { done: result.files.length, total: list.length, message }) : message
+            message: result.files.length ? t('admin.uploadPartial', { done: result.files.length, total: list.length, message }) : message,
+            // For the upload dialog: "Not added: …" when none of them were
+            noneSaved: result.files.length === 0,
+            reason: message
         }) };
     }
 
@@ -1239,14 +1277,16 @@ class PhotoFrameAdmin {
     }
 
     async uploadFiles() {
-        if (this.selectedFiles.length === 0) return;
+        if (this.selectedFiles.length === 0 || this.uploading) return;
         
+        this.uploading = true;
+        this.updateUploadButton();
+        this.showUploadError(null);
         this.showUploadProgress();
         
         try {
             const response = await this.uploadInBatches(this.selectedFiles, this.currentPath);
             if (!response) {
-                this.hideUploadProgress();
                 return; // Session expired
             }
             
@@ -1257,14 +1297,20 @@ class PhotoFrameAdmin {
                 this.hideUploadModal();
                 this.loadFolderContents();
             } else {
-                this.showToast(i18n.error(data, 'admin.uploadFailed'), 'error');
+                // Once, as a toast in front of the dialog, and kept in the dialog itself
+                const message = i18n.error(data, 'admin.uploadFailed');
+                this.showToast(message, 'error');
+                this.showUploadError(data.noneSaved ? t('admin.uploadNotAdded', { message: data.reason || message }) : message);
             }
         } catch (error) {
             console.error('Error uploading files:', error);
             this.showToast(t('admin.uploadFailed'), 'error');
+            this.showUploadError(t('admin.uploadFailed'));
+        } finally {
+            this.uploading = false;
+            this.hideUploadProgress();
+            this.updateUploadButton();
         }
-        
-        this.hideUploadProgress();
     }
 
     showUploadProgress() {
@@ -2062,7 +2108,7 @@ class PhotoFrameAdmin {
         const btnText = document.getElementById('emptyStateUploadBtnText');
         const cancelBtn = document.getElementById('emptyStateCancelBtn');
         
-        btn.disabled = !this.emptyStateSelectedFiles || this.emptyStateSelectedFiles.length === 0;
+        btn.disabled = !this.emptyStateSelectedFiles || this.emptyStateSelectedFiles.length === 0 || Boolean(this.uploading);
         
         if (this.emptyStateSelectedFiles && this.emptyStateSelectedFiles.length > 0) {
             btnText.textContent = t('admin.uploadFilesButton', { count: this.emptyStateSelectedFiles.length });
@@ -2092,8 +2138,10 @@ class PhotoFrameAdmin {
     }
 
     async uploadEmptyStateFiles() {
-        if (!this.emptyStateSelectedFiles || this.emptyStateSelectedFiles.length === 0) return;
+        if (!this.emptyStateSelectedFiles || this.emptyStateSelectedFiles.length === 0 || this.uploading) return;
         
+        this.uploading = true;
+        this.updateEmptyStateUploadButton();
         this.showEmptyStateUploadProgress();
         
         try {
@@ -2115,6 +2163,9 @@ class PhotoFrameAdmin {
         } catch (error) {
             console.error('Error uploading files:', error);
             this.showToast(t('admin.uploadFailed'), 'error');
+        } finally {
+            this.uploading = false;
+            this.updateEmptyStateUploadButton();
         }
         
         this.hideEmptyStateUploadProgress();
@@ -2202,7 +2253,15 @@ class PhotoFrameAdmin {
 
 }
 
+// Back or Forward can bring this page back from the browser's memory just as it
+// was left (the back/forward cache), with another library's folders and controls
+// if the person switched libraries meanwhile. Load it afresh instead.
+function reloadIfRestored(event) {
+    if (event && event.persisted) location.reload();
+}
+
 // Initialize the admin panel when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     window.photoFrameAdmin = new PhotoFrameAdmin();
+    window.addEventListener('pageshow', reloadIfRestored);
 });

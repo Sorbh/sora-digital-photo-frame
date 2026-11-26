@@ -23,9 +23,16 @@
     const choices = window.SoraPairFlow.choices({ accountList: $('accountList'), newAccount: $('newAccount'), folderList: $('folderList') });
     let doneName = null;
 
-    function showError(message) {
-        $('pairError').textContent = message;
-        $('pairError').classList.toggle('hidden', !message);
+    // At the top of the form, brought into view: a long folder list can push
+    // anything lower under the button that stays at the bottom. focus: false
+    // leaves the focus on a field that needs filling in.
+    function showError(message, { focus = true } = {}) {
+        const element = $('pairError');
+        element.textContent = message;
+        element.classList.toggle('hidden', !message);
+        if (!message) return;
+        if (typeof element.scrollIntoView === 'function') element.scrollIntoView({ block: 'nearest' });
+        if (focus) element.focus({ preventScroll: true });
     }
 
     // Signed out: back here after signing in, with the code kept aside rather than in the sign-in address
@@ -108,7 +115,7 @@
         event.preventDefault();
         const name = $('frameName').value.trim();
         if (!name) {
-            showError(t('pair.name_required'));
+            showError(t('pair.name_required'), { focus: false });
             $('frameName').focus();
             return;
         }

@@ -99,7 +99,7 @@ class JobManager {
   async executeGooglePhotosImport(job) {
     const { mediaItems, destinationPath, accessToken } = job.data;
     const { getLibrary } = require('../library');
-    const { assertCanAdd, addWithinQuota } = require('../services/quotaService');
+    const { assertCanAdd, addWithinQuota, photoItems } = require('../services/quotaService');
     const { currentTenant } = require('../context');
     const slots = require('./workSlots');
 
@@ -139,9 +139,9 @@ class JobManager {
       try {
         console.log('🔧 [DEBUG] Processing item', i + 1, 'of', mediaItems.length, ':', item.id);
         // Room left, and a turn among the photos being converted, before downloading it
-        await assertCanAdd(1);
+        await assertCanAdd({ items: 1, bytes: 1 });
         release = await slots.acquire(currentTenant().id, { kind: 'import' });
-        await assertCanAdd(1); // the library may have filled up while this waited
+        await assertCanAdd({ items: 1, bytes: 1 }); // the library may have filled up while this waited
 
         // Get download URL
         let downloadUrl = '';
@@ -199,7 +199,9 @@ class JobManager {
           continue;
         }
         const filename = `google-${Date.now()}-${Math.round(Math.random() * 1E9)}.webp`;
-        const added = await addWithinQuota(imageBuffer.length, () => getLibrary().addPhoto(destinationPath, {
+        // 1 item per photo, 5 for one that stayed animated, as an upload
+        const items = await photoItems(imageBuffer);
+        const added = await addWithinQuota({ items, bytes: imageBuffer.length }, () => getLibrary().addPhoto(destinationPath, {
           buffer: imageBuffer,
           originalName: filename,
           contentType: 'image/webp'

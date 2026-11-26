@@ -40,7 +40,10 @@
       const code = typeof payload === 'object' && payload ? payload.code : null;
       const message = typeof payload === 'object' && payload ? (payload.message || payload.error) : payload;
       const translated = code && this.t(`errors.${code}`, payload);
-      return translated && translated !== `errors.${code}` ? translated : (message || this.t(fallback));
+      // A text that needs a value the server didn't send (a host's own limit, say)
+      // gives way to the server's own message
+      const usable = translated && translated !== `errors.${code}` && !(message && /\{\w+\}/.test(translated));
+      return usable ? translated : (message || this.t(fallback));
     },
     apply(root = document) {
       root.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = this.t(el.dataset.i18n); });

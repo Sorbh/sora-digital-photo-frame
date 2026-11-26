@@ -1,7 +1,7 @@
 const path = require('path');
 const { getLibrary } = require('../library');
 const { toAdminPath } = require('../utils/safePath');
-const { addWithinQuota } = require('./quotaService');
+const { addWithinQuota, ITEMS } = require('./quotaService');
 
 const { UPLOADS_DIR } = require('../config/paths');
 const notes = require('./noteService');
@@ -89,17 +89,18 @@ class SnapService {
     return { snap: saved, fullPath };
   }
 
-  // A new snap, or one that grew, needs room in the library like a photo
+  // A new snap (1 item), or one that grew, needs room in the library like a photo
   // (not when the server itself keeps snaps in step with a moved photo)
   async write(fullPath, snap, { checkQuota = true } = {}) {
     const buffer = Buffer.from(JSON.stringify(snap, null, 2));
     const write = () => getLibrary().writeItem(toAdminPath(fullPath), buffer);
     if (!checkQuota) return write();
     // Measured in the family's turn, against the snap as it is now (its content, so
-    // an encrypted library compares like with like)
+    // an encrypted library compares like with like). Only a snap that isn't there yet
+    // is a new item; saving one again just grows it.
     const growth = async () => {
       const current = await getLibrary().readItem(toAdminPath(fullPath)).catch(() => null);
-      return buffer.length - (current ? current.length : 0);
+      return { items: current ? 0 : ITEMS.snap, bytes: buffer.length - (current ? current.length : 0) };
     };
     await addWithinQuota(growth, write);
   }

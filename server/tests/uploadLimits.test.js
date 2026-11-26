@@ -33,9 +33,9 @@ describe('Upload limits', () => {
     resolveTenant: req => (req.get('x-tenant') ? { id: req.get('x-tenant'), plan: 'free' } : null),
     auth: { requireAuth: (req, res, next) => next() },
     quota: {
-      async canAdd(bytes) {
+      async canAdd(request) {
         if (currentTenant().id !== 'full') return { ok: true };
-        seen.push(bytes);
+        seen.push(request);
         return { ok: false, message: 'Storage limit reached' };
       }
     }
@@ -61,7 +61,8 @@ describe('Upload limits', () => {
       .attach('images', Buffer.from('not really a png'), { filename: 'x.png', contentType: 'image/png' })
       .expect(413);
     expect(res.body.code).toBe('QUOTA_EXCEEDED');
-    expect(seen).toEqual([1]);
+    // "Any room at all?": one item, one byte
+    expect(seen).toEqual([{ items: 1, bytes: 1, screens: 0 }]);
   });
 
   test('photos with too many pixels are refused with a code', async () => {
@@ -170,11 +171,11 @@ describe('Upload limits', () => {
     quotaService.setQuota({ canAdd: async () => ({ ok: true }) });
     try {
       await Promise.all([
-        quotaService.addWithinQuota(async () => 200 - size, async () => {
+        quotaService.addWithinQuota(async () => ({ bytes: 200 - size }), async () => {
           await new Promise(resolve => setTimeout(resolve, 10));
           size = 200;
         }),
-        quotaService.addWithinQuota(async () => { measured.push(300 - size); return 300 - size; }, async () => { size = 300; })
+        quotaService.addWithinQuota(async () => { measured.push(300 - size); return { bytes: 300 - size }; }, async () => { size = 300; })
       ]);
       expect(measured).toEqual([100]);
     } finally {
@@ -393,9 +394,9 @@ describe('Upload limits', () => {
     const limit = 100;
     const writes = [];
     const appQuota = quotaService.getQuota();
-    quotaService.setQuota({ canAdd: async bytes => ({ ok: used + bytes <= limit, message: 'Storage limit reached' }) });
+    quotaService.setQuota({ canAdd: async ({ bytes }) => ({ ok: used + bytes <= limit, message: 'Storage limit reached' }) });
     try {
-      const add = () => quotaService.addWithinQuota(80, async () => {
+      const add = () => quotaService.addWithinQuota({ bytes: 80 }, async () => {
         await new Promise(resolve => setTimeout(resolve, 20));
         used += 80;
         writes.push(80);

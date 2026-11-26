@@ -68,7 +68,7 @@ async function uploadLimits(req, res, next) {
 
   // No room left at all? Then don't even read the photos
   try {
-    await runWithTenant(req.tenant, () => assertCanAdd(1));
+    await runWithTenant(req.tenant, () => assertCanAdd({ items: 1, bytes: 1 }));
   } catch (error) {
     // Answered like the upload handler answers a hook's error: code, vars, and no photos saved
     if (closed) return;

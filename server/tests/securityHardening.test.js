@@ -52,6 +52,49 @@ describe('PIN guessing', () => {
     expect(results.filter(r => r.status === 401).length).toBeLessThanOrEqual(5);
     expect(results.filter(r => r.status === 429).length).toBeGreaterThanOrEqual(7);
   });
+
+  const familyTries = () => [...accessAccounts.limiter.entries].find(([key]) => key.startsWith('family:'))?.[1].attempts || 0;
+  const addressTries = address => accessAccounts.limiter.entries.get(`ip:${address}`)?.attempts || 0;
+
+  test("a right PIN uses up none of the family's tries, and clears the address's own", async () => {
+    const admin = await signedInAdmin(app);
+    await admin.post('/api/access-accounts').send({ name: 'Hall', pin: '482910' }).expect(201);
+
+    await request(app).post('/api/auth/pin').set('X-Forwarded-For', '10.2.0.1').send({ pin: '000001' }).expect(401);
+    await request(app).post('/api/auth/pin').set('X-Forwarded-For', '10.2.0.2').send({ pin: '000002' }).expect(401);
+    expect(familyTries()).toBe(2);
+    expect(addressTries('10.2.0.2')).toBe(1);
+
+    await request(app).post('/api/auth/pin').set('X-Forwarded-For', '10.2.0.2').send({ pin: '482910' }).expect(200);
+    // Neither counted nor cleared for the family: someone who knows one PIN can't reset its count
+    expect(familyTries()).toBe(2);
+    expect(addressTries('10.2.0.2')).toBe(0);
+  });
+
+  test('a storage error while checking the PIN costs neither the address nor the family a try', async () => {
+    const admin = await signedInAdmin(app);
+    await admin.post('/api/access-accounts').send({ name: 'Porch', pin: '593021' }).expect(201);
+    const quiet = jest.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      // The accounts can't be read at all
+      const load = jest.spyOn(accessAccounts, 'loadAccounts').mockRejectedValueOnce(new Error('disk unavailable'));
+      await request(app).post('/api/auth/pin').set('X-Forwarded-For', '10.3.0.1').send({ pin: '000003' }).expect(500);
+      load.mockRestore();
+      // The accounts were read, but comparing the PIN failed
+      const compare = jest.spyOn(accessAccounts, 'findByPin').mockRejectedValueOnce(new Error('compare failed'));
+      await request(app).post('/api/auth/pin').set('X-Forwarded-For', '10.3.0.1').send({ pin: '000003' }).expect(500);
+      compare.mockRestore();
+    } finally {
+      quiet.mockRestore();
+    }
+    expect(addressTries('10.3.0.1')).toBe(0);
+    expect(familyTries()).toBe(0);
+
+    // Wrong PINs from that address still count as before
+    await request(app).post('/api/auth/pin').set('X-Forwarded-For', '10.3.0.1').send({ pin: '000003' }).expect(401);
+    expect(addressTries('10.3.0.1')).toBe(1);
+    expect(familyTries()).toBe(1);
+  });
 });
 
 describe('the attempt limiter', () => {

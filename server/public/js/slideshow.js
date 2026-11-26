@@ -163,6 +163,15 @@ class AuthenticationManager {
         try {
             const query = new URLSearchParams({ code: pairing.code, secret: pairing.secret });
             data = await (await fetch(`/api/pair/status?${query}`)).json();
+            if (this.pairing !== pairing) return;
+            // Approved: collect the token, which also signs this browser in
+            if (data?.status === 'ready') {
+                data = await (await fetch('/api/pair/collect', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ code: pairing.code, secret: pairing.secret })
+                })).json();
+            }
         } catch (error) {
             data = null; // offline for a moment: keep waiting
         }

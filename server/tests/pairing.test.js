@@ -19,6 +19,8 @@ describe('Pairing a frame by QR code', () => {
   const start = async (frame) => (await frame.post('/api/pair/start').expect(200)).body;
   const status = (frame, pairing, secret = pairing.secret) =>
     frame.get('/api/pair/status').query({ code: pairing.code, secret }).expect(200).then(r => r.body);
+  const collect = (frame, pairing, secret = pairing.secret) =>
+    frame.post('/api/pair/collect').send({ code: pairing.code, secret }).expect(200).then(r => r.body);
 
   beforeAll(async () => {
     await fs.ensureDir(path.join(testUploadsDir, 'Goa'));
@@ -94,13 +96,19 @@ describe('Pairing a frame by QR code', () => {
     expect(kitchen.pin).toBeUndefined();
     expect(kitchen.pinHash).toMatch(/^\$2[aby]\$/);
 
-    const collected = await status(frame, pairing);
+    // Polling only says it's ready: no token, and the frame isn't signed in yet
+    const polled = await status(frame, pairing);
+    expect(polled).toEqual({ success: true, status: 'ready' });
+    expect((await frame.get('/api/auth/session').expect(200)).body.authenticated).toBe(false);
+
+    const collected = await collect(frame, pairing);
     expect(collected).toMatchObject({ status: 'approved', device: { name: 'Kitchen frame' }, account: { name: 'Kitchen frame' } });
     expect(collected.token.length).toBeGreaterThan(30);
     expect((await frame.get('/api/auth/session').expect(200)).body.authenticated).toBe(true);
 
     // Handed over once only
     expect((await status(frame, pairing)).status).toBe('expired');
+    expect((await collect(frame, pairing)).status).toBe('expired');
 
     // After a restart or a day, the token signs the frame back in
     const later = request.agent(app);
@@ -114,6 +122,166 @@ describe('Pairing a frame by QR code', () => {
     expect(JSON.stringify(stored)).not.toContain(collected.token);
   });
 
+  test('only a same-origin POST from the browser that started the pairing can collect it', async () => {
+    const frame = request.agent(app);
+    const pairing = await start(frame);
+    await admin.post(`/api/admin/pair/${pairing.code}/approve`).send({ name: 'Den frame', newAccount: {} }).expect(200);
+
+    // Another site can't make the frame's browser collect it
+    const crossSite = await frame.post('/api/pair/collect').set('Sec-Fetch-Site', 'cross-site')
+      .send({ code: pairing.code, secret: pairing.secret }).expect(403);
+    expect(crossSite.body.code).toBe('CROSS_SITE');
+    await frame.post('/api/pair/collect').set('Origin', 'http://evil.example')
+      .send({ code: pairing.code, secret: pairing.secret }).expect(403);
+
+    // Nor can another browser that knows the code and secret
+    const other = request.agent(app);
+    expect((await collect(other, pairing)).status).toBe('expired');
+    expect((await other.get('/api/auth/session').expect(200)).body.authenticated).toBe(false);
+    expect((await collect(frame, pairing, 'x'.repeat(48))).status).toBe('expired');
+
+    // The frame itself still can
+    const collected = await frame.post('/api/pair/collect').set('Sec-Fetch-Site', 'same-origin')
+      .send({ code: pairing.code, secret: pairing.secret }).expect(200);
+    expect(collected.body).toMatchObject({ status: 'approved', device: { name: 'Den frame' } });
+  });
+
+  test('a malformed secret is just a wrong one', async () => {
+    const frame = request.agent(app);
+    const pairing = await start(frame);
+    // As many characters as the real secret, but more bytes
+    const odd = 'é'.repeat(pairing.secret.length);
+    expect((await status(frame, pairing, odd)).status).toBe('expired');
+    expect((await collect(frame, pairing, odd)).status).toBe('expired');
+    expect((await status(frame, pairing)).status).toBe('waiting');
+  });
+
+  test('starting a pairing keeps no session on the server', async () => {
+    const res = await request(app).post('/api/pair/start').expect(200);
+    const cookies = (res.headers['set-cookie'] || []).join(';');
+    expect(cookies).not.toContain('photoframe.sid');
+  });
+
+  test('each tab of a browser can collect its own pairing', async () => {
+    const browser = request.agent(app);
+    const first = await start(browser);
+    const second = await start(browser);
+    await admin.post(`/api/admin/pair/${first.code}/approve`).send({ name: 'First tab', newAccount: {} }).expect(200);
+    expect((await collect(browser, first)).status).toBe('approved');
+    await admin.post(`/api/admin/pair/${second.code}/approve`).send({ name: 'Second tab', newAccount: {} }).expect(200);
+    expect((await collect(browser, second)).status).toBe('approved');
+  });
+
+  test('two tabs starting at the same moment can each collect their own pairing', async () => {
+    const browser = request.agent(app);
+    const [first, second] = await Promise.all([start(browser), start(browser)]);
+    for (const [tab, name] of [[first, 'Left tab'], [second, 'Right tab']]) {
+      await admin.post(`/api/admin/pair/${tab.code}/approve`).send({ name, newAccount: {} }).expect(200);
+      expect((await collect(browser, tab)).status).toBe('approved');
+    }
+  });
+
+  test('polling never hands the pairing over, even from the browser that started it', async () => {
+    const frame = request.agent(app);
+    const pairing = await start(frame);
+    await admin.post(`/api/admin/pair/${pairing.code}/approve`).send({ name: 'Polling page', newAccount: {} }).expect(200);
+    const polled = await frame.get('/api/pair/status').set('Sec-Fetch-Site', 'same-origin')
+      .query({ code: pairing.code, secret: pairing.secret }).expect(200);
+    expect(polled.body).toEqual({ success: true, status: 'ready' });
+    expect(polled.headers['set-cookie'] || []).toEqual([]);
+    expect((await frame.get('/api/auth/session').expect(200)).body.authenticated).toBe(false);
+    expect((await collect(frame, pairing)).status).toBe('approved');
+  });
+
+  test("an account made for an approval can't be picked by another until that frame is paired", async () => {
+    const service = require('../services/pairingService');
+    const slowFrame = request.agent(app);
+    const slow = await start(slowFrame);
+    const addDevice = service.addDevice;
+    let release;
+    const gate = new Promise(resolve => { release = resolve; });
+    service.addDevice = async function (options) {
+      if (options.name === 'Slow frame') {
+        await gate;
+        const made = await addDevice.call(this, options);
+        service.pairings.get(slow.code).expiresAt = Date.now() - 1; // and it ran out meanwhile
+        return made;
+      }
+      return addDevice.call(this, options);
+    };
+    try {
+      const slowApproval = admin.post(`/api/admin/pair/${slow.code}/approve`).send({ name: 'Slow frame', newAccount: {} }).then(r => r);
+      // Wait until the slow approval's account shows up, then pair a second frame to it
+      let made;
+      for (let i = 0; i < 100 && !made; i++) {
+        made = (await admin.get('/api/access-accounts').expect(200)).body.accounts.find(a => a.name === 'Slow frame');
+        if (!made) await new Promise(resolve => setTimeout(resolve, 20));
+      }
+      expect(made).toBeTruthy();
+      const otherFrame = request.agent(app);
+      const other = await start(otherFrame);
+      const otherApproval = await admin.post(`/api/admin/pair/${other.code}/approve`).send({ name: 'Other frame', accountId: made.id });
+
+      release();
+      expect((await slowApproval).status).toBe(404);
+      // Either the second approval was refused, or the frame it paired works
+      if (otherApproval.status === 200) {
+        expect((await collect(otherFrame, other)).status).toBe('approved');
+      } else {
+        expect(otherApproval.status).toBe(400);
+      }
+    } finally {
+      service.addDevice = addDevice;
+      release();
+    }
+  });
+
+  test('an approval that finishes after the code expired is undone', async () => {
+    const before = (await admin.get('/api/admin/devices').expect(200)).body.devices.length;
+    const accountsBefore = (await admin.get('/api/access-accounts').expect(200)).body.accounts.length;
+    const frame = request.agent(app);
+    const started = await start(frame);
+    const service = require('../services/pairingService');
+    const { setEvents } = require('../events');
+    const addDevice = service.addDevice;
+    service.addDevice = async function (...args) {
+      const made = await addDevice.apply(this, args);
+      service.pairings.get(started.code).expiresAt = Date.now() - 1; // took past the deadline
+      return made;
+    };
+    // A host's index that is down while the device is undone
+    setEvents({ devicesRemoved() { throw new Error('host index is down'); } });
+    try {
+      const res = await admin.post(`/api/admin/pair/${started.code}/approve`).send({ name: 'Too late', newAccount: {} });
+      expect(res.body.code).toBe('PAIRING_EXPIRED');
+      expect(res.status).toBe(404);
+    } finally {
+      service.addDevice = addDevice;
+      setEvents({});
+    }
+    expect((await admin.get('/api/admin/devices').expect(200)).body.devices).toHaveLength(before);
+    // The account made for it is gone too
+    expect((await admin.get('/api/access-accounts').expect(200)).body.accounts).toHaveLength(accountsBefore);
+  });
+
+  test('two approvals at the same time pair the frame once', async () => {
+    const devicesBefore = (await admin.get('/api/admin/devices').expect(200)).body.devices.length;
+    const accountsBefore = (await admin.get('/api/access-accounts').expect(200)).body.accounts.length;
+    const frame = request.agent(app);
+    const pairing = await start(frame);
+
+    const results = await Promise.all(['Twin one', 'Twin two'].map(name =>
+      admin.post(`/api/admin/pair/${pairing.code}/approve`).send({ name, newAccount: {} })));
+    expect(results.map(r => r.status).sort()).toEqual([200, 404]);
+    expect((await admin.get('/api/admin/devices').expect(200)).body.devices).toHaveLength(devicesBefore + 1);
+    expect((await admin.get('/api/access-accounts').expect(200)).body.accounts).toHaveLength(accountsBefore + 1);
+
+    // The one device made is the one whose token the frame collects
+    const { token, device } = await collect(frame, pairing);
+    expect(device.name).toBe(results.find(r => r.status === 200).body.device.name);
+    await request(app).post('/api/auth/device').send({ token }).expect(200);
+  });
+
   test('frames can share an existing account, and removing one unpairs it', async () => {
     const accounts = (await admin.get('/api/access-accounts').expect(200)).body.accounts;
     const kitchen = accounts.find(a => a.name === 'Kitchen frame');
@@ -122,7 +290,7 @@ describe('Pairing a frame by QR code', () => {
     const pairing = await start(frame);
     await admin.post(`/api/admin/pair/${pairing.code}/approve`).send({ name: 'Hall frame', accountId: 'acc_nope' }).expect(400);
     await admin.post(`/api/admin/pair/${pairing.code}/approve`).send({ name: 'Hall frame', accountId: kitchen.id }).expect(200);
-    const { token } = await status(frame, pairing);
+    const { token } = await collect(frame, pairing);
 
     await request(app).get('/api/admin/devices').expect(401);
     const listed = (await admin.get('/api/admin/devices').expect(200)).body.devices;

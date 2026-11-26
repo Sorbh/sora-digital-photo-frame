@@ -215,6 +215,8 @@
 
                     <!-- 2. Its name and photos -->
                     <form id="screenPairForm" class="add-screen-step hidden" novalidate>
+                        <!-- At the top, not under the buttons that stay at the bottom -->
+                        <p class="pair-error hidden" id="screenPairError" role="alert" tabindex="-1"></p>
                         <div class="code-check">
                             <span class="code-check-label" data-i18n="pair.static_007">Code on the frame</span>
                             <span class="code-check-code"><span id="screenCodeShown" dir="ltr">······</span></span>
@@ -232,7 +234,6 @@
                                 <div class="folder-list" id="screenFolderList"></div>
                             </div>
                         </fieldset>
-                        <p class="pair-error hidden" id="screenPairError" role="alert"></p>
                         <div class="add-screen-buttons">
                             <button type="button" class="btn-outline" id="screenBackBtn" data-i18n="accessAccounts.screenOtherCode">Another code</button>
                             <button type="submit" class="pair-submit" id="screenPairBtn">
@@ -254,7 +255,7 @@
         </dialog>
 
         <!-- Toast notifications -->
-        <div id="toastContainer" class="toast-container"></div>
+        <div id="toastContainer" class="toast-container" popover="manual"></div>
     </div>
 
     <!-- Mobile tab bar -->
@@ -281,6 +282,7 @@
         });
     </script>
     <script src="/js/i18n.js"></script>
+    <script src="/js/toastLayer.js"></script>
     <script src="/js/pairFlow.js"></script>
     <script src="access-accounts.js"></script>
 </body>

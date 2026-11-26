@@ -17,11 +17,13 @@ async function freshViewer(req, res, next) {
   if (session.viewerCheckedAt && Date.now() - session.viewerCheckedAt < RECHECK_MS) return next();
 
   let account;
+  let screen = null;
   let screenKept = true;
   try {
     account = (await accessAccounts.loadAccounts()).find(a => a.id === signedIn.id);
     if (account && session.deviceId) {
-      screenKept = (await pairing.loadDevices()).some(d => d.id === session.deviceId && d.accountId === account.id);
+      screen = (await pairing.loadDevices()).find(d => d.id === session.deviceId && d.accountId === account.id) || null;
+      screenKept = Boolean(screen);
     }
   } catch (error) {
     // Storage is down: don't sign frames out over it, try again next time
@@ -39,6 +41,13 @@ async function freshViewer(req, res, next) {
 
   session.accessAccount = { id: account.id, name: account.name, assignedFolders: account.assignedFolders || [] };
   session.viewerCheckedAt = Date.now();
+  // A frame that stays signed in by its session still counts as used ("Last used"
+  // on Access): at most about once an hour, and never in its way
+  try {
+    await pairing.noteUse({ account, device: screen });
+  } catch (error) {
+    console.warn('Could not note when a frame was last used:', error.message);
+  }
   next();
 }
 

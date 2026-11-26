@@ -243,10 +243,24 @@ class PairingService {
     };
   }
 
-  // The frame just showed up, so Access can say when it was last seen
-  async markSeen(id) {
-    await getDataStore().update('devices', [], devices => devices.map(device =>
-      device.id === id ? { ...device, lastSeen: new Date().toISOString() } : device));
+  // A frame was just used, so Access can say when: its screen's lastSeen and its
+  // account's lastAccessed ("Last used"). Pass what was already read; each is
+  // written only when it is missing or older than SEEN_WRITE_GAP_MS, so a frame
+  // playing all day writes about once an hour.
+  async noteUse({ account = null, device = null } = {}) {
+    const now = Date.now();
+    const at = new Date(now).toISOString();
+    const stale = when => !when || !(now - Date.parse(when) < SEEN_WRITE_GAP_MS);
+    const writes = [];
+    if (device && stale(device.lastSeen)) {
+      writes.push(getDataStore().update('devices', [], devices => devices.map(d =>
+        d.id === device.id ? { ...d, lastSeen: at } : d)));
+    }
+    if (account && stale(account.lastAccessed)) {
+      writes.push(getDataStore().update('access-accounts', [], accounts => accounts.map(a =>
+        a.id === account.id ? { ...a, lastAccessed: at } : a)));
+    }
+    await Promise.all(writes);
   }
 
   async loadDevices() {
@@ -271,10 +285,7 @@ class PairingService {
       ? devices.find(d => d.id === id && crypto.timingSafeEqual(Buffer.from(d.tokenHash), Buffer.from(hash(token))))
       : devices.find(d => d.tokenHash === hash(token));
     if (!device) return null;
-    if (!device.lastSeen || Date.now() - Date.parse(device.lastSeen) > SEEN_WRITE_GAP_MS) {
-      await getDataStore().update('devices', [], current => current.map(d =>
-        d.id === device.id ? { ...d, lastSeen: new Date().toISOString() } : d));
-    }
+    await this.noteUse({ device });
     return device;
   }
 

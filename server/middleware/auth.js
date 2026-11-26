@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const { rotateSession } = require('../utils/session');
 const AttemptLimiter = require('../utils/attemptLimiter');
 const storedSecret = require('../utils/storedSecret');
+const { currentTenant } = require('../context');
 
 // The admin password: ADMIN_PASSWORD, unless it's missing or the old default
 // (admin123). Then the server makes up one, keeps it in DATA_DIR/admin-password
@@ -180,7 +181,8 @@ const sessionRequireViewer = (req, res, next) => {
 
 // A hosted setup can swap in its own sign-in, e.g. Google accounts.
 // provider: { requireAuth, requireGuest, requireViewer } middleware, all optional,
-// and scope(req) (see scopeFor below), also optional.
+// and scope(req) (see scopeFor below) and isScreenPaused(deviceId) (see
+// screenPaused below), also optional.
 let provider = {};
 
 const setAuthProvider = (next) => {
@@ -221,6 +223,22 @@ const scopeFor = (req) => {
   return { folders, canEdit: scope.canEdit === true, isOwner: scope.isOwner === true };
 };
 
+/**
+ * Whether the host has paused this screen (a plan that allows fewer screens,
+ * say), from the provider's optional isScreenPaused(deviceId, { tenantId }),
+ * which may return a promise. Only true means paused: no hook, an error or any
+ * other answer is "not paused", so Access still lists the screen as it is.
+ */
+const screenPaused = async (deviceId) => {
+  if (typeof provider.isScreenPaused !== 'function') return false;
+  try {
+    return (await provider.isScreenPaused(deviceId, { tenantId: currentTenant()?.id ?? null })) === true;
+  } catch (error) {
+    console.error('Auth provider isScreenPaused(deviceId) failed:', error && error.message);
+    return false;
+  }
+};
+
 const requireAuth = (req, res, next) => (provider.requireAuth || sessionRequireAuth)(req, res, next);
 const requireGuest = (req, res, next) => (provider.requireGuest || sessionRequireGuest)(req, res, next);
 const requireViewer = (req, res, next) => (provider.requireViewer || sessionRequireViewer)(req, res, next);
@@ -242,6 +260,7 @@ module.exports = {
   setAuthProvider,
   setPublicPhotos,
   scopeFor,
+  screenPaused,
   login,
   logout,
   getAuthStatus

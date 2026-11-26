@@ -9,7 +9,7 @@ These options are a public contract. Treat a change to a name, an argument or a 
 | `library` | `PhotoLibrary` subclass. Its `photoUrl(adminPath)` must return a URL with each path segment percent-encoded, since folder and file names can hold `#`, `?` and `%` (`PhotoLibrary.uploadsUrl(adminPath)` builds one for the `/uploads` route). May also offer `rawUrl(adminPath)`, which lets frames fetch encrypted photos from remote storage and decrypt them in the browser. Only `createFolder` makes folders: `addPhoto`, `movePhoto` and `writeItem` into a missing folder (deleted meanwhile, even mid-write) must throw `PhotoLibrary.folderNotFoundError()` (404 `FOLDER_NOT_FOUND`) and leave it missing. Storage with symlinks should offer `realPath(adminPath)`: the admin path a path really leads to, or `null` when it leads out of the library; frames' folder limits and `MAX_FOLDER_DEPTH` are checked there. Notes are `*.note.json` files in folders, stored like snaps (`*.snap.json`): `listItems`, `readItem`, `writeItem`, `movePhoto` and `deletePhoto` must handle them, and so must moving, renaming and deleting a folder. `listFolder` should give them type `'note'`, and `allPhotos` must never return them: a note is not a photo (see [Notes](#notes)) | Local uploads folder | `server/library/PhotoLibrary.js` |
 | `dataStore` | `DataStore` subclass: `get`, `set`, `update`. `folder-settings:<folder>` documents (a folder's play order) belong to that photo folder: writing one must not create the folder, and throws 404 `FOLDER_NOT_FOUND` when it is gone. Notes are not kept here any more but in the library, as `*.note.json` files like `*.snap.json`; the old `notes` document is read once at start, then emptied, with a copy in `notes-before-folders` (see [Notes](#notes)) | Local data files | `server/store/DataStore.js` |
 | `resolveTenant` | `async (req) => ({ id, plan })` or `null` | One `default` tenant | `server/context.js` |
-| `auth` | `{ requireAuth, requireGuest, requireViewer }` middleware, and `scope(req)` (see [Scope](#scope)), all optional | Admin password session, which sees and changes everything | `server/middleware/auth.js` |
+| `auth` | `{ requireAuth, requireGuest, requireViewer }` middleware, `scope(req)` (see [Scope](#scope)) and `isScreenPaused(deviceId, { tenantId })` (see [Paused screens](#paused-screens)), all optional | Admin password session, which sees and changes everything | `server/middleware/auth.js` |
 | `quota` | `{ canAdd({ items, bytes, screens }, context) => ({ ok, message }) }` for the current tenant. **Changed in 3.0.0** (it took `bytes` alone): see [Quota](#quota) | Unlimited | `server/services/quotaService.js` |
 | `events` | `{ devicePaired, devicesRemoved, familyCodeSet }`, may be async; if one throws, the action fails, with one exception (see [Events](#events)) | None | `server/events.js` |
 | `keys` | `{ currentKey(), getKey(id) }`, may return promises | `PHOTO_ENCRYPTION_KEY`, or no encryption | `server/crypto/keys.js` |
@@ -18,7 +18,7 @@ These options are a public contract. Treat a change to a name, an argument or a 
 | `trustProxy` | Express `trust proxy` setting | `TRUST_PROXY`, else `1` | `server/app.js` |
 | `publicPhotos` | `true` serves photos, thumbnails, folders and notes without a viewer check (`requireViewer`) | Off (`PUBLIC_PHOTOS=true` turns it on) | `server/app.js` |
 | `familyCode` | `true`: a PIN sign-in also sends the family's code (shown on the Access page), so `resolveTenant` can find the family from it. `familyCodeSet({ code, previous, tenantId })` keeps the host's index | Off | `server/services/familyCodeService.js` |
-| `beforeRoutes` | `(app) => {}`, runs after core middleware and before core routes | None | `server/app.js` |
+| `beforeRoutes` | `(app) => {}`, runs after core middleware and before core routes. Routes it adds under `/api` answer `Cache-Control: no-store` with no ETag, like the core's own, unless they set their own `Cache-Control` | None | `server/app.js` |
 
 ## Quota
 
@@ -160,6 +160,14 @@ A host can refuse a frame whose screen it has paused (a plan with fewer screens,
 ```
 
 The frame then shows a calm full-screen card with that message (`error` is used if there is no `message`, and a translated line if neither). It keeps its token, asks again every 3 minutes (`POST /api/auth/device` with its token, else `GET /api/folders`), and reloads by itself once the answer is anything else, so it starts playing again after an upgrade with nobody touching it. The slideshow page and its scripts themselves must still load.
+
+To show the owner which screens are paused, give the auth provider `isScreenPaused(deviceId, { tenantId })`. It runs for the library's tenant, once per screen when the Access page lists them, and may return a promise:
+
+- `true` means paused: `GET /api/admin/devices` gives that screen `paused: true`, and the Access page shows a "Paused" badge with "Paused: your plan allows fewer screens. Upgrade to turn it back on." in place of when it was last seen.
+- Anything else, a thrown error or a rejected promise means not paused (an error is logged), so the list still loads.
+- Without the hook no screen is ever `paused`, as self-hosted.
+
+It only changes what Access shows. Refusing the paused frame itself is still the host's 403 `SCREEN_PAUSED` above.
 
 ## Adding a hook
 

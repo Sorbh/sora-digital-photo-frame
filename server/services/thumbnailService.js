@@ -9,7 +9,9 @@ const { getLibrary } = require('../library');
 const { jpegCopy, acceptsWebp } = require('../middleware/webpFallback');
 const { currentTenant, DEFAULT_TENANT } = require('../context');
 
-const CACHE_DIR = path.join(CACHE_ROOT, 'thumbs');
+// v2: keys that always name the family (see cachePathFor). Files from before sit one
+// folder up and are never looked at, so an old key that two families shared can't be served.
+const CACHE_DIR = path.join(CACHE_ROOT, 'thumbs', 'v2');
 const IMAGE_PATTERN = /\.(jpg|jpeg|png|gif|webp)$/i;
 
 // Square cover crop, big enough for a 2x-density grid tile

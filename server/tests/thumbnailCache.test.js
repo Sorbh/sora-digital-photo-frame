@@ -159,3 +159,23 @@ describe('Google Photos picker thumbnails', () => {
     }
   });
 });
+
+describe('Thumbnails cached before the per-family keys', () => {
+  test('an old cache file at a name the new keys can produce is never served', async () => {
+    const crypto = require('crypto');
+    // Under the old keys, family "__default__"'s family/beach.png had the name the
+    // default family's family/beach.png has under the new ones
+    const oldKey = crypto.createHash('sha1').update('__default__/family/beach.png:480').digest('hex');
+    const oldFile = path.join(testCacheDir, 'thumbs', `${oldKey}.webp`);
+    const planted = await sharp({ create: { width: 480, height: 480, channels: 3, background: '#000' } }).webp().toBuffer();
+    await fs.ensureDir(path.dirname(oldFile));
+    await fs.writeFile(oldFile, planted);
+    const future = new Date(Date.now() + 60 * 60 * 1000);
+    await fs.utimes(oldFile, future, future);
+
+    const res = await admin.get('/api/images/family%2Fbeach.png/thumbnail').set('Accept', 'image/webp').buffer(true)
+      .parse((r, cb) => { const chunks = []; r.on('data', c => chunks.push(c)); r.on('end', () => cb(null, Buffer.concat(chunks))); })
+      .expect(200);
+    expect(Buffer.compare(res.body, planted)).not.toBe(0);
+  });
+});

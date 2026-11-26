@@ -560,12 +560,12 @@ class PhotoFrameAdmin {
                 this.updateBreadcrumb();
                 this.updateBackButton();
             } else {
-                this.setCreateFolder('allowed'); // not known: the server still checks
+                this.setCreateFolder(this.knownCreateFolder(path));
                 this.showToast(i18n.error(data, 'admin.loadFolderFailed'), 'error');
             }
         } catch (error) {
             if (!isCurrent()) return;
-            this.setCreateFolder('allowed'); // not known: the server still checks
+            this.setCreateFolder(this.knownCreateFolder(path));
             console.error('Error loading folder contents:', error);
             this.showToast(t('admin.loadFolderFailed'), 'error');
         }
@@ -577,7 +577,17 @@ class PhotoFrameAdmin {
     setCreateFolder(state) {
         const button = document.getElementById('createFolderBtn');
         button.disabled = state !== 'allowed';
-        if (state !== 'pending') button.classList.toggle('hidden', state === 'refused');
+        if (state !== 'pending') {
+            button.classList.toggle('hidden', state === 'refused');
+            this.createFolderKnown = { path: this.currentPath, state };
+        }
+    }
+
+    // A listing that failed: what an earlier one said about this folder, if it was
+    // this folder (a refresh after an upload); otherwise offered, as the server still checks
+    knownCreateFolder(path) {
+        const known = this.createFolderKnown;
+        return known && known.path === path ? known.state : 'allowed';
     }
 
     renderFolderContents(data) {

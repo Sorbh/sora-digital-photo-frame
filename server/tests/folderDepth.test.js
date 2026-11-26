@@ -121,13 +121,24 @@ describe('MAX_FOLDER_DEPTH', () => {
     const vm = require('vm');
     const hiddenClasses = new Set();
     const button = { disabled: false, classList: { toggle: (name, on) => (on ? hiddenClasses.add(name) : hiddenClasses.delete(name)) } };
-    const other = { classList: { add() {}, remove() {}, toggle() {} }, style: {} };
-    const context = { console, document: { getElementById: id => (id === 'createFolderBtn' ? button : other), querySelector: () => other, addEventListener() {} }, t: key => key, i18n: { error: (_, key) => key } };
+    // Any other element: every property and call answers with another stand-in, so
+    // the real renderFolderContents() runs (it builds the grid)
+    const anything = new Proxy(function () {}, {
+      get: (target, key) => (key === Symbol.toPrimitive ? () => '' : key === 'length' ? 0 : anything),
+      set: () => true,
+      apply: () => anything
+    });
+    const context = {
+      console,
+      document: { getElementById: id => (id === 'createFolderBtn' ? button : anything), querySelector: () => anything, querySelectorAll: () => [], createElement: () => anything, addEventListener() {} },
+      t: key => key,
+      i18n: { error: (_, key) => key }
+    };
     context.window = context;
     vm.createContext(context);
     vm.runInContext(`${require('fs').readFileSync(path.join(__dirname, '../public/admin.js'), 'utf8')}\n;this.PhotoFrameAdmin = PhotoFrameAdmin;`, context);
     const page = Object.create(context.PhotoFrameAdmin.prototype);
-    Object.assign(page, { clearSelection() {}, updateBreadcrumb() {}, updateBackButton() {}, showToast() {}, renderFolderContents() {} });
+    Object.assign(page, { clearSelection() {}, updateBreadcrumb() {}, updateBackButton() {}, showToast() {} });
     const pending = [];
     page.authenticatedFetch = () => new Promise(resolve => pending.push(resolve));
     const open = adminPath => { page.currentPath = adminPath; return page.loadFolderContents(); };
@@ -151,11 +162,18 @@ describe('MAX_FOLDER_DEPTH', () => {
     await loading;
     expect(state()).toEqual({ disabled: false, hidden: false });
 
-    // Redrawing a cached listing (a language change) while a deeper one loads doesn't turn it back on
+    // Redrawing a cached listing (a language change, with the real renderer) while a
+    // deeper one loads doesn't turn it back on
     loading = open('uploads/Trips/Italy');
     page.renderFolderContents({ files: [], folders: [], canCreateFolder: true });
     expect(state().disabled).toBe(true);
     answer({ files: [], folders: [], canCreateFolder: false });
+    await loading;
+    expect(state()).toEqual({ disabled: true, hidden: true });
+
+    // A refresh of that same folder (after an upload, say) that fails keeps what is known
+    loading = open('uploads/Trips/Italy');
+    answer({ message: 'nope' }, false);
     await loading;
     expect(state()).toEqual({ disabled: true, hidden: true });
   });

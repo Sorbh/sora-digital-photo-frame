@@ -10,6 +10,9 @@ class LoginManager {
 
         this.setupEventListeners();
         this.checkUrlParams();
+        // A copy kept by the browser (Back) may be out of date: ask again, and a
+        // signed-in visitor is sent on to the library
+        window.addEventListener('pageshow', (e) => { if (e.persisted) location.reload(); });
         // Messages shown before the catalogue loaded, or in the previous language
         window.addEventListener('sora:languagechange', () => {
             if (this.messageKey) document.getElementById(this.messageKey.target).textContent = t(this.messageKey.key);
@@ -61,8 +64,9 @@ class LoginManager {
                 // Back to the page that asked for sign-in (e.g. pairing a frame), else the library
                 const next = new URLSearchParams(window.location.search).get('next');
                 const target = next && /^\/(?![\/\\])/.test(next) ? next : '/admin';
+                // replace: Back from the library must not land on this form again
                 setTimeout(() => {
-                    window.location.href = target;
+                    window.location.replace(target);
                 }, 1000);
             } else {
                 this.showError(i18n.error(data, 'login.failed'));

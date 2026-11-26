@@ -221,6 +221,27 @@ describe('Upload limits', () => {
     }
   });
 
+  test('a photo removed while the quota hook answers is not written', async () => {
+    await fs.writeFile(path.join(testUploadsDir, 'family', 'late.png'), await png(20, 10));
+    const library = getLibrary();
+    const realStat = library.stat.bind(library);
+    let calls = 0;
+    // Still there when measured, gone by the moment of writing
+    const statSpy = jest.spyOn(library, 'stat').mockImplementation(async adminPath => {
+      calls += 1;
+      return calls <= 4 ? realStat(adminPath) : null; // exists, photo info, before, measured: then gone
+    });
+    const writeSpy = jest.spyOn(library, 'writeItem');
+    try {
+      const res = await request(app).post('/api/images/rotate').send({ path: 'uploads/family/late.png', angle: 90 }).expect(409);
+      expect(res.body.code).toBe('PHOTO_CHANGED');
+      expect(writeSpy).not.toHaveBeenCalled();
+    } finally {
+      statSpy.mockRestore();
+      writeSpy.mockRestore();
+    }
+  });
+
   test('rotation waits its turn among the photos being converted', async () => {
     await fs.writeFile(path.join(testUploadsDir, 'family', 'turn.png'), await png(20, 10));
     const held = [slots.tryAcquire('default'), slots.tryAcquire('default')];
@@ -243,6 +264,53 @@ describe('Upload limits', () => {
     expect(await readLimited(response([Buffer.alloc(4)], '11'), max)).toBeNull();
     expect(await readLimited(response([Buffer.alloc(6), Buffer.alloc(6)], null), max)).toBeNull();
     expect((await readLimited(response([Buffer.alloc(4), Buffer.alloc(6)], '10'), max)).length).toBe(10);
+  });
+
+  test('a chunked upload is stopped at the size cap', async () => {
+    const http = require('http');
+    const server = app.listen(4821);
+    try {
+      const boundary = 'x-boundary';
+      const result = await new Promise((resolve, reject) => {
+        const req = http.request({ port: 4821, method: 'POST', path: '/api/upload', headers: {
+          'Content-Type': `multipart/form-data; boundary=${boundary}`, 'Transfer-Encoding': 'chunked'
+        } }, (res) => {
+          let body = '';
+          res.on('data', chunk => { body += chunk; });
+          res.on('end', () => { clearTimeout(timer); resolve({ status: res.statusCode, body: JSON.parse(body || '{}'), sent }); });
+        });
+        req.on('error', () => {}); // the server closes the connection after answering
+        let sent = 0;
+        req.write(`--${boundary}\r\nContent-Disposition: form-data; name="images"; filename="big.png"\r\nContent-Type: image/png\r\n\r\n`);
+        const chunk = Buffer.alloc(64 * 1024);
+        const pump = () => {
+          while (sent < 3 * 1024 * 1024) {
+            sent += chunk.length;
+            if (!req.write(chunk)) return req.once('drain', pump);
+          }
+          req.end();
+        };
+        pump();
+        const timer = setTimeout(() => reject(new Error('no answer')), 4000);
+      });
+      expect(result.status).toBe(413);
+      expect(result.body.code).toBe('UPLOAD_TOO_LARGE');
+      expect(slots.running.total).toBe(0);
+    } finally {
+      await new Promise(resolve => server.close(resolve));
+    }
+  });
+
+  test('an unexpected quota hook error gets a generic answer', async () => {
+    const appQuota = quotaService.getQuota();
+    quotaService.setQuota({ canAdd: async () => { throw new Error('database down at db-SECRET-host'); } });
+    try {
+      const res = await request(app).post('/api/upload').field('path', 'uploads/family')
+        .attach('images', await png(8, 8), 'p.png').expect(500);
+      expect(JSON.stringify(res.body)).not.toMatch(/SECRET/);
+    } finally {
+      quotaService.setQuota(appQuota);
+    }
   });
 
   test('two uploads at once cannot both use the last free space', async () => {
@@ -274,7 +342,7 @@ describe('Upload limits', () => {
       res.set = () => res;
       res.json = body => { res.body = body; return res; };
       const next = jest.fn();
-      const req = { headers, tenant };
+      const req = Object.assign(new EventEmitter(), { headers, tenant, unpipe() {}, destroy() {} });
       await uploadLimits(req, res, next);
       return { req, res, next };
     };

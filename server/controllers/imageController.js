@@ -493,14 +493,18 @@ class ImageController {
           .toBuffer();
         // A re-encoded photo can come out bigger: that growth needs room too. Checked in
         // the family's turn, against the photo as it is now: gone or changed meanwhile, it stays so.
-        const growth = async () => {
+        const sameFile = async () => {
           const now = await getLibrary().stat(toAdminPath(fullPath));
           if (!now || now.size !== before.size || now.mtimeMs !== before.mtimeMs) {
             throw Object.assign(new Error('The photo changed while it was being rotated'), { status: 409, code: 'PHOTO_CHANGED' });
           }
-          return buffer.length - original.length;
         };
-        await addWithinQuota(growth, () => getLibrary().writeItem(toAdminPath(fullPath), buffer));
+        const growth = async () => { await sameFile(); return buffer.length - original.length; };
+        // Checked once more after the quota hook answered, right before writing
+        await addWithinQuota(growth, async () => {
+          await sameFile();
+          await getLibrary().writeItem(toAdminPath(fullPath), buffer);
+        });
       } finally {
         release();
       }

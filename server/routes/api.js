@@ -30,7 +30,7 @@ router.get('/folders/:folderPath(*)/thumbnail', requirePhotoViewer, folderContro
 router.get('/folders/:folderPath(*)', requirePhotoViewer, folderController.getFolderStructure.bind(folderController));
 
 // Protected routes (authentication required)
-router.post('/upload', requireAuth, upload.uploadLimits, upload.array('images'), keepTenant, imageController.uploadImages.bind(imageController));
+router.post('/upload', requireAuth, upload.limitedArray('images'), keepTenant, imageController.uploadImages.bind(imageController));
 router.delete('/images', requireAuth, imageController.deleteImage.bind(imageController));
 router.delete('/images/batch', requireAuth, imageController.batchDeleteImages.bind(imageController));
 router.post('/images/rotate', requireAuth, imageController.rotateImage.bind(imageController));

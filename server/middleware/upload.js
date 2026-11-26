@@ -48,13 +48,12 @@ const upload = multer({
  * the route's handler calls req.uploadSlot.finish() when it is done.
  */
 async function uploadLimits(req, res, next) {
-  // Without a Content-Length (chunked), multer's per-file and per-form limits still apply
+  const size = Math.round(MAX_UPLOAD_SIZE / (1024 * 1024));
+  const tooLarge = () => res.status(413).set('Connection', 'close')
+    .json({ code: 'UPLOAD_TOO_LARGE', size, message: `Upload too large. Maximum is ${size}MB per request.` });
   const length = Number(req.headers['content-length']);
-  if (Number.isFinite(length) && length > MAX_UPLOAD_SIZE) {
-    const size = Math.round(MAX_UPLOAD_SIZE / (1024 * 1024));
-    return res.status(413).set('Connection', 'close')
-      .json({ code: 'UPLOAD_TOO_LARGE', size, message: `Upload too large. Maximum is ${size}MB per request.` });
-  }
+  const hasLength = req.headers['content-length'] !== undefined && Number.isFinite(length);
+  if (hasLength && length > MAX_UPLOAD_SIZE) return tooLarge();
 
   // Listen first: the browser may leave while the quota hook is still answering
   let closed = false;
@@ -71,7 +70,10 @@ async function uploadLimits(req, res, next) {
   } catch (error) {
     // Answered like the upload handler answers a hook's error: code, vars, and no photos saved
     if (closed) return;
-    if (!clientErrorResponse(res, error, { files: [] })) next(error);
+    if (clientErrorResponse(res, error, { files: [] })) return;
+    // Anything else from the hook could say anything: a generic answer
+    console.error('Upload quota check failed:', error && error.name);
+    res.status(500).json({ message: 'Server error', files: [] });
     return;
   }
 
@@ -84,10 +86,43 @@ async function uploadLimits(req, res, next) {
 
   // Given back when the handler finishes, or when the request ends before it starts
   req.uploadSlot = slot;
+
+  // Sent without a length (chunked): count the bytes as they come, and stop at the cap.
+  // Added right before multer pipes the request, so both see every chunk.
+  if (!hasLength) {
+    let received = 0;
+    const count = (chunk) => {
+      received += chunk.length;
+      if (received <= MAX_UPLOAD_SIZE || req.uploadRejected) return;
+      req.uploadRejected = true; // multer's own error for this request is not answered (see limitedArray)
+      req.off('data', count);
+      req.unpipe();
+      req.resume(); // read and drop the rest for a moment, so the answer isn't lost to a reset
+      tooLarge();
+      res.once('finish', () => setTimeout(() => req.destroy(), 1000).unref());
+    };
+    req.on('data', count);
+  }
   next();
+}
+
+/**
+ * uploadLimits, then multer's array(field), as one middleware: a request the
+ * limits already answered (too large while streaming) gets no second answer.
+ */
+function limitedArray(field) {
+  const parse = upload.array(field);
+  return (req, res, next) => uploadLimits(req, res, (error) => {
+    if (error) return next(error);
+    parse(req, res, (parseError) => {
+      if (req.uploadRejected) return;
+      next(parseError);
+    });
+  });
 }
 
 module.exports = upload;
 module.exports.MAX_FILE_SIZE = MAX_FILE_SIZE;
 module.exports.MAX_UPLOAD_SIZE = MAX_UPLOAD_SIZE;
 module.exports.uploadLimits = uploadLimits;
+module.exports.limitedArray = limitedArray;

@@ -155,7 +155,8 @@ class NoteService {
     return photos.map(photo => ({
       path: photo,
       url: uploadsUrl(path.join('uploads', photo)),
-      thumbnail: `/api/images/${encodeURIComponent(photo)}/thumbnail`
+      // ?revalidate=1: not the address browsers cached for a day before thumbnails were always checked
+      thumbnail: `/api/images/${encodeURIComponent(photo)}/thumbnail?revalidate=1`
     }));
   }
 

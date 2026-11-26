@@ -74,7 +74,7 @@
                     <span class="material-symbols-outlined">key</span>
                     <span class="tb-label" data-i18n="common.access">Access</span>
                 </button>
-                <a href="/notes" class="tb-btn" title="Notes shown on the frame" data-i18n-attr="title:admin.static_034">
+                <a href="/notes" id="notesLink" class="tb-btn" title="Notes shown on the frame" data-i18n-attr="title:admin.static_034">
                     <span class="material-symbols-outlined">sticky_note_2</span>
                     <span class="tb-label" data-i18n="common.notes">Notes</span>
                 </a>
@@ -243,6 +243,10 @@
                     <button type="button" role="menuitem" tabindex="-1" class="menu-item" data-action="edit-snap" data-for="snap">
                         <span class="material-symbols-outlined mr-2">edit</span>
                         <span data-i18n="admin.menuEditSnap">Edit snap</span>
+                    </button>
+                    <button type="button" role="menuitem" tabindex="-1" class="menu-item" data-action="edit-note" data-for="note">
+                        <span class="material-symbols-outlined mr-2">edit</span>
+                        <span data-i18n="notes.editNote">Edit note</span>
                     </button>
                     <button type="button" role="menuitem" tabindex="-1" class="menu-item" data-action="move-earlier" data-for="image snap">
                         <span class="material-symbols-outlined mr-2">arrow_back</span>

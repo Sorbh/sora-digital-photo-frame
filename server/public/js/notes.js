@@ -2,14 +2,25 @@
  * Admin Notes page: list, write and schedule the note pages the slideshow
  * slips in between photos. The preview uses the same NotePage renderer as
  * the frame, so what you see here is what the frame shows.
+ *
+ * Each note is a file in a library folder. Notes in the top folder show on
+ * every frame; a note in another folder shows on the frames that show it.
+ *
+ *   /notes?folder=uploads/Family                 new notes go into Family
+ *   /notes?folder=uploads/Family&edit=<path>     opens that note's editor
  */
+const TOP_FOLDER = 'uploads';
+const STATUS_ORDER = ['active', 'upcoming', 'paused', 'ended'];
+
 class NotesManager extends PageEditor {
     constructor() {
         super(document.getElementById('noteForm'), 'note');
+        const params = new URLSearchParams(window.location.search);
         this.notes = [];
-        this.accounts = [];
+        this.folders = [TOP_FOLDER];
+        this.cameFrom = params.get('folder') || TOP_FOLDER;  // the library folder this page was opened from
+        this.pendingEdit = params.get('edit');                // a note to open once the list is in
         this.editing = null;      // note being edited, or null for a new one
-        this.audience = { all: true, accountIds: [] };
         this.deleting = null;
         this.init();
     }
@@ -18,8 +29,13 @@ class NotesManager extends PageEditor {
         this.renderLayoutPicker();
         this.renderScheduleControls();
         this.bindEvents();
+        const back = this.cameFrom === TOP_FOLDER ? '/admin' : `/admin?${new URLSearchParams({ path: this.cameFrom })}`;
+        document.getElementById('backLink').href = back;
+        // Until the list arrives: the top folder and the one this page came from
+        this.folders = [...new Set([TOP_FOLDER, this.cameFrom])];
+        this.renderFolderSelect();
+        this.pickerPath = this.cameFrom; // photos are chosen starting in that folder too
         this.loadNotes();
-        this.loadAccounts();
     }
 
     bindEvents() {
@@ -43,7 +59,7 @@ class NotesManager extends PageEditor {
         window.addEventListener('sora:languagechange', () => {
             this.renderLayoutPicker();
             this.renderScheduleControls();
-            this.renderAudience();
+            this.renderFolderSelect();
             if (this.loaded) this.renderList();
             this.renderDeleteText();
             const modal = document.getElementById('noteModal');
@@ -60,8 +76,11 @@ class NotesManager extends PageEditor {
             const { ok, data } = await this.api('/api/notes');
             if (!ok) throw new Error(i18n.error(data, 'notes.loadFailed'));
             this.notes = data.notes || [];
+            this.folders = data.folders?.length ? data.folders : [TOP_FOLDER];
             this.loaded = true;
+            this.renderFolderSelect();
             this.renderList();
+            this.openPendingEdit();
         } catch (error) {
             if (error.message !== 'Signed out') {
                 this.showToast(t('notes.loadFailed'), 'error');
@@ -70,15 +89,41 @@ class NotesManager extends PageEditor {
         }
     }
 
-    async loadAccounts() {
-        try {
-            const { ok, data } = await this.api('/api/access-accounts');
-            if (ok) this.accounts = data.accounts || [];
-        } catch (_) {
-            this.accounts = [];
-        }
-        this.renderAudience();
-        if (this.notes.length) this.renderList();
+    // Opened from a note's tile in the library: its editor, once
+    openPendingEdit() {
+        if (!this.pendingEdit) return;
+        const note = this.notes.find(n => n.path === this.pendingEdit);
+        this.pendingEdit = null;
+        if (note) this.openEditor(note);
+    }
+
+    // ---------- Folders ---------------------------------------------
+
+    // "Top folder (all frames)", or the folder's path below the library: "Family / Beach"
+    folderLabel(folder) {
+        if (!folder || folder === TOP_FOLDER) return t('notes.topFolder');
+        return folder.split('/').slice(1).join(' / ');
+    }
+
+    // New notes go into the folder this page was opened from, when it can hold them
+    defaultFolder() {
+        return this.folders.includes(this.cameFrom) ? this.cameFrom : (this.folders[0] || TOP_FOLDER);
+    }
+
+    renderFolderSelect() {
+        const select = document.getElementById('noteFolder');
+        const current = select.value;
+        select.replaceChildren(...this.folders.map(folder => {
+            const option = document.createElement('option');
+            option.value = folder;
+            option.textContent = this.folderLabel(folder);
+            return option;
+        }));
+        if (current && this.folders.includes(current)) select.value = current;
+    }
+
+    folderSummary(note) {
+        return note.folder === TOP_FOLDER ? t('notes.allFrames') : t('notes.framesShowingFolder', { folder: this.folderLabel(note.folder) });
     }
 
     // ---------- List ------------------------------------------------
@@ -104,24 +149,25 @@ class NotesManager extends PageEditor {
         empty.classList.add('hidden');
         list.classList.remove('hidden');
 
-        const groups = [
-            ['active', t('notes.groupActive')],
-            ['upcoming', t('notes.groupUpcoming')],
-            ['paused', t('notes.groupPaused')],
-            ['ended', t('notes.groupEnded')]
-        ];
+        // One group per folder: the top folder first, then the folder this page came
+        // from, then the rest by name. In each, showing now first, then by date.
+        const folders = [...new Set(this.notes.map(n => n.folder))].sort((a, b) => {
+            const rank = f => (f === TOP_FOLDER ? 0 : f === this.cameFrom ? 1 : 2);
+            return rank(a) - rank(b) || a.localeCompare(b);
+        });
         let index = 0;
-        groups.forEach(([status, label]) => {
+        folders.forEach(folder => {
             const notes = this.notes
-                .filter(n => n.status === status)
-                .sort((a, b) => new Date(a.eventAt || a.startsAt) - new Date(b.eventAt || b.startsAt));
-            if (!notes.length) return;
+                .filter(n => n.folder === folder)
+                .sort((a, b) => STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status)
+                    || new Date(a.eventAt || a.startsAt) - new Date(b.eventAt || b.startsAt));
 
             const section = document.createElement('section');
-            section.className = `notes-group group-${status}`;
+            section.className = 'notes-group';
+            section.dataset.folder = folder;
             const heading = document.createElement('h2');
             heading.className = 'notes-group-title sora-eyebrow';
-            heading.textContent = t('notes.groupHeading', { label, total: notes.length });
+            heading.textContent = t('notes.groupHeading', { label: this.folderLabel(folder), total: notes.length });
             section.appendChild(heading);
 
             const grid = document.createElement('div');
@@ -174,7 +220,7 @@ class NotesManager extends PageEditor {
         [
             ['schedule', this.scheduleSummary(note)],
             ['repeat', t('notes.repeatSummary', { interval: this.minutesLabel(note.everyMinutes), seconds: note.showForSeconds })],
-            ['devices', this.audienceSummary(note)]
+            ['folder', this.folderSummary(note)]
         ].forEach(([icon, text]) => {
             const li = document.createElement('li');
             const i = document.createElement('span');
@@ -236,13 +282,16 @@ class NotesManager extends PageEditor {
 
     // "Show every [5 min] for [20 sec]" is one sentence: the translation decides where the selects go
     renderScheduleControls() {
+        // Kept from the first call: a sentence without a slot (the key itself, before
+        // the language has loaded) must never take the selects out of the form
         const f = this.form.elements;
-        [f.everyMinutes, f.showForSeconds].forEach(select => {
+        this.scheduleSelects = this.scheduleSelects || { every: f.everyMinutes, duration: f.showForSeconds };
+        const slots = this.scheduleSelects;
+        Object.values(slots).forEach(select => {
             [...select.options].forEach(option => { option.textContent = this.optionLabel(select, option.value); });
         });
         const row = document.getElementById('showEveryRow');
         if (!row) return;
-        const slots = { every: f.everyMinutes, duration: f.showForSeconds };
         const parts = t(row.dataset.i18nTemplate || 'notes.showEveryFor').split(/\{(\w+)\}/);
         const nodes = [];
         parts.forEach((part, i) => {
@@ -257,16 +306,8 @@ class NotesManager extends PageEditor {
             label.textContent = text;
             nodes.push(label);
         });
+        Object.values(slots).forEach(select => { if (!nodes.includes(select)) nodes.push(select); });
         row.replaceChildren(...nodes);
-    }
-
-    audienceSummary(note) {
-        if (note.audience?.all !== false) return t('notes.allFrames');
-        const names = (note.audience.accountIds || [])
-            .map(id => this.accounts.find(a => a.id === id)?.name)
-            .filter(Boolean);
-        if (!names.length) return t('notes.framesCount', { count: note.audience.accountIds.length });
-        return names.length > 2 ? `${names.slice(0, 2).join(', ')} +${names.length - 2}` : names.join(', ');
     }
 
     renderEmptyExample() {
@@ -286,7 +327,7 @@ class NotesManager extends PageEditor {
     async setEnabled(note, enabled, checkbox) {
         checkbox.disabled = true;
         try {
-            const { ok, data } = await this.api(`/api/notes/${encodeURIComponent(note.id)}`, {
+            const { ok, data } = await this.api(`/api/notes?${new URLSearchParams({ path: note.path })}`, {
                 method: 'PUT',
                 body: JSON.stringify({ enabled })
             });
@@ -316,19 +357,15 @@ class NotesManager extends PageEditor {
             f.endsAt.value = this.toLocalInput(note.endsAt);
             this.selectValue(f.everyMinutes, note.everyMinutes);
             this.selectValue(f.showForSeconds, note.showForSeconds);
-            this.audience = {
-                all: note.audience?.all !== false,
-                accountIds: [...(note.audience?.accountIds || [])]
-            };
+            f.folder.value = note.folder;
         } else {
             f.startsAt.value = this.toLocalInput(new Date().toISOString());
             this.photos = [];
             this.layout = 'auto';
-            this.audience = { all: true, accountIds: [] };
+            f.folder.value = this.defaultFolder();
         }
 
         this.renderPhotoTiles();
-        this.renderAudience();
         this.updatePreview();
         document.getElementById('noteModal').showModal();
         f.title.focus();
@@ -366,7 +403,7 @@ class NotesManager extends PageEditor {
             endsAt: this.fromLocalInput(f.endsAt.value),
             everyMinutes: Number(f.everyMinutes.value),
             showForSeconds: Number(f.showForSeconds.value),
-            audience: { ...this.audience }
+            folder: f.folder.value || TOP_FOLDER
         };
     }
 
@@ -391,7 +428,7 @@ class NotesManager extends PageEditor {
         const btn = document.getElementById('saveNoteBtn');
         btn.disabled = true;
         try {
-            const url = this.editing ? `/api/notes/${encodeURIComponent(this.editing.id)}` : '/api/notes';
+            const url = this.editing ? `/api/notes?${new URLSearchParams({ path: this.editing.path })}` : '/api/notes';
             const { ok, data } = await this.api(url, {
                 method: this.editing ? 'PUT' : 'POST',
                 body: JSON.stringify(payload)
@@ -425,52 +462,6 @@ class NotesManager extends PageEditor {
         return Number.isNaN(d.getTime()) ? null : d.toISOString();
     }
 
-    // ---------- Audience --------------------------------------------
-
-    renderAudience() {
-        const wrap = document.getElementById('audienceChips');
-        wrap.replaceChildren();
-
-        const chip = (label, icon, active, onClick) => {
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            btn.className = 'nf-chip';
-            btn.classList.toggle('is-on', active);
-            btn.setAttribute('aria-pressed', String(active));
-            const i = document.createElement('span');
-            i.className = 'material-symbols-outlined';
-            i.textContent = active ? 'check' : icon;
-            const t = document.createElement('span');
-            t.textContent = label;
-            btn.append(i, t);
-            btn.addEventListener('click', () => {
-                onClick();
-                this.renderAudience();
-                this.form.querySelector('[data-error-for="audience"]').textContent = '';
-            });
-            wrap.appendChild(btn);
-        };
-
-        chip(t('notes.allFrames'), 'devices', this.audience.all, () => {
-            this.audience = { all: true, accountIds: [] };
-        });
-        this.accounts.forEach(account => {
-            const on = !this.audience.all && this.audience.accountIds.includes(account.id);
-            chip(account.name, 'key', on, () => {
-                const ids = new Set(this.audience.all ? [] : this.audience.accountIds);
-                if (ids.has(account.id)) ids.delete(account.id); else ids.add(account.id);
-                this.audience = ids.size ? { all: false, accountIds: [...ids] } : { all: true, accountIds: [] };
-            });
-        });
-
-        if (!this.accounts.length) {
-            const hint = document.createElement('span');
-            hint.className = 'nf-hint';
-            hint.textContent = t('notes.audienceHint');
-            wrap.appendChild(hint);
-        }
-    }
-
     // ---------- Delete ----------------------------------------------
 
     confirmDelete(note) {
@@ -492,7 +483,7 @@ class NotesManager extends PageEditor {
         const btn = document.getElementById('confirmDeleteBtn');
         btn.disabled = true;
         try {
-            const { ok, data } = await this.api(`/api/notes/${encodeURIComponent(this.deleting.id)}`, { method: 'DELETE' });
+            const { ok, data } = await this.api(`/api/notes?${new URLSearchParams({ path: this.deleting.path })}`, { method: 'DELETE' });
             if (!ok) throw new Error(i18n.error(data, 'notes.deleteFailed'));
             this.showToast(t('notes.noteDeleted'), 'success');
             document.getElementById('deleteModal').close();

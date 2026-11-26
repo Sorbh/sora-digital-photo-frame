@@ -631,7 +631,8 @@ class PhotoFrameSlideshow {
         this.folderStorage = new FolderStorage();
         this.leavingTimers = [null, null];
         this.currentDuration = this.interval;
-        this.noteScheduler = window.NoteScheduler ? new NoteScheduler() : null;
+        // Notes from the top folder, and from the folder this frame plays
+        this.noteScheduler = window.NoteScheduler ? new NoteScheduler(() => this.folderStorage.getCurrentFolderPath()) : null;
         this.noteHideTimer = null;
         this.fullscreenCheck = null;
         this.screenShift = window.ScreenShift ? new ScreenShift(document.documentElement) : null;

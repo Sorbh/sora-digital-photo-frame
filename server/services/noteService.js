@@ -4,7 +4,8 @@ const { UPLOADS_DIR } = require('../config/paths');
 const thumbnails = require('./thumbnailService');
 const { getLibrary } = require('../library');
 const { getDataStore } = require('../store');
-const LocalDataStore = require('../store/LocalDataStore');
+const { addWithinQuota, ITEMS } = require('./quotaService');
+const { canSee, inFolder } = require('../utils/viewerAccess');
 const { toAdminPath, uploadsUrl } = require('../utils/safePath');
 
 const THEMES = ['paper', 'berry', 'ink'];
@@ -15,98 +16,211 @@ const LIMITS = {
   message: 160,
   signoff: 40,
   eyebrow: 40,
-  photos: 4,
-  accountIds: 50
+  photos: 4
 };
 // A note about an event stays up this long after it starts, unless endsAt says otherwise
 const EVENT_GRACE_MS = 2 * 60 * 60 * 1000;
 
+const NOTE_EXT = '.note.json';
+const NOTE_PATTERN = /\.note\.json$/i;
+
+// Where notes were kept before they moved into folders (one document for the library)
+const OLD_STORE = 'notes';
+const OLD_STORE_BACKUP = 'notes-before-folders';
+
+// The folder of a path relative to uploads, "/"-separated: '' for the top folder
+const folderOf = (relativePath) => String(relativePath).split(/[\\/]/).filter(Boolean).slice(0, -1).join('/');
+
 /**
  * Notes are short messages ("Priya is visiting on Monday") that the
  * slideshow shows as a memory-book page every few minutes, inside a date
- * window. Stored as one JSON file, like access accounts.
+ * window. Each is a "name.note.json" file in a library folder, like snaps,
+ * so moving, renaming or deleting a folder takes its notes along.
+ *
+ * Notes in the top folder show on every frame. A note in a folder shows on
+ * the frames that may see that folder. Notes are never photos: they are not
+ * played, counted or listed with them.
  */
 class NoteService {
-  constructor(file) {
-    // A file argument keeps isolated service tests on their own document.
-    this.store = file ? new LocalDataStore(path.dirname(file)) : null;
-    this.name = file ? path.basename(file, '.json') : 'notes';
+  isNote(fileName) {
+    return NOTE_PATTERN.test(fileName);
   }
 
-  dataStore() {
-    return this.store || getDataStore();
+  // A note's path relative to uploads, "/"-separated ("Family/visit.note.json")
+  relative(fullPath) {
+    return path.relative(UPLOADS_DIR, fullPath).split(path.sep).join('/');
   }
 
-  async load() {
-    try {
-      const notes = await this.dataStore().get(this.name, []);
-      return Array.isArray(notes) ? notes : [];
-    } catch (error) {
-      if (error.code !== 'ENOENT') console.error('Could not read notes, treating as empty:', error.message);
-      return [];
+  async read(fullPath) {
+    const data = JSON.parse((await getLibrary().readItem(toAdminPath(fullPath))).toString('utf8'));
+    if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Not a note');
+    return data;
+  }
+
+  // A new note is 1 item, like a snap; saving one again only asks for its growth
+  // (not when the server itself moves notes in, or keeps them in step with a moved photo)
+  async write(fullPath, note, { checkQuota = true } = {}) {
+    const buffer = Buffer.from(JSON.stringify(note, null, 2));
+    const write = () => getLibrary().writeItem(toAdminPath(fullPath), buffer);
+    if (!checkQuota) return write();
+    // Measured in the family's turn, against the note as it is now
+    const growth = async () => {
+      const current = await getLibrary().readItem(toAdminPath(fullPath)).catch(() => null);
+      return { items: current ? 0 : ITEMS.note, bytes: buffer.length - (current ? current.length : 0) };
+    };
+    await addWithinQuota(growth, write);
+  }
+
+  // Every note file in dir (absolute), and in the folders below it unless recursive is false
+  async findAll(dir = UPLOADS_DIR, { recursive = true } = {}) {
+    const found = [];
+    const items = await getLibrary().listItems(toAdminPath(dir)).catch(() => []);
+    for (const item of items) {
+      if (item.name.startsWith('.')) continue;
+      const fullPath = path.join(dir, item.name);
+      if (item.isFolder) {
+        if (recursive) found.push(...await this.findAll(fullPath));
+      } else if (this.isNote(item.name)) {
+        found.push(fullPath);
+      }
     }
+    return found;
   }
 
-  async save(notes) {
-    await this.dataStore().set(this.name, notes);
+  // Every folder in the library (absolute), the top folder first
+  async allFolders(dir = UPLOADS_DIR) {
+    const folders = [dir];
+    const items = await getLibrary().listItems(toAdminPath(dir)).catch(() => []);
+    for (const item of items) {
+      if (item.isFolder && !item.name.startsWith('.')) folders.push(...await this.allFolders(path.join(dir, item.name)));
+    }
+    return folders;
   }
 
-  async list(now = new Date()) {
-    const notes = await this.load();
-    return notes.map(note => ({ ...note, status: this.status(note, now), photoUrls: this.photoUrls(note.photos) }));
+  // The note as the Notes page and the library show it
+  describe(fullPath, note, now = new Date()) {
+    return {
+      ...note,
+      path: toAdminPath(fullPath),
+      folder: toAdminPath(path.dirname(fullPath)),
+      status: this.status(note, now),
+      photoUrls: this.photoUrls(note.photos)
+    };
   }
 
-  async create(input) {
+  async load(fullPath, now = new Date()) {
+    return this.describe(fullPath, await this.read(fullPath), now);
+  }
+
+  /**
+   * Notes for the Notes page: in one folder (absolute), or in the whole
+   * library. visible(relativePath) says which ones the person may see.
+   */
+  async list({ folder = null, visible = () => true, now = new Date() } = {}) {
+    const files = folder ? await this.findAll(folder, { recursive: false }) : await this.findAll();
+    const notes = await Promise.all(files.filter(file => visible(this.relative(file))).map(file =>
+      this.load(file, now).catch(error => {
+        console.error('Skipping unreadable note:', file, error.message);
+        return null;
+      })));
+    return notes.filter(Boolean);
+  }
+
+  // A free file name for a note with this title in folderPath (absolute)
+  async freePath(folderPath, title) {
+    const base = this.slug(title);
+    let target = path.join(folderPath, base + NOTE_EXT);
+    for (let n = 2; await getLibrary().exists(toAdminPath(target)); n++) {
+      target = path.join(folderPath, `${base}-${n}${NOTE_EXT}`);
+    }
+    return target;
+  }
+
+  /**
+   * Save a new note in folderPath (absolute). The file is named after the
+   * headline and never overwrites an existing file.
+   */
+  async create(folderPath, input) {
     const { note, errors } = await this.validate(input);
     if (errors) return { errors };
 
     const now = new Date().toISOString();
-    const created = { id: `nt_${crypto.randomBytes(5).toString('hex')}`, ...note, createdAt: now, updatedAt: now };
-    await this.dataStore().update(this.name, [], notes => [...notes, created]);
-    return { note: created };
+    const saved = { version: 1, id: `nt_${crypto.randomBytes(5).toString('hex')}`, ...note, createdAt: now, updatedAt: now };
+    const target = await this.freePath(folderPath, saved.title);
+    await this.write(target, saved);
+    return { note: saved, fullPath: target };
   }
 
-  async update(id, input) {
-    let result;
-    await this.dataStore().update(this.name, [], async notes => {
-      const index = notes.findIndex(n => n.id === id);
-      if (index === -1) { result = { notFound: true }; return notes; }
+  // Partial updates (e.g. just { enabled: false }) keep the other fields
+  async update(fullPath, input = {}) {
+    const current = await this.read(fullPath);
+    const { note, errors } = await this.validate({ ...current, ...input });
+    if (errors) return { errors };
 
-      // Partial updates (e.g. just { enabled: false }) keep the other fields
-      const { note, errors } = await this.validate({ ...notes[index], ...input });
-      if (errors) { result = { errors }; return notes; }
-
-      const next = [...notes];
-      next[index] = { ...notes[index], ...note, updatedAt: new Date().toISOString() };
-      result = { note: next[index] };
-      return next;
-    });
-    return result;
+    const { audience, ...rest } = current;
+    const saved = { ...rest, ...note, updatedAt: new Date().toISOString() };
+    await this.write(fullPath, saved);
+    return { note: saved, fullPath };
   }
 
-  async remove(id) {
-    let removed = false;
-    await this.dataStore().update(this.name, [], notes => {
-      const remaining = notes.filter(n => n.id !== id);
-      removed = remaining.length !== notes.length;
-      return remaining;
-    });
-    return removed;
+  // Into another folder (absolute) that exists; returns the note's new full path
+  async move(fullPath, folderPath) {
+    if (path.dirname(fullPath) === folderPath) return fullPath;
+    const moved = await getLibrary().movePhoto(toAdminPath(fullPath), toAdminPath(folderPath));
+    return path.join(UPLOADS_DIR, path.relative('uploads', moved.path));
+  }
+
+  async remove(fullPath) {
+    await getLibrary().deletePhoto(toAdminPath(fullPath));
+  }
+
+  // A photo moved (paths relative to uploads): notes that use it follow, as snaps do
+  async photoMoved(from, to) {
+    for (const fullPath of await this.findAll()) {
+      try {
+        const note = await this.read(fullPath);
+        if (!note.photos?.includes(from)) continue;
+        note.photos = note.photos.map(p => (p === from ? to : p));
+        await this.write(fullPath, note, { checkQuota: false });
+      } catch (error) {
+        console.error('Could not update note after a move:', fullPath, error.message);
+      }
+    }
   }
 
   /**
-   * Notes a frame should show right now: inside their window, meant for this
-   * frame, and with photos limited to the folders its PIN may see.
+   * May this frame show the note at relativePath? Notes in the top folder show
+   * on every frame; a note in a folder shows on frames that may see that folder.
+   * playing is the folder the frame chose to play (relative to uploads), if any.
    */
-  async active(session = {}, now = new Date()) {
-    const notes = (await this.load()).filter(note =>
-      this.status(note, now) === 'active' && this.isForAccount(note, session.accessAccount));
+  isForFrame(req, relativePath, playing = '') {
+    if (folderOf(relativePath) === '') return true;
+    if (!canSee(req, relativePath)) return false;
+    return !playing || inFolder(relativePath, playing, '/');
+  }
 
-    return Promise.all(notes.map(async note => {
+  /**
+   * Notes a frame should show right now: inside their window, in a folder the
+   * frame may see, and with photos limited to the folders it may see.
+   */
+  async active(req = {}, { now = new Date(), folder = '' } = {}) {
+    const session = req.session || {};
+    const files = (await this.findAll()).filter(file => this.isForFrame(req, this.relative(file), folder));
+    const notes = [];
+    for (const file of files) {
+      try {
+        const note = await this.read(file);
+        if (this.status(note, now) === 'active') notes.push({ file, note });
+      } catch (error) {
+        console.error('Skipping unreadable note:', file, error.message);
+      }
+    }
+
+    return Promise.all(notes.map(async ({ file, note }) => {
       const photos = await this.visiblePhotos(note.photos, session);
 
       return {
-        id: note.id,
+        id: note.id || this.relative(file),
         title: note.title,
         message: note.message,
         signoff: note.signoff,
@@ -136,11 +250,6 @@ class NoteService {
     return null;
   }
 
-  isForAccount(note, account) {
-    if (note.audience?.all) return true;
-    return Boolean(account && note.audience?.accountIds?.includes(account.id));
-  }
-
   inFolders(photo, folders) {
     const folder = path.dirname(photo);
     return folders.some(allowed => folder === allowed || folder.startsWith(allowed + path.sep));
@@ -158,6 +267,16 @@ class NoteService {
       // ?revalidate=1: not the address browsers cached for a day before thumbnails were always checked
       thumbnail: `/api/images/${encodeURIComponent(photo)}/thumbnail?revalidate=1`
     }));
+  }
+
+  slug(title) {
+    const slug = String(title || '').toLowerCase()
+      .normalize('NFKD').replace(/[̀-ͯ]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 48)
+      .replace(/-+$/, '');
+    return slug || 'note';
   }
 
   /**
@@ -195,13 +314,6 @@ class NoteService {
     };
 
     if (note.endsAt && note.endsAt <= note.startsAt) errors.endsAt = 'Must be after the start';
-
-    const audience = input.audience || {};
-    const accountIds = Array.isArray(audience.accountIds)
-      ? [...new Set(audience.accountIds.filter(id => typeof id === 'string'))].slice(0, LIMITS.accountIds)
-      : [];
-    note.audience = { all: audience.all !== false, accountIds };
-    if (!note.audience.all && accountIds.length === 0) errors.audience = 'Pick at least one frame';
 
     return Object.keys(errors).length ? { errors } : { note };
   }
@@ -263,9 +375,68 @@ class NoteService {
     }
     return visible;
   }
+
+  /**
+   * One-time move from the old library-wide notes list (the "notes" data
+   * document) into the top folder, one file per note. A note that was shown
+   * only on some frames is logged, so the admin can file it in a folder.
+   * Safe to run again: notes already moved (same id) are skipped, and the
+   * old list is emptied once every note is in place (a copy is kept in
+   * "notes-before-folders").
+   */
+  async migrateFromStore({ store = getDataStore(), log = console } = {}) {
+    const old = await store.get(OLD_STORE, []);
+    if (!Array.isArray(old) || old.length === 0) return { moved: 0, skipped: 0 };
+
+    const existing = new Set();
+    for (const file of await this.findAll()) {
+      const note = await this.read(file).catch(() => null);
+      if (note?.id) existing.add(note.id);
+    }
+
+    // Names for the log: "Grandma's frame" says more than an id
+    const accounts = await store.get('access-accounts', []).catch(() => []);
+    const accountName = id => (Array.isArray(accounts) && accounts.find(a => a && a.id === id)?.name) || id;
+
+    let moved = 0;
+    let skipped = 0;
+    for (const entry of old) {
+      if (!entry || typeof entry !== 'object' || typeof entry.title !== 'string' || !entry.title.trim()) {
+        skipped++;
+        continue;
+      }
+      const { audience, ...note } = entry;
+      if (note.id && existing.has(note.id)) {
+        skipped++;
+        continue;
+      }
+      const saved = { version: 1, ...note };
+      if (!saved.id) saved.id = `nt_${crypto.randomBytes(5).toString('hex')}`;
+      const target = await this.freePath(UPLOADS_DIR, saved.title);
+      // Notes already in the library are not new: they never need room
+      await this.write(target, saved, { checkQuota: false });
+      existing.add(saved.id);
+      moved++;
+
+      const ids = audience && audience.all === false && Array.isArray(audience.accountIds) ? audience.accountIds : [];
+      if (ids.length) {
+        log.warn(`⚠️  Note "${saved.title}" was shown only on some frames (${ids.map(accountName).join(', ')}). ` +
+          `It is now in the top folder (${toAdminPath(target)}), so every frame shows it. ` +
+          'Move it into a folder that only those frames show.');
+      }
+    }
+
+    // Keep a copy, then empty the old list so this never runs again
+    await store.set(OLD_STORE_BACKUP, old);
+    await store.set(OLD_STORE, []);
+    if (moved) log.log(`Moved ${moved} note(s) into the top folder of the library.`);
+    return { moved, skipped };
+  }
 }
 
 module.exports = new NoteService();
 module.exports.NoteService = NoteService;
 module.exports.LAYOUTS = LAYOUTS;
 module.exports.LIMITS = LIMITS;
+module.exports.NOTE_EXT = NOTE_EXT;
+module.exports.NOTE_PATTERN = NOTE_PATTERN;

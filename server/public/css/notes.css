@@ -22,11 +22,6 @@
     background: var(--rule);
 }
 
-.group-ended .notes-group-title,
-.group-paused .notes-group-title {
-    color: var(--muted-foreground);
-}
-
 .notes-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
@@ -195,6 +190,13 @@
     width: min(1120px, calc(100vw - 2rem));
     max-width: none;
     max-height: calc(100dvh - 2rem);
+}
+
+/* A form taller than the screen scrolls inside the dialog, so Save stays in reach */
+#noteModal > article > section,
+#photoPicker > article > section {
+    min-height: 0;
+    overflow-y: auto;
 }
 
 .note-editor {
@@ -462,42 +464,6 @@
 .swatch input:focus-visible + span {
     outline: 2px solid var(--safelight);
     outline-offset: 3px;
-}
-
-/* Audience chips */
-.nf-chips {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 6px;
-}
-
-.nf-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 12px 6px 9px;
-    border: 1px solid var(--rule);
-    border-radius: 999px;
-    background: var(--paper-raised);
-    color: var(--foreground);
-    font: 500 0.8125rem var(--font-sans);
-    cursor: pointer;
-    transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease;
-}
-
-.nf-chip .material-symbols-outlined {
-    font-size: 16px;
-}
-
-.nf-chip:hover {
-    border-color: color-mix(in oklab, var(--foreground) 25%, var(--rule));
-}
-
-.nf-chip.is-on {
-    border-color: var(--safelight);
-    background: var(--safelight-soft);
-    color: var(--safelight);
 }
 
 /* Preview */

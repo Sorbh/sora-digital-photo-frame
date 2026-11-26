@@ -10,6 +10,7 @@ const { displayCopy, assertImageSize, MAX_PIXELS } = require('../utils/displayCo
 const slots = require('../utils/workSlots');
 const { canSee, inFolder, realVisiblePath } = require('../utils/viewerAccess');
 const snaps = require('../services/snapService');
+const notes = require('../services/noteService');
 const playOrder = require('../services/playOrderService');
 const photoInfo = require('../services/photoInfoService');
 const { resolveAdminPath, toAdminPath } = require('../utils/safePath');
@@ -49,7 +50,8 @@ class ImageController {
       return this.imageCache;
     }
 
-    const photos = await getLibrary().allPhotos();
+    // Notes are never photos, even from a library that lists them with photos
+    const photos = (await getLibrary().allPhotos()).filter(photo => !notes.isNote(photo.path || photo.name || ''));
     const images = photos.map(photo => {
       const fullPath = resolveAdminPath(photo.path);
       const relativePath = path.relative(this.uploadsDir, fullPath);
@@ -384,7 +386,9 @@ class ImageController {
         const fullPath = resolveAdminPath(imagePath);
 
         const isSnap = Boolean(fullPath) && snaps.isSnap(fullPath);
-        if (!fullPath || !(isSnap || thumbnails.IMAGE_PATTERN.test(fullPath)) || !await getLibrary().exists(toAdminPath(fullPath))) {
+        // A note dragged onto a folder moves there too (and then shows on that folder's frames)
+        const isNote = Boolean(fullPath) && notes.isNote(fullPath);
+        if (!fullPath || !(isSnap || isNote || thumbnails.IMAGE_PATTERN.test(fullPath)) || !await getLibrary().exists(toAdminPath(fullPath))) {
           results.failedCount++;
           results.errors.push(`Image not found: ${imagePath}`);
           continue;
@@ -396,8 +400,11 @@ class ImageController {
           await thumbnails.remove(fullPath);
           await photoInfo.moveUpload(fullPath, resolveAdminPath(moved.path))
             .catch(error => console.warn('Could not move photo info:', error.message));
-          if (!isSnap) {
-            await snaps.photoMoved(path.relative(this.uploadsDir, fullPath), path.relative('uploads', moved.path));
+          if (!isSnap && !isNote) {
+            const from = path.relative(this.uploadsDir, fullPath);
+            const to = path.relative('uploads', moved.path);
+            await snaps.photoMoved(from, to);
+            await notes.photoMoved(from, to);
           }
           results.movedCount++;
         } catch (error) {

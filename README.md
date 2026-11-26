@@ -55,7 +55,7 @@ Prefer Docker? `ADMIN_PASSWORD=yourpassword docker compose up -d` — see [DOCKE
 **💌 Notes**
 - Slip a note into the slideshow: "Ambika is visiting you", with up to four photos.
 - It shows every few minutes between two dates, with an optional countdown to the event.
-- Pick a memory-book layout, a theme, and which frames or PINs see it.
+- Pick a memory-book layout and a theme, and put it in a folder: notes in the top folder show on every frame, a note in a folder on the frames that show it.
 
 **🔑 Sharing**
 - Give each frame or family member their own PIN.

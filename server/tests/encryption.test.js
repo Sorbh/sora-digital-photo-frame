@@ -135,10 +135,12 @@ describe('Encrypted storage in the app', () => {
   });
 
   test('notes are stored encrypted and read back', async () => {
-    await agent.post('/api/notes').send({ title: 'Lake trip', message: 'Tuesday' }).expect(201);
-    const raw = await fs.readJson(path.join(testDataDir, 'notes.json'));
-    expect(Object.keys(raw)).toEqual(['encrypted']);
-    expect(JSON.stringify(raw)).not.toMatch(/Lake trip/);
+    const created = await agent.post('/api/notes').send({ title: 'Lake trip', message: 'Tuesday' }).expect(201);
+    // A note is a file in its folder, encrypted like photos and snaps
+    expect(created.body.path).toBe('uploads/lake-trip.note.json');
+    const raw = await fs.readFile(path.join(testUploadsDir, 'lake-trip.note.json'));
+    expect(cipher.isEncrypted(raw)).toBe(true);
+    expect(raw.toString('latin1')).not.toMatch(/Lake trip/);
 
     const list = await agent.get('/api/notes').expect(200);
     expect(JSON.stringify(list.body)).toMatch(/Lake trip/);

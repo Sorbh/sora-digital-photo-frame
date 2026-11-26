@@ -203,8 +203,10 @@ class AuthenticationManager {
             const query = new URLSearchParams({ code: pairing.code, secret: pairing.secret });
             data = await (await fetch(`/api/pair/status?${query}`)).json();
             if (this.pairing !== pairing) return;
-            // Approved: collect the token, which also signs this browser in
+            // Approved: collect the token, which also signs this browser in. A
+            // sign-in from the address still under way would replace it: stop it first.
             if (data?.status === 'ready') {
+                this.outrankUrlSignIn();
                 data = await (await fetch('/api/pair/collect', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -217,6 +219,9 @@ class AuthenticationManager {
         if (this.pairing !== pairing) return;
 
         if (data?.status === 'approved') {
+            // Signed in now, though the overlay stays a moment to say so: nothing
+            // from the address may replace this sign-in meanwhile
+            this.outrankUrlSignIn();
             localStorage.setItem(DEVICE_TOKEN_KEY, data.token);
             this.pairCard.classList.add('is-approved');
             this.useScreenLanguage(data.device?.language);
@@ -293,6 +298,13 @@ class AuthenticationManager {
         this.urlSignIn = null;
     }
 
+    // A PIN being typed, or a pairing, outranks a sign-in from the address: stop
+    // it, and have any reply or retry of it ignored
+    outrankUrlSignIn() {
+        this.signInGeneration += 1;
+        this.cancelUrlSignIn();
+    }
+
     async requestPin(pin, signal) {
         const response = await fetch('/api/auth/pin', {
             method: 'POST',
@@ -316,7 +328,10 @@ class AuthenticationManager {
             this.authenticate();
         });
 
+        // Someone is typing a PIN (keyboard or keypad): the sign-in from the address
+        // must not sign in and hide the form under them
         this.pinInput.addEventListener('input', () => {
+            this.outrankUrlSignIn();
             this.clearError();
             this.clearErrorState();
         });
@@ -328,6 +343,7 @@ class AuthenticationManager {
             this.pinInput.focus();
         });
         this.familyInput?.addEventListener('input', () => {
+            this.outrankUrlSignIn();
             this.clearError();
             this.clearErrorState();
         });
@@ -420,8 +436,7 @@ class AuthenticationManager {
         this.setLoading(true);
         // Typed by hand: this outranks a sign-in from the address, still waiting
         // for its reply or to try again
-        this.signInGeneration += 1;
-        this.cancelUrlSignIn();
+        this.outrankUrlSignIn();
 
         try {
             const data = await this.requestPin(pin);

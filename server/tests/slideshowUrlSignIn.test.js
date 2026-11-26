@@ -10,17 +10,26 @@ const headScript = /<head>[\s\S]*?<script>([\s\S]*?)<\/script>/.exec(html)[1];
 // sandbox opened at the given address. fetchPin answers each PIN request; an
 // answer with a cookie sets it as it arrives, unless the request was aborted
 // first, as a browser does with Set-Cookie.
-function openSlideshow(href, { fetchPin = () => new Promise(() => {}), headScriptRuns = true } = {}) {
-  const element = () => new Proxy({}, {
-    get: (target, prop) => {
-      if (prop in target) return target[prop];
-      if (prop === 'classList') return { add() {}, remove() {}, contains: () => true };
-      if (prop === 'dataset' || prop === 'style') return {};
-      if (prop === 'value' || prop === 'textContent' || prop === 'innerHTML') return '';
-      return () => {};
-    },
-    set: (target, prop, value) => { target[prop] = value; return true; }
-  });
+// fetchOther answers the rest (pairing...), by default never. Elements keep
+// their event listeners, so the page's own handlers can be driven.
+function openSlideshow(href, { fetchPin = () => new Promise(() => {}), fetchOther = () => new Promise(() => {}), headScriptRuns = true } = {}) {
+  const element = (extra = {}) => {
+    const listeners = {};
+    return new Proxy({ ...extra }, {
+      get: (target, prop) => {
+        if (prop in target) return target[prop];
+        if (prop === 'classList') return { add() {}, remove() {}, toggle() {}, contains: () => true };
+        if (prop === 'dataset' || prop === 'style') return {};
+        if (prop === 'value' || prop === 'textContent' || prop === 'innerHTML') return '';
+        if (prop === 'disabled') return false;
+        if (prop === 'addEventListener') return (type, fn) => { (listeners[type] ||= []).push(fn); };
+        if (prop === 'dispatchEvent') return (event) => { (listeners[event.type] || []).forEach(fn => fn(event)); return true; };
+        return () => {};
+      },
+      set: (target, prop, value) => { target[prop] = value; return true; }
+    });
+  };
+  const keypad = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', 'back'].map(key => element({ dataset: { key } }));
   const requests = [];
   const timers = [];
   const listeners = {};
@@ -31,6 +40,7 @@ function openSlideshow(href, { fetchPin = () => new Promise(() => {}), headScrip
     URL,
     URLSearchParams,
     AbortController,
+    Event,
     console: { log() {}, error: (...a) => process.env.DEBUG_VM && process.stderr.write(a.map(String).join(' ') + '\n'), warn() {} },
     setTimeout: (fn, ms) => { timers.push({ fn, ms }); return timers.length; },
     clearTimeout() {},
@@ -42,9 +52,9 @@ function openSlideshow(href, { fetchPin = () => new Promise(() => {}), headScrip
     CustomEvent: class { constructor(type, init) { this.type = type; this.detail = init?.detail; } },
     i18n: { error: (data, key) => key },
     document: {
-      getElementById: element,
-      querySelector: element,
-      querySelectorAll: () => [],
+      getElementById: () => element(),
+      querySelector: () => element(),
+      querySelectorAll: selector => (selector === '.keypad [data-key]' ? keypad : []),
       addEventListener() {},
       dispatchEvent() {},
       documentElement: { dataset: {} }
@@ -52,13 +62,13 @@ function openSlideshow(href, { fetchPin = () => new Promise(() => {}), headScrip
     addEventListener: (type, fn) => { listeners[type] = fn; },
     matchMedia: () => ({ matches: false, addEventListener() {}, addListener() {} }),
     fetch: (url, options) => {
-      if (url !== '/api/auth/pin') return new Promise(() => {}); // pairing etc.: never answers
       const body = options?.body ? JSON.parse(options.body) : null;
       const signal = options?.signal;
-      requests.push({ url, body, signal });
+      if (url === '/api/auth/pin') requests.push({ url, body, signal });
       return new Promise((resolve, reject) => {
         signal?.addEventListener('abort', () => reject(Object.assign(new Error('The operation was aborted'), { name: 'AbortError' })));
-        Promise.resolve(fetchPin(body)).then((reply) => {
+        const reply = url === '/api/auth/pin' ? fetchPin(body) : fetchOther(url, body);
+        Promise.resolve(reply).then((reply) => {
           if (signal?.aborted) return; // dropped by the browser, its cookie too
           if (reply?.cookie) cookies.session = reply.cookie;
           resolve(reply);
@@ -90,7 +100,7 @@ function openSlideshow(href, { fetchPin = () => new Promise(() => {}), headScrip
     sandbox.location.hash = new URL(next).hash;
     listeners.hashchange?.();
   };
-  return { location: sandbox.location, addressAfterHead, requests, timers, manager: sandbox.manager, localStorage: sandbox.localStorage, navigate, cookies };
+  return { location: sandbox.location, addressAfterHead, requests, timers, manager: sandbox.manager, localStorage: sandbox.localStorage, navigate, cookies, keypad };
 }
 
 const flush = () => new Promise(resolve => setImmediate(resolve));
@@ -208,6 +218,54 @@ describe('Slideshow sign-in from the address', () => {
     await flush();
     expect(cookies.session).toBe('typed-session');
     expect(manager.userAccount.name).toBe('Typed');
+  });
+
+  const lateUrlReply = () => ({ status: 200, cookie: 'url-session', json: async () => ({ success: true, token: 'url-token', account: { name: 'From address' } }) });
+
+  test.each([
+    ['the keypad', ({ keypad }) => keypad[4].dispatchEvent({ type: 'click' })],
+    ['the keyboard', ({ manager }) => { manager.pinInput.value = '5'; manager.pinInput.dispatchEvent(new Event('input')); }],
+    ['the family code field', ({ manager }) => { manager.familyInput.value = 'A'; manager.familyInput.dispatchEvent(new Event('input')); }]
+  ])('starting to type on %s stops the sign-in from the address, so it cannot hide the form', async (_, type) => {
+    let answerUrl;
+    const page = openSlideshow('https://frame.example/slideshow#pin=123456', { fetchPin: () => new Promise(resolve => { answerUrl = resolve; }) });
+    type(page);
+    expect(page.requests[0].signal.aborted).toBe(true);
+    answerUrl(lateUrlReply());
+    await flush();
+    expect(page.cookies.session).toBeNull();
+    expect(page.manager.isAuthenticated).toBe(false);
+    expect(page.localStorage.getItem('photoframe_device_token')).toBeNull();
+  });
+
+  test('a frame paired by QR code keeps its sign-in while it shows "paired" before the slideshow', async () => {
+    let answerUrl;
+    const fetchOther = (url) => {
+      if (url.startsWith('/api/pair/status')) return answer(200, { status: 'ready' });
+      if (url === '/api/pair/collect') {
+        return answer(200, { status: 'approved', token: 'pair-token', device: { name: 'Kitchen' }, account: { name: 'Paired' } })
+          .then(reply => ({ ...reply, cookie: 'pair-session' }));
+      }
+      return new Promise(() => {});
+    };
+    const { manager, requests, cookies, timers, localStorage } = openSlideshow('https://frame.example/slideshow#pin=123456', {
+      fetchPin: () => new Promise(resolve => { answerUrl = resolve; }),
+      fetchOther
+    });
+    manager.pairing = { code: 'ABC123', secret: 's', expiresAt: Date.now() + 60000 };
+    await manager.checkPairing();
+    expect(cookies.session).toBe('pair-session');
+    expect(requests[0].signal.aborted).toBe(true);
+    // The address's reply lands while "paired" shows, before the 700 ms are up
+    answerUrl(lateUrlReply());
+    await flush();
+    expect(cookies.session).toBe('pair-session');
+    expect(localStorage.getItem('photoframe_device_token')).toBe('pair-token');
+    expect(manager.isAuthenticated).toBe(false);
+    const show = timers.find(t => t.ms === 700);
+    expect(show).toBeDefined();
+    show.fn();
+    expect(manager.userAccount.name).toBe('Paired');
   });
 
   test('signing in another way meanwhile stops the request from the address too', async () => {

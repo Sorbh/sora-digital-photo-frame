@@ -265,7 +265,7 @@ class PairingController {
 
   async signIn(req, res) {
     try {
-      const ip = this.clientIp(req);
+      const ip = accessAccounts.addressKey(this.clientIp(req));
       const limit = accessAccounts.checkRateLimit(ip);
       if (!limit.allowed) return res.status(429).json({ success: false, error: limit.message, code: 'RATE_LIMITED' });
 

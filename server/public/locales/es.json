@@ -77,6 +77,11 @@
     "familyCodeLabel": "Código familiar",
     "familyCodeRequired": "Introduce el código familiar de 8 caracteres que aparece en la página Acceso.",
     "familyOrPinWrong": "El código familiar y el PIN no coinciden. Revisa ambos e inténtalo de nuevo.",
+    "keepAwake": "Mantener la pantalla encendida",
+    "keepAwakeNeedsTap": "Esta pantalla puede apagarse. Tócala para mantenerla encendida.",
+    "keepAwakeUnavailable": "Este navegador no puede mantener la pantalla encendida. Desactiva la suspensión en los ajustes de pantalla del dispositivo.",
+    "fullscreenUnavailable": "Este navegador no puede mostrar pantalla completa. Usa su propio menú o añade el marco a la pantalla de inicio.",
+    "fullscreenRefused": "El navegador no permitió la pantalla completa. Vuelve a pulsar el botón.",
     "retry": "Reintentar",
     "retryingNote": "El marco sigue intentándolo por sí solo.",
     "connectionTitle": "No se puede acceder a tus fotos"

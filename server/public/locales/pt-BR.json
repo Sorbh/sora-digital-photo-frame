@@ -77,6 +77,11 @@
     "familyCodeLabel": "Código da família",
     "familyCodeRequired": "Digite o código da família de 8 caracteres que aparece na página Acesso.",
     "familyOrPinWrong": "O código da família e o PIN não conferem. Verifique os dois e tente de novo.",
+    "keepAwake": "Manter a tela ligada",
+    "keepAwakeNeedsTap": "Esta tela pode apagar. Toque para mantê-la ligada.",
+    "keepAwakeUnavailable": "Este navegador não consegue manter a tela ligada. Desative o modo de espera nas configurações de tela do aparelho.",
+    "fullscreenUnavailable": "Este navegador não consegue abrir em tela cheia. Use o menu dele ou adicione o porta-retrato à tela inicial.",
+    "fullscreenRefused": "O navegador não permitiu a tela cheia. Tente o botão de novo.",
     "retry": "Tentar de novo",
     "retryingNote": "O porta-retrato continua tentando sozinho.",
     "connectionTitle": "Não foi possível acessar suas fotos"

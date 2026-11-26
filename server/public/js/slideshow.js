@@ -565,6 +565,11 @@ function timeoutSignal(ms) {
     return controller.signal;
 }
 
+// The element shown fullscreen, whichever prefix this browser uses
+function fullscreenElement() {
+    return document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement || null;
+}
+
 // "12 March 2019" in the frame's language. Camera times carry no zone and
 // a date-time without one is read as local time, so the day never shifts.
 function formatTakenAt(takenAt) {
@@ -593,6 +598,8 @@ class PhotoFrameSlideshow {
         this.currentDuration = this.interval;
         this.noteScheduler = window.NoteScheduler ? new NoteScheduler() : null;
         this.noteHideTimer = null;
+        this.fullscreenCheck = null;
+        this.screenShift = window.ScreenShift ? new ScreenShift(document.documentElement) : null;
         // Until a photo shows, a failure leaves the error card up and tries again later
         this.hasShownPhoto = false;
         this.recovery = new PhotoRecovery({
@@ -641,6 +648,9 @@ class PhotoFrameSlideshow {
         this.captionPlace = document.getElementById('captionPlace');
         this.captionDate = document.getElementById('captionDate');
         this.noteLayer = document.getElementById('noteLayer');
+        this.noticeSlots = { wake: document.getElementById('wakeNotice'), info: document.getElementById('infoNotice') };
+        this.keepAwakeBtn = document.getElementById('keepAwakeBtn');
+        this.notices = new FrameNotices({ render: (slot, notice) => this.renderNotice(slot, notice) });
         this.retryBtn = document.getElementById('retryBtn');
 
         this.errorState.classList.add('hidden');
@@ -653,6 +663,8 @@ class PhotoFrameSlideshow {
         this.logoutBtn.addEventListener('click', () => this.logout());
         this.playPauseBtn.addEventListener('click', () => this.togglePlayPause());
         this.nextBtn.addEventListener('click', () => this.nextImage());
+        // The tap itself is what lets the browser keep the screen on
+        this.keepAwakeBtn.addEventListener('click', () => this.wakeLock?.onGesture());
         // Retry, and back online: try again now, without waiting out the delay
         this.recovery.listen(window, this.retryBtn);
 
@@ -708,18 +720,19 @@ class PhotoFrameSlideshow {
             this.showControlsTemporarily();
         });
 
-        // Handle fullscreen change events
-        document.addEventListener('fullscreenchange', () => {
-            if (!document.fullscreenElement) {
-                document.body.classList.remove('fullscreen');
-            }
-        });
-
-        document.addEventListener('webkitfullscreenchange', () => {
-            if (!document.webkitFullscreenElement) {
-                document.body.classList.remove('fullscreen');
-            }
-        });
+        // Fullscreen came or went (the page's button, the browser's own, or Escape)
+        // (any real change answers the prefixed request, so its later check is not needed)
+        ['fullscreenchange', 'webkitfullscreenchange', 'MSFullscreenChange'].forEach(type =>
+            document.addEventListener(type, () => {
+                clearTimeout(this.fullscreenCheck);
+                document.body.classList.toggle('fullscreen', Boolean(fullscreenElement()));
+            }));
+        // Older browsers say no with an event rather than a rejected promise
+        ['webkitfullscreenerror', 'MSFullscreenError'].forEach(type =>
+            document.addEventListener(type, () => {
+                clearTimeout(this.fullscreenCheck);
+                this.notices.fullscreen('refused');
+            }));
     }
 
     // The next picture for the chosen folder. Ordered folders continue from
@@ -1046,7 +1059,7 @@ class PhotoFrameSlideshow {
     }
 
     toggleFullscreen() {
-        if (!document.fullscreenElement) {
+        if (!fullscreenElement()) {
             // Enter fullscreen
             const element = document.documentElement;
 
@@ -1056,15 +1069,19 @@ class PhotoFrameSlideshow {
                     this.showControlsTemporarily();
                 }).catch((err) => {
                     console.error('Error attempting to enable fullscreen:', err);
+                    this.notices.fullscreen('refused');
                 });
-            } else if (element.webkitRequestFullscreen) {
-                element.webkitRequestFullscreen();
-                document.body.classList.add('fullscreen');
-                this.showControlsTemporarily();
-            } else if (element.msRequestFullscreen) {
-                element.msRequestFullscreen();
-                document.body.classList.add('fullscreen');
-                this.showControlsTemporarily();
+            } else if (element.webkitRequestFullscreen || element.msRequestFullscreen) {
+                // These answer with an event, or not at all: check a moment later
+                (element.webkitRequestFullscreen || element.msRequestFullscreen).call(element);
+                clearTimeout(this.fullscreenCheck);
+                this.fullscreenCheck = setTimeout(() => {
+                    if (fullscreenElement()) this.showControlsTemporarily();
+                    else this.notices.fullscreen('refused');
+                }, 1500);
+            } else {
+                // iPhone Safari, some TV browsers: only the browser's own menu can do it
+                this.notices.fullscreen('unavailable');
             }
         } else {
             // Exit fullscreen
@@ -1116,6 +1133,22 @@ class PhotoFrameSlideshow {
         if (this.currentImageData) this.folder.textContent = this.currentImageData.folder || t('common.library');
         if (this.errorText && !this.errorState.classList.contains('hidden')) this.errorMessage.textContent = t(...this.errorText);
         if (this.errorTitleKey && !this.errorState.classList.contains('hidden')) this.errorTitle.textContent = t(this.errorTitleKey);
+        Object.keys(this.noticeSlots).forEach(slot => this.renderNotice(slot, this.notices.shown[slot]));
+    }
+
+    // Draws one of the notices at the top (FrameNotices decides what and when)
+    renderNotice(slot, notice) {
+        const element = this.noticeSlots[slot];
+        element.classList.toggle('hidden', !notice);
+        if (notice) {
+            element.querySelector('.material-icons').textContent = notice.icon;
+            element.querySelector('.frame-notice-text').textContent = t(notice.key);
+            element.classList.toggle('is-compact', Boolean(notice.compact));
+            if (slot === 'wake') this.keepAwakeBtn.classList.toggle('hidden', !notice.button);
+        }
+        // Narrow screens hide the caption under a message (not under the small pill)
+        document.body.classList.toggle('notice-showing', this.notices.coversTop());
+        document.body.classList.toggle('notice-pill', Boolean(this.notices.shown.wake?.compact) && !this.notices.coversTop());
     }
 
     logout() {
@@ -1220,7 +1253,10 @@ class PhotoFrameSlideshow {
 
     requestWakeLock() {
         // Keep phones and tablets awake for as long as the frame is open
-        if (!this.wakeLock) this.wakeLock = new KeepAwake();
+        if (!this.wakeLock) {
+            this.wakeLock = new KeepAwake();
+            this.wakeLock.onchange = status => this.notices.wakeStatus(status);
+        }
         this.wakeLock.enable();
     }
 
@@ -1282,12 +1318,20 @@ class PhotoFrameSlideshow {
             this.wakeLock.disable();
         }
 
+        this.screenShift?.stop();
+        this.notices.stop();
+        clearTimeout(this.fullscreenCheck);
+
         this.noteScheduler?.stop();
     }
 
     async startSlideshow() {
         this.hideError();
         this.noteScheduler?.start();
+        this.screenShift?.start();
+        this.requestWakeLock(); // again after signing out and back in (cleanup turned it off)
+        this.notices.start();
+
         this.hasShownPhoto = false; // a new session: until its photo shows, say what's wrong
         await this.recovery.start();
     }

@@ -77,6 +77,11 @@
     "familyCodeLabel": "Familiencode",
     "familyCodeRequired": "Geben Sie den 8-stelligen Familiencode von der Seite „Zugang“ ein.",
     "familyOrPinWrong": "Familiencode und PIN passen nicht zusammen. Prüfen Sie beides und versuchen Sie es erneut.",
+    "keepAwake": "Bildschirm anlassen",
+    "keepAwakeNeedsTap": "Dieser Bildschirm kann sich ausschalten. Tippen Sie, damit er an bleibt.",
+    "keepAwakeUnavailable": "Dieser Browser kann den Bildschirm nicht anlassen. Schalten Sie den Ruhezustand in den Anzeigeeinstellungen des Geräts aus.",
+    "fullscreenUnavailable": "Dieser Browser kann nicht in den Vollbildmodus wechseln. Nutzen Sie sein eigenes Menü oder legen Sie den Rahmen auf den Startbildschirm.",
+    "fullscreenRefused": "Der Browser hat den Vollbildmodus nicht erlaubt. Versuchen Sie es noch einmal mit der Taste.",
     "retry": "Erneut versuchen",
     "retryingNote": "Der Rahmen versucht es von selbst weiter.",
     "connectionTitle": "Ihre Fotos sind nicht erreichbar"

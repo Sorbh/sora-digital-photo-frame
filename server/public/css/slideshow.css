@@ -270,6 +270,12 @@ body.note-showing .stage-scrim {
 
 /* ---------- Clock placard --------------------------------------- */
 
+/* Against burn-in, the clock and caption move a little every few minutes
+   (screenShift.js sets --shift-x and --shift-y between 0 and 1) */
+:root {
+    --shift-range: 1.6vmin;
+}
+
 .weather-widget {
     position: absolute;
     left: clamp(1.5rem, 4vw, 3.5rem);
@@ -283,6 +289,8 @@ body.note-showing .stage-scrim {
     opacity: var(--widget-text, 1);
     text-shadow: 0 2px 30px rgba(0, 0, 0, 0.45);
     pointer-events: none;
+    margin: calc(var(--shift-y, 0) * var(--shift-range)) calc(var(--shift-x, 0) * var(--shift-range));
+    transition: margin 3s ease-in-out;
     animation: rise 1.2s var(--ease-out) both;
 }
 
@@ -313,7 +321,8 @@ body.note-showing .stage-scrim {
 .weather-display {
     margin-top: 14px;
     font-family: var(--font-mono);
-    font-size: clamp(0.75rem, 1.1vw, 0.9rem);
+    /* Readable from across the room: about 22px on a 1080p TV */
+    font-size: clamp(0.8rem, 2vmin, 1.6rem);
     font-weight: 500;
     letter-spacing: 0.16em;
     text-transform: uppercase;
@@ -387,6 +396,92 @@ body.note-showing .stage-scrim {
 body.is-paused .paused-badge {
     opacity: 1;
     transform: none;
+}
+
+/* ---------- Notice: fullscreen or keep-awake not available ------ */
+
+/* Keep-awake on top, fullscreen under it; they move with the clock against burn-in */
+.frame-notices {
+    position: absolute;
+    top: clamp(1rem, 3vw, 2rem);
+    left: 50%;
+    z-index: 7;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    width: max-content;
+    max-width: calc(100% - 2.5rem);
+    margin-top: calc(var(--shift-y, 0) * var(--shift-range));
+    transform: translateX(calc(-50% + var(--shift-x, 0) * var(--shift-range)));
+    transition: margin 3s ease-in-out, transform 3s ease-in-out;
+    pointer-events: none;
+}
+
+.frame-notice {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    max-width: 100%;
+    padding: 10px 12px 10px 16px;
+    pointer-events: auto;
+    border-radius: var(--shape-lg);
+    background: rgba(30, 16, 26, 0.78);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08) inset, 0 20px 50px -20px rgba(0, 0, 0, 0.8);
+    color: #f4efe6;
+    font-size: clamp(0.9rem, 2vmin, 1.35rem);
+    line-height: 1.35;
+    animation: notice-in 0.5s var(--ease-out) both;
+}
+
+/* After a minute only the button stays, small, until the tap it needs */
+.frame-notice.is-compact {
+    padding: 6px;
+    background: rgba(30, 16, 26, 0.55);
+}
+
+.frame-notice.is-compact > .material-icons,
+.frame-notice.is-compact .frame-notice-text {
+    display: none;
+}
+
+.frame-notice > .material-icons {
+    flex: none;
+    font-size: 1.35em;
+    color: #ffc2d4;
+}
+
+.frame-notice-btn {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 44px;
+    padding: 8px 16px;
+    border: 0;
+    border-radius: 999px;
+    background: #ff5c8d;
+    color: #1a0b12;
+    font: inherit;
+    font-size: 0.9em;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.frame-notice-btn .material-icons {
+    font-size: 1.2em;
+}
+
+.frame-notice-btn:focus-visible {
+    outline: 3px solid #fff;
+    outline-offset: 3px;
+}
+
+@keyframes notice-in {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: none; }
 }
 
 /* ---------- Dock ------------------------------------------------- */
@@ -490,14 +585,15 @@ body.chrome-visible .controls,
     right: clamp(1.5rem, 4vw, 3.5rem);
     bottom: clamp(1.75rem, 5vh, 3.5rem);
     z-index: 3;
-    max-width: min(26rem, 38vw);
+    max-width: max(min(26rem, 38vw), 30vmin);
     text-align: right;
     color: #f4efe6;
     text-shadow: 0 2px 24px rgba(0, 0, 0, 0.55);
     pointer-events: none;
     opacity: 0;
     transform: translateY(6px);
-    transition: opacity 0.6s ease, transform 0.8s var(--ease-out);
+    margin: calc(var(--shift-y, 0) * var(--shift-range)) calc(var(--shift-x, 0) * var(--shift-range));
+    transition: opacity 0.6s ease, transform 0.8s var(--ease-out), margin 3s ease-in-out;
 }
 
 .photo-caption.is-visible {
@@ -507,7 +603,7 @@ body.chrome-visible .controls,
 
 .caption-place {
     font-family: var(--font-display);
-    font-size: clamp(1.25rem, 2.2vw, 1.85rem);
+    font-size: clamp(1.25rem, 3.6vmin, 2.75rem);
     font-style: italic;
     font-weight: 400;
     line-height: 1.1;
@@ -516,7 +612,7 @@ body.chrome-visible .controls,
 
 .caption-date {
     margin-top: 6px;
-    font-size: 0.6875rem;
+    font-size: clamp(0.75rem, 1.7vmin, 1.3rem);
     font-weight: 700;
     letter-spacing: 0.16em;
     text-transform: uppercase;
@@ -1080,6 +1176,40 @@ body.note-showing .photo-caption {
 
     body.is-paused .photo-caption {
         top: 3.75rem;
+    }
+
+    /* Narrow screens: the notices take the top, under the paused badge */
+    .frame-notices {
+        top: 1.25rem;
+        width: calc(100% - 2.5rem);
+    }
+
+    .frame-notice:not(.is-compact) {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        width: 100%;
+    }
+
+    .frame-notice-btn {
+        grid-column: 1 / -1;
+        justify-self: start;
+    }
+
+    body.is-paused .frame-notices {
+        top: 3.75rem;
+    }
+
+    body.notice-showing .photo-caption {
+        opacity: 0;
+    }
+
+    /* The small keep-awake pill: the caption moves down under it instead */
+    body.notice-pill .photo-caption {
+        top: 5rem;
+    }
+
+    body.is-paused.notice-pill .photo-caption {
+        top: 7.5rem;
     }
 }
 

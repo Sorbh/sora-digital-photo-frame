@@ -77,6 +77,11 @@
     "familyCodeLabel": "Family code",
     "familyCodeRequired": "Enter the 8-character family code from the Access page.",
     "familyOrPinWrong": "That family code and PIN don't match. Check both and try again.",
+    "keepAwake": "Keep screen awake",
+    "keepAwakeNeedsTap": "This screen may go to sleep. Tap to keep it on.",
+    "keepAwakeUnavailable": "This browser can't keep the screen on. Turn off sleep in the device's display settings.",
+    "fullscreenUnavailable": "This browser can't go full screen. Use its own menu, or add the frame to the home screen.",
+    "fullscreenRefused": "The browser didn't allow full screen. Try the button again.",
     "retry": "Retry",
     "retryingNote": "The frame keeps trying by itself.",
     "connectionTitle": "Can't reach your photos"

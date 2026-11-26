@@ -77,6 +77,11 @@
     "familyCodeLabel": "Codice famiglia",
     "familyCodeRequired": "Inserisci il codice famiglia di 8 caratteri che trovi nella pagina Accesso.",
     "familyOrPinWrong": "Codice famiglia e PIN non corrispondono. Controllali entrambi e riprova.",
+    "keepAwake": "Tieni lo schermo acceso",
+    "keepAwakeNeedsTap": "Questo schermo potrebbe spegnersi. Toccalo per tenerlo acceso.",
+    "keepAwakeUnavailable": "Questo browser non riesce a tenere acceso lo schermo. Disattiva lo standby nelle impostazioni dello schermo del dispositivo.",
+    "fullscreenUnavailable": "Questo browser non può andare a schermo intero. Usa il suo menu oppure aggiungi la cornice alla schermata Home.",
+    "fullscreenRefused": "Il browser non ha permesso lo schermo intero. Riprova con il pulsante.",
     "retry": "Riprova",
     "retryingNote": "La cornice continua a riprovare da sola.",
     "connectionTitle": "Impossibile raggiungere le tue foto"

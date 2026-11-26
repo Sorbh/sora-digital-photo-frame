@@ -77,6 +77,11 @@
     "familyCodeLabel": "Code famille",
     "familyCodeRequired": "Saisissez le code famille de 8 caractères affiché sur la page Accès.",
     "familyOrPinWrong": "Ce code famille et ce PIN ne correspondent pas. Vérifiez les deux et réessayez.",
+    "keepAwake": "Garder l’écran allumé",
+    "keepAwakeNeedsTap": "Cet écran peut se mettre en veille. Touchez-le pour le garder allumé.",
+    "keepAwakeUnavailable": "Ce navigateur ne peut pas garder l’écran allumé. Désactivez la mise en veille dans les réglages d’affichage de l’appareil.",
+    "fullscreenUnavailable": "Ce navigateur ne peut pas passer en plein écran. Utilisez son propre menu, ou ajoutez le cadre à l’écran d’accueil.",
+    "fullscreenRefused": "Le navigateur a refusé le plein écran. Réessayez avec le bouton.",
     "retry": "Réessayer",
     "retryingNote": "Le cadre continue d’essayer tout seul.",
     "connectionTitle": "Impossible d’accéder à vos photos"

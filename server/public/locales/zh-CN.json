@@ -77,6 +77,11 @@
     "familyCodeLabel": "家庭代码",
     "familyCodeRequired": "请输入“访问权限”页面上的 8 位家庭代码。",
     "familyOrPinWrong": "家庭代码和 PIN 不匹配。请检查后重试。",
+    "keepAwake": "保持屏幕常亮",
+    "keepAwakeNeedsTap": "此屏幕可能会进入休眠。轻点以保持常亮。",
+    "keepAwakeUnavailable": "此浏览器无法保持屏幕常亮。请在设备的显示设置中关闭休眠。",
+    "fullscreenUnavailable": "此浏览器无法全屏显示。请使用浏览器自带的菜单，或将相框添加到主屏幕。",
+    "fullscreenRefused": "浏览器未允许全屏。请再按一次按钮。",
     "retry": "重试",
     "retryingNote": "相框会自动继续重试。",
     "connectionTitle": "无法连接到你的照片"

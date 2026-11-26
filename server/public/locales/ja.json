@@ -77,6 +77,11 @@
     "familyCodeLabel": "ファミリーコード",
     "familyCodeRequired": "アクセスページにある8文字のファミリーコードを入力してください。",
     "familyOrPinWrong": "ファミリーコードとPINが一致しません。両方を確認して、もう一度お試しください。",
+    "keepAwake": "画面をつけたままにする",
+    "keepAwakeNeedsTap": "この画面はスリープする可能性があります。タップすると画面がついたままになります。",
+    "keepAwakeUnavailable": "このブラウザでは画面をつけたままにできません。端末の画面設定でスリープをオフにしてください。",
+    "fullscreenUnavailable": "このブラウザは全画面表示にできません。ブラウザのメニューを使うか、フレームをホーム画面に追加してください。",
+    "fullscreenRefused": "ブラウザが全画面表示を許可しませんでした。もう一度ボタンを押してください。",
     "retry": "再試行",
     "retryingNote": "フレームは自動で再試行を続けます。",
     "connectionTitle": "写真に接続できません"

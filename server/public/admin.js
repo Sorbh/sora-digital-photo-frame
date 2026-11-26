@@ -225,7 +225,11 @@ class PhotoFrameAdmin {
             if (e.key === 'Escape') this.hideContextMenu();
         });
         window.addEventListener('resize', () => this.hideContextMenu());
-        document.addEventListener('scroll', () => this.hideContextMenu(), { capture: true, passive: true });
+        // Scrolling the page moves the menu's anchor away; scrolling a long menu itself doesn't
+        document.addEventListener('scroll', (e) => {
+            if (e.target instanceof Element && e.target.closest('#contextMenuPopover')) return;
+            this.hideContextMenu();
+        }, { capture: true, passive: true });
         document.getElementById('contextMenuPopover').addEventListener('click', (e) => {
             e.stopPropagation();
             if (e.target.closest('.menu-item')) {

@@ -26,6 +26,7 @@
     var timer = null;
     var press = null; // { id, x, y, type } while a pointer is down
     var held = false; // a long press finished; swallow the click that follows
+    var heldId = null; // the pointer that made it
     var lastType = '';
 
     function end() {
@@ -51,6 +52,7 @@
       timer = setTimeout(function () {
         timer = null;
         held = true;
+        heldId = e.pointerId;
         options.onLongPress(e);
       }, delay);
     }
@@ -68,8 +70,9 @@
     }
 
     function cancel(e) {
-      // The browser took the pointer over (a scroll): no click is coming
-      held = false;
+      // The browser took the holding pointer over (a scroll): no click is coming.
+      // Another finger being cancelled changes nothing for this one.
+      if (e.pointerId === heldId) held = false;
       if (press && e.pointerId === press.id) end();
     }
 

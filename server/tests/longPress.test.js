@@ -106,6 +106,17 @@ describe('library long press', () => {
     expect(onClick).not.toHaveBeenCalled();
   });
 
+  test('another finger cancelled after a hold leaves the hold\'s click swallowed', () => {
+    const { tile, onClick, click } = setup();
+    tile.dispatchEvent(pointer('pointerdown'));
+    jest.advanceTimersByTime(SoraLongPress.DELAY);
+    tile.dispatchEvent(pointer('pointerdown', { pointerId: 2, isPrimary: false }));
+    tile.dispatchEvent(pointer('pointercancel', { pointerId: 2, isPrimary: false }));
+    tile.dispatchEvent(pointer('pointerup'));
+    expect(click().defaultPrevented).toBe(true);
+    expect(onClick).not.toHaveBeenCalled();
+  });
+
   test('moving the finger (scrolling) cancels the press', () => {
     const onEnd = jest.fn();
     const { tile, onLongPress } = setup({ onEnd });

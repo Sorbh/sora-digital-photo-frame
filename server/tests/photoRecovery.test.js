@@ -149,14 +149,71 @@ describe('A frame that could not show its first photo', () => {
     expect(f.recovery.recovering).toBe(false);
   });
 
-  test('with a good photo on screen a failure keeps it there, and still tries again', async () => {
+  test('with a good photo on screen a network drop keeps it there quietly, and still tries again', async () => {
     const f = frame({ photoOnScreen: true });
     f.recovery.start();
-    f.tries[0].resolve({ ok: false, error: { key: 'slideshow.noImagesInFolder', vars: { folder: 'Goa' } } });
+    f.tries[0].resolve(offline);
     await settle();
     expect(f.failures).toEqual([]); // no error card over the photo
     jest.advanceTimersByTime(5000);
     expect(f.tries).toHaveLength(2);
+
+    // A request that hangs, and a photo that fails to load, are the same
+    jest.advanceTimersByTime(30000);
+    await settle();
+    expect(f.failures).toEqual([]);
+    jest.advanceTimersByTime(10000);
+    f.tries[2].resolve({ ok: false, error: { key: 'slideshow.loadFirstImageFailed', transient: true } });
+    await settle();
+    expect(f.failures).toEqual([]);
+    expect(f.recovery.recovering).toBe(true);
+  });
+
+  test('an empty folder picked while a photo is on screen shows the card, and the frame recovers once it has photos', async () => {
+    const empty = { ok: false, error: { key: 'slideshow.noImagesInFolder', vars: { folder: 'Goa' } } };
+    const f = frame({ photoOnScreen: true });
+    f.recovery.start(); // the empty folder picked
+    f.tries[0].resolve(empty);
+    await settle();
+    expect(f.failures).toEqual([empty.error]);
+
+    // Still empty on the next try: said again, and tried again
+    jest.advanceTimersByTime(5000);
+    f.tries[1].resolve(empty);
+    await settle();
+    expect(f.failures).toHaveLength(2);
+
+    // Photos added: the next try shows one and the retrying ends
+    jest.advanceTimersByTime(10000);
+    f.tries[2].resolve({ ok: true });
+    await settle();
+    expect(f.recovery.recovering).toBe(false);
+    jest.advanceTimersByTime(10 * 60 * 1000);
+    expect(f.tries).toHaveLength(3);
+  });
+
+  test('an account without access shows the card over a photo; picking another folder recovers', async () => {
+    const restricted = { ok: false, error: { key: 'errors.ACCESS_RESTRICTED' } };
+    const f = frame({ photoOnScreen: true });
+    f.recovery.start();
+    f.tries[0].resolve(restricted);
+    await settle();
+    expect(f.failures).toEqual([restricted.error]);
+
+    f.recovery.start(); // another folder
+    f.tries[1].resolve({ ok: true });
+    await settle();
+    jest.advanceTimersByTime(10 * 60 * 1000);
+    expect(f.tries).toHaveLength(2); // the first folder's retry never ran
+    expect(f.recovery.recovering).toBe(false);
+  });
+
+  test('mustShow: what the user has to act on, not the network', () => {
+    expect(PhotoRecovery.mustShow({ key: 'slideshow.noImagesInFolder' })).toBe(true);
+    expect(PhotoRecovery.mustShow({ offline: true })).toBe(false);
+    expect(PhotoRecovery.mustShow({ timeout: true })).toBe(false);
+    expect(PhotoRecovery.mustShow({ key: 'slideshow.loadFirstImageFailed', transient: true })).toBe(false);
+    expect(PhotoRecovery.mustShow(undefined)).toBe(false);
   });
 
   test('picking a folder or signing out makes earlier slideshow work too late to count; Retry does not', async () => {

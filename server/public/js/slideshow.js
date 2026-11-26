@@ -598,7 +598,8 @@ class PhotoFrameSlideshow {
         this.recovery = new PhotoRecovery({
             attempt: (signal, isCurrent) => this.showFirstPhoto(signal, isCurrent),
             failed: error => this.showFailure(error),
-            photoOnScreen: () => this.hasShownPhoto,
+            // A photo the error card covers (an empty folder picked, say) is not on screen
+            photoOnScreen: () => this.hasShownPhoto && this.errorState.classList.contains('hidden'),
             schedule: new RetrySchedule(),
             timeoutMs: REQUEST_TIMEOUT_MS
         });
@@ -1170,13 +1171,14 @@ class PhotoFrameSlideshow {
         if (!isCurrent()) return { ok: false };
         if (next.error) return { ok: false, error: next.error };
         if (!await this.present(next.image, { signal, isCurrent })) {
-            return { ok: false, error: signal?.aborted ? { offline: true } : { key: 'slideshow.loadFirstImageFailed' } };
+            return { ok: false, error: signal?.aborted ? { offline: true } : { key: 'slideshow.loadFirstImageFailed', transient: true } };
         }
         if (this.isPlaying) this.scheduleNext();
         return { ok: true };
     }
 
-    // The error card, for an empty screen (PhotoRecovery keeps a photo already up)
+    // The error card: for an empty screen, or over a photo when the folder can't
+    // play (PhotoRecovery keeps a photo up through network trouble)
     showFailure(error) {
         if (!error || error.offline || error.timeout) {
             this.showErrorKey('slideshow.unable_images', undefined, 'slideshow.connectionTitle');

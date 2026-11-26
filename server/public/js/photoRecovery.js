@@ -17,7 +17,11 @@
  * resolves { ok: false, error } with what to tell the user; it checks
  * isCurrent() before putting anything on screen. On failure the next try is
  * scheduled by `schedule` (RetrySchedule), and `failed(error)` shows the error
- * card, unless `photoOnScreen()` says a good photo is up: that one stays.
+ * card. With a good photo up (`photoOnScreen()`), the network or the server
+ * being away for a while (offline, timeout, a load that failed: `transient`)
+ * leaves that photo there quietly; an error the user has to act on (it has a
+ * message `key` without `transient`: an empty folder, no access) still shows
+ * the card, as a new folder that can't play must not look like the old one.
  */
 (function (root) {
   class PhotoRecovery {
@@ -110,9 +114,11 @@
         return 'shown';
       }
       current.controller.abort(); // a request still running is not needed any more
-      // With a photo already on screen it stays there; the error card is for an empty screen
-      if (!this.photoOnScreen()) this.failed(result && result.error);
-      else console.warn('Keeping the last photo on screen:', result && result.error);
+      const error = result && result.error;
+      // A photo already on screen stays through a network blip; the card is for
+      // an empty screen, or for something the user has to fix
+      if (!this.photoOnScreen() || PhotoRecovery.mustShow(error)) this.failed(error);
+      else console.warn('Keeping the last photo on screen:', error);
       this.retryTimer = this.timers.setTimeout(() => {
         this.retryTimer = null;
         this.run();
@@ -120,6 +126,12 @@
       return 'failed';
     }
   }
+
+  // An error to show even over a photo: one that says what is wrong (an empty
+  // folder, access restricted), not the network or server being away
+  PhotoRecovery.mustShow = function (error) {
+    return Boolean(error && error.key && !error.transient);
+  };
 
   // `promise`, or a rejection after `ms` if it hasn't settled by then
   PhotoRecovery.withTimeout = function (promise, ms, timers) {

@@ -1,9 +1,26 @@
 // The /pair page itself (public/js/pair.js), run against a small stand-in for the browser
-const fs = require('fs');
+// and, at the end, against the real server from a typed code to a paired frame
 const path = require('path');
 const vm = require('vm');
+const request = require('supertest');
+const fs = require('fs-extra');
+
+// The end-to-end test at the bottom runs the page against the real server, in throwaway folders
+const testUploadsDir = path.join(__dirname, 'pair-page-uploads');
+const testCacheDir = path.join(__dirname, 'pair-page-cache');
+const testDataDir = path.join(__dirname, 'pair-page-data');
+process.env.UPLOAD_DIR = testUploadsDir;
+process.env.CACHE_DIR = testCacheDir;
+process.env.DATA_DIR = testDataDir;
+process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
+process.env.ADMIN_PASSWORD = 'test-admin-pass';
 
 const source = fs.readFileSync(path.join(__dirname, '..', 'public', 'js', 'pair.js'), 'utf8');
+// Waits for the page to get somewhere that goes through the real server (not just promises)
+const waitFor = async (done) => {
+  for (let i = 0; i < 200 && !done(); i++) await new Promise(resolve => setTimeout(resolve, 10));
+  expect(done()).toBe(true);
+};
 const flush = async () => { for (let i = 0; i < 10; i++) await new Promise(resolve => setImmediate(resolve)); };
 
 function fakeElement() {
@@ -226,5 +243,58 @@ describe('The /pair page', () => {
     });
     await flush();
     expect(page.visible()).toEqual(['stateUnreachable']);
+  });
+});
+
+describe('The /pair page against the real server', () => {
+  let app;
+  let admin;
+
+  beforeAll(async () => {
+    await fs.ensureDir(path.join(testUploadsDir, 'Goa'));
+    app = require('../server');
+    admin = request.agent(app);
+    await admin.post('/api/auth/login').send({ password: 'test-admin-pass' }).expect(200);
+  });
+
+  afterAll(async () => {
+    await fs.remove(testUploadsDir);
+    await fs.remove(testCacheDir);
+    await fs.remove(testDataDir);
+  });
+
+  // The phone's browser: the admin's signed-in session
+  const phone = async (url, { method = 'GET', headers = {}, body } = {}) => {
+    let call = admin[method.toLowerCase()](url).set(headers);
+    if (body !== undefined) call = call.send(body);
+    const res = await call;
+    return { ok: res.status < 400, status: res.status, json: async () => res.body };
+  };
+
+  test('a code typed off the frame pairs it, and the frame signs in', async () => {
+    const frame = request.agent(app);
+    const pairing = (await frame.post('/api/pair/start').expect(200)).body;
+
+    // Typed by hand, as the frame shows it
+    const page = openPage('', null, { fetch: phone, account: '__new__' });
+    page.el('codeInput').value = `${pairing.code.slice(0, 3).toLowerCase()}-${pairing.code.slice(3)}`;
+    page.el('stateEnter').fire('submit');
+    await flush();
+    await waitFor(() => page.visible()[0] === 'pairForm');
+    expect(page.el('codeShown').textContent).toBe(`${pairing.code.slice(0, 3)}-${pairing.code.slice(3)}`);
+
+    page.el('frameName').value = 'Hall frame';
+    page.el('pairForm').fire('submit');
+    await waitFor(() => page.visible()[0] === 'stateDone');
+    expect(page.el('doneTitle').innerHTML).toBe('pair.donePaired');
+    expect(page.storage.items.has('sora_pair_code')).toBe(false);
+
+    // The frame hears it was approved, collects its sign-in and is in
+    const polled = await frame.get('/api/pair/status').query({ code: pairing.code, secret: pairing.secret }).expect(200);
+    expect(polled.body.status).toBe('ready');
+    const collected = await frame.post('/api/pair/collect').send({ code: pairing.code, secret: pairing.secret }).expect(200);
+    expect(collected.body).toMatchObject({ status: 'approved', device: { name: 'Hall frame' }, account: { name: 'Hall frame' } });
+    const session = await frame.get('/api/auth/session').expect(200);
+    expect(session.body).toMatchObject({ authenticated: true, account: { name: 'Hall frame' } });
   });
 });

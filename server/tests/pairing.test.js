@@ -169,19 +169,59 @@ describe('Pairing a frame by QR code', () => {
     }
   });
 
-  test('an open page from before collection moved to a POST still finishes pairing', async () => {
+  test('polling never hands the pairing over, even from the browser that started it', async () => {
     const frame = request.agent(app);
     const pairing = await start(frame);
-    await admin.post(`/api/admin/pair/${pairing.code}/approve`).send({ name: 'Old page', newAccount: {} }).expect(200);
-    const poll = (agent, site) => agent.get('/api/pair/status').set('Sec-Fetch-Site', site)
-      .query({ code: pairing.code, secret: pairing.secret }).expect(200).then(r => r.body);
-    // Not from another site, and not from another browser
-    expect(await poll(frame, 'cross-site')).toEqual({ success: true, status: 'ready' });
-    expect(await poll(request.agent(app), 'same-origin')).toEqual({ success: true, status: 'ready' });
-    const collected = await poll(frame, 'same-origin');
-    expect(collected).toMatchObject({ status: 'approved', device: { name: 'Old page' } });
-    expect(collected.token).toBeTruthy();
-    expect((await frame.get('/api/auth/session').expect(200)).body.authenticated).toBe(true);
+    await admin.post(`/api/admin/pair/${pairing.code}/approve`).send({ name: 'Polling page', newAccount: {} }).expect(200);
+    const polled = await frame.get('/api/pair/status').set('Sec-Fetch-Site', 'same-origin')
+      .query({ code: pairing.code, secret: pairing.secret }).expect(200);
+    expect(polled.body).toEqual({ success: true, status: 'ready' });
+    expect(polled.headers['set-cookie'] || []).toEqual([]);
+    expect((await frame.get('/api/auth/session').expect(200)).body.authenticated).toBe(false);
+    expect((await collect(frame, pairing)).status).toBe('approved');
+  });
+
+  test("an account made for an approval can't be picked by another until that frame is paired", async () => {
+    const service = require('../services/pairingService');
+    const slowFrame = request.agent(app);
+    const slow = await start(slowFrame);
+    const addDevice = service.addDevice;
+    let release;
+    const gate = new Promise(resolve => { release = resolve; });
+    service.addDevice = async function (options) {
+      if (options.name === 'Slow frame') {
+        await gate;
+        const made = await addDevice.call(this, options);
+        service.pairings.get(slow.code).expiresAt = Date.now() - 1; // and it ran out meanwhile
+        return made;
+      }
+      return addDevice.call(this, options);
+    };
+    try {
+      const slowApproval = admin.post(`/api/admin/pair/${slow.code}/approve`).send({ name: 'Slow frame', newAccount: {} }).then(r => r);
+      // Wait until the slow approval's account shows up, then pair a second frame to it
+      let made;
+      for (let i = 0; i < 100 && !made; i++) {
+        made = (await admin.get('/api/access-accounts').expect(200)).body.accounts.find(a => a.name === 'Slow frame');
+        if (!made) await new Promise(resolve => setTimeout(resolve, 20));
+      }
+      expect(made).toBeTruthy();
+      const otherFrame = request.agent(app);
+      const other = await start(otherFrame);
+      const otherApproval = await admin.post(`/api/admin/pair/${other.code}/approve`).send({ name: 'Other frame', accountId: made.id });
+
+      release();
+      expect((await slowApproval).status).toBe(404);
+      // Either the second approval was refused, or the frame it paired works
+      if (otherApproval.status === 200) {
+        expect((await collect(otherFrame, other)).status).toBe('approved');
+      } else {
+        expect(otherApproval.status).toBe(400);
+      }
+    } finally {
+      service.addDevice = addDevice;
+      release();
+    }
   });
 
   test('an approval that finishes after the code expired is undone', async () => {

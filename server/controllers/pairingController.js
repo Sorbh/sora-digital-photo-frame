@@ -140,15 +140,7 @@ class PairingController {
 
   async status(req, res) {
     try {
-      const { code, secret } = req.query;
-      const status = pairing.status(code, secret);
-      // Pages loaded before collection moved to a POST only poll here. A browser
-      // that says the request is from this site's own page, and that started this
-      // pairing, still gets it handed over. Can go once those pages are reloaded.
-      if (status === 'ready' && req.get('sec-fetch-site') === 'same-origin' && this.browserKey(req, code)) {
-        return this.handOver(req, res, code, secret);
-      }
-      res.json({ success: true, status });
+      res.json({ success: true, status: pairing.status(req.query.code, req.query.secret) });
     } catch (error) {
       console.error('Error checking pairing:', error);
       res.status(500).json({ success: false, error: 'Could not check pairing' });
@@ -158,12 +150,8 @@ class PairingController {
   // A POST, so only this site's own pages can send it (middleware/sameOrigin), and
   // only from the browser that started the pairing, since it signs that browser in
   async collect(req, res) {
-    const { code, secret } = req.body || {};
-    return this.handOver(req, res, code, secret);
-  }
-
-  async handOver(req, res, code, secret) {
     try {
+      const { code, secret } = req.body || {};
       const result = pairing.collect(code, secret, this.browserKey(req, code));
       if (result.status !== 'approved') return res.json({ success: true, status: result.status });
 
@@ -228,14 +216,15 @@ class PairingController {
     };
     try {
       if (req.body.accountId) {
-        account = (await accessAccounts.loadAccounts()).find(a => a.id === req.body.accountId);
+        // Not one still being made for another frame's approval: that one may yet be undone
+        account = (await accessAccounts.loadAccounts()).find(a => a.id === req.body.accountId && !a.pendingPairing);
         if (!account) return res.status(400).json({ success: false, error: 'That account no longer exists' });
       } else if (req.body.newAccount) {
         const folders = req.body.newAccount.assignedFolders || [];
         if (!Array.isArray(folders) || folders.some(f => typeof f !== 'string')) {
           return res.status(400).json({ success: false, error: 'Folders must be a list of folder names' });
         }
-        account = await accessAccounts.addAccountWithRandomPin({ name, assignedFolders: [...new Set(folders)] });
+        account = await accessAccounts.addAccountWithRandomPin({ name, assignedFolders: [...new Set(folders)], pendingPairing: true });
         madeAccount = true;
       } else {
         return res.status(400).json({ success: false, error: 'Choose an account for the frame' });
@@ -245,6 +234,15 @@ class PairingController {
       if (!device) {
         await undoAccount();
         return res.status(404).json({ success: false, error: 'This code has expired', code: 'PAIRING_EXPIRED' });
+      }
+      if (madeAccount) {
+        // The frame is paired, so its account can be chosen for others now
+        await getDataStore().update('access-accounts', [], accounts => accounts.map((a) => {
+          if (a.id !== account.id) return a;
+          const { pendingPairing, ...paired } = a;
+          return paired;
+        }))
+          .catch(error => console.error('Could not finish the account made for a pairing:', error));
       }
       res.json({ success: true, device: { id: device.id, name: device.name }, account: this.sessionAccount(account) });
     } catch (error) {

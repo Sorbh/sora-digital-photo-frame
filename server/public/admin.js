@@ -850,7 +850,10 @@ class PhotoFrameAdmin {
         const badge = document.createElement('span');
         badge.className = 'snap-badge';
         badge.innerHTML = '<span class="material-symbols-outlined">auto_stories</span>';
-        badge.append(t('admin.snapBadge'));
+        const label = document.createElement('span');
+        label.className = 'snap-badge-text';
+        label.textContent = t('admin.snapBadge');
+        badge.appendChild(label);
         div.appendChild(badge);
 
         div.querySelector('.photo-grid-name').textContent = snap.title || file.name;
@@ -1174,36 +1177,29 @@ class PhotoFrameAdmin {
             menuItem.style.display = menuItem.dataset.for.split(' ').includes(item.type) ? '' : 'none';
         });
         
-        // Position at the right-click location, or under the options button
+        // Under the options button, or at the right-click, kept on screen (js/placeMenu.js)
         const anchor = event.type === 'click' && event.currentTarget instanceof Element
             ? event.currentTarget.getBoundingClientRect()
             : null;
-        const x = anchor ? anchor.right : event.clientX;
-        const y = anchor ? anchor.bottom + 4 : event.clientY;
         popover.style.position = 'fixed';
-        popover.style.left = (anchor ? x - popover.offsetWidth : x) + 'px';
-        popover.style.top = y + 'px';
+        popover.style.maxHeight = '';
+        popover.style.overflowY = '';
         
-        // Show the popover (re-opening moves it to the new spot)
+        // Show the popover (re-opening moves it to the new spot), then measure it
         if (!popover.matches(':popover-open')) popover.showPopover();
-        
-        // Adjust position if menu goes off screen
-        setTimeout(() => {
-            const rect = popover.getBoundingClientRect();
-            if (anchor) {
-                popover.style.left = Math.max(8, x - rect.width) + 'px';
-                if (rect.bottom > window.innerHeight) {
-                    popover.style.top = (anchor.top - rect.height - 4) + 'px';
-                }
-                return;
-            }
-            if (rect.right > window.innerWidth) {
-                popover.style.left = (x - rect.width) + 'px';
-            }
-            if (rect.bottom > window.innerHeight) {
-                popover.style.top = (y - rect.height) + 'px';
-            }
-        }, 0);
+        const spot = SoraPlaceMenu.place({
+            anchor,
+            point: { x: event.clientX, y: event.clientY },
+            width: popover.offsetWidth,
+            height: popover.offsetHeight,
+            viewport: { width: window.innerWidth, height: window.innerHeight }
+        });
+        popover.style.left = spot.left + 'px';
+        popover.style.top = spot.top + 'px';
+        if (spot.maxHeight !== null) {
+            popover.style.maxHeight = spot.maxHeight + 'px';
+            popover.style.overflowY = 'auto';
+        }
     }
 
     hideContextMenu() {

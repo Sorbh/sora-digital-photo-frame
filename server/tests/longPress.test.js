@@ -86,14 +86,24 @@ describe('library long press', () => {
     expect(onClick).toHaveBeenCalledTimes(1);
   });
 
-  test('a click long after the hold ended goes through', () => {
+  test('a keyboard click during a hold leaves the release click swallowed', () => {
     const { tile, onClick, click } = setup();
     tile.dispatchEvent(pointer('pointerdown'));
     jest.advanceTimersByTime(SoraLongPress.DELAY);
-    tile.dispatchEvent(pointer('pointerup')); // and the browser sends no click
-    jest.advanceTimersByTime(SoraLongPress.CLICK_WINDOW + 1);
-    click();
+    expect(click(0).defaultPrevented).toBe(false); // Space on the checkbox while still holding
+    tile.dispatchEvent(pointer('pointerup'));
+    expect(click().defaultPrevented).toBe(true); // the hold's own click does not open the photo
     expect(onClick).toHaveBeenCalledTimes(1);
+  });
+
+  test('a second finger does not undo the first one\'s hold', () => {
+    const { tile, onClick, click } = setup();
+    tile.dispatchEvent(pointer('pointerdown'));
+    jest.advanceTimersByTime(SoraLongPress.DELAY);
+    tile.dispatchEvent(pointer('pointerdown', { pointerId: 2, isPrimary: false }));
+    tile.dispatchEvent(pointer('pointerup'));
+    expect(click().defaultPrevented).toBe(true);
+    expect(onClick).not.toHaveBeenCalled();
   });
 
   test('moving the finger (scrolling) cancels the press', () => {

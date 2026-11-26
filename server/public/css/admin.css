@@ -314,7 +314,36 @@ body {
 }
 
 .snap-badge .material-symbols-outlined {
+    flex: none;
     font-size: 14px;
+}
+
+/* Long names ("Page souvenir") stop short of the options button: start 46px,
+   button and its margins about 56px */
+.snap-badge {
+    max-width: calc(100% - 104px);
+}
+
+.snap-badge-text {
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+/* Too narrow for any of the word (small phones): the book icon alone says snap */
+.file-item.snap {
+    container-type: inline-size;
+}
+
+@container (max-width: 180px) {
+    .snap-badge {
+        padding-inline-end: 7px;
+    }
+
+    .snap-badge-text {
+        display: none;
+    }
 }
 
 .photo-grid-overlay {

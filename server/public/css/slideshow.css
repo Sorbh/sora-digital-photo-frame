@@ -1039,8 +1039,9 @@ body.note-showing .photo-caption {
     }
 }
 
-/* 320px phones: no dividers and a slimmer frame keep all seven 44px buttons on one row */
-@media (max-width: 339px) {
+/* Phones up to 360px: no dividers and a slimmer frame keep all seven 44px
+   buttons on one row (312px) from 320px up, clear of the date and weather */
+@media (max-width: 360px) {
     .controls {
         padding: 4px 2px;
     }

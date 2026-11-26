@@ -90,6 +90,7 @@ SESSION_SECRET=$(openssl rand -base64 32)
 | `SESSION_SECRET` | Signs session cookies and encrypts Google Photos tokens | **Recommended** | made up at first start, kept in the data volume |
 | `ADMIN_PASSWORD` | Admin login password | **Recommended** | made up at first start, printed in the logs |
 | `TRUST_PROXY` | Which `X-Forwarded-*` headers to believe. `false` if nothing sits in front of the server | No | 1 (one reverse proxy) |
+| `MAX_FOLDER_DEPTH` | How many folder levels the library may have below its root (`2`: folders and subfolders). Deeper folders that already exist keep working | No | 0 (no limit) |
 | `GOOGLE_CLIENT_ID` | Google Photos API client ID | No | - |
 | `GOOGLE_CLIENT_SECRET` | Google Photos API secret | No | - |
 | `GOOGLE_REDIRECT_URI` | Google OAuth redirect URI | No | - |

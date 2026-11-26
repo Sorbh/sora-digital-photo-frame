@@ -2,6 +2,29 @@ const crypto = require('crypto');
 const oauthManager = require('../utils/oauthManager');
 const jobManager = require('../utils/jobManager');
 const { passClientError } = require('../utils/httpError');
+const { resolveAdminPath } = require('../utils/safePath');
+const { assertFolderAllowed } = require('../utils/folderDepth');
+
+// MAX_FOLDER_DEPTH: refuse a destination the import would have to create past the
+// limit up front, before photos are picked or downloaded. True when it answered.
+async function refuseTooDeep(res, destinationPath) {
+  const fullPath = resolveAdminPath(destinationPath, { allowRoot: true });
+  if (!fullPath) return false; // the library refuses paths outside uploads/ when saving
+  try {
+    await assertFolderAllowed(fullPath);
+    return false;
+  } catch (error) {
+    if (error.code !== 'FOLDER_TOO_DEEP') throw error;
+    res.status(400).json({
+      success: false,
+      code: error.code,
+      message: error.message,
+      ...error.vars,
+      error: { code: error.code, message: error.message }
+    });
+    return true;
+  }
+}
 const { isGooglePhotoUrl, fetchGooglePhoto } = require('../utils/googleUrls');
 
 // Simple async handler for error handling
@@ -231,6 +254,8 @@ const googlePhotosController = {
           }
         });
       }
+
+      if (await refuseTooDeep(res, destinationPath)) return;
 
       // Create picker session using Google Photos Picker API
       const sessionData = await oauthManager.createPickerSession(tokens.access_token, destinationPath);
@@ -475,6 +500,8 @@ const googlePhotosController = {
           }
         });
       }
+
+      if (await refuseTooDeep(res, destinationPath)) return;
 
       console.log('🔧 [DEBUG] Starting background import job for', mediaItems.length, 'photos to', destinationPath);
 

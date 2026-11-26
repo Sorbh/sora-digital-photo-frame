@@ -21,6 +21,7 @@ async function readLimited(response, max) {
   return Buffer.concat(chunks);
 }
 const { resolveAdminPath } = require('./safePath');
+const { assertFolderAllowed } = require('./folderDepth');
 const { UPLOADS_DIR } = require('../config/paths');
 const photoInfo = require('../services/photoInfoService');
 
@@ -108,7 +109,10 @@ class JobManager {
     // Set up progress tracking
     job.progress.total = mediaItems.length;
 
-    // Ensure destination folder exists (the library refuses paths outside uploads/)
+    // Ensure destination folder exists (the library refuses paths outside uploads/),
+    // and not past MAX_FOLDER_DEPTH (the import route already refused that up front)
+    const destinationDir = resolveAdminPath(destinationPath, { allowRoot: true });
+    if (destinationDir) await assertFolderAllowed(destinationDir);
     await getLibrary().createFolder(destinationPath);
     let quotaReached = false;
 

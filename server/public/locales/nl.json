@@ -244,7 +244,8 @@
     "BUSY": "Er worden nu veel foto's geüpload. Probeer het zo opnieuw.",
     "PHOTO_CHANGED": "Deze foto is veranderd tijdens het draaien. Probeer het opnieuw.",
     "UNSUPPORTED_TYPE": "Je kunt alleen JPEG-, PNG-, GIF-, WebP- en HEIC-foto's uploaden",
-    "SCREEN_LIMIT": "Deze familie heeft al {limit} schermen. Verwijder er een die je niet meer gebruikt om dit scherm toe te voegen."
+    "SCREEN_LIMIT": "Deze familie heeft al {limit} schermen. Verwijder er een die je niet meer gebruikt om dit scherm toe te voegen.",
+    "FOLDER_TOO_DEEP": "Hier kan geen nieuwe map worden gemaakt: mappen mogen hoogstens {limit} niveaus diep zijn."
   },
   "admin": {
     "static_001": "Bibliotheek · Sora Frame",

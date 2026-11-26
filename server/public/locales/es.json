@@ -244,7 +244,8 @@
     "BUSY": "Se están subiendo muchas fotos ahora mismo. Inténtalo de nuevo en un momento.",
     "PHOTO_CHANGED": "Esta foto cambió mientras se giraba. Inténtalo de nuevo.",
     "UNSUPPORTED_TYPE": "Solo se pueden subir fotos JPEG, PNG, GIF, WebP y HEIC",
-    "SCREEN_LIMIT": "Esta familia ya tiene {limit} pantallas. Quita una que ya no uses para añadir esta."
+    "SCREEN_LIMIT": "Esta familia ya tiene {limit} pantallas. Quita una que ya no uses para añadir esta.",
+    "FOLDER_TOO_DEEP": "Aquí no se puede crear una carpeta nueva: las carpetas pueden tener como máximo {limit} niveles de profundidad."
   },
   "admin": {
     "static_001": "Biblioteca · Sora Frame",

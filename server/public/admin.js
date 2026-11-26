@@ -584,6 +584,8 @@ class PhotoFrameAdmin {
         this.playOrder = data.order || 'shuffle';
         this.fileNames = data.files.map(file => file.name);
         this.showPlayOrder();
+        // MAX_FOLDER_DEPTH: no "New folder" in a folder at the deepest level
+        document.getElementById('createFolderBtn').classList.toggle('hidden', data.canCreateFolder === false);
         
         // Background hint under the grid; the empty state has its own upload box
         const isEmpty = data.folders.length === 0 && data.files.length === 0;

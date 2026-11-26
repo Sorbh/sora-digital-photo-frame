@@ -26,6 +26,7 @@ const { setAuthProvider, setPublicPhotos, requirePhotoViewer, announceAdminPassw
 const { sessionSecret, announceSessionSecret } = require('./utils/sessionSecret');
 const { setEvents } = require('./events');
 const accessAccounts = require('./controllers/accessAccountController');
+const { setMaxFolderDepth } = require('./utils/folderDepth');
 
 /**
  * Build the photo frame app. The self-hosted server calls this with no
@@ -72,6 +73,8 @@ function createApp({ sessionStore, beforeRoutes, library, dataStore, resolveTena
   setEvents(events);
   accessAccounts.pinSignIn = pinSignIn !== false;
   accessAccounts.familyCode = familyCode === true;
+  // MAX_FOLDER_DEPTH (.env): how deep new folders may go; unset or 0 = no limit
+  setMaxFolderDepth(process.env.MAX_FOLDER_DEPTH);
 
   // Which X-Forwarded-* headers to believe (client address, https). The default, 1,
   // fits one reverse proxy in front. With nothing in front, set TRUST_PROXY=false,

@@ -14,6 +14,7 @@ const playOrder = require('../services/playOrderService');
 const photoInfo = require('../services/photoInfoService');
 const { resolveAdminPath, toAdminPath } = require('../utils/safePath');
 const { passClientError } = require('../utils/httpError');
+const { assertFolderAllowed } = require('../utils/folderDepth');
 
 class ImageController {
   constructor() {
@@ -282,6 +283,8 @@ class ImageController {
       if (!targetDir) {
         return res.status(400).json({ message: 'Invalid upload folder' });
       }
+      // Uploading makes a missing folder: not one past MAX_FOLDER_DEPTH
+      await assertFolderAllowed(targetDir);
 
       // A phone that shrank a photo before sending it says what the original knew (js/photoUpload.js)
       let sentInfo = [];

@@ -159,11 +159,20 @@ describe("the family's limit on wrong PINs", () => {
     expect(statuses.filter(s => s === 429)).toHaveLength(7);
   });
 
-  test('a lockout lasts through a restart', async () => {
+  test('a lockout lasts through a restart, for every request arriving at once', async () => {
     for (let i = 0; i < 5; i++) await tryPin('000000').expect(401);
-    await tryPin('7351').expect(429);
+    await tryPin('7351').expect(429); // answered only once the lockout is saved
     restart();
-    await tryPin('7351').expect(429);
+    const results = await Promise.all([tryPin('000000'), tryPin('7351'), tryPin('000000')]);
+    expect(results.map(r => r.status)).toEqual([429, 429, 429]);
+  });
+
+  test("one address can't go over its own limit by sending tries at once", async () => {
+    const ip = '203.0.113.77';
+    for (let i = 0; i < 4; i++) accessAccounts.limiter.fail(`ip:${ip}`); // one try left
+    const send = () => request(app).post('/api/auth/pin').set('X-Forwarded-For', ip).send({ pin: '000000' });
+    const statuses = (await Promise.all([send(), send(), send()])).map(r => r.status).sort();
+    expect(statuses).toEqual([401, 429, 429]);
   });
 
   test('is not used up by right PINs refused for the screen limit', async () => {

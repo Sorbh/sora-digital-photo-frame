@@ -205,7 +205,8 @@ class AuthenticationManager {
             const data = await this.requestPin(pin);
             if (!data.success) {
                 this.showAuthOverlay();
-                this.handleAuthError(data.error, data.code, data);
+                // Too many tries just now: try the same PIN again once the wait is over
+                this.handleAuthError(data.error, data.code, data, () => this.signInFromUrl(pin));
                 return;
             }
             this.keepScreen(data);
@@ -371,7 +372,7 @@ class AuthenticationManager {
         }));
     }
 
-    handleAuthError(error, errorCode, data = {}) {
+    handleAuthError(error, errorCode, data = {}, retry = null) {
         // Hosted, a wrong family code and a wrong PIN look the same on purpose
         if (errorCode === 'INVALID_PIN' && this.familyCodeRequired) this.showErrorKey('slideshow.familyOrPinWrong');
         else this.showError(i18n.error({ ...data, code: errorCode, message: error }, 'slideshow.invalidPin'));
@@ -380,6 +381,15 @@ class AuthenticationManager {
             this.pinInput.disabled = true;
             this.pinInput.classList.add('border-destructive');
             this.authButton.disabled = true;
+            // The form comes back when the wait is over (and a bookmarked PIN is tried again)
+            clearTimeout(this.rateLimitTimer);
+            this.rateLimitTimer = setTimeout(() => {
+                this.pinInput.disabled = false;
+                this.authButton.disabled = false;
+                this.pinInput.classList.remove('border-destructive');
+                this.clearError();
+                if (retry) retry();
+            }, Math.max(1, Number(data.remainingTime) || 1) * 60 * 1000);
         } else {
             this.pinInput.classList.add('border-destructive');
             this.focusPin();

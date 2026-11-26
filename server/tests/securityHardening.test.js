@@ -103,6 +103,28 @@ describe('the attempt limiter', () => {
     expect((await limiter.begin('k')).allowed).toBe(false);
   });
 
+  test('a try that gave up waiting leaves the queue', async () => {
+    const limiter = new AttemptLimiter({ maxAttempts: 1, maxWait: 50 });
+    await limiter.begin('k');
+    const gaveUp = await limiter.begin('k');
+    expect(gaveUp.allowed).toBe(false);
+    expect(limiter.waiting.get('k') || []).toHaveLength(0);
+    limiter.end('k', false);
+  });
+
+  test('a lockout is answered only once it has been saved', async () => {
+    let saved = false;
+    const limiter = new AttemptLimiter({
+      maxAttempts: 1,
+      onLockout: () => new Promise(resolve => setTimeout(() => { saved = true; resolve(); }, 20))
+    });
+    await limiter.begin('k');
+    limiter.end('k', true);
+    const locked = await limiter.begin('k');
+    expect(locked.allowed).toBe(false);
+    expect(saved).toBe(true);
+  });
+
   test('a right try leaves the clock of wrong tries alone', async () => {
     let now = 0;
     const realNow = Date.now;

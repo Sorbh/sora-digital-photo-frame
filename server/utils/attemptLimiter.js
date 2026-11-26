@@ -17,7 +17,7 @@ class AttemptLimiter {
         maxTracked = 10000, // keys remembered at once, so made-up addresses can't grow memory forever
         keep = () => false, // keys never dropped to make room
         maxWait = 10 * 1000, // how long begin() waits for tries being checked
-        onLockout = () => {} // (key, { lockoutUntil, lockouts, lastLockout }) when a lockout starts
+        onLockout = () => {} // (key, { lockoutUntil, lockouts, lastLockout }) when a lockout starts; may return a promise
     } = {}) {
         Object.assign(this, { maxAttempts, attemptWindow, lockoutDuration, maxLockout, strikeMemory, maxTracked, keep, maxWait, onLockout });
         this.entries = new Map();
@@ -59,7 +59,10 @@ class AttemptLimiter {
             record.lockouts = (record.lockouts || 0) + 1;
             record.lockoutUntil = now + duration;
             record.lastLockout = now;
-            this.onLockout(key, { lockoutUntil: record.lockoutUntil, lockouts: record.lockouts, lastLockout: now });
+            // begin() answers only once this is done (saving the lockout, say)
+            record.saving = new Promise(resolve => resolve(
+                this.onLockout(key, { lockoutUntil: record.lockoutUntil, lockouts: record.lockouts, lastLockout: now })
+            )).catch(() => {});
             return this.locked(duration);
         }
 
@@ -110,7 +113,10 @@ class AttemptLimiter {
         const until = Date.now() + this.maxWait;
         for (;;) {
             const status = this.check(key);
-            if (!status.allowed) return status;
+            if (!status.allowed) {
+                await this.entries.get(key)?.saving;
+                return status;
+            }
             const pending = this.pending.get(key) || 0;
             if (this.maxAttempts - status.attemptsRemaining + pending < this.maxAttempts) {
                 this.pending.set(key, pending + 1);
@@ -119,9 +125,17 @@ class AttemptLimiter {
             const left = until - Date.now();
             if (left <= 0) return this.locked(60 * 1000);
             await new Promise(resolve => {
-                const timer = setTimeout(resolve, left);
                 if (!this.waiting.has(key)) this.waiting.set(key, []);
-                this.waiting.get(key).push(() => { clearTimeout(timer); resolve(); });
+                const queue = this.waiting.get(key);
+                const wake = () => { clearTimeout(timer); resolve(); };
+                // Gave up waiting: out of the queue, so stalled checks don't pile up callbacks
+                const timer = setTimeout(() => {
+                    const at = queue.indexOf(wake);
+                    if (at !== -1) queue.splice(at, 1);
+                    if (!queue.length && this.waiting.get(key) === queue) this.waiting.delete(key);
+                    resolve();
+                }, left);
+                queue.push(wake);
             });
         }
     }

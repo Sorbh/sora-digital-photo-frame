@@ -28,20 +28,25 @@ class AccessAccountController {
         this.limiter = new AttemptLimiter({
             keep: key => key.startsWith('family:'),
             onLockout: (key, lockout) => {
-                if (!key.startsWith('family:')) return;
-                getDataStore().set('pin-lockout', lockout)
+                if (!key.startsWith('family:')) return null;
+                return getDataStore().set('pin-lockout', lockout)
                     .catch(error => console.error('Could not save the PIN lockout:', error.message));
             }
         });
-        this.restoredLockouts = new Set(); // families whose saved lockout was read since starting
+        this.restoredLockouts = new Map(); // family -> reading its saved lockout, once since starting
     }
 
-    // Reads a family's saved lockout once after a restart
-    async restoreLockout(familyKey) {
-        if (this.restoredLockouts.has(familyKey)) return;
-        this.restoredLockouts.add(familyKey);
-        const lockout = await getDataStore().get('pin-lockout', null).catch(() => null);
-        if (lockout && Number.isFinite(lockout.lockoutUntil)) this.limiter.restore(familyKey, lockout);
+    // Reads a family's saved lockout once after a restart. Every request for the
+    // family waits for the same read, so none gets in before it's back.
+    restoreLockout(familyKey) {
+        if (!this.restoredLockouts.has(familyKey)) {
+            this.restoredLockouts.set(familyKey, getDataStore().get('pin-lockout', null)
+                .catch(() => null)
+                .then((lockout) => {
+                    if (lockout && Number.isFinite(lockout.lockoutUntil)) this.limiter.restore(familyKey, lockout);
+                }));
+        }
+        return this.restoredLockouts.get(familyKey);
     }
 
     async loadAccounts() {
@@ -366,7 +371,19 @@ class AccessAccountController {
                 });
             }
 
-            // Count the address's try before checking it (see recordFailedAttempt)
+            // The address again, now that waiting for the family is over: other tries
+            // from it may have been counted meanwhile. Then its try is counted before
+            // checking it (see recordFailedAttempt), with no wait in between.
+            const addressCheck = this.checkRateLimit(addressKey);
+            if (!addressCheck.allowed) {
+                this.limiter.end(familyKey, false);
+                return res.status(429).json({
+                    success: false,
+                    error: addressCheck.message,
+                    code: 'RATE_LIMITED',
+                    remainingTime: addressCheck.remainingTime
+                });
+            }
             this.recordFailedAttempt(addressKey);
 
             let accounts = [];

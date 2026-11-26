@@ -64,6 +64,15 @@ class PhotoInfoService {
     state.saveTimer.unref?.();
   }
 
+  // Drop any waiting saves (a test that is done and removing its folders)
+  discard() {
+    for (const state of this.states.values()) {
+      clearTimeout(state.saveTimer);
+      state.saveTimer = null;
+      state.save = null;
+    }
+  }
+
   // Write any waiting saves now (on shutdown, or before a test removes its folders)
   async flush() {
     await Promise.all([...this.states.values()].map(state => {

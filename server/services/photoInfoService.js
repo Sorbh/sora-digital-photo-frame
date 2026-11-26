@@ -1,4 +1,5 @@
 const exifr = require('exifr');
+const { AsyncResource } = require('async_hooks');
 
 const path = require('path');
 const { toAdminPath, UPLOADS_DIR } = require('../utils/safePath');
@@ -24,7 +25,7 @@ const ADMIN_SUFFIX = /\s+(municipal corporation|municipal council|municipality|m
  */
 class PhotoInfoService {
   constructor() {
-    this.states = new Map(); // tenant id -> { info, places, saveTimer }
+    this.states = new Map(); // tenant id -> { info, places, saveTimer, save }
     this.pending = new Map();
     this.placeQueue = Promise.resolve(); // shared: the rate limit is per server, not per tenant
   }
@@ -32,7 +33,7 @@ class PhotoInfoService {
   // Each tenant has its own cache of photo info and place names
   state() {
     const { id } = currentTenant();
-    if (!this.states.has(id)) this.states.set(id, { info: null, places: null, saveTimer: null });
+    if (!this.states.has(id)) this.states.set(id, { info: null, places: null, saveTimer: null, save: null });
     return this.states.get(id);
   }
 
@@ -52,11 +53,32 @@ class PhotoInfoService {
   scheduleSave() {
     const state = this.state();
     clearTimeout(state.saveTimer);
-    state.saveTimer = setTimeout(() => {
-      Promise.all([getDataStore().set('photo-info', state.info), getDataStore().set('places', state.places)])
+    // Bound to this request's context, so an early flush() still saves for the right tenant
+    state.save = AsyncResource.bind(() => {
+      state.saveTimer = null;
+      state.save = null;
+      return Promise.all([getDataStore().set('photo-info', state.info), getDataStore().set('places', state.places)])
         .catch(error => console.error('Could not save photo info cache:', error.message));
-    }, 2000);
+    });
+    state.saveTimer = setTimeout(state.save, 2000);
     state.saveTimer.unref?.();
+  }
+
+  // Drop any waiting saves (a test that is done and removing its folders)
+  discard() {
+    for (const state of this.states.values()) {
+      clearTimeout(state.saveTimer);
+      state.saveTimer = null;
+      state.save = null;
+    }
+  }
+
+  // Write any waiting saves now (on shutdown, or before a test removes its folders)
+  async flush() {
+    await Promise.all([...this.states.values()].map(state => {
+      clearTimeout(state.saveTimer);
+      return state.save ? state.save() : null;
+    }));
   }
 
   // { takenAt, lat, lon, modifiedAt } for a photo (or a snap: its creation date)

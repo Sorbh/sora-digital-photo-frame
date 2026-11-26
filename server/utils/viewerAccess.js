@@ -3,6 +3,7 @@
 // folders and everything inside them; folders above them can be opened to get
 // there, but show only what leads to the assigned ones.
 const path = require('path');
+const { getLibrary } = require('../library');
 
 // Folders are split where the photo storage splits them: on Windows at a
 // backslash too, elsewhere a backslash is just part of a name
@@ -42,6 +43,35 @@ function canOpen(req, relativePath) {
   return canSee(req, relativePath) || foldersBelow(req, relativePath).length > 0;
 }
 
+// A photo (relative to uploads) in this folder or one inside it. Either may use
+// "/"; on Windows (sep "\\") either may use "\\" too, as path.relative writes it.
+// An empty folder name is in no photo's path, so it matches none.
+function inFolder(relativePath, folder, sep = path.sep) {
+  const split = (value) => String(value || '').split(sep === '\\' ? /[\\/]/ : /\//).filter(Boolean);
+  const want = split(folder);
+  const have = split(relativePath).slice(0, -1);
+  return want.length > 0 && have.length >= want.length && want.every((part, i) => part === have[i]);
+}
+
+// What a path (relative to uploads) really reads once symlinks are followed,
+// "/"-separated, when the viewer may see it there as well as where it was asked
+// for; null when it can't be seen, or leads out of the library. check is canSee,
+// or canOpen for a folder. Libraries without realPath are taken as they are.
+async function realVisiblePath(req, relativePath, check = canSee) {
+  if (!check(req, relativePath)) return null;
+  const library = getLibrary();
+  if (typeof library.realPath !== 'function') return relativePath;
+  let real;
+  try {
+    real = await library.realPath(relativePath ? `uploads/${relativePath}` : 'uploads');
+  } catch {
+    return null;
+  }
+  if (typeof real !== 'string') return null;
+  const realRelative = segments(real).filter(Boolean).slice(1).join('/');
+  return check(req, realRelative) ? realRelative : null;
+}
+
 // The photo an /uploads request asks for (relative to uploads), or null when it
 // can't be decoded or has "." or ".." segments
 function photoPath(req) {
@@ -65,16 +95,22 @@ function isFolderUrl(req) {
   }
 }
 
-// For /uploads: photos outside the account's folders look like they don't exist.
-// The request goes on with the path that was checked in req.photoPath, for
-// whatever reads the file (see atPhotoPath).
-function requireVisiblePhoto(req, res, next) {
-  const relativePath = photoPath(req);
-  if (relativePath === null || !canSee(req, relativePath)) {
-    return res.status(404).json({ message: 'Not found', code: 'NOT_FOUND' });
+// For /uploads: photos outside the account's folders look like they don't exist,
+// also when a symlink leads there (or out of the library). The request goes on
+// with the real path that was checked in req.photoPath, for whatever reads the
+// file (see atPhotoPath).
+async function requireVisiblePhoto(req, res, next) {
+  try {
+    const relativePath = photoPath(req);
+    const real = relativePath === null ? null : await realVisiblePath(req, relativePath);
+    if (real === null) {
+      return res.status(404).json({ message: 'Not found', code: 'NOT_FOUND' });
+    }
+    req.photoPath = real;
+    return next();
+  } catch (error) {
+    return next(error);
   }
-  req.photoPath = relativePath;
-  return next();
 }
 
 // Runs a file reader that goes by the URL (express.static, webpFallback) on the
@@ -95,4 +131,4 @@ function atPhotoPath(reader) {
   };
 }
 
-module.exports = { assignedFolders, canSee, canOpen, foldersBelow, photoPath, isFolderUrl, requireVisiblePhoto, atPhotoPath };
+module.exports = { assignedFolders, canSee, canOpen, foldersBelow, inFolder, realVisiblePath, photoPath, isFolderUrl, requireVisiblePhoto, atPhotoPath };

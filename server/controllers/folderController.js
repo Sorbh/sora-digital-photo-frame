@@ -7,8 +7,8 @@ const playOrder = require('../services/playOrderService');
 const imageController = require('./imageController');
 const { resolveAdminPath, toAdminPath, uploadsUrl } = require('../utils/safePath');
 const { passClientError } = require('../utils/httpError');
-const { canSee, canOpen, foldersBelow } = require('../utils/viewerAccess');
-const { maxFolderDepth, allowsFolderIn, folderTooDeepError } = require('../utils/folderDepth');
+const { canSee, canOpen, foldersBelow, realVisiblePath } = require('../utils/viewerAccess');
+const { maxFolderDepth, canMakeFolderIn, folderTooDeepError } = require('../utils/folderDepth');
 
 class FolderController {
   constructor() {
@@ -108,14 +108,18 @@ class FolderController {
   // Get folder structure for slideshow selection
   async getFolderStructure(req, res) {
     try {
-      const folderPath = req.params.folderPath || '';
-      const fullPath = thumbnails.resolveInUploads(folderPath);
+      const requestedPath = req.params.folderPath || '';
+      const requested = thumbnails.resolveInUploads(requestedPath);
+      // Folders a frame can't open look like they don't exist, also through a symlink.
+      // A symlinked folder is listed where it really is, so what's inside is checked there.
+      const visible = requested ? await realVisiblePath(req, path.relative(this.uploadsDir, requested), canOpen) : null;
+      const fullPath = visible === null ? null : path.join(this.uploadsDir, visible);
+      const folderPath = fullPath && requestedPath ? path.relative(this.uploadsDir, fullPath) : requestedPath;
 
-      // Folders a frame can't open look like they don't exist
-      if (!fullPath || !canOpen(req, path.relative(this.uploadsDir, fullPath)) || !await getLibrary().exists(toAdminPath(fullPath))) {
+      if (!fullPath || !await getLibrary().exists(toAdminPath(fullPath))) {
         return res.status(404).json({ 
           success: false,
-          error: `Folder not found: ${folderPath}`,
+          error: `Folder not found: ${requestedPath}`,
           code: 'FOLDER_NOT_FOUND'
         });
       }
@@ -124,14 +128,6 @@ class FolderController {
       let folders = [];
       let images = [];
       
-      // Check if user has access restrictions (PIN authenticated users, not admin)
-      const hasAccessRestrictions = req.session && req.session.accessAccount && req.session.accessAccount.assignedFolders && req.session.accessAccount.assignedFolders.length > 0 && !req.session.authenticated;
-      let allowedFolders = null;
-      
-      if (hasAccessRestrictions) {
-        allowedFolders = req.session.accessAccount.assignedFolders;
-      }
-
       // Folder details (counts, covers) are gathered in parallel after filtering
       const folderJobs = [];
       
@@ -142,23 +138,9 @@ class FolderController {
           const itemPath = path.join(fullPath, item.name);
           const relativePath = folderPath ? path.join(folderPath, item.name) : item.name;
           
-          // Apply access control filtering
-          if (hasAccessRestrictions) {
-            // Check if this folder or any parent folder is in allowed folders
-            const folderAllowed = allowedFolders.some(allowedFolder => {
-              // Check if current folder matches allowed folder exactly
-              if (relativePath === allowedFolder) return true;
-              // Check if current folder is a parent of an allowed folder
-              if (allowedFolder.startsWith(relativePath + path.sep)) return true;
-              // Check if current folder is a child of an allowed folder
-              if (relativePath.startsWith(allowedFolder + path.sep)) return true;
-              return false;
-            });
-            
-            if (!folderAllowed) {
-              continue; // Skip this folder
-            }
-          }
+          // Only an assigned folder, one inside it, or one on the way to it
+          // (whatever the separators: "/" from the frame, "\\" on Windows)
+          if (!canOpen(req, relativePath)) continue;
 
           folderJobs.push((async () => {
             const [subItems, { imageCount, thumbnail }] = await Promise.all([
@@ -176,21 +158,9 @@ class FolderController {
           })());
         } else if (item.isFile() && /\.(jpg|jpeg|png|gif|webp)$/i.test(item.name)) {
           const relativePath = folderPath ? path.join(folderPath, item.name) : item.name;
-          const imageFolder = path.dirname(relativePath);
-          
-          // Apply access control filtering for images
-          if (hasAccessRestrictions) {
-            const imageAllowed = allowedFolders.some(allowedFolder => {
-              // Check if image folder matches allowed folder exactly
-              if (imageFolder === allowedFolder) return true;
-              // Check if image folder is a child of an allowed folder
-              if (imageFolder.startsWith(allowedFolder + path.sep)) return true;
-              return false;
-            });
-            if (!imageAllowed) {
-              continue; // Skip this image
-            }
-          }
+
+          // Only photos in an assigned folder or one inside it
+          if (!canSee(req, relativePath)) continue;
           
           images.push({
             id: relativePath,
@@ -253,9 +223,12 @@ class FolderController {
   // Get folder thumbnail endpoint
   async getFolderThumbnail(req, res) {
     try {
-      const fullPath = thumbnails.resolveInUploads(req.params.folderPath);
-      // Only a cover from inside the frame's own folders
-      if (fullPath && !canSee(req, path.relative(this.uploadsDir, fullPath))) {
+      const requested = thumbnails.resolveInUploads(req.params.folderPath);
+      // Only a cover from inside the frame's own folders, also through a symlink:
+      // found where the folder really is
+      const visible = requested ? await realVisiblePath(req, path.relative(this.uploadsDir, requested)) : null;
+      const fullPath = visible === null ? requested : path.join(this.uploadsDir, visible);
+      if (fullPath && visible === null) {
         return res.status(404).json({
           success: false,
           error: 'No thumbnail available for folder',
@@ -363,7 +336,7 @@ class FolderController {
         order,
         // MAX_FOLDER_DEPTH: the library hides "New folder" where one can't be made
         maxFolderDepth: maxFolderDepth(),
-        canCreateFolder: allowsFolderIn(fullPath),
+        canCreateFolder: await canMakeFolderIn(fullPath),
         folders: folders.sort((a, b) => a.name.localeCompare(b.name)),
         files: sorted.map(entry => entry.file)
       });
@@ -380,7 +353,7 @@ class FolderController {
     try {
       const fullPath = resolveAdminPath(req.query.path || 'uploads', { allowRoot: true });
       if (!fullPath || !(await getLibrary().stat(toAdminPath(fullPath)).catch(() => null))?.isFolder) {
-        return res.status(404).json({ success: false, error: 'Folder not found' });
+        return res.status(404).json({ success: false, error: 'Folder not found', code: 'FOLDER_NOT_FOUND' });
       }
 
       const { order, sequence } = req.body || {};
@@ -422,8 +395,8 @@ class FolderController {
         return res.status(400).json({ message: 'Invalid parent folder' });
       }
 
-      // MAX_FOLDER_DEPTH: no new folder past the deepest level
-      if (!allowsFolderIn(parentDir)) throw folderTooDeepError();
+      // MAX_FOLDER_DEPTH: no new folder past the deepest level (where it really is, after symlinks)
+      if (!await canMakeFolderIn(parentDir)) throw folderTooDeepError();
 
       const fullPath = path.join(parentDir, name.trim());
       if (await getLibrary().exists(toAdminPath(fullPath))) {

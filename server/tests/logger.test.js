@@ -237,6 +237,8 @@ describe('Google Photos token check', () => {
 });
 
 describe('Controller logs', () => {
+  afterAll(() => fs.remove(testUploadsDir)); // the folder-name test below writes a photo
+
   let output;
   let spies;
   beforeEach(() => {

@@ -26,4 +26,13 @@ function clientErrorResponse(res, error, extra = {}) {
   return true;
 }
 
-module.exports = { passClientError, clientErrorResponse };
+/**
+ * The error for saving into a folder that isn't there (deleted while a photo was
+ * still being saved into it, say). Saving never brings a folder back: only
+ * creating it on purpose does (see PhotoLibrary).
+ */
+function folderNotFoundError() {
+  return Object.assign(new Error('Folder not found'), { status: 404, code: 'FOLDER_NOT_FOUND' });
+}
+
+module.exports = { passClientError, clientErrorResponse, folderNotFoundError };

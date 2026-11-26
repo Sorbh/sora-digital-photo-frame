@@ -246,7 +246,8 @@
     "PHOTO_CHANGED": "Esta foto mudou enquanto era girada. Tente de novo.",
     "UNSUPPORTED_TYPE": "Só é possível enviar fotos JPEG, PNG, GIF, WebP e HEIC",
     "SCREEN_LIMIT": "Esta família já tem {limit} telas. Remova uma que você não usa mais para adicionar esta.",
-    "FOLDER_TOO_DEEP": "Não é possível criar uma pasta aqui: as pastas podem ter no máximo {limit} níveis de profundidade."
+    "FOLDER_TOO_DEEP": "Não é possível criar uma pasta aqui: as pastas podem ter no máximo {limit} níveis de profundidade.",
+    "FOLDER_NOT_FOUND": "Esta pasta não existe mais. Talvez tenha sido excluída."
   },
   "admin": {
     "static_001": "Biblioteca · Sora Frame",

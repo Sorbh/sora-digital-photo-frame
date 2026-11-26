@@ -5,7 +5,19 @@
     const $ = id => document.getElementById(id);
     // As shown on the frame (K7P-4QX), any case, with or without the hyphen or spaces
     const normalize = value => String(value || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-    let code = normalize(new URLSearchParams(location.search).get('code'));
+    // A typed code is kept for this tab only, not in the address: a reload, or
+    // signing in again, comes back to it without the code going into ?next=
+    const CODE_KEY = 'sora_pair_code';
+    const remember = value => {
+        try {
+            if (value) sessionStorage.setItem(CODE_KEY, value);
+            else sessionStorage.removeItem(CODE_KEY);
+        } catch (_) { /* storage off: the code is typed again */ }
+    };
+    const remembered = () => {
+        try { return sessionStorage.getItem(CODE_KEY); } catch (_) { return null; }
+    };
+    let code = normalize(new URLSearchParams(location.search).get('code') || remembered());
     const states = ['stateLoading', 'stateEnter', 'stateExpired', 'stateUnreachable', 'pairForm', 'stateDone'];
 
     const show = id => states.forEach(s => $(s).classList.toggle('hidden', s !== id));
@@ -78,7 +90,12 @@
     async function getJson(url, options) {
         const response = await fetch(url, options);
         if (response.status === 401) {
-            location.href = `/login?next=${encodeURIComponent(location.pathname + location.search)}`;
+            // Back here after signing in, with the code kept aside rather than in the sign-in address
+            remember(code);
+            const query = new URLSearchParams(location.search); // keeps ?lang= and the like
+            query.delete('code');
+            const back = query.toString() ? `${location.pathname}?${query}` : location.pathname;
+            location.href = `/login?next=${encodeURIComponent(back)}`;
             throw Object.assign(new Error('Signed out'), { signedOut: true });
         }
         // A proxy's error page (or a sign-in page) is not JSON: `json` is false then
@@ -88,6 +105,12 @@
         } catch (_) { /* not JSON */ }
         const json = Boolean(data) && typeof data === 'object';
         return { ok: response.ok, status: response.status, json, data: json ? data : {} };
+    }
+
+    // A code that is used up or too old is not offered again
+    function expired() {
+        remember(null);
+        show('stateExpired');
     }
 
     function showEnter() {
@@ -102,7 +125,7 @@
             const pairing = await getJson(`/api/admin/pair/${encodeURIComponent(code)}`);
             // Only the server's own "no such code" means expired; anything else (a 503,
             // a proxy's 404 page, a restarting server) is worth another try
-            if (pairing.json && (pairing.data.code === 'PAIRING_EXPIRED' || (pairing.ok && pairing.data.approved))) return show('stateExpired');
+            if (pairing.json && (pairing.data.code === 'PAIRING_EXPIRED' || (pairing.ok && pairing.data.approved))) return expired();
             if (!pairing.ok || !pairing.json || typeof pairing.data.code !== 'string') return show('stateUnreachable');
 
             // The folder list only matters for a new account: without it, "no ticks"
@@ -136,14 +159,26 @@
         }
         $('codeError').classList.add('hidden');
         code = typed;
-        // So a reload, or signing in again, comes back to this code
-        const query = new URLSearchParams(location.search); // keeps ?lang= and the like
-        query.set('code', code);
-        history.replaceState(null, '', `/pair?${query}`);
+        remember(code);
         load();
     });
 
     $('codeInput').addEventListener('input', () => $('codeError').classList.add('hidden'));
+
+    // "Type a code" is for another code: forget this one (a reload would check it again)
+    document.querySelectorAll('a[href="/pair"]').forEach(link => link.addEventListener('click', event => {
+        event.preventDefault();
+        remember(null);
+        code = '';
+        $('codeInput').value = '';
+        $('codeError').classList.add('hidden');
+        const query = new URLSearchParams(location.search);
+        if (query.has('code')) {
+            query.delete('code');
+            history.replaceState(null, '', query.toString() ? `/pair?${query}` : '/pair');
+        }
+        showEnter();
+    }));
 
     // "Type a code" keeps the chosen language
     const lang = new URLSearchParams(location.search).get('lang');
@@ -176,11 +211,12 @@
                 body: JSON.stringify(body)
             });
             if (result.ok) {
+                remember(null); // paired: a later /pair starts afresh
                 doneName = result.data.device.name;
                 renderDone();
                 show('stateDone');
             } else if (result.data.code === 'PAIRING_EXPIRED') {
-                show('stateExpired');
+                expired();
             } else {
                 showError(i18n.error(result.data, 'pair.failed'));
             }

@@ -239,15 +239,62 @@ describe('MAX_FOLDER_DEPTH', () => {
     }
   });
 
-  test('an upload can\'t make a missing folder past the limit', async () => {
+  test('an upload never makes a missing folder, past the limit or not (#89)', async () => {
     const admin = await adminFor('2');
-    const res = await admin.post('/api/upload').field('path', 'uploads/Trips/Italy/Rome')
-      .attach('images', await jpeg(), 'x.jpg').expect(400);
-    expect(res.body).toMatchObject({ code: 'FOLDER_TOO_DEEP', limit: 2 });
-    expect(await fs.pathExists(path.join(testUploadsDir, 'Trips/Italy/Rome'))).toBe(false);
-    // Up to the limit a missing folder is still made, as before
+    for (const folder of ['Trips/Italy/Rome', 'Trips/Italy']) {
+      const res = await admin.post('/api/upload').field('path', `uploads/${folder}`)
+        .attach('images', await jpeg(), 'x.jpg').expect(404);
+      expect(res.body).toMatchObject({ code: 'FOLDER_NOT_FOUND', files: [] });
+      expect(await fs.pathExists(path.join(testUploadsDir, folder))).toBe(false);
+    }
+    // Into one that exists, it saves
+    await fs.ensureDir(path.join(testUploadsDir, 'Trips/Italy'));
     await admin.post('/api/upload').field('path', 'uploads/Trips/Italy')
       .attach('images', await jpeg(), 'x.jpg').expect(200);
+  });
+
+  // A folder symlinked from higher up counts where it really is (#59)
+  describe('through a symlink', () => {
+    let canLink = true;
+    beforeEach(async () => {
+      await fs.ensureDir(path.join(testUploadsDir, 'Trips/Italy'));
+      try {
+        await fs.symlink(path.join(testUploadsDir, 'Trips/Italy'), path.join(testUploadsDir, 'Italy'), 'dir');
+      } catch {
+        canLink = false; // e.g. Windows without the right to make symlinks
+      }
+    });
+    const linkTest = (name, fn) => test(name, async () => { if (canLink) await fn(); });
+
+    linkTest('New folder inside the link is refused, and not offered', async () => {
+      const admin = await adminFor('2');
+      const res = await mkdir(admin, 'uploads/Italy', 'Rome').expect(400);
+      expect(res.body).toMatchObject({ code: 'FOLDER_TOO_DEEP', limit: 2 });
+      expect(await fs.pathExists(path.join(testUploadsDir, 'Trips/Italy/Rome'))).toBe(false);
+      const listed = await admin.get(`/api/admin/folders?path=${encodeURIComponent('uploads/Italy')}`).expect(200);
+      expect(listed.body.canCreateFolder).toBe(false);
+      // Still allowed where the link really is one level higher
+      await adminFor('3');
+      expect(await require('../utils/folderDepth').canMakeFolderIn(path.join(testUploadsDir, 'Italy'))).toBe(true);
+    });
+
+    linkTest('a Google Photos import into the link is refused', async () => {
+      const admin = await adminFor('2');
+      jest.spyOn(oauthManager, 'getStoredTokens').mockReturnValue({ access_token: 'token' });
+      jest.spyOn(oauthManager, 'isTokenExpired').mockReturnValue(false);
+      const createJob = jest.spyOn(jobManager, 'createJob').mockReturnValue('job-1');
+      try {
+        const res = await admin.post('/api/admin/google-photos/import')
+          .send({ mediaItems: [{ id: '1' }], destinationPath: 'uploads/Italy/Rome' }).expect(400);
+        expect(res.body).toMatchObject({ code: 'FOLDER_TOO_DEEP' });
+        expect(createJob).not.toHaveBeenCalled();
+        const job = { id: 'j', data: { mediaItems: [], destinationPath: 'uploads/Italy/Rome', accessToken: 'x' }, progress: {} };
+        await expect(jobManager.executeGooglePhotosImport(job)).rejects.toMatchObject({ code: 'FOLDER_TOO_DEEP' });
+        expect(await fs.pathExists(path.join(testUploadsDir, 'Trips/Italy/Rome'))).toBe(false);
+      } finally {
+        jest.restoreAllMocks();
+      }
+    });
   });
 
   describe('Google Photos import', () => {

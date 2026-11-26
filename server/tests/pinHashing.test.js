@@ -13,6 +13,9 @@ process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
 process.env.ADMIN_PASSWORD = 'pin-test-admin';
 
 const { createApp } = require('../app');
+
+// Each PIN is hashed with bcrypt; under a loaded full run that can pass jest's 5 s default
+jest.setTimeout(30000);
 const LocalDataStore = require('../store/LocalDataStore');
 
 const accountsFile = path.join(testDataDir, 'access-accounts.json');

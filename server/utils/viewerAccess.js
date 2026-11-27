@@ -16,6 +16,11 @@ const segments = (value) => String(value || '').split(SEPARATORS);
 // family/x/../y -> family/y, so ".." can't step out of an assigned folder
 const norm = (value) => path.posix.normalize('/' + segments(value).join('/')).replace(/^\/+|\/+$/g, '');
 
+function screenFolders(req) {
+  const folders = req.session?.accessAccount?.assignedFolders;
+  return Array.isArray(folders) && folders.length ? folders.map(norm).filter(Boolean) : null;
+}
+
 // The assigned folders, or null for no limit. A scope with folders: those (an
 // empty list sees nothing). Otherwise a PIN account's, never the admin's.
 function assignedFolders(req) {
@@ -23,13 +28,11 @@ function assignedFolders(req) {
   if (scope && scope.folders) return scope.folders.map(norm).filter(Boolean);
   const session = req.session;
   if (!session || session.authenticated) return null;
-  const folders = session.accessAccount?.assignedFolders;
-  return Array.isArray(folders) && folders.length ? folders.map(norm).filter(Boolean) : null;
+  return screenFolders(req);
 }
 
 // A photo or folder (relative to uploads) inside an assigned folder
-function canSee(req, relativePath) {
-  const folders = assignedFolders(req);
+function canSee(req, relativePath, folders = assignedFolders(req)) {
   if (!folders) return true;
   const target = norm(relativePath);
   return folders.some(folder => target === folder || target.startsWith(folder + '/'));
@@ -156,4 +159,4 @@ function atPhotoPath(reader) {
   };
 }
 
-module.exports = { assignedFolders, canSee, canOpen, keepHiddenPhotos, foldersBelow, inFolder, realVisiblePath, photoPath, isFolderUrl, requireVisiblePhoto, atPhotoPath };
+module.exports = { assignedFolders, screenFolders, canSee, canOpen, keepHiddenPhotos, foldersBelow, inFolder, realVisiblePath, photoPath, isFolderUrl, requireVisiblePhoto, atPhotoPath };

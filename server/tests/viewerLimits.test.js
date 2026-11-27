@@ -37,13 +37,19 @@ afterAll(async () => {
 });
 
 let pinCount = 0;
-const frameFor = async (assignedFolders) => {
+const frameFor = async (assignedFolders, frame = request.agent(app)) => {
   const pin = String(700000 + (++pinCount));
   const { body } = await admin.post('/api/access-accounts').send({ name: `Frame ${pin}`, pin, assignedFolders }).expect(201);
-  const frame = request.agent(app);
   await frame.post('/api/auth/pin').send({ pin }).expect(200);
   return { frame, accountId: (body.account || body.data || body).id };
 };
+
+test('the owner browser can open the frame with its own session and choose a folder', async () => {
+  const { body } = await admin.get('/api/auth/session').expect(200);
+  expect(body).toMatchObject({ authenticated: true, viewer: false });
+  const next = await admin.get('/api/images/next').query({ folder: 'private' }).expect(200);
+  expect(next.body.image.filename).toBe('secret.png');
+});
 
 describe('a frame limited to family/kids', () => {
   let frame;
@@ -54,6 +60,31 @@ describe('a frame limited to family/kids', () => {
     await frame.get('/api/images/family%2Fkids%2Fpark.png/thumbnail').expect(200);
     await frame.get('/api/folders/family/kids/thumbnail').expect(200);
     await frame.get('/api/folders/family/kids').expect(200);
+  });
+
+  test('a folder parameter cannot change what the access account plays', async () => {
+    for (const query of [{}, { folder: 'private' }, { 'folder[]': 'private' }, { folder: 'family/kids/absent' }]) {
+      const { body } = await frame.get('/api/images/next').query(query).expect(200);
+      expect(body.image.filename).toBe('park.png');
+    }
+  });
+
+  test('an access account plays only its folders even when an admin is signed in in that browser', async () => {
+    const browser = request.agent(app);
+    await browser.post('/api/auth/login').send({ password: 'limits-admin-pass' }).expect(200);
+    await frameFor(['family/kids'], browser);
+    const { body } = await browser.get('/api/auth/session').expect(200);
+    expect(body).toMatchObject({ authenticated: true, viewer: true });
+    const random = jest.spyOn(Math, 'random');
+    try {
+      for (const value of [0, 0.5, 0.99]) {
+        random.mockReturnValue(value);
+        const next = await browser.get('/api/images/next').expect(200);
+        expect(next.body.image.filename).toBe('park.png');
+      }
+    } finally {
+      random.mockRestore();
+    }
   });
 
   test('gets nothing from other folders, by any route', async () => {

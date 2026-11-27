@@ -504,10 +504,12 @@ class AccessAccountController {
 
     async getSession(req, res) {
         try {
-            if (req.session.accessAccount) {
+            const { accessAccount, authenticated, deviceId, user } = req.session;
+            if (accessAccount || authenticated) {
                 res.json({
                     authenticated: true,
-                    account: req.session.accessAccount,
+                    viewer: Boolean(accessAccount || deviceId),
+                    account: accessAccount || { name: user?.name || 'Admin' },
                     pinSignIn: this.pinSignIn,
                     familyCode: this.familyCode
                 });

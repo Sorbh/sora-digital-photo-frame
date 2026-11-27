@@ -962,7 +962,7 @@ class FolderSelector {
             const loaded = await this.loadFolders();
             
             // After loading, verify the selection is still valid (not when the list failed to load)
-            if (loaded && currentSelection && currentSelection.path) {
+            if (loaded && !this.container.hidden && currentSelection?.path) {
                 const folderExists = this.findFolderInList(currentSelection.path);
                 if (!folderExists) {
                     // Selected folder no longer exists, reset to "All Folders"

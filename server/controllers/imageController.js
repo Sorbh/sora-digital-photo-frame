@@ -8,7 +8,7 @@ const thumbnails = require('../services/thumbnailService');
 const { sharpInput } = require('../utils/heic');
 const { displayCopy, assertImageSize, MAX_PIXELS } = require('../utils/displayCopy');
 const slots = require('../utils/workSlots');
-const { assignedFolders, canSee, inFolder, realVisiblePath } = require('../utils/viewerAccess');
+const { assignedFolders, screenFolders, canSee, inFolder, realVisiblePath } = require('../utils/viewerAccess');
 const snaps = require('../services/snapService');
 const notes = require('../services/noteService');
 const playOrder = require('../services/playOrderService');
@@ -79,7 +79,10 @@ class ImageController {
       // Already decoded by Express: decoding again breaks folder names with %.
       // ?folder[]=x still works as before (an array reads as its joined text, and
       // an empty ?folder[]= is still a filter that matches nothing).
-      const hasFolderFilter = Boolean(req.query.folder);
+      // An access account plays its full assignment. Folder choice is for
+      // browsers previewing the slideshow and for public photo API callers.
+      const screen = req.session?.accessAccount || req.session?.deviceId;
+      const hasFolderFilter = !screen && Boolean(req.query.folder);
       const folderFilter = hasFolderFilter ? String(req.query.folder) : '';
       const allImages = await this.getAllImages();
       
@@ -93,15 +96,16 @@ class ImageController {
       
       let availableImages = allImages;
       
-      // A PIN account with assigned folders, or a signed-in person limited to some
-      // (their scope): only photos in those folders or their subfolders
+      // A browser can be signed in as both an admin and a screen. During playback,
+      // apply the screen's folders as well as any library scope.
       const limitedTo = assignedFolders(req);
-      if (limitedTo) {
-        // In an assigned folder or one of its subfolders, whatever the separators
-        availableImages = allImages.filter(img => canSee(req, img.relativePath));
+      const screenLimitedTo = req.session?.authenticated ? screenFolders(req) : null;
+      if (limitedTo || screenLimitedTo) {
+        availableImages = allImages.filter(img =>
+          canSee(req, img.relativePath, limitedTo) && canSee(req, img.relativePath, screenLimitedTo));
 
         if (availableImages.length === 0) {
-          console.log('❌ Access Control - No accessible images found for assigned folders:', limitedTo);
+          console.log('❌ Access Control - No accessible images found for assigned folders');
           return res.status(403).json({ 
             success: false,
             error: 'No images accessible with your account permissions',

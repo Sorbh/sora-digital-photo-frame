@@ -16,7 +16,7 @@
  *
  *   new FrameSession({ fetch, signedOut, timers, storage, checkMs })
  *   session.fetch(url, options)   the page's fetch, watching each answer
- *   session.start() / stop()      while the frame is signed in and playing
+ *   session.start({ viewer }) / stop() while the frame is signed in and playing
  */
 (function (root) {
   const TOKEN_KEY = 'photoframe_device_token';
@@ -53,7 +53,8 @@
       });
     }
 
-    start() {
+    start({ viewer = false } = {}) {
+      this.viewer = viewer;
       this.active = true;
       this.schedule();
     }
@@ -84,7 +85,7 @@
       if (!response.ok) return this.schedule(); // a 5xx, or paused (its card is up)
       let data = null;
       try { data = await response.json(); } catch (error) { /* not an answer */ }
-      if (data && data.authenticated === false) return this.confirm();
+      if (data && (data.authenticated === false || (this.viewer && data.viewer === false))) return this.confirm();
       this.schedule();
     }
 

@@ -465,7 +465,7 @@ class AuthenticationManager {
             if (data.code === 'SCREEN_PAUSED') return;
 
             if (data.authenticated) {
-                this.handleAuthSuccess(data.account);
+                this.handleAuthSuccess(data.account, data.viewer !== false);
             } else {
                 if (data.pinSignIn === false) this.hidePinSignIn();
                 else if (data.familyCode) this.showFamilyField();
@@ -524,7 +524,7 @@ class AuthenticationManager {
         this.rateLimitTimer = null;
     }
 
-    handleAuthSuccess(account) {
+    handleAuthSuccess(account, viewer = true) {
         this.cancelUrlSignIn(); // signed in another way (paired, say): its reply must not replace this one
         this.stopRateLimitWait();
         this.isAuthenticated = true;
@@ -535,10 +535,10 @@ class AuthenticationManager {
 
         this.hideAuthOverlay();
         // From now on, a screen removed meanwhile goes back to its code (js/frameSession.js)
-        window.frameSession?.start();
+        window.frameSession?.start({ viewer });
 
         document.dispatchEvent(new CustomEvent('authenticationComplete', {
-            detail: { account }
+            detail: { account, viewer }
         }));
     }
 
@@ -723,7 +723,7 @@ class PhotoFrameSlideshow {
         this.leavingTimers = [null, null];
         this.currentDuration = this.interval;
         // Notes from the top folder, and from the folder this frame plays
-        this.noteScheduler = window.NoteScheduler ? new NoteScheduler(() => this.folderStorage.getCurrentFolderPath()) : null;
+        this.noteScheduler = window.NoteScheduler ? new NoteScheduler(() => this.selectedFolderPath()) : null;
         this.noteHideTimer = null;
         this.fullscreenCheck = null;
         this.screenShift = window.ScreenShift ? new ScreenShift(document.documentElement) : null;
@@ -867,7 +867,7 @@ class PhotoFrameSlideshow {
     // Resolves { image }, or { error } to show on the error card
     async fetchRandomImage(signal) {
         try {
-            const selectedFolderPath = this.folderStorage.getCurrentFolderPath();
+            const selectedFolderPath = this.selectedFolderPath();
             const params = new URLSearchParams();
             if (selectedFolderPath) params.set('folder', selectedFolderPath);
             const last = this.lastShown();
@@ -895,7 +895,7 @@ class PhotoFrameSlideshow {
             console.error('Error fetching random image:', error);
             // fetch() itself failed (no network, no server) or took too long
             if (error instanceof TypeError || error.name === 'AbortError') return { error: { offline: true } };
-            const folder = this.folderStorage.getCurrentFolderPath() && this.folderStorage.getCurrentFolderName();
+            const folder = this.selectedFolderPath() && this.folderStorage.getCurrentFolderName();
             return { error: folder ? { key: 'slideshow.noImagesInFolder', vars: { folder } } : { key: 'slideshow.noImages' } };
         }
     }
@@ -913,7 +913,7 @@ class PhotoFrameSlideshow {
         } catch {
             return false;
         }
-        if (this.folderStorage.getCurrentFolderPath() !== folder) return false; // another folder was picked meanwhile
+        if (this.selectedFolderPath() !== folder) return false; // the folder or session changed meanwhile
         console.log('The saved folder is gone; playing all folders');
         this.folderStorage.saveSelectedFolder('', 'All Folders');
         this.folderSelector?.updateCurrentSelection();
@@ -1435,13 +1435,41 @@ class PhotoFrameSlideshow {
         this.cursorHideTimer = setTimeout(hideCursor, 3000);
     }
 
-    initializeFolderSelector() {
+    selectedFolderPath() {
+        return this.viewer ? '' : this.folderStorage.getCurrentFolderPath();
+    }
+
+    clearViewerFolderChoice() {
+        this.folderStorage.clearSelectedFolder();
+        this.folderStorage.clearHistory();
+        try {
+            if (this.lastShown()?.folder) localStorage.removeItem(LAST_SHOWN_KEY);
+        } catch (error) { /* storage off */ }
+
+        const url = new URL(location.href);
+        const fragment = new URLSearchParams(url.hash.slice(1));
+        const inFragment = fragment.has('folder');
+        if (!url.searchParams.has('folder') && !inFragment) return;
+        url.searchParams.delete('folder');
+        if (inFragment) {
+            fragment.delete('folder');
+            url.hash = fragment.toString();
+        }
+        history.replaceState(history.state, '', url.pathname + url.search + url.hash);
+    }
+
+    initializeFolderSelector(viewer) {
+        this.viewer = viewer;
         const container = document.getElementById('folderSelector');
-        if (container && window.FolderSelector) {
+        const showPicker = !viewer && Boolean(container && window.FolderSelector);
+        if (container) container.hidden = !showPicker;
+        document.querySelectorAll('#controls .dock-divider').forEach(divider => { divider.hidden = !showPicker; });
+        if (viewer) this.clearViewerFolderChoice();
+        if (!showPicker) return null;
+
+        if (!this.folderSelector) {
             this.folderSelector = new FolderSelector(container, {
-                onFolderChanged: (folderPath, folderName) => {
-                    this.onFolderChanged(folderPath, folderName);
-                },
+                onFolderChanged: () => this.onFolderChanged(),
                 showFolderCount: true,
                 autoClose: true
             });
@@ -1449,6 +1477,7 @@ class PhotoFrameSlideshow {
             this.folderSelector.folders = [];
             this.folderSelector.renderFolders();
         }
+        return this.folderSelector;
     }
 
     // The new folder's first photo, tried again until it shows. A retry still
@@ -1460,6 +1489,7 @@ class PhotoFrameSlideshow {
     cleanup() {
         this.clearTimers();
         this.recovery.stop(); // a try still running for this session is dropped
+        if (this.folderSelector?.isOpen) this.folderSelector.closeDropdown();
 
         if (this.cursorHideTimer) {
             clearTimeout(this.cursorHideTimer);
@@ -1761,16 +1791,16 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log('Authentication complete, starting slideshow for:', e.detail.account.name);
 
         window.slideshow.hideError();
-        window.slideshow.initializeFolderSelector();
+        const selector = window.slideshow.initializeFolderSelector(e.detail.viewer);
 
         // Load the folder list first (it checks the saved folder still exists), but
         // don't wait on it for ever: the photos come without it, and only the
         // slideshow's own start can show the error card and keep retrying
         // Locked (signed out) while waiting: that sign-in is over, don't start
         const generation = window.slideshow.recovery.generation;
-        if (window.slideshow.folderSelector) {
+        if (selector) {
             try {
-                await PhotoRecovery.withTimeout(window.slideshow.folderSelector.refresh(), REQUEST_TIMEOUT_MS);
+                await PhotoRecovery.withTimeout(selector.refresh(), REQUEST_TIMEOUT_MS);
             } catch (error) {
                 console.error('Folders did not load; starting the slideshow anyway:', error);
             }

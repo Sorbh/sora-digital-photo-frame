@@ -20,57 +20,60 @@ afterAll(async () => {
   await Promise.all([testUploadsDir, testCacheDir, testDataDir].map(dir => fs.remove(dir)));
 });
 
+const waitingFrom = address => pairing.store.list(Date.now()).filter(p => p.address === address && !p.approved && !p.claimId);
+const row = created => pairing.pairings.get(created.code);
+
 describe('the pairing queue', () => {
   beforeEach(() => pairing.pairings.clear());
 
-  test('one address keeps only its newest few waiting codes', () => {
+  test('one address keeps only its newest few waiting codes', async () => {
     const codes = [];
-    for (let i = 0; i < pairing.MAX_PER_ADDRESS + 3; i++) codes.push(pairing.start('203.0.113.7').code);
-    const waiting = pairing.waitingFrom('203.0.113.7').map(p => p.code);
+    for (let i = 0; i < pairing.MAX_PER_ADDRESS + 3; i++) codes.push((await pairing.start('203.0.113.7')).code);
+    const waiting = waitingFrom('203.0.113.7').map(p => p.code);
     expect(waiting).toEqual(codes.slice(-pairing.MAX_PER_ADDRESS));
     expect(pairing.find(codes[0])).toBeNull();
   });
 
-  test("a new code never pushes out one another screen is still showing, or one an owner looked up", () => {
+  test("a new code never pushes out one another screen is still showing, or one an owner looked up", async () => {
     const now = Date.now();
     const home = '203.0.113.9';
-    const shown = pairing.start(home);
-    const lookedUp = pairing.start(home);
+    const shown = await pairing.start(home);
+    const lookedUp = await pairing.start(home);
     const abandoned = [];
-    for (let i = 2; i < pairing.MAX_PER_ADDRESS; i++) abandoned.push(pairing.start(home));
+    for (let i = 2; i < pairing.MAX_PER_ADDRESS; i++) abandoned.push(await pairing.start(home));
     // Time passes: only the first screen still polls; the owner looked up the second
-    for (const p of [lookedUp, ...abandoned]) p.lastSeen = now - pairing.IN_USE_MS - 1000;
-    lookedUp.lookedUpAt = now;
+    for (const p of [lookedUp, ...abandoned]) row(p).lastSeen = now - pairing.IN_USE_MS - 1000;
+    await pairing.lookUp(lookedUp.code);
     for (let i = 0; i < abandoned.length + 2; i++) {
-      pairing.start(home).lastSeen = now - pairing.IN_USE_MS - 1000;
+      row(await pairing.start(home)).lastSeen = now - pairing.IN_USE_MS - 1000;
     }
     expect(pairing.find(shown.code)).not.toBeNull();
     expect(pairing.find(lookedUp.code)).not.toBeNull();
     expect(abandoned.every(p => !pairing.find(p.code))).toBe(true);
   });
 
-  test('a full queue still lets a new frame in, at the cost of the busiest address', () => {
+  test('a full queue still lets a new frame in, at the cost of the busiest address', async () => {
     // Many addresses fill every slot
     for (let i = 0; pairing.pairings.size < pairing.MAX_PENDING; i++) {
-      pairing.start(`flood-${Math.floor(i / pairing.MAX_PER_ADDRESS)}`);
+      await pairing.start(`flood-${Math.floor(i / pairing.MAX_PER_ADDRESS)}`);
     }
     expect(pairing.pairings.size).toBe(pairing.MAX_PENDING);
-    const frame = pairing.start('198.51.100.20');
+    const frame = await pairing.start('198.51.100.20');
     expect(frame).not.toBeNull();
     expect(pairing.pairings.size).toBe(pairing.MAX_PENDING);
     expect(pairing.find(frame.code)).not.toBeNull();
   });
 
-  test('when everyone holds as few codes as the newcomer would, the queue says full', () => {
-    for (let i = 0; i < pairing.MAX_PENDING; i++) pairing.start(`one-each-${i}`);
-    expect(pairing.start('one-each-0')).toBeNull();
-    expect(pairing.start('someone-new')).toBeNull();
+  test('when everyone holds as few codes as the newcomer would, the queue says full', async () => {
+    for (let i = 0; i < pairing.MAX_PENDING; i++) await pairing.start(`one-each-${i}`);
+    expect(await pairing.start('one-each-0')).toBeNull();
+    expect(await pairing.start('someone-new')).toBeNull();
   });
 
-  test('codes an admin approved are never pushed out', () => {
-    const approved = pairing.start('203.0.113.8');
-    approved.approved = { token: 't', device: {}, tenant: {} };
-    for (let i = 0; i < pairing.MAX_PER_ADDRESS + 2; i++) pairing.start('203.0.113.8');
+  test('codes an admin approved are never pushed out', async () => {
+    const approved = await pairing.start('203.0.113.8');
+    row(approved).approved = { token: 't', device: {}, tenantId: 'default' };
+    for (let i = 0; i < pairing.MAX_PER_ADDRESS + 2; i++) await pairing.start('203.0.113.8');
     expect(pairing.find(approved.code)).not.toBeNull();
   });
 
@@ -91,7 +94,7 @@ describe('the pairing queue', () => {
     }
     expect(statuses.slice(0, 20).every(s => s === 200)).toBe(true);
     expect(statuses.slice(20)).toEqual([429, 429]);
-    expect(pairing.waitingFrom(networkKey('2001:db8:77:1::1'))).toHaveLength(pairing.MAX_PER_ADDRESS);
+    expect(waitingFrom(networkKey('2001:db8:77:1::1'))).toHaveLength(pairing.MAX_PER_ADDRESS);
   });
 });
 

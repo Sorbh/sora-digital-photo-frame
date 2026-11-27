@@ -29,6 +29,8 @@ const { setEvents } = require('./events');
 const accessAccounts = require('./controllers/accessAccountController');
 const pairingController = require('./controllers/pairingController');
 const { nearbyPairingFromEnv } = pairingController;
+const { withStore } = require('./services/pairingService');
+const { createHmac } = require('node:crypto');
 const { setMaxFolderDepth, canMakeFolderAt, maxFolderDepth } = require('./utils/folderDepth');
 const pages = require('./views/pages');
 
@@ -40,6 +42,8 @@ const pages = require('./views/pages');
  *   sessionStore  express-session store (default: in-memory)
  *   library       photo storage implementation (default: local uploads folder)
  *   dataStore     JSON document storage (default: local data, cache and folder files)
+ *   pairingStore  shared pairing queue (default: in-memory; see HOOKS.md, Pairing store)
+ *   resolvePairingTenant async function(id) -> tenant or null, for collecting from a shared queue
  *   resolveTenant async function(req) -> { id, plan } or null (default: one 'default' tenant)
  *   auth          { requireAuth, requireGuest, requireViewer } middleware, all optional
  *                 (default: admin password session)
@@ -65,13 +69,17 @@ const pages = require('./views/pages');
  *   accountUrl    the host's account page ("/account"): the header links to it, and
  *                 Access leaves the header and tab bar (default: none, Access stays)
  */
-function createApp({ sessionStore, beforeRoutes, library, dataStore, resolveTenant, auth, quota, events, pinSignIn = pinSignInFromEnv(), nearbyPairing = nearbyPairingFromEnv(), trustProxy = process.env.TRUST_PROXY, publicPhotos = process.env.PUBLIC_PHOTOS === 'true', familyCode = false, keys = keysFromEnv(), brand, accountUrl } = {}) {
+function createApp({ sessionStore, beforeRoutes, library, dataStore, resolveTenant, pairingStore, resolvePairingTenant, auth, quota, events, pinSignIn = pinSignInFromEnv(), nearbyPairing = nearbyPairingFromEnv(), trustProxy = process.env.TRUST_PROXY, publicPhotos = process.env.PUBLIC_PHOTOS === 'true', familyCode = false, keys = keysFromEnv(), brand, accountUrl } = {}) {
   // Checked first: a wrong brand or accountUrl stops here, before anything is set up
   pages.configure({ brand, accountUrl });
   announceSessionSecret();
   const secret = sessionSecret();
 
   const app = express();
+  if (pairingStore) {
+    app.locals.pairingService = withStore(pairingStore, resolvePairingTenant);
+    app.locals.pairingNetworkKey = createHmac('sha256', secret).update('sora-frame pairing networks').digest();
+  }
   let photoLibrary = library || new LocalPhotoLibrary();
   let store = dataStore || new LocalDataStore();
   if (keys) {

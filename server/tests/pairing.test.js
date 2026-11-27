@@ -404,15 +404,15 @@ describe('Pairing a frame by QR code', () => {
     });
 
     test('an approval whose code runs out while its account is finished is undone', async () => {
-      const pairing = service.start('10.66.0.2', 'browser-key');
+      const pairing = await service.start('10.66.0.2', 'browser-key');
       const before = await deviceIds();
       const device = await service.approve(pairing.code, {
         name: 'Slow account',
         accountId: 'acc_none',
-        beforeReady: async () => { pairing.expiresAt = Date.now() - 1; } // the account write took past the deadline
+        beforeReady: async () => { service.pairings.get(pairing.code).expiresAt = Date.now() - 1; } // the account write took past the deadline
       });
       expect(device).toBeNull();
-      expect(pairing.approved).toBeNull();
+      expect(await service.find(pairing.code)).toBeNull();
       expect(await deviceIds()).toEqual(before);
       expect(reported).toHaveLength(1);
       expect(before).not.toContain(reported[0]);

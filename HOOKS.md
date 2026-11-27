@@ -8,6 +8,8 @@ These options are a public contract. Treat a change to a name, an argument or a 
 |---|---|---|---|
 | `library` | `PhotoLibrary` subclass. Its `photoUrl(adminPath)` must return a URL with each path segment percent-encoded, since folder and file names can hold `#`, `?` and `%` (`PhotoLibrary.uploadsUrl(adminPath)` builds one for the `/uploads` route). May also offer `rawUrl(adminPath)`, which lets frames fetch encrypted photos from remote storage and decrypt them in the browser. Only `createFolder` makes folders: `addPhoto`, `movePhoto` and `writeItem` into a missing folder (deleted meanwhile, even mid-write) must throw `PhotoLibrary.folderNotFoundError()` (404 `FOLDER_NOT_FOUND`) and leave it missing. Storage with symlinks should offer `realPath(adminPath)`: the admin path a path really leads to, or `null` when it leads out of the library; frames' folder limits and `MAX_FOLDER_DEPTH` are checked there. Notes are `*.note.json` files in folders, stored like snaps (`*.snap.json`): `listItems`, `readItem`, `writeItem`, `movePhoto` and `deletePhoto` must handle them, and so must moving, renaming and deleting a folder. `listFolder` should give them type `'note'`, and `allPhotos` must never return them: a note is not a photo (see [Notes](#notes)) | Local uploads folder | `server/library/PhotoLibrary.js` |
 | `dataStore` | `DataStore` subclass: `get`, `set`, `update`. `folder-settings:<folder>` documents (a folder's play order) belong to that photo folder: writing one must not create the folder, and throws 404 `FOLDER_NOT_FOUND` when it is gone. Notes are not kept here any more but in the library, as `*.note.json` files like `*.snap.json`; the old `notes` document is read once at start, then emptied, with a copy in `notes-before-folders` (see [Notes](#notes)) | Local data files | `server/store/DataStore.js` |
+| `pairingStore` | Async pairing queue. See [Pairing store](#pairing-store) | In-memory | `server/services/memoryPairingStore.js` |
+| `resolvePairingTenant` | `async (id) => ({ id, plan })` or `null` when an approved code's tenant is gone | `{ id }` with a custom store | `server/services/pairingService.js` |
 | `resolveTenant` | `async (req) => ({ id, plan })` or `null` | One `default` tenant | `server/context.js` |
 | `auth` | `{ requireAuth, requireGuest, requireViewer }` middleware, `scope(req)` (see [Scope](#scope)) and `isScreenPaused(deviceId, { tenantId })` (see [Paused screens](#paused-screens)), all optional | Admin password session, which sees and changes everything | `server/middleware/auth.js` |
 | `quota` | `{ canAdd({ items, bytes, screens }, context) => ({ ok, message }) }` for the current tenant. **Changed in 3.0.0** (it took `bytes` alone): see [Quota](#quota) | Unlimited | `server/services/quotaService.js` |
@@ -154,6 +156,28 @@ Many frames are TVs with only a remote, so a host may want nothing ever typed on
 
 Whether PIN sign-in is on or off, the owner adds a frame by scanning its QR code (`/pair`) or with **Add a screen** on the Access page: type the code the frame shows (any case, with or without the dash or spaces), name the screen, pick an existing screen or a new one and its folders. Both use `GET /api/admin/pair/:code` and `POST /api/admin/pair/:code/approve`.
 
+### Pairing store
+
+Pass `createApp({ pairingStore, resolvePairingTenant })` to share codes between processes or keep them through a restart. The default store is in memory. Apps sharing a store must use the same stable `SESSION_SECRET` for network matching. The host can look up the current tenant context with `resolvePairingTenant(id)` when the frame collects its approval. A missing tenant makes the code expire.
+
+The queue is shared across tenants. Times are epoch milliseconds. Unapproved records contain `code`, `secretHash`, `browserHash` (nullable), `createdAt`, `expiresAt`, `lastSeen`, `lookedUpAt` (optional), `address` (a keyed network hash), `device` (screen hints), `claimId` (nullable), and `approved` (nullable). The core hashes the pairing secret and browser key before handing them to the store. Approval contains `{ token, device, tenantId }`. The token is a device credential and must be recoverable for collection. Keep it out of logs, including errors.
+
+Each method may return a promise. Treat records returned by the store as snapshots.
+
+| Method | Contract |
+| --- | --- |
+| `enqueue(choose)` | In a single atomic operation, pass active rows in insertion order and the current time to the synchronous `choose(rows, now)` callback. Apply its `{ pairing, evict }` decision, deleting the codes in the `evict` array and inserting the new record. Return the inserted record or `null` when the queue refuses it. Serialize this with other starts and guard against evicting a newly claimed or approved row. |
+| `list(now, address)` | Return active rows in insertion order. The optional network hash lets the store narrow the results. Only the presence of an approval is needed for listings and enqueue decisions. |
+| `get(code, now)` | Return the active record or `null`. Ignore or remove expired rows. |
+| `claim(code, claimId, now)` | Atomically take an active, unapproved and unclaimed code. Return the record with the supplied claim ID or `null` if unavailable. |
+| `release(pairing)` | Clear the claim only if its ID still matches and the code is unapproved. |
+| `approve(pairing, approval, now)` | Save the approval only on an active, unapproved record with the matching claim ID. Return whether it was saved. |
+| `touch(pairing, field, now)` | Advance `lastSeen` (a verified screen poll) or `lookedUpAt` (an owner lookup) on the same active record, identified by code and secret hash. A shared store can retain exact polls locally and persist them at most every ten seconds. |
+| `take(pairing, now)` | Atomically remove the active, approved record identified by code and secret hash. Return its decoded approval, or `null` if already gone. |
+| `restore(pairing, now)` | Put the original record back after a failed handover, only if it is still active and the code has not been reused. |
+
+Purge expired rows during normal operation. A server interrupted during an approval can leave a claim in the store until the code expires. Keep database locks short and release claims on handled approval failures.
+
 ### Sora Frame nearby
 
 A screen (a TV, phone, tablet or browser) showing its pairing code on the same home internet connection as the owner's phone can be set up with no typing or scanning. The self-hosted `/pair` page offers such codes as one tap above the code box; a host can show them on its own screens page. Native apps that want to be found this way: see [Pairing for apps](docs/pairing-for-apps.md).
@@ -171,7 +195,7 @@ A screen (a TV, phone, tablet or browser) showing its pairing code on the same h
 | `platform` | Plain text, at most 30 characters, as `name` |
 | `app` | Plain text, at most 40 characters, as `name` |
 
-It is kept with the waiting code only (in memory, gone with it) and is **untrusted input, a hint only**: anyone can send anything. Show it as text (`textContent`), never as HTML, and decide nothing on it. The web slideshow sends `kind` and `platform` guessed from its user agent (`server/public/js/deviceKind.js`) and no name.
+It is kept with the waiting code and goes away with it and is **untrusted input, a hint only**: anyone can send anything. Show it as text (`textContent`), never as HTML, and decide nothing on it. The web slideshow sends `kind` and `platform` guessed from its user agent (`server/public/js/deviceKind.js`) and no name.
 
 **Finding them:**
 
@@ -186,7 +210,7 @@ GET /api/admin/pair/nearby     signed in, owner only
 - `code` is as the screen shows it (`K7P-4QX`); pass it to `GET /api/admin/pair/:code` and `POST /api/admin/pair/:code/approve` as usual (any case, with or without the dash). `name`, `kind` and `platform` are what the screen said (each may be `null`). `createdAt` is when it asked for the code, `lastSeen` its last `POST /api/pair/status` poll (the web slideshow polls every 2 seconds). The list is empty (`{ "nearby": [] }`) when nothing is found; it never says anything about the network.
 - `GET /api/admin/pair/:code` now also answers `name`, `kind`, `platform` and `app`, so an approve dialog can prefill the screen's name (`/pair` and **Add a screen** do).
 - Listed: codes not approved (or being approved), made in the last 10 minutes (their whole life) and polled in the last 60 seconds, so the screen is still showing them, whose network matches the request's. At most 3, newest first.
-- **The network:** when a code is made, the server keeps a keyed hash (HMAC-SHA256, with a key made by each process and kept only in memory, like the codes) of the screen's IPv4 address, or of the /64 its IPv6 address is in. A lookup matches when the two hashes are the same. No address is kept or answered. A screen on IPv4 and a phone on IPv6 (or the other way round) don't match: the phone falls back to the QR code or typing.
+- **The network:** when a code is made, the server keeps a keyed hash (HMAC-SHA256, with a process-local key by default, or a key derived from `SESSION_SECRET` with a shared store) of the screen's IPv4 address, or of the /64 its IPv6 address is in. A lookup matches when the two hashes are the same. No address is kept or answered. A screen on IPv4 and a phone on IPv6 (or the other way round) don't match: the phone falls back to the QR code or typing.
 - **The address** is Express's `req.ip`, so it follows `trustProxy`: behind one proxy (the default, `1`), the last `X-Forwarded-For` entry, which the proxy adds; with `TRUST_PROXY=false`, the connection's own address, and `X-Forwarded-For` is ignored. Set `trustProxy` to the proxies really in front, and let only them reach the server, so nobody can pick their own address by sending the header.
 - Viewers and editors get 403 `OWNER_ONLY`, signed out 401. Answers are `Cache-Control: no-store`. Each network gets 30 lookups a minute (then 429 `RATE_LIMITED`), plenty for a page asking every few seconds.
 - **Shared networks:** people behind one address (flats on one connection, a café, a mobile carrier's shared address) could see each other's codes. That is limited by the 10-minute and 60-second windows, the cap of 3, the owner checking the code on the phone matches the screen before pairing, and the route being for library owners only. Turn it off with `createApp({ nearbyPairing: false })` or `NEARBY_PAIRING=off`; the route then answers 404 for everyone and `/pair` offers nothing.

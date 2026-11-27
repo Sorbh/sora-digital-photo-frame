@@ -3,6 +3,7 @@ const { getDataStore } = require('../store');
 const { currentTenant, runWithTenant } = require('../context');
 const { emit } = require('../events');
 const quota = require('./quotaService');
+const MemoryPairingStore = require('./memoryPairingStore');
 const { deviceInfo } = require('../utils/deviceInfo');
 const PAIRING_TTL_MS = 10 * 60 * 1000;
 // "Sora Frame nearby" (see nearby): codes made this recently, whose screen asked for
@@ -49,15 +50,17 @@ const deviceIdFromToken = token => (typeof token === 'string' && TOKEN_PATTERN.e
  *
  * Pairing by QR code: the frame asks for a short code and shows it as
  * a QR code; an admin scans it, approves, and the frame collects a device
- * token it keeps for good. Pairings live in memory for ten minutes; paired
+ * token it keeps for good. Pairings last ten minutes; paired
  * frames are kept in data/devices.json with only a hash of their token.
  */
 class PairingService {
-  constructor() {
-    this.seenAt = new Map(); // "tenant:device" -> when that screen last asked for anything (ms)
-    this.pairings = new Map(); // code -> { code, secret, createdAt, lastSeen, expiresAt, address, device, claimed, approved }
-    this.retries = new Map(); // tenant id -> { timer, attempt }, for reportRemovals
-    this.reporting = new Map(); // tenant id -> { running, again }, so reports don't pile up
+  constructor(store = null, resolveTenant = null, devices = null) {
+    this.store = store || new MemoryPairingStore();
+    this.resolveTenant = resolveTenant;
+    this.pairings = this.store.rows;
+    this.seenAt = devices?.seenAt || new Map(); // "tenant:device" -> when that screen last asked for anything (ms)
+    this.retries = devices?.retries || new Map(); // tenant id -> { timer, attempt }, for reportRemovals
+    this.reporting = devices?.reporting || new Map(); // tenant id -> { running, again }, so reports don't pile up
     this.retryDelays = RETRY_DELAYS_MS;
   }
 
@@ -70,18 +73,6 @@ class PairingService {
     return Array.from(bytes, b => CODE_ALPHABET[b % CODE_ALPHABET.length]).join('');
   }
 
-  dropExpired() {
-    const now = Date.now();
-    for (const [code, pairing] of this.pairings) {
-      if (pairing.expiresAt <= now) this.pairings.delete(code);
-    }
-  }
-
-  // Codes still waiting for an admin, oldest first (a Map keeps the order they were made in)
-  waitingFrom(address) {
-    return [...this.pairings.values()].filter(p => !p.approved && !p.claimed && p.address === address);
-  }
-
   // Of a network's waiting codes (oldest first), the one to drop: one no screen
   // shows any more, else one nobody looked up, else the oldest
   leastInUse(codes, now = Date.now()) {
@@ -91,20 +82,18 @@ class PairingService {
   }
 
   // The queue is full: the address with the most waiting codes, if it has more
-  // than the one asking would, loses its oldest. False if nobody has more.
-  makeRoom(address) {
+  // than the one asking would, loses its oldest.
+  busiestCode(pairings, address) {
     const waiting = new Map(); // address -> its codes, oldest first
-    for (const pairing of this.pairings.values()) {
-      if (pairing.approved || pairing.claimed) continue;
+    for (const pairing of pairings) {
+      if (pairing.approved || pairing.claimId) continue;
       if (!waiting.has(pairing.address)) waiting.set(pairing.address, []);
       waiting.get(pairing.address).push(pairing);
     }
     const asking = (waiting.get(address) || []).length + 1;
     let busiest = null;
     for (const codes of waiting.values()) if (!busiest || codes.length > busiest.length) busiest = codes;
-    if (!busiest || busiest.length <= asking) return false;
-    this.pairings.delete(busiest[0].code);
-    return true;
+    return busiest && busiest.length > asking ? busiest[0].code : null;
   }
 
   // A new pairing for a frame: the code goes in the QR, the secret stays on the frame.
@@ -112,92 +101,87 @@ class PairingService {
   // in the controller), never the address itself;
   // browser is a key only the browser that asked has, so only it can collect.
   // device is what the screen said about itself (utils/deviceInfo), a hint only.
-  start(address = 'unknown', browser = null, device = deviceInfo()) {
-    this.dropExpired();
-    const mine = this.waitingFrom(address);
-    // One network keeps only its newest few codes. A home shares one: its other
-    // screens, and the code its owner is typing in, go last, so a screen asking for
-    // a code never takes the one another screen is showing (oldest first otherwise)
-    if (mine.length >= MAX_PER_ADDRESS) this.pairings.delete(this.leastInUse(mine).code);
-    if (this.pairings.size >= MAX_PENDING && !this.makeRoom(address)) return null;
-    let code = this.newCode();
-    while (this.pairings.has(code)) code = this.newCode();
-    const now = Date.now();
-    const pairing = {
-      code,
-      secret: crypto.randomBytes(24).toString('hex'),
-      createdAt: now,
-      lastSeen: now, // the frame's last status poll (see status)
-      expiresAt: now + PAIRING_TTL_MS,
-      address,
-      browser,
-      device,
-      claimed: false, // an admin is approving it (see claim)
-      approved: null
-    };
-    this.pairings.set(code, pairing);
-    return pairing;
+  async start(address = 'unknown', browser = null, device = deviceInfo()) {
+    const secret = crypto.randomBytes(24).toString('hex');
+    const pairing = await this.store.enqueue((rows, now) => {
+      const mine = rows.filter(p => !p.approved && !p.claimId && p.address === address);
+      // Screens still showing their code, and codes an owner has looked up, go last.
+      const evict = mine.length >= MAX_PER_ADDRESS ? [this.leastInUse(mine, now).code] : [];
+      if (rows.length - evict.length >= MAX_PENDING) {
+        const busiest = this.busiestCode(rows.filter(p => !evict.includes(p.code)), address);
+        if (!busiest) return { pairing: null, evict };
+        evict.push(busiest);
+      }
+      const used = new Set(rows.map(row => row.code));
+      let code;
+      do { code = this.newCode(); } while (used.has(code));
+      return {
+        evict,
+        pairing: {
+          code,
+          secretHash: hash(secret),
+          browserHash: typeof browser === 'string' ? hash(browser) : null,
+          createdAt: now,
+          lastSeen: now,
+          expiresAt: now + PAIRING_TTL_MS,
+          address,
+          device,
+          claimId: null,
+          approved: null
+        }
+      };
+    });
+    return pairing && { code: pairing.code, secret, expiresAt: pairing.expiresAt };
   }
 
   find(code) {
-    const pairing = this.pairings.get(this.normalize(code));
-    if (!pairing) return null;
-    if (pairing.expiresAt <= Date.now()) {
-      this.pairings.delete(pairing.code);
-      return null;
-    }
+    return this.store.get(this.normalize(code), Date.now());
+  }
+
+  async lookUp(code) {
+    const pairing = await this.find(code);
+    if (pairing) await this.store.touch(pairing, 'lookedUpAt', Date.now());
     return pairing;
   }
 
-  // Takes a waiting pairing for one approval, before anything is created, so two
-  // approvals at the same time can't both go ahead. The pairing, or null when it's
-  // gone or already taken. Give it back with release() if the approval fails.
+  // Take the code before creating anything, so two approvals can't both go ahead.
   claim(code) {
-    const pairing = this.find(code);
-    if (!pairing || pairing.claimed) return null;
-    pairing.claimed = true;
-    return pairing;
+    return this.store.claim(this.normalize(code), crypto.randomUUID(), Date.now());
   }
 
   release(pairing) {
-    if (!pairing.approved) pairing.claimed = false;
+    return this.store.release(pairing);
   }
 
   // The admin said yes: make the device and hold its token for the frame to collect.
-  // Pass a pairing from claim(), or a code to claim it here.
-  // beforeReady, if given, runs once the device exists and before the frame can
-  // collect it; if it fails, the device is removed and the approval fails.
+  // The caller owns the release when it supplies a claim. Otherwise release it here.
   async approve(codeOrPairing, { name, accountId, beforeReady = null }) {
-    const pairing = typeof codeOrPairing === 'object' ? codeOrPairing : this.claim(codeOrPairing);
-    if (!pairing || pairing.approved || this.pairings.get(pairing.code) !== pairing) return null;
-    // The code ran out, or was replaced, while waiting: the frame has moved on to
-    // a new code and could never collect this one
-    const lapsed = () => pairing.expiresAt <= Date.now() || this.pairings.get(pairing.code) !== pairing;
+    const ownClaim = typeof codeOrPairing !== 'object';
+    const pairing = ownClaim ? await this.claim(codeOrPairing) : codeOrPairing;
+    if (!pairing?.claimId) return null;
+    let published = false;
     try {
+      if (pairing.expiresAt <= Date.now()) return null;
       const { device, token } = await this.addDevice({ name, accountId, via: 'qr' });
-      if (lapsed()) {
+      try {
+        const live = await this.find(pairing.code);
+        if (live?.claimId === pairing.claimId && !live.approved) {
+          if (beforeReady) await beforeReady();
+          const tenant = currentTenant();
+          const approved = { token, device, tenantId: tenant.id };
+          // In-memory hosts can still use the approving context directly.
+          if (this.store instanceof MemoryPairingStore) approved.tenant = tenant;
+          published = await this.store.approve(pairing, approved, Date.now());
+          if (published) return device;
+        }
+      } catch (error) {
         await this.discardDevice(device.id);
-        return null;
+        throw error;
       }
-      if (beforeReady) {
-        try {
-          await beforeReady();
-        } catch (error) {
-          await this.discardDevice(device.id);
-          throw error;
-        }
-        // Checked again: finishing the account may have taken past the deadline
-        if (lapsed()) {
-          await this.discardDevice(device.id);
-          return null;
-        }
-      }
-      // Nothing is awaited from here on, so the frame can collect what this returns.
-      // The frame collects this without a session; it runs as the approving tenant
-      pairing.approved = { token, device, tenant: currentTenant() };
-      return device;
+      await this.discardDevice(device.id);
+      return null;
     } finally {
-      this.release(pairing);
+      if (ownClaim && !published) await this.release(pairing);
     }
   }
 
@@ -245,46 +229,50 @@ class PairingService {
     return { device, token };
   }
 
-  // The pairing for a code, when the secret is its own
-  withSecret(code, secret) {
-    const pairing = this.find(code);
-    return pairing && sameSecret(secret, pairing.secret) ? pairing : null;
+  // The pairing for a code, when the secret is its own.
+  async withSecret(code, secret) {
+    if (typeof secret !== 'string') return null;
+    const pairing = await this.find(code);
+    return pairing && sameSecret(hash(secret), pairing.secretHash) ? pairing : null;
   }
 
-  // What the waiting frame sees while it polls: waiting, ready (approved, to collect) or expired.
-  // Each poll notes the frame is still there, showing its code (see nearby).
-  status(code, secret) {
-    const pairing = this.withSecret(code, secret);
+  // Each poll notes that the frame is still showing its code (see nearby).
+  async status(code, secret) {
+    const pairing = await this.withSecret(code, secret);
     if (!pairing) return 'expired';
-    pairing.lastSeen = Date.now();
+    await this.store.touch(pairing, 'lastSeen', Date.now());
     return pairing.approved ? 'ready' : 'waiting';
   }
 
-  // "Sora Frame nearby": codes still waiting on the same network as the one asking
-  // (address is the same keyed hash start() was given), made in the last ten
-  // minutes and polled in the last minute, newest first, at most NEARBY_MAX
-  nearby(address) {
+  // Codes waiting on the same network, newest first.
+  async nearby(address) {
     if (!address) return [];
     const now = Date.now();
-    return [...this.pairings.values()]
-      .filter(p => p.address === address && !p.approved && !p.claimed && p.expiresAt > now &&
+    const rows = await this.store.list(now, address);
+    return rows
+      .filter(p => p.address === address && !p.approved && !p.claimId && p.expiresAt > now &&
         now - p.createdAt <= NEARBY_MAX_AGE_MS && now - p.lastSeen <= NEARBY_SEEN_MS)
       .sort((a, b) => b.createdAt - a.createdAt)
       .slice(0, NEARBY_MAX);
   }
 
-  // The frame takes its approved pairing, from the browser that started it.
-  // Handed over once, then gone.
-  collect(code, secret, browser) {
-    const pairing = this.withSecret(code, secret);
-    if (!pairing || !sameSecret(browser, pairing.browser)) return { status: 'expired' };
+  // Only the browser that started the pairing can take it, and only once.
+  async collect(code, secret, browser) {
+    const pairing = await this.withSecret(code, secret);
+    if (!pairing || typeof browser !== 'string' || !sameSecret(hash(browser), pairing.browserHash)) {
+      return { status: 'expired' };
+    }
     if (!pairing.approved) return { status: 'waiting' };
-    this.pairings.delete(pairing.code);
+    const approved = await this.store.take(pairing, Date.now());
+    if (!approved) return { status: 'expired' };
+    const { token, device, tenantId, tenant: approvingTenant } = approved;
     return {
       status: 'approved',
-      ...pairing.approved,
-      // If handing over fails, the frame can collect again on its next poll
-      restore: () => this.pairings.set(pairing.code, pairing)
+      token,
+      device,
+      tenant: async () => this.resolveTenant ? this.resolveTenant(tenantId) : approvingTenant || { id: tenantId },
+      // A failed handover can be retried until the original deadline.
+      restore: () => this.store.restore(pairing, Date.now())
     };
   }
 
@@ -477,6 +465,7 @@ class PairingService {
 }
 
 module.exports = new PairingService();
+module.exports.withStore = (store, resolveTenant) => new PairingService(store, resolveTenant, module.exports);
 module.exports.deviceIdFromToken = deviceIdFromToken;
 module.exports.PAIRING_TTL_MS = PAIRING_TTL_MS;
 module.exports.MAX_PENDING = MAX_PENDING;

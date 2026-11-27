@@ -235,6 +235,7 @@
     "continue": "Continua",
     "codeInvalid": "Scrivi le 6 lettere e cifre mostrate sulla cornice.",
     "typeCode": "Scrivi un codice",
+    "nearbyHeading": "{brand} nelle vicinanze",
     "unreachableHeading": "Impossibile <em>verificare</em> il codice",
     "unreachableNote": "La libreria non ha risposto. Controlla la connessione del telefono e riprova.",
     "tryAgain": "Riprova",

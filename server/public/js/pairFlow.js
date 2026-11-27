@@ -89,6 +89,8 @@
         return {
             state: 'ready',
             code: pairing.data.code,
+            // What the screen said it is when it asked for the code: a hint, plain text
+            name: typeof pairing.data.name === 'string' ? pairing.data.name : '',
             accounts: accounts.data.accounts,
             folders: folderList,
             pinSignIn: accounts.data.pinSignIn !== false

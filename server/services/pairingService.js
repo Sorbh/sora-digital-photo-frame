@@ -3,7 +3,13 @@ const { getDataStore } = require('../store');
 const { currentTenant, runWithTenant } = require('../context');
 const { emit } = require('../events');
 const quota = require('./quotaService');
+const { deviceInfo } = require('../utils/deviceInfo');
 const PAIRING_TTL_MS = 10 * 60 * 1000;
+// "Sora Frame nearby" (see nearby): codes made this recently, whose screen asked for
+// their status this recently (it is still showing them), at most this many
+const NEARBY_MAX_AGE_MS = 10 * 60 * 1000;
+const NEARBY_SEEN_MS = 60 * 1000;
+const NEARBY_MAX = 3;
 // Shared by every tenant on a hosted server. Each address keeps at most
 // MAX_PER_ADDRESS waiting codes, and when the queue is full the address holding
 // the most gives up its oldest, so floods from many addresses can't lock frames out.
@@ -41,7 +47,7 @@ const deviceIdFromToken = token => (typeof token === 'string' && TOKEN_PATTERN.e
  */
 class PairingService {
   constructor() {
-    this.pairings = new Map(); // code -> { code, secret, expiresAt, address, claimed, approved }
+    this.pairings = new Map(); // code -> { code, secret, createdAt, lastSeen, expiresAt, address, device, claimed, approved }
     this.retries = new Map(); // tenant id -> { timer, attempt }, for reportRemovals
     this.reporting = new Map(); // tenant id -> { running, again }, so reports don't pile up
     this.retryDelays = RETRY_DELAYS_MS;
@@ -86,9 +92,11 @@ class PairingService {
   }
 
   // A new pairing for a frame: the code goes in the QR, the secret stays on the frame.
-  // address is where the request came from (see addressGroup in the controller);
+  // address is a keyed hash of the network the request came from (see networkKey
+  // in the controller), never the address itself;
   // browser is a key only the browser that asked has, so only it can collect.
-  start(address = 'unknown', browser = null) {
+  // device is what the screen said about itself (utils/deviceInfo), a hint only.
+  start(address = 'unknown', browser = null, device = deviceInfo()) {
     this.dropExpired();
     const mine = this.waitingFrom(address);
     // A frame that keeps asking keeps only its newest few codes
@@ -96,12 +104,16 @@ class PairingService {
     if (this.pairings.size >= MAX_PENDING && !this.makeRoom(address)) return null;
     let code = this.newCode();
     while (this.pairings.has(code)) code = this.newCode();
+    const now = Date.now();
     const pairing = {
       code,
       secret: crypto.randomBytes(24).toString('hex'),
-      expiresAt: Date.now() + PAIRING_TTL_MS,
+      createdAt: now,
+      lastSeen: now, // the frame's last status poll (see status)
+      expiresAt: now + PAIRING_TTL_MS,
       address,
       browser,
+      device,
       claimed: false, // an admin is approving it (see claim)
       approved: null
     };
@@ -221,11 +233,26 @@ class PairingService {
     return pairing && sameSecret(secret, pairing.secret) ? pairing : null;
   }
 
-  // What the waiting frame sees while it polls: waiting, ready (approved, to collect) or expired
+  // What the waiting frame sees while it polls: waiting, ready (approved, to collect) or expired.
+  // Each poll notes the frame is still there, showing its code (see nearby).
   status(code, secret) {
     const pairing = this.withSecret(code, secret);
     if (!pairing) return 'expired';
+    pairing.lastSeen = Date.now();
     return pairing.approved ? 'ready' : 'waiting';
+  }
+
+  // "Sora Frame nearby": codes still waiting on the same network as the one asking
+  // (address is the same keyed hash start() was given), made in the last ten
+  // minutes and polled in the last minute, newest first, at most NEARBY_MAX
+  nearby(address) {
+    if (!address) return [];
+    const now = Date.now();
+    return [...this.pairings.values()]
+      .filter(p => p.address === address && !p.approved && !p.claimed && p.expiresAt > now &&
+        now - p.createdAt <= NEARBY_MAX_AGE_MS && now - p.lastSeen <= NEARBY_SEEN_MS)
+      .sort((a, b) => b.createdAt - a.createdAt)
+      .slice(0, NEARBY_MAX);
   }
 
   // The frame takes its approved pairing, from the browser that started it.
@@ -419,3 +446,5 @@ module.exports.deviceIdFromToken = deviceIdFromToken;
 module.exports.PAIRING_TTL_MS = PAIRING_TTL_MS;
 module.exports.MAX_PENDING = MAX_PENDING;
 module.exports.MAX_PER_ADDRESS = MAX_PER_ADDRESS;
+module.exports.NEARBY_MAX = NEARBY_MAX;
+module.exports.NEARBY_SEEN_MS = NEARBY_SEEN_MS;

@@ -43,6 +43,12 @@
             <h1 class="sora-display" data-i18n-html="pair.enterHeading">Type the <em>code</em></h1>
             <p class="pair-note" data-i18n-html="pair.enterNote">The frame shows it under its QR code, like <bdi class="code-example">K7P-4QX</bdi>.</p>
 
+            <!-- Sora Frame nearby: a screen on this phone's network showing its code now (js/pair.js) -->
+            <div class="pair-nearby hidden" id="nearbyTv">
+                <p class="field-label" data-i18n="pair.nearbyHeading">Sora Frame nearby</p>
+                <div class="pair-links" id="nearbyList"></div>
+            </div>
+
             <label class="field">
                 <span class="field-label" data-i18n="pair.static_007">Code on the frame</span>
                 <input type="text" id="codeInput" class="code-input" dir="ltr" maxlength="24" placeholder="K7P-4QX" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" enterkeyhint="go" aria-describedby="codeError" required>

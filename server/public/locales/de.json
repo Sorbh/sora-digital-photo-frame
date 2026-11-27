@@ -233,6 +233,7 @@
     "continue": "Weiter",
     "codeInvalid": "Geben Sie die 6 Buchstaben und Ziffern vom Rahmen ein.",
     "typeCode": "Code eingeben",
+    "nearbyHeading": "{brand} in der Nähe",
     "unreachableHeading": "Code konnte nicht <em>geprüft</em> werden",
     "unreachableNote": "Die Bibliothek hat nicht geantwortet. Prüfen Sie die Verbindung Ihres Telefons und versuchen Sie es erneut.",
     "tryAgain": "Erneut versuchen",

@@ -233,6 +233,7 @@
     "continue": "Continuar",
     "codeInvalid": "Escribe las 6 letras y números que aparecen en el marco.",
     "typeCode": "Escribir un código",
+    "nearbyHeading": "{brand} cerca",
     "unreachableHeading": "No se pudo <em>comprobar</em> el código",
     "unreachableNote": "La biblioteca no respondió. Revisa la conexión de tu teléfono y vuelve a intentarlo.",
     "tryAgain": "Reintentar",

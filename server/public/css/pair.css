@@ -101,6 +101,17 @@ body {
     text-decoration: none;
 }
 
+.pair-nearby {
+    display: grid;
+    gap: 8px;
+    justify-items: center;
+}
+
+.pair-nearby bdi {
+    font-weight: 600;
+    letter-spacing: 0.08em;
+}
+
 button.pair-link {
     font-family: inherit;
     cursor: pointer;

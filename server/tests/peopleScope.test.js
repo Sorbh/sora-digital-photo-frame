@@ -306,6 +306,7 @@ const ROUTES = {
   'PUT /device/language': none('a frame setting its own language'),
 
   // Pairing and devices: the owner's
+  'GET /admin/pair/nearby': owner(p => as(p).get('/api/admin/pair/nearby')),
   'GET /admin/pair/:code': owner(p => as(p).get('/api/admin/pair/ABC-DEF')),
   'POST /admin/pair/:code/approve': owner(p => as(p).post('/api/admin/pair/ABC-DEF/approve').send({})),
   'GET /admin/devices': owner(p => as(p).get('/api/admin/devices')),

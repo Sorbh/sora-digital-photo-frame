@@ -241,6 +241,7 @@
     "continue": "متابعة",
     "codeInvalid": "اكتب الأحرف والأرقام الستة الظاهرة على الإطار.",
     "typeCode": "كتابة رمز",
+    "nearbyHeading": "{brand} قريب",
     "unreachableHeading": "تعذّر <em>التحقق</em> من الرمز",
     "unreachableNote": "لم تستجب المكتبة. تحقّق من اتصال هاتفك، ثم حاول مرة أخرى.",
     "tryAgain": "حاول مرة أخرى",

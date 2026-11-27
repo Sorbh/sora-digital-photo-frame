@@ -233,6 +233,7 @@
     "continue": "Continue",
     "codeInvalid": "Type the 6 letters and numbers shown on the frame.",
     "typeCode": "Type a code",
+    "nearbyHeading": "{brand} nearby",
     "unreachableHeading": "Couldn't <em>check</em> the code",
     "unreachableNote": "The library didn't answer. Check your phone's connection, then try again.",
     "tryAgain": "Try again",

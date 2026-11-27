@@ -10,11 +10,14 @@ const pairing = require('../services/pairingService');
 const accessAccounts = require('./accessAccountController');
 const { passClientError } = require('../utils/httpError');
 const { screenPaused } = require('../middleware/auth');
+const { deviceInfo } = require('../utils/deviceInfo');
 
 const START_LIMIT = 20; // new codes per IP in START_WINDOW_MS
 const START_WINDOW_MS = 10 * 60 * 1000;
 const LOCAL_HOSTS = ['localhost', '127.0.0.1', '::1', '[::1]'];
 const MAX_TRACKED = 10000; // addresses remembered for the start limit
+const NEARBY_LIMIT = 30; // "Sora Frame nearby" lookups per network in NEARBY_WINDOW_MS
+const NEARBY_WINDOW_MS = 60 * 1000;
 // Marks the browser that started a pairing, so only it can collect: one cookie
 // per pairing (photoframe.pairing.<code>), so tabs starting at the same moment
 // don't overwrite each other's. Not the session, so a pairing that's never
@@ -36,19 +39,35 @@ function addressGroup(ip) {
   return `${groups.slice(0, 4).map(g => parseInt(g, 16).toString(16)).join(':')}::/64`;
 }
 
+// A pairing keeps only this keyed hash of its network (addressGroup), never the
+// address: enough to tell two requests came from the same one. The key is made
+// fresh by each process and never leaves memory, as pairings don't either.
+const NETWORK_KEY = crypto.randomBytes(32);
+function networkKey(ip) {
+  return crypto.createHmac('sha256', NETWORK_KEY).update(addressGroup(ip)).digest('base64url');
+}
+
+// NEARBY_PAIRING=off (or false, 0, no) turns "Sora Frame nearby" off; anything else leaves it on
+function nearbyPairingFromEnv(value = process.env.NEARBY_PAIRING) {
+  return !['off', 'false', '0', 'no'].includes(String(value || '').trim().toLowerCase());
+}
+
 /**
  * Pairing a frame by QR code, and signing paired frames back in.
  *
- *   frame   POST /api/pair/start         a code, a secret and the QR code
+ *   frame   POST /api/pair/start         a code, a secret and the QR code (body: what the screen is, optional)
  *   frame   POST /api/pair/status        waiting | ready | expired, changes nothing
  *   frame   POST /api/pair/collect       a ready pairing: the device token, and signs in
+ *   admin   GET  /api/admin/pair/nearby  codes waiting on the admin's own network ("Sora Frame nearby")
  *   admin   GET  /api/admin/pair/:code   the code exists and is waiting
  *   admin   POST /api/admin/pair/:code/approve
  *   frame   POST /api/auth/device        sign in with the device token
  */
 class PairingController {
   constructor() {
-    this.starts = new Map(); // ip -> start times
+    this.starts = new Map(); // network key -> start times
+    this.nearbyLookups = new Map(); // network key -> lookup times
+    this.nearbyPairing = nearbyPairingFromEnv(); // createApp({ nearbyPairing }) sets it
   }
 
   clientIp(req) {
@@ -56,26 +75,31 @@ class PairingController {
   }
 
   tooManyStarts(address) {
+    return this.tooMany(this.starts, address, START_LIMIT, START_WINDOW_MS);
+  }
+
+  // A sliding-window limit: true when address already had limit tries in windowMs.
+  // Refused tries don't count, so a frame retrying every minute gets back in.
+  tooMany(times, address, limit, windowMs) {
     const now = Date.now();
-    const recent = (this.starts.get(address) || []).filter(t => now - t < START_WINDOW_MS);
-    // Refused tries don't count, so a frame retrying every minute gets back in
-    const refused = recent.length >= START_LIMIT;
+    const recent = (times.get(address) || []).filter(t => now - t < windowMs);
+    const refused = recent.length >= limit;
     if (!refused) recent.push(now);
-    this.starts.delete(address); // re-added at the end, so the Map stays oldest first
-    this.starts.set(address, recent);
-    if (this.starts.size > MAX_TRACKED) this.forgetOldStarts(now);
+    times.delete(address); // re-added at the end, so the Map stays oldest first
+    times.set(address, recent);
+    if (times.size > MAX_TRACKED) this.forgetOld(times, now, windowMs);
     return refused;
   }
 
-  // Keeps the start limit's memory bounded: drop addresses with no recent
-  // starts, then the longest quiet ones
-  forgetOldStarts(now) {
-    for (const [address, times] of this.starts) {
-      if (!times.some(t => now - t < START_WINDOW_MS)) this.starts.delete(address);
+  // Keeps a limit's memory bounded: drop addresses with no recent tries, then
+  // the longest quiet ones
+  forgetOld(times, now, windowMs) {
+    for (const [address, list] of times) {
+      if (!list.some(t => now - t < windowMs)) times.delete(address);
     }
-    for (const address of this.starts.keys()) {
-      if (this.starts.size <= MAX_TRACKED) break;
-      this.starts.delete(address);
+    for (const address of times.keys()) {
+      if (times.size <= MAX_TRACKED) break;
+      times.delete(address);
     }
   }
 
@@ -120,12 +144,13 @@ class PairingController {
 
   async start(req, res) {
     try {
-      const address = addressGroup(this.clientIp(req));
+      const address = networkKey(this.clientIp(req));
       if (this.tooManyStarts(address)) {
         return res.status(429).json({ success: false, error: 'Too many codes. Try again in a few minutes.' });
       }
       const browser = crypto.randomBytes(24).toString('base64url');
-      const created = pairing.start(address, browser);
+      // { name, kind, platform, app }, cleaned up: a hint for the owner, nothing more
+      const created = pairing.start(address, browser, deviceInfo(req.body));
       if (!created) return res.status(503).json({ success: false, error: 'Too many frames are pairing. Try again shortly.' });
 
       res.cookie(BROWSER_COOKIE + created.code, browser, { ...this.browserCookieOptions(req), maxAge: pairing.PAIRING_TTL_MS });
@@ -203,10 +228,40 @@ class PairingController {
     }
   }
 
+  // "Sora Frame nearby": codes a screen on the owner's own network is showing right now
+  // (see pairingService.nearby), so the owner can pick one instead of typing it.
+  // The code as the screen shows it, what the screen said it is, and when: nothing
+  // about the network.
+  // Turned off (createApp({ nearbyPairing: false })): the route isn't there, for anyone
+  nearbyOn(req, res, next) {
+    if (!this.nearbyPairing) return res.status(404).json({ success: false, error: 'Not found', code: 'NEARBY_OFF' });
+    next();
+  }
+
+  async nearby(req, res) {
+    res.set('Cache-Control', 'no-store');
+    const address = networkKey(this.clientIp(req));
+    if (this.tooMany(this.nearbyLookups, address, NEARBY_LIMIT, NEARBY_WINDOW_MS)) {
+      return res.status(429).json({ success: false, error: 'Too many lookups. Try again in a minute.', code: 'RATE_LIMITED' });
+    }
+    res.json({
+      nearby: pairing.nearby(address).map(p => ({
+        code: `${p.code.slice(0, 3)}-${p.code.slice(3)}`,
+        name: p.device.name,
+        kind: p.device.kind,
+        platform: p.device.platform,
+        createdAt: new Date(p.createdAt).toISOString(),
+        lastSeen: new Date(p.lastSeen).toISOString()
+      }))
+    });
+  }
+
   async show(req, res) {
     const found = pairing.find(req.params.code);
     if (!found) return res.status(404).json({ success: false, error: 'This code has expired', code: 'PAIRING_EXPIRED' });
-    res.json({ success: true, code: found.code, expiresAt: found.expiresAt, approved: !!found.approved });
+    // name, kind, platform, app: what the screen said it is (a hint, e.g. to prefill its name)
+    const { name, kind, platform, app } = found.device;
+    res.json({ success: true, code: found.code, expiresAt: found.expiresAt, approved: !!found.approved, name, kind, platform, app });
   }
 
   async approve(req, res) {
@@ -337,3 +392,5 @@ class PairingController {
 
 module.exports = new PairingController();
 module.exports.addressGroup = addressGroup;
+module.exports.networkKey = networkKey;
+module.exports.nearbyPairingFromEnv = nearbyPairingFromEnv;

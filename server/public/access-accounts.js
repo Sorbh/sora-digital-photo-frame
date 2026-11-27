@@ -110,7 +110,7 @@ class AddScreenDialog {
             if (found.state !== 'ready') return this.showCodeError('pair.unreachableNote');
             this.code = found.code;
             this.$('screenCodeShown').textContent = pretty(found.code);
-            this.$('screenName').value = '';
+            this.$('screenName').value = found.name || ''; // the name the screen gave itself, if any
             this.showPairError(null);
             this.choices.show(found);
             this.step('pair');

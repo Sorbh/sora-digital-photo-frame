@@ -15,6 +15,7 @@ These options are a public contract. Treat a change to a name, an argument or a 
 | `keys` | `{ currentKey(), getKey(id) }`, may return promises | `PHOTO_ENCRYPTION_KEY`, or no encryption | `server/crypto/keys.js` |
 | `sessionStore` | `express-session` store | In memory | `server/app.js` |
 | `pinSignIn` | `false` turns off PIN sign-in: frames connect only by their pairing code (see [Frames that connect by code](#frames-that-connect-by-code)) | On (`PIN_SIGN_IN=off` turns it off) | `server/app.js` |
+| `nearbyPairing` | `false` turns off "Sora Frame nearby": `GET /api/admin/pair/nearby` answers 404 `NEARBY_OFF` (see [Sora Frame nearby](#sora-frame-nearby)) | On (`NEARBY_PAIRING=off` turns it off) | `server/app.js` |
 | `trustProxy` | Express `trust proxy` setting | `TRUST_PROXY`, else `1` | `server/app.js` |
 | `publicPhotos` | `true` serves photos, thumbnails, folders and notes without a viewer check (`requireViewer`) | Off (`PUBLIC_PHOTOS=true` turns it on) | `server/app.js` |
 | `familyCode` | `true`: a PIN sign-in also sends the family's code (shown on the Access page), so `resolveTenant` can find the family from it. `familyCodeSet({ code, previous, tenantId })` keeps the host's index | Off | `server/services/familyCodeService.js` |
@@ -152,6 +153,43 @@ Many frames are TVs with only a remote, so a host may want nothing ever typed on
 - The Access page shows access accounts as **Screens**: a name and its folders, with no PIN field. `GET /api/access-accounts` and `GET /api/features` say `pinSignIn: false`. A screen made there or by pairing gets no PIN at all, and a PIN sent to `POST`/`PUT /api/access-accounts` is not kept.
 
 Whether PIN sign-in is on or off, the owner adds a frame by scanning its QR code (`/pair`) or with **Add a screen** on the Access page: type the code the frame shows (any case, with or without the dash or spaces), name the screen, pick an existing screen or a new one and its folders. Both use `GET /api/admin/pair/:code` and `POST /api/admin/pair/:code/approve`.
+
+### Sora Frame nearby
+
+A screen (a TV, phone, tablet or browser) showing its pairing code on the same home internet connection as the owner's phone can be set up with no typing or scanning. The self-hosted `/pair` page offers such codes as one tap above the code box; a host can show them on its own screens page. Native apps that want to be found this way: see [Pairing for apps](docs/pairing-for-apps.md).
+
+**A screen says what it is** when it asks for a code. `POST /api/pair/start` takes an optional JSON body, every field optional:
+
+```json
+{ "name": "Living room TV", "kind": "tv", "platform": "Android TV", "app": "sora-android/1.2.0" }
+```
+
+| Field | Kept as |
+|---|---|
+| `name` | Plain text, at most 40 characters: control and invisible characters (bidi overrides, zero-width) become spaces, spaces are collapsed and trimmed, longer text is cut. Empty or not text: `null` |
+| `kind` | One of `tv`, `phone`, `tablet`, `browser`, `frame` (any case), else `null` |
+| `platform` | Plain text, at most 30 characters, as `name` |
+| `app` | Plain text, at most 40 characters, as `name` |
+
+It is kept with the waiting code only (in memory, gone with it) and is **untrusted input, a hint only**: anyone can send anything. Show it as text (`textContent`), never as HTML, and decide nothing on it. The web slideshow sends `kind` and `platform` guessed from its user agent (`server/public/js/deviceKind.js`) and no name.
+
+**Finding them:**
+
+```
+GET /api/admin/pair/nearby     signed in, owner only
+```
+
+```json
+{ "nearby": [{ "code": "K7P-4QX", "name": "Living room TV", "kind": "tv", "platform": "Android TV", "createdAt": "2026-11-27T10:00:00.000Z", "lastSeen": "2026-11-27T10:04:58.000Z" }] }
+```
+
+- `code` is as the screen shows it (`K7P-4QX`); pass it to `GET /api/admin/pair/:code` and `POST /api/admin/pair/:code/approve` as usual (any case, with or without the dash). `name`, `kind` and `platform` are what the screen said (each may be `null`). `createdAt` is when it asked for the code, `lastSeen` its last `POST /api/pair/status` poll (the web slideshow polls every 2 seconds). The list is empty (`{ "nearby": [] }`) when nothing is found; it never says anything about the network.
+- `GET /api/admin/pair/:code` now also answers `name`, `kind`, `platform` and `app`, so an approve dialog can prefill the screen's name (`/pair` and **Add a screen** do).
+- Listed: codes not approved (or being approved), made in the last 10 minutes (their whole life) and polled in the last 60 seconds, so the screen is still showing them, whose network matches the request's. At most 3, newest first.
+- **The network:** when a code is made, the server keeps a keyed hash (HMAC-SHA256, with a key made by each process and kept only in memory, like the codes) of the screen's IPv4 address, or of the /64 its IPv6 address is in. A lookup matches when the two hashes are the same. No address is kept or answered. A screen on IPv4 and a phone on IPv6 (or the other way round) don't match: the phone falls back to the QR code or typing.
+- **The address** is Express's `req.ip`, so it follows `trustProxy`: behind one proxy (the default, `1`), the last `X-Forwarded-For` entry, which the proxy adds; with `TRUST_PROXY=false`, the connection's own address, and `X-Forwarded-For` is ignored. Set `trustProxy` to the proxies really in front, and let only them reach the server, so nobody can pick their own address by sending the header.
+- Viewers and editors get 403 `OWNER_ONLY`, signed out 401. Answers are `Cache-Control: no-store`. Each network gets 30 lookups a minute (then 429 `RATE_LIMITED`), plenty for a page asking every few seconds.
+- **Shared networks:** people behind one address (flats on one connection, a café, a mobile carrier's shared address) could see each other's codes. That is limited by the 10-minute and 60-second windows, the cap of 3, the owner checking the code on the phone matches the screen before pairing, and the route being for library owners only. Turn it off with `createApp({ nearbyPairing: false })` or `NEARBY_PAIRING=off`; the route then answers 404 for everyone and `/pair` offers nothing.
 
 ### Paused screens
 

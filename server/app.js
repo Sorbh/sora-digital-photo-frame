@@ -27,6 +27,8 @@ const { setAuthProvider, setPublicPhotos, requirePhotoViewer, announceAdminPassw
 const { sessionSecret, announceSessionSecret } = require('./utils/sessionSecret');
 const { setEvents } = require('./events');
 const accessAccounts = require('./controllers/accessAccountController');
+const pairingController = require('./controllers/pairingController');
+const { nearbyPairingFromEnv } = pairingController;
 const { setMaxFolderDepth, canMakeFolderAt, maxFolderDepth } = require('./utils/folderDepth');
 const pages = require('./views/pages');
 
@@ -47,6 +49,8 @@ const pages = require('./views/pages');
  *   pinSignIn     false turns off PIN sign-in: frames connect only by their pairing code
  *                 (QR, or typed on Access), and accounts are "screens" with no PIN
  *                 (default: PIN_SIGN_IN=off turns it off, else on)
+ *   nearbyPairing false turns off "Sora Frame nearby": GET /api/admin/pair/nearby answers 404
+ *                 (default: NEARBY_PAIRING=off turns it off, else on; see HOOKS.md)
  *   trustProxy    Express 'trust proxy' setting (default: TRUST_PROXY, else 1 = one proxy in front)
  *   publicPhotos  true lets anyone who can reach the server load photos, thumbnails, folders
  *                 and notes without signing in, as before (default: PUBLIC_PHOTOS=true, else off)
@@ -61,7 +65,7 @@ const pages = require('./views/pages');
  *   accountUrl    the host's account page ("/account"): the header links to it, and
  *                 Access leaves the header and tab bar (default: none, Access stays)
  */
-function createApp({ sessionStore, beforeRoutes, library, dataStore, resolveTenant, auth, quota, events, pinSignIn = pinSignInFromEnv(), trustProxy = process.env.TRUST_PROXY, publicPhotos = process.env.PUBLIC_PHOTOS === 'true', familyCode = false, keys = keysFromEnv(), brand, accountUrl } = {}) {
+function createApp({ sessionStore, beforeRoutes, library, dataStore, resolveTenant, auth, quota, events, pinSignIn = pinSignInFromEnv(), nearbyPairing = nearbyPairingFromEnv(), trustProxy = process.env.TRUST_PROXY, publicPhotos = process.env.PUBLIC_PHOTOS === 'true', familyCode = false, keys = keysFromEnv(), brand, accountUrl } = {}) {
   // Checked first: a wrong brand or accountUrl stops here, before anything is set up
   pages.configure({ brand, accountUrl });
   announceSessionSecret();
@@ -84,6 +88,7 @@ function createApp({ sessionStore, beforeRoutes, library, dataStore, resolveTena
   setEvents(events);
   accessAccounts.pinSignIn = pinSignIn !== false;
   accessAccounts.familyCode = familyCode === true;
+  pairingController.nearbyPairing = nearbyPairing !== false;
   // MAX_FOLDER_DEPTH (.env): how deep new folders may go; unset or 0 = no limit
   setMaxFolderDepth(process.env.MAX_FOLDER_DEPTH);
 

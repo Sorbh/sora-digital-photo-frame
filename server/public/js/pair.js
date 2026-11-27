@@ -54,6 +54,52 @@
     function showEnter() {
         show('stateEnter');
         if (matchMedia('(pointer: fine)').matches) $('codeInput').focus();
+        offerNearby();
+    }
+
+    // "Sora Frame nearby": codes a screen on this phone's own network is showing right
+    // now (GET /api/admin/pair/nearby), one tap each, then the usual check that the
+    // code matches the screen. Turned off, or any failure: nothing is offered.
+    // Names and platforms come from the screens themselves: text only, never HTML.
+    const KIND_ICONS = { tv: 'tv', phone: 'smartphone', tablet: 'tablet', browser: 'computer', frame: 'photo' };
+    async function offerNearby() {
+        const box = $('nearbyTv');
+        const list = $('nearbyList');
+        box.classList.add('hidden');
+        let found = [];
+        try {
+            const reply = await window.SoraPairFlow.request('/api/admin/pair/nearby');
+            if (reply.ok && Array.isArray(reply.data.nearby)) found = reply.data.nearby;
+        } catch (_) { /* no suggestion */ }
+        list.innerHTML = '';
+        for (const screen of found) {
+            const typed = normalize(screen.code);
+            if (typed.length !== CODE_LENGTH) continue;
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'pair-link';
+            const icon = document.createElement('span');
+            icon.className = 'material-icons';
+            icon.textContent = KIND_ICONS[screen.kind] || 'devices';
+            button.appendChild(icon);
+            const label = [screen.name, screen.platform].filter(part => typeof part === 'string' && part).join(' · ');
+            if (label) {
+                const about = document.createElement('span');
+                about.textContent = label;
+                button.appendChild(about);
+            }
+            const shown = document.createElement('bdi');
+            shown.dir = 'ltr';
+            shown.textContent = pretty(typed);
+            button.appendChild(shown);
+            button.addEventListener('click', () => {
+                code = typed;
+                remember(code);
+                load();
+            });
+            list.appendChild(button);
+        }
+        box.classList.toggle('hidden', !list.children.length);
     }
 
     async function load() {
@@ -64,6 +110,8 @@
             if (found.state === 'expired') return expired();
             if (found.state !== 'ready') return show('stateUnreachable');
             $('codeShown').textContent = pretty(found.code);
+            // The name the screen gave itself, if any, unless one was typed already
+            if (found.name && !$('frameName').value.trim()) $('frameName').value = found.name;
             choices.show(found);
             show('pairForm');
             if (matchMedia('(pointer: fine)').matches) $('frameName').focus();

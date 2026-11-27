@@ -118,6 +118,8 @@ router.post('/pair/start', pairingController.start.bind(pairingController));
 router.post('/pair/status', pairingController.status.bind(pairingController));
 router.post('/pair/collect', pairingController.collect.bind(pairingController));
 router.post('/auth/device', pairingController.signIn.bind(pairingController));
+// Before /admin/pair/:code, which would take "nearby" for a code
+router.get('/admin/pair/nearby', pairingController.nearbyOn.bind(pairingController), requireAuth, owner, pairingController.nearby.bind(pairingController));
 router.get('/admin/pair/:code', requireAuth, owner, pairingController.show.bind(pairingController));
 router.post('/admin/pair/:code/approve', requireAuth, owner, pairingController.approve.bind(pairingController));
 router.get('/admin/devices', requireAuth, owner, pairingController.listDevices.bind(pairingController));

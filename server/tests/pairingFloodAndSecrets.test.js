@@ -14,7 +14,7 @@ delete process.env.PHOTO_ENCRYPTION_KEY;
 
 const { createApp } = require('../app');
 const pairing = require('../services/pairingService');
-const { addressGroup } = require('../controllers/pairingController');
+const { addressGroup, networkKey } = require('../controllers/pairingController');
 
 afterAll(async () => {
   await Promise.all([testUploadsDir, testCacheDir, testDataDir].map(dir => fs.remove(dir)));
@@ -73,7 +73,7 @@ describe('the pairing queue', () => {
     }
     expect(statuses.slice(0, 20).every(s => s === 200)).toBe(true);
     expect(statuses.slice(20)).toEqual([429, 429]);
-    expect(pairing.waitingFrom('2001:db8:77:1::/64')).toHaveLength(pairing.MAX_PER_ADDRESS);
+    expect(pairing.waitingFrom(networkKey('2001:db8:77:1::1'))).toHaveLength(pairing.MAX_PER_ADDRESS);
   });
 });
 

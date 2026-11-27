@@ -235,6 +235,7 @@
     "continue": "Continuer",
     "codeInvalid": "Saisissez les 6 lettres et chiffres affichés sur le cadre.",
     "typeCode": "Saisir un code",
+    "nearbyHeading": "{brand} à proximité",
     "unreachableHeading": "Impossible de <em>vérifier</em> le code",
     "unreachableNote": "La bibliothèque n’a pas répondu. Vérifiez la connexion de votre téléphone, puis réessayez.",
     "tryAgain": "Réessayer",

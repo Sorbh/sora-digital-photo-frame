@@ -199,7 +199,11 @@ class AuthenticationManager {
         this.pairCard.classList.remove('is-approved', 'is-error');
         this.setPairStatus(null);
         try {
-            const response = await fetch('/api/pair/start', { method: 'POST' });
+            const response = await fetch('/api/pair/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(this.describeDevice())
+            });
             const data = await response.json();
             if (!this.pairing) return; // signed in meanwhile
             if (!data.success) throw new Error(data.error || 'Could not get a code');
@@ -218,6 +222,16 @@ class AuthenticationManager {
             this.pairCard.classList.add('is-error');
             this.setPairStatus('slideshow.noCode');
             this.pairTimer = setTimeout(() => this.startPairing(), 60 * 1000);
+        }
+    }
+
+    // What this screen is (js/deviceKind.js), for "Sora Frame nearby": a hint only
+    describeDevice() {
+        try {
+            const nav = typeof navigator === 'object' ? navigator : {};
+            return window.SoraDevice ? window.SoraDevice.describe(nav.userAgent, { touchPoints: nav.maxTouchPoints || 0 }) : {};
+        } catch (error) {
+            return {};
         }
     }
 

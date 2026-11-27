@@ -233,6 +233,7 @@
     "continue": "继续",
     "codeInvalid": "请输入相框上显示的 6 位字母和数字。",
     "typeCode": "输入代码",
+    "nearbyHeading": "附近的 {brand}",
     "unreachableHeading": "无法<em>核对</em>代码",
     "unreachableNote": "照片库没有响应。请检查手机的网络连接，然后重试。",
     "tryAgain": "重试",

@@ -233,6 +233,7 @@
     "continue": "Doorgaan",
     "codeInvalid": "Typ de 6 letters en cijfers die op de fotolijst staan.",
     "typeCode": "Code typen",
+    "nearbyHeading": "{brand} in de buurt",
     "unreachableHeading": "Code kon niet worden <em>gecontroleerd</em>",
     "unreachableNote": "De bibliotheek gaf geen antwoord. Controleer de verbinding van je telefoon en probeer het opnieuw.",
     "tryAgain": "Opnieuw proberen",

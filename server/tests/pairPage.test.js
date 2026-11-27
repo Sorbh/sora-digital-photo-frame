@@ -63,6 +63,8 @@ function fakeStorage() {
 function openPage(search, answer, { storage = fakeStorage(), fetch, account } = {}) {
   const elements = {};
   const requests = [];
+  const nearbyLookups = []; // "TV found nearby", asked each time the page asks for a code
+  const record = url => (url === '/api/admin/pair/nearby' ? nearbyLookups : requests).push(url);
   // The two "Type a code" links
   const links = [0, 1].map(() => {
     const listeners = {};
@@ -91,8 +93,8 @@ function openPage(search, answer, { storage = fakeStorage(), fetch, account } = 
     console: { error() {} },
     t: key => key,
     i18n: { error: (_, key) => key },
-    fetch: fetch ? (url, options) => { requests.push(url); return fetch(url, options); } : async (url) => {
-      requests.push(url);
+    fetch: fetch ? (url, options) => { record(url); return fetch(url, options); } : async (url) => {
+      record(url);
       const reply = await answer(url);
       return { ok: reply.status < 400, status: reply.status, json: async () => (reply.body === undefined ? Promise.reject(new SyntaxError('not JSON')) : reply.body) };
     }
@@ -100,10 +102,14 @@ function openPage(search, answer, { storage = fakeStorage(), fetch, account } = 
   vm.runInNewContext(source, sandbox);
   const visible = () => ['stateLoading', 'stateEnter', 'stateExpired', 'stateUnreachable', 'pairForm', 'stateDone']
     .filter(id => elements[id] && !elements[id].classList.contains('hidden'));
-  return { el: sandbox.document.getElementById, requests, location, visible, links, storage };
+  return { el: sandbox.document.getElementById, requests, nearbyLookups, location, visible, links, storage };
 }
 
-const library = (code, accounts = []) => url => {
+// nearby: what GET /api/admin/pair/nearby answers (by default 404, as when it's turned off)
+const library = (code, accounts = [], nearby = null) => url => {
+  if (url === '/api/admin/pair/nearby') {
+    return nearby ? { status: 200, body: { nearby } } : { status: 404, body: { success: false, code: 'NEARBY_OFF' } };
+  }
   if (url.startsWith('/api/admin/pair/')) {
     return decodeURIComponent(url.split('/').pop()) === code
       ? { status: 200, body: { success: true, code, approved: false } }
@@ -133,6 +139,47 @@ describe('The /pair page', () => {
     expect(page.requests.slice(1).sort()).toEqual(['/api/access-accounts', '/api/folders']);
     expect(page.visible()).toEqual(['pairForm']);
     expect(page.el('codeShown').textContent).toBe('K7P-4QX');
+  });
+
+  test('a screen found nearby is offered as one tap, which goes to the usual code check', async () => {
+    const page = openPage('', library('K7P4QX', [], [{ code: 'K7P-4QX', createdAt: '2026-11-27T10:00:00.000Z', lastSeen: '2026-11-27T10:00:30.000Z' }]));
+    await flush();
+    expect(page.nearbyLookups).toEqual(['/api/admin/pair/nearby']);
+    expect(page.visible()).toEqual(['stateEnter']);
+    expect(page.el('nearbyTv').classList.contains('hidden')).toBe(false);
+    const [offer] = page.el('nearbyList').children;
+    offer.fire('click');
+    await flush();
+    expect(page.requests[0]).toBe('/api/admin/pair/K7P4QX');
+    expect(page.visible()).toEqual(['pairForm']);
+    // The phone still shows the code, to check it matches the screen
+    expect(page.el('codeShown').textContent).toBe('K7P-4QX');
+  });
+
+  test('what a nearby screen says it is shows as text, and its name fills in the screen name', async () => {
+    const said = { name: '<img src=x onerror=alert(1)>', kind: 'tv', platform: 'Android TV' };
+    const working = library('K7P4QX', [], [{ code: 'K7P-4QX', ...said, createdAt: '2026-11-27T10:00:00.000Z', lastSeen: '2026-11-27T10:00:30.000Z' }]);
+    const page = openPage('', url => (url === '/api/admin/pair/K7P4QX'
+      ? { status: 200, body: { success: true, code: 'K7P4QX', approved: false, ...said, app: null } }
+      : working(url)));
+    await flush();
+    const [offer] = page.el('nearbyList').children;
+    expect(offer.children.map(part => part.textContent)).toEqual(['tv', '<img src=x onerror=alert(1)> · Android TV', 'K7P-4QX']);
+    expect(offer.children.every(part => part.innerHTML === '')).toBe(true); // never as markup
+    offer.fire('click');
+    await flush();
+    expect(page.visible()).toEqual(['pairForm']);
+    expect(page.el('frameName').value).toBe(said.name);
+  });
+
+  test('with no screen nearby, or the lookup turned off, nothing is offered', async () => {
+    for (const nearby of [[], null]) {
+      const page = openPage('', library('K7P4QX', [], nearby));
+      await flush();
+      expect(page.nearbyLookups).toHaveLength(1);
+      expect(page.el('nearbyTv').classList.contains('hidden')).toBe(true);
+      expect(page.el('nearbyList').children).toEqual([]);
+    }
   });
 
   test('a code that is too short is caught on the phone, with a message', async () => {

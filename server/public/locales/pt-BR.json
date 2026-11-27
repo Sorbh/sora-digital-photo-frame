@@ -235,6 +235,7 @@
     "continue": "Continuar",
     "codeInvalid": "Digite as 6 letras e números que aparecem no porta-retrato.",
     "typeCode": "Digitar um código",
+    "nearbyHeading": "{brand} por perto",
     "unreachableHeading": "Não foi possível <em>verificar</em> o código",
     "unreachableNote": "A biblioteca não respondeu. Confira a conexão do celular e tente de novo.",
     "tryAgain": "Tentar de novo",

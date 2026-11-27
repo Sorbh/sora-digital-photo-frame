@@ -167,8 +167,11 @@ class PairingController {
   // A POST with the secret in the body, so it never shows in a URL a proxy might log
   async status(req, res) {
     try {
-      const { code, secret } = req.body || {};
-      res.json({ success: true, status: pairing.status(code, secret) });
+      // Frames still running a slideshow from before #66 ask with a GET and the code
+      // in the URL: answer them the same way, so a lapsed code ("expired") makes them
+      // start a new one rather than show a dead code until someone reloads the page
+      const { code, secret } = (req.method === 'GET' ? req.query : req.body) || {};
+      res.json({ success: true, status: pairing.status(typeof code === 'string' ? code : '', typeof secret === 'string' ? secret : '') });
     } catch (error) {
       console.error('Error checking pairing:', error);
       res.status(500).json({ success: false, error: 'Could not check pairing' });

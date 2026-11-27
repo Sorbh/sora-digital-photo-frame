@@ -197,9 +197,12 @@ describe('Pairing a frame by QR code', () => {
     const frame = request.agent(app);
     // From its own address, so this file stays under the per-address start limit
     const pairing = (await frame.post('/api/pair/start').set('X-Forwarded-For', '10.66.0.1').expect(200)).body;
-    // Status is a POST with the secret in the body; there's no GET to put it in a query
-    const asGet = await frame.get('/api/pair/status').query({ code: pairing.code, secret: pairing.secret });
-    expect(asGet.body.status).toBeUndefined();
+    // Today's slideshow asks with a POST, the secret in the body (tests/pairPoll.test.js).
+    // A GET is still answered for frames from before #66, which send it in the URL either
+    // way; a logged secret alone still can't collect the token, which needs the frame's cookie
+    const fromLog = request.agent(app);
+    const collected = await fromLog.post('/api/pair/collect').send({ code: pairing.code, secret: pairing.secret }).expect(200);
+    expect(collected.body.token).toBeUndefined();
     // Another site can't poll it either
     await frame.post('/api/pair/status').set('Sec-Fetch-Site', 'cross-site')
       .send({ code: pairing.code, secret: pairing.secret }).expect(403);
@@ -535,5 +538,15 @@ describe('Pairing a frame by QR code', () => {
     } finally {
       delete process.env.MAX_SCREENS;
     }
+  });
+
+  it('answers frames from before #66, which ask with a GET: expired codes make them start again', async () => {
+    const frame = request.agent(app);
+    const pairing = (await frame.post('/api/pair/start').set('X-Forwarded-For', '10.66.0.2').expect(200)).body;
+    const ask = query => frame.get('/api/pair/status').query(query).expect(200).then(r => r.body.status);
+    expect(await ask({ code: pairing.code, secret: pairing.secret })).toBe('waiting');
+    expect(await ask({ code: pairing.code, secret: 'not-the-secret' })).toBe('expired');
+    expect(await ask({ code: 'ZZZZZZ', secret: 'x' })).toBe('expired');
+    expect(await ask({ code: ['a', 'b'] })).toBe('expired');
   });
 });

@@ -184,7 +184,7 @@ Purge expired rows during normal operation. A server interrupted during an appro
 
 Pass `createApp({ deviceStore })` to store paired screens separately from the library's DataStore. The default uses the same `devices` document (`devices.json` with the local DataStore). This store holds paired screens and their token hashes. The pairing store holds short-lived codes and approvals.
 
-Device records have `id`, `accountId`, `name`, `via` (`qr` or `pin`), a SHA-256 hex `tokenHash`, ISO-8601 `pairedAt`, ISO-8601 or null `lastSeen`, and optional `language`. The core supplies the token hash and keeps it out of API responses. A store may return an optional `pausedAt` for its own pause state. The [auth hook](#paused-screens) supplies the API's `paused` flag.
+Device records have `id`, `accountId`, `name`, `via` (`qr` or `pin`), a SHA-256 hex `tokenHash`, ISO-8601 `pairedAt`, ISO-8601 or null `lastSeen`, optional `language`, and optional `info` (`{ name, kind, platform, app, model }`). The owner-facing devices API returns the advertised `info` when available. The core supplies the token hash and keeps it out of API responses. A store may return an optional `pausedAt` for its own pause state. The [auth hook](#paused-screens) supplies the API's `paused` flag.
 
 Each method may return a promise. Scope all reads and writes to the supplied tenant ID and return snapshots. Except for a batch of touches, calls run in that tenant's context.
 
@@ -194,7 +194,7 @@ Each method may return a promise. Scope all reads and writes to the supplied ten
 | `add(tenantId, device, checkLimit)` | In one atomic operation, count the tenant's devices, including paused ones, await `checkLimit(count)`, then insert the device. Roll back if the callback throws. Serialize with concurrent adds, even when the tenant has no devices. The callback checks both `MAX_SCREENS` and the quota hook. |
 | `remove(tenantId, match)` | Atomically delete the devices that satisfy the synchronous `match(device)` predicate. Return their full records. |
 | `restore(tenantId, devices)` | Reinsert the full records after a removal hook fails, including any store-managed fields. |
-| `update(tenantId, id, changes)` | Apply a partial update (`name` or `language`) and return the updated device, or `null` if missing. |
+| `update(tenantId, id, changes)` | Apply a partial device update (`name`, `language` or `info`) and return the updated device, or `null` if missing. |
 | `findById(tenantId, id)` | Return the device or `null`. |
 | `findByTokenHash(tenantId, tokenHash)` | Return the device or `null`. Used for tokens issued before tokens included a device ID. |
 | `touchMany([{ tenantId, deviceId, at }])` | Apply one batch spanning tenants. For each existing device, retain the later of the stored timestamp and `at` (epoch milliseconds). Ignore missing devices. |
@@ -208,7 +208,7 @@ A screen (a TV, phone, tablet or browser) showing its pairing code on the same h
 **A screen says what it is** when it asks for a code. `POST /api/pair/start` takes an optional JSON body, every field optional:
 
 ```json
-{ "name": "Living room TV", "kind": "tv", "platform": "Android TV", "app": "sora-android/1.2.0" }
+{ "name": "Living room TV", "kind": "tv", "platform": "Android TV", "app": "sora-android/1.2.0", "model": "BRAVIA XR" }
 ```
 
 | Field | Kept as |
@@ -217,8 +217,9 @@ A screen (a TV, phone, tablet or browser) showing its pairing code on the same h
 | `kind` | One of `tv`, `phone`, `tablet`, `browser`, `frame` (any case), else `null` |
 | `platform` | Plain text, at most 30 characters, as `name` |
 | `app` | Plain text, at most 40 characters, as `name` |
+| `model` | Plain text, at most 40 characters, as `name` |
 
-It is kept with the waiting code and goes away with it and is **untrusted input, a hint only**: anyone can send anything. Show it as text (`textContent`), never as HTML, and decide nothing on it. The web slideshow sends `kind` and `platform` guessed from its user agent (`server/public/js/deviceKind.js`) and no name.
+The advertisement stays with the waiting code. After approval, the device record keeps it as `info`. `POST /api/auth/device` also accepts these fields alongside the token and refreshes the recorded details when they change. Treat these fields as **untrusted input** and display them using `textContent`. The web slideshow sends `kind`, a `platform` that includes the browser name, and `model` when available through User-Agent Client Hints.
 
 **Finding them:**
 
@@ -227,11 +228,11 @@ GET /api/admin/pair/nearby     signed in, owner only
 ```
 
 ```json
-{ "nearby": [{ "code": "K7P-4QX", "name": "Living room TV", "kind": "tv", "platform": "Android TV", "createdAt": "2026-11-27T10:00:00.000Z", "lastSeen": "2026-11-27T10:04:58.000Z" }] }
+{ "nearby": [{ "code": "K7P-4QX", "name": "Living room TV", "kind": "tv", "platform": "Android TV", "model": "BRAVIA XR", "createdAt": "2026-11-27T10:00:00.000Z", "lastSeen": "2026-11-27T10:04:58.000Z" }] }
 ```
 
-- `code` is as the screen shows it (`K7P-4QX`); pass it to `GET /api/admin/pair/:code` and `POST /api/admin/pair/:code/approve` as usual (any case, with or without the dash). `name`, `kind` and `platform` are what the screen said (each may be `null`). `createdAt` is when it asked for the code, `lastSeen` its last `POST /api/pair/status` poll (the web slideshow polls every 2 seconds). The list is empty (`{ "nearby": [] }`) when nothing is found; it never says anything about the network.
-- `GET /api/admin/pair/:code` now also answers `name`, `kind`, `platform` and `app`, so an approve dialog can prefill the screen's name (`/pair` and **Add a screen** do).
+- `code` is as the screen shows it (`K7P-4QX`). Pass it to `GET /api/admin/pair/:code` and `POST /api/admin/pair/:code/approve` in any case, with or without the dash. `name`, `kind`, `platform` and `model` are what the screen said (each may be `null`). `createdAt` is when it asked for the code, and `lastSeen` is its last `POST /api/pair/status` poll (the web slideshow polls every 2 seconds). The API returns `{ "nearby": [] }` for an empty list.
+- `GET /api/admin/pair/:code` also returns the full advertisement, including `app`. The approval dialog on `/pair` and **Add a screen** uses `name` to prefill the screen name.
 - Listed: codes not approved (or being approved), made in the last 10 minutes (their whole life) and polled in the last 10 seconds, so the screen is still showing them, whose network matches the request's. At most 3, newest first. `POST /api/pair/cancel` lets a closing screen remove its waiting code immediately.
 - **The network:** when a code is made, the server keeps a keyed hash (HMAC-SHA256, with a process-local key by default, or a key derived from `SESSION_SECRET` with a shared store) of the screen's IPv4 address, or of the /64 its IPv6 address is in. A lookup matches when the two hashes are the same. No address is kept or answered. A screen on IPv4 and a phone on IPv6 (or the other way round) don't match: the phone falls back to the QR code or typing.
 - **The address** is Express's `req.ip`, so it follows `trustProxy`: behind one proxy (the default, `1`), the last `X-Forwarded-For` entry, which the proxy adds; with `TRUST_PROXY=false`, the connection's own address, and `X-Forwarded-For` is ignored. Set `trustProxy` to the proxies really in front, and let only them reach the server, so nobody can pick their own address by sending the header.

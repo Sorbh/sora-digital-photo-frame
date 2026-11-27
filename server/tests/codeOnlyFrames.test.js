@@ -108,7 +108,7 @@ const reply = (status, body) => ({ ok: status < 400, status, json: async () => b
 
 // The slideshow page: slideshow.html's head script, js/screenPause.js and the
 // sign-in class, at an address, with the server's data-pin-sign-in on <html>
-function openSlideshow(href, { pinSignIn = 'on', answer = () => new Promise(() => {}), token = null } = {}) {
+function openSlideshow(href, { pinSignIn = 'on', answer = () => new Promise(() => {}), token = null, navigator } = {}) {
   const html = read('slideshow.html');
   const headScript = /<head>[\s\S]*?<script>([\s\S]*?)<\/script>/.exec(html)[1];
   const page = fakePage();
@@ -150,12 +150,34 @@ function openSlideshow(href, { pinSignIn = 'on', answer = () => new Promise(() =
   };
   const context = vm.createContext(sandbox);
   vm.runInContext(headScript, context);
+  if (navigator) {
+    sandbox.navigator = navigator;
+    vm.runInContext(read('js/deviceKind.js'), context);
+  }
   vm.runInContext(read('js/screenPause.js'), context);
   vm.runInContext(read('js/frameSession.js'), context);
   const source = read('js/slideshow.js');
   vm.runInContext(`${source.slice(0, source.indexOf('class PhotoFrameSlideshow'))}\nthis.manager = this.authManager = new AuthenticationManager();`, context);
   return { ...page, sandbox, requests, timers, manager: sandbox.manager };
 }
+
+test('the slideshow advertises its model and browser at pairing start and token sign-in', async () => {
+  const navigator = {
+    userAgent: 'Mozilla/5.0 (Linux; Android 10; K) Chrome/120.0 Mobile Safari/537.36',
+    userAgentData: { getHighEntropyValues: async () => ({ model: 'Pixel 7', platformVersion: '14.0.0' }) }
+  };
+  const answer = url => {
+    if (url === '/api/auth/device') return reply(200, { success: true, account: { id: 'acc_1' } });
+    return reply(200, { authenticated: false });
+  };
+  const href = 'https://frame.example/frame';
+  const pairing = openSlideshow(href, { pinSignIn: 'off', navigator, answer });
+  const reconnect = openSlideshow(href, { pinSignIn: 'off', navigator, answer, token: 'dev_tok' });
+  await flush();
+  const info = { kind: 'phone', platform: 'Android · Chrome', model: 'Pixel 7' };
+  expect(pairing.requests).toContainEqual({ url: '/api/pair/start', body: info });
+  expect(reconnect.requests).toContainEqual({ url: '/api/auth/device', body: { token: 'dev_tok', ...info } });
+});
 
 // ---------------------------------------------------------------------------
 

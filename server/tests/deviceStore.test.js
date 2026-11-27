@@ -63,12 +63,14 @@ test.each(['default document', 'custom async'])('pairing, sign-in, language and 
   const frame = request.agent(app);
   await owner.post('/api/auth/login').send({ password: process.env.ADMIN_PASSWORD }).expect(200);
 
-  const { body: { code, secret } } = await frame.post('/api/pair/start').expect(200);
+  const info = { name: 'Family TV', kind: 'tv', platform: 'Android TV', app: 'sora-android/1.2.0', model: 'BRAVIA XR' };
+  const { body: { code, secret } } = await frame.post('/api/pair/start')
+    .send({ ...info, name: ' Family\u0000 TV ', kind: ' TV ', model: 'BRAVIA\u202e XR' }).expect(200);
   await owner.post(`/api/admin/pair/${code}/approve`).send({ name: 'Hall TV', newAccount: {} }).expect(200);
   const { body: { device, token } } = await frame.post('/api/pair/collect').send({ code, secret }).expect(200);
   const id = device.id;
   const rows = deviceStore ? await deviceStore.list('default') : await dataStore.get('devices', []);
-  expect(rows).toEqual([expect.objectContaining({ id, name: 'Hall TV', tokenHash: expect.stringMatching(/^[a-f0-9]{64}$/) })]);
+  expect(rows).toEqual([expect.objectContaining({ id, name: 'Hall TV', info, tokenHash: expect.stringMatching(/^[a-f0-9]{64}$/) })]);
   expect(JSON.stringify(rows)).not.toContain(token);
   if (deviceStore) expect(await dataStore.get('devices', [])).toEqual([]);
 
@@ -78,7 +80,7 @@ test.each(['default document', 'custom async'])('pairing, sign-in, language and 
   expect(signedIn.body.device.language).toBe('fr');
 
   const listed = await owner.get('/api/admin/devices').expect(200);
-  expect(listed.body.devices).toEqual([expect.objectContaining({ id, language: 'fr', lastSeen: expect.any(String) })]);
+  expect(listed.body.devices).toEqual([expect.objectContaining({ id, name: 'Hall TV', info, language: 'fr', lastSeen: expect.any(String) })]);
   expect(listed.body.devices[0]).not.toHaveProperty('tokenHash');
   await app.locals.pairingService.flushSeen();
   await owner.delete(`/api/admin/devices/${id}`).expect(200);
@@ -93,6 +95,39 @@ test.each(['default document', 'custom async'])('pairing, sign-in, language and 
   } else {
     expect(JSON.parse(await fs.readFile(path.join(tmp, 'devices.json'), 'utf8'))).toEqual([]);
   }
+  await app.locals.pairingService.drainSeen();
+});
+
+test('sign-in updates the advertisement only for a valid token and changed, usable details', async () => {
+  const deviceStore = asyncDeviceStore();
+  const app = createApp({ dataStore: new LocalDataStore(tmp), deviceStore });
+  const owner = request.agent(app);
+  const frame = request.agent(app);
+  await owner.post('/api/auth/login').send({ password: process.env.ADMIN_PASSWORD }).expect(200);
+  const { body: { code, secret } } = await frame.post('/api/pair/start').expect(200);
+  await owner.post(`/api/admin/pair/${code}/approve`).send({ name: 'Hall TV', newAccount: {} }).expect(200);
+  const { body: { device: { id }, token } } = await frame.post('/api/pair/collect').send({ code, secret }).expect(200);
+  expect((await deviceStore.findById('default', id))).not.toHaveProperty('info');
+
+  const signIn = body => request(app).post('/api/auth/device').send({ token, ...body });
+  const advertisement = { name: 'Den\u2066 TV', kind: ' TV ', platform: 'Android TV', app: 'sora-android/2', model: `X\u0000 ${'😀'.repeat(45)}` };
+  const info = { ...advertisement, name: 'Den TV', kind: 'tv', model: `X ${'😀'.repeat(38)}` };
+  await signIn({ ...advertisement, token: `${id}.invalid` }).expect(401);
+  expect(deviceStore.update).not.toHaveBeenCalled();
+
+  await signIn(advertisement).expect(200);
+  expect(deviceStore.update).toHaveBeenCalledTimes(1);
+  expect(deviceStore.update).toHaveBeenLastCalledWith('default', id, { info });
+  await signIn(info).expect(200);
+  await signIn({ name: {}, kind: 'toaster', model: '  ' }).expect(200);
+  await signIn().expect(200);
+  expect(deviceStore.update).toHaveBeenCalledTimes(1);
+
+  const changed = { ...info, name: 'Kitchen TV', app: 'sora-android/3' };
+  await signIn(changed).expect(200);
+  expect(deviceStore.update).toHaveBeenCalledTimes(2);
+  const listed = await owner.get('/api/admin/devices').expect(200);
+  expect(listed.body.devices).toEqual([expect.objectContaining({ id, name: 'Hall TV', info: changed })]);
   await app.locals.pairingService.drainSeen();
 });
 

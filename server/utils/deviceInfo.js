@@ -1,10 +1,10 @@
-// What a screen says about itself when it asks for a pairing code
-// (POST /api/pair/start): { name, kind, platform, app }, every field optional.
+// What a screen says about itself when it pairs or signs in:
+// { name, kind, platform, app, model }, every field optional.
 // It comes from whoever asked, so it is a hint only: plain text, cut short,
 // shown with textContent and never as HTML, and never trusted for anything.
 
 const KINDS = ['tv', 'phone', 'tablet', 'browser', 'frame'];
-const LIMITS = { name: 40, platform: 30, app: 40 };
+const LIMITS = { name: 40, platform: 30, app: 40, model: 40 };
 // Control characters, and the invisible ones that reorder or hide text (bidi
 // overrides and isolates, zero-width characters, BOM)
 const UNSAFE = /[\p{Cc}​-‏‪-‮⁠-⁩﻿]/gu;
@@ -24,7 +24,8 @@ function deviceInfo(body) {
     name: plainText(given.name, LIMITS.name),
     kind: KINDS.includes(kind) ? kind : null,
     platform: plainText(given.platform, LIMITS.platform),
-    app: plainText(given.app, LIMITS.app)
+    app: plainText(given.app, LIMITS.app),
+    model: plainText(given.model, LIMITS.model)
   };
 }
 

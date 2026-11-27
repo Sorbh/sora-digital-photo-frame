@@ -67,7 +67,7 @@ describe('Sora Frame nearby (behind one trusted proxy)', () => {
     expect(res.headers['cache-control']).toBe('no-store');
     const when = new Date(Date.now()).toISOString();
     expect(res.body).toEqual({
-      nearby: [{ code: shown(tv.code), name: null, kind: null, platform: null, createdAt: when, lastSeen: when }]
+      nearby: [{ code: shown(tv.code), name: null, kind: null, platform: null, model: null, createdAt: when, lastSeen: when }]
     });
     expect(res.text).not.toContain('203.0.113');
   });
@@ -147,7 +147,7 @@ describe('Sora Frame nearby (behind one trusted proxy)', () => {
     for (const p of pairing.pairings.values()) expect(p.address).toMatch(/^[A-Za-z0-9_-]{43}$/);
     const answer = (await nearby(admin, HOME).expect(200)).text;
     expect(answer).not.toContain('203.0.113');
-    expect(Object.keys(JSON.parse(answer).nearby[0]).sort()).toEqual(['code', 'createdAt', 'kind', 'lastSeen', 'name', 'platform']);
+    expect(Object.keys(JSON.parse(answer).nearby[0]).sort()).toEqual(['code', 'createdAt', 'kind', 'lastSeen', 'model', 'name', 'platform']);
   });
 });
 
@@ -159,14 +159,15 @@ describe('what a screen says about itself', () => {
   });
 
   test('is kept with its code, and shown by nearby and by the code lookup', async () => {
-    const tv = await tvStarts(app, HOME, { name: 'Living room TV', kind: 'tv', platform: 'Android TV', app: 'sora-android/1.2.0' });
+    const info = { name: 'Living room TV', kind: 'tv', platform: 'Android TV', app: 'sora-android/1.2.0', model: 'BRAVIA XR' };
+    const tv = await tvStarts(app, HOME, info);
     expect((await nearby(admin, HOME).expect(200)).body.nearby).toEqual([expect.objectContaining({
-      code: shown(tv.code), name: 'Living room TV', kind: 'tv', platform: 'Android TV'
+      code: shown(tv.code), name: 'Living room TV', kind: 'tv', platform: 'Android TV', model: 'BRAVIA XR'
     })]);
     expect((await admin.get(`/api/admin/pair/${tv.code}`).expect(200)).body).toMatchObject({
-      code: tv.code, approved: false, name: 'Living room TV', kind: 'tv', platform: 'Android TV', app: 'sora-android/1.2.0'
+      code: tv.code, approved: false, ...info
     });
-    expect(pairing.find(tv.code).device).toEqual({ name: 'Living room TV', kind: 'tv', platform: 'Android TV', app: 'sora-android/1.2.0' });
+    expect(pairing.find(tv.code).device).toEqual(info);
   });
 
   test('is cleaned up: plain text, cut short, a kind from the list or none', async () => {
@@ -186,14 +187,14 @@ describe('what a screen says about itself', () => {
       const asking = request(app).post('/api/pair/start').set('X-Forwarded-For', HOME);
       const res = body === undefined ? await asking : await asking.set('Content-Type', 'application/json').send(body);
       if (res.status !== 200) { expect(res.status).toBe(400); continue; } // JSON the parser refuses outright
-      expect(pairing.find(res.body.code).device).toEqual({ name: null, kind: null, platform: null, app: null });
+      expect(pairing.find(res.body.code).device).toEqual({ name: null, kind: null, platform: null, app: null, model: null });
     }
   });
 
   test('the sanitiser on its own', () => {
     const { deviceInfo } = require('../utils/deviceInfo');
-    expect(deviceInfo()).toEqual({ name: null, kind: null, platform: null, app: null });
-    expect(deviceInfo({ kind: ' Phone ', name: '   ', platform: 7 })).toEqual({ name: null, kind: 'phone', platform: null, app: null });
+    expect(deviceInfo()).toEqual({ name: null, kind: null, platform: null, app: null, model: null });
+    expect(deviceInfo({ kind: ' Phone ', name: '   ', platform: 7 })).toEqual({ name: null, kind: 'phone', platform: null, app: null, model: null });
     for (const kind of ['tv', 'phone', 'tablet', 'browser', 'frame']) expect(deviceInfo({ kind }).kind).toBe(kind);
     expect(deviceInfo({ name: 'a\u200Bb\uFEFFc\u2066d' }).name).toBe('a b c d');
     expect(deviceInfo({ app: '😀'.repeat(50) }).app).toBe('😀'.repeat(40)); // characters, not UTF-16 units

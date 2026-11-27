@@ -18,17 +18,22 @@ An app that does this is also found by **Sora Frame nearby**: when the owner ope
 POST /api/pair/start
 Content-Type: application/json
 
-{ "name": "Living room TV", "kind": "tv", "platform": "Android TV", "app": "sora-android/1.2.0" }
+{ "name": "Living room TV", "kind": "tv", "platform": "Android TV", "app": "sora-android/1.2.0", "model": "BRAVIA XR" }
 ```
 
-The body is optional, and so is every field in it. It is shown to the owner as a hint (it prefills the screen's name when they approve), never trusted:
+The body and all its fields are optional. Send the OS device name and hardware model at pairing and again at sign-in. The owner sees these details as a hint and can choose a separate screen name when approving the pairing.
 
 | Field | What to send | Kept as |
 |---|---|---|
-| `name` | A name the owner would recognise, such as the device's own name. Optional | Plain text, at most 40 characters (control and invisible characters removed, longer text cut) |
+| `name` | The OS device name, with the model as a fallback | Plain text, at most 40 characters (control and invisible characters removed, longer text cut) |
 | `kind` | `tv`, `phone`, `tablet`, `browser` or `frame` | Anything else becomes `null` |
 | `platform` | A short label: `Android TV`, `Android`, `iOS`, `tvOS`, `Fire TV` | Plain text, at most 30 characters |
 | `app` | Your app and version, `sora-android/1.2.0` | Plain text, at most 40 characters |
+| `model` | The hardware model, for example `BRAVIA XR` or `Pixel 7` | Plain text, at most 40 characters |
+
+On Android, read the name with `Settings.Global.getString(contentResolver, Settings.Global.DEVICE_NAME)` and get the model from `Build.MODEL`. [Android Settings.Global documentation](https://developer.android.com/reference/android/provider/Settings.Global#DEVICE_NAME)
+
+On iOS, use `UIDevice.current.name` when the user-assigned name is available. iOS 16 and later require Apple's user-assigned device name entitlement to access it. Fall back to the model when the app lacks the entitlement. [Apple UIDevice.name documentation](https://developer.apple.com/documentation/uikit/uidevice/name)
 
 **200:**
 
@@ -116,8 +121,10 @@ With the pairing cookie from step 1 in the jar. **200**, once approved:
 
 ```
 POST /api/auth/device
-{ "token": "dev_3fa94c0b12de.Jc0…" }
+{ "token": "dev_3fa94c0b12de.Jc0…", "name": "Living room TV", "kind": "tv", "platform": "Android TV", "app": "sora-android/1.2.0", "model": "BRAVIA XR" }
 ```
+
+Include the current advertisement fields alongside the token so a new name or app version reaches the owner. A sign-in with at least one valid field replaces the previous advertisement if it changed. A token-only request keeps the existing details.
 
 | Status | Answer | What to do |
 |---|---|---|

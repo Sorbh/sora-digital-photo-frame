@@ -1,9 +1,4 @@
-// What this browser is, told to the server when it asks for a pairing code
-// (POST /api/pair/start), so "Sora Frame nearby" can say "Android TV" beside the
-// code. A rough guess from the user agent, and only a hint: nothing depends on it.
-//
-//   SoraDevice.describe(userAgent, { touchPoints }) -> { kind, platform }
-//   kind: 'tv' | 'phone' | 'tablet' | 'browser'; platform: a short label
+// A short description of the browser for pairing and device sign-in.
 (function (root) {
     // TVs first: many say "Android" too, without "Mobile"
     const TVS = [
@@ -17,8 +12,7 @@
         [/SMART-?TV|SmartTV|HbbTV|\bTV\b/i, 'Smart TV']
     ];
 
-    function describe(userAgent, { touchPoints = 0 } = {}) {
-        const ua = String(userAgent || '');
+    function identifyPlatform(ua, touchPoints) {
         for (const [pattern, platform] of TVS) {
             if (pattern.test(ua)) return { kind: 'tv', platform };
         }
@@ -33,11 +27,48 @@
         if (/Windows Phone|Mobile/i.test(ua)) return { kind: 'phone', platform: 'Web' };
         if (/CrOS/.test(ua)) return { kind: 'browser', platform: 'ChromeOS' };
         if (/Windows/.test(ua)) return { kind: 'browser', platform: 'Windows' };
-        if (/Macintosh|Mac OS X/.test(ua)) return { kind: 'browser', platform: 'macOS' };
+        if (/Macintosh|Mac OS X/.test(ua)) return { kind: 'browser', platform: 'Mac' };
         if (/Linux/.test(ua)) return { kind: 'browser', platform: 'Linux' };
         return { kind: 'browser', platform: 'Web' };
     }
 
-    root.SoraDevice = { describe };
-    if (typeof module === 'object' && module.exports) module.exports = { describe };
+    function browserLabel(ua, brands) {
+        if (/Edg(?:e|A|iOS)?\//i.test(ua)) return 'Edge';
+        if (/OPR\/|OPiOS\/|Opera\//i.test(ua)) return 'Opera';
+        if (/SamsungBrowser\//i.test(ua)) return 'Samsung Internet';
+        if (/Silk\//i.test(ua)) return 'Silk';
+        if (/Firefox\/|FxiOS\//i.test(ua)) return 'Firefox';
+        if (brands?.some(entry => entry.brand === 'Brave')) return 'Brave';
+        if (/\bwv\).*Chrome\//i.test(ua)) return 'WebView';
+        if (/Chromium\//i.test(ua)) return 'Chromium';
+        if (/Chrome\/|CriOS\//i.test(ua)) return 'Chrome';
+        if (/Version\/.*Safari\//i.test(ua)) return 'Safari';
+        return '';
+    }
+
+    function describe(userAgent, { touchPoints = 0, brands, model } = {}) {
+        const ua = String(userAgent || '');
+        const { kind, platform } = identifyPlatform(ua, touchPoints);
+        const browser = browserLabel(ua, brands);
+        const hardware = typeof model === 'string' && model.trim();
+        return {
+            kind,
+            platform: browser ? `${platform} · ${browser}` : platform,
+            ...(hardware && { model: hardware })
+        };
+    }
+
+    async function advertise(navigator) {
+        const { userAgent, maxTouchPoints, userAgentData } = navigator || {};
+        let hints;
+        try {
+            hints = await userAgentData?.getHighEntropyValues?.(['model', 'platformVersion']);
+        } catch {
+            // The browser can deny access to these hints.
+        }
+        return describe(userAgent, { touchPoints: maxTouchPoints, brands: userAgentData?.brands, model: hints?.model });
+    }
+
+    root.SoraDevice = { describe, advertise };
+    if (typeof module === 'object' && module.exports) module.exports = { describe, advertise };
 })(typeof window !== 'undefined' ? window : globalThis);

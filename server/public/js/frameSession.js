@@ -123,7 +123,7 @@
         response = await this.request('/api/auth/device', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token })
+          body: JSON.stringify({ token, ...await root.SoraDevice?.advertise(root.navigator) })
         });
       } catch (error) {
         return false; // offline: keep the pairing, ask again later

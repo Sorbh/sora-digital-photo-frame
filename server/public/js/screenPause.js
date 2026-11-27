@@ -74,7 +74,7 @@
           ? await this.request('/api/auth/device', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ token })
+            body: JSON.stringify({ token, ...await root.SoraDevice?.advertise(root.navigator) })
           })
           : await this.request('/api/folders', { credentials: 'same-origin' });
       } catch (error) {

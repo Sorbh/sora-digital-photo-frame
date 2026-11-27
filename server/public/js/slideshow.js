@@ -204,7 +204,7 @@ class AuthenticationManager {
         const response = await fetch('/api/auth/device', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ token })
+            body: JSON.stringify({ token, ...await this.describeDevice() })
         });
         return response.json();
     }
@@ -217,10 +217,12 @@ class AuthenticationManager {
         this.pairCard.classList.remove('is-approved', 'is-error');
         this.setPairStatus(null);
         try {
+            const info = await this.describeDevice();
+            if (this.pairing !== starting) return;
             const response = await fetch('/api/pair/start', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(this.describeDevice())
+                body: JSON.stringify(info)
             });
             const data = await response.json();
             if (this.pairing !== starting) return; // signed in or left meanwhile
@@ -244,14 +246,9 @@ class AuthenticationManager {
         }
     }
 
-    // What this screen is (js/deviceKind.js), for "Sora Frame nearby": a hint only
+    // What this screen is (js/deviceKind.js), for the owner who connects it
     describeDevice() {
-        try {
-            const nav = typeof navigator === 'object' ? navigator : {};
-            return window.SoraDevice ? window.SoraDevice.describe(nav.userAgent, { touchPoints: nav.maxTouchPoints || 0 }) : {};
-        } catch (error) {
-            return {};
-        }
+        return window.SoraDevice?.advertise(window.navigator) ?? {};
     }
 
     async checkPairing() {

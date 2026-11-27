@@ -271,6 +271,7 @@ class PairingController {
           name: p.device.name,
           kind: p.device.kind,
           platform: p.device.platform,
+          model: p.device.model ?? null,
           createdAt: new Date(p.createdAt).toISOString(),
           lastSeen: new Date(p.lastSeen).toISOString()
         }))
@@ -285,8 +286,7 @@ class PairingController {
       const found = await pairingFor(req).lookUp(req.params.code);
       if (!found) return res.status(404).json({ success: false, error: 'This code has expired', code: 'PAIRING_EXPIRED' });
       // These hints can prefill the frame's name.
-      const { name, kind, platform, app } = found.device;
-      res.json({ success: true, code: found.code, expiresAt: found.expiresAt, approved: !!found.approved, name, kind, platform, app });
+      res.json({ success: true, code: found.code, expiresAt: found.expiresAt, approved: !!found.approved, ...deviceInfo(found.device) });
     } catch (error) {
       next(error);
     }
@@ -368,7 +368,7 @@ class PairingController {
       if (!limit.allowed) return res.status(429).json({ success: false, error: limit.message, code: 'RATE_LIMITED' });
 
       accessAccounts.recordFailedAttempt(ip); // counted before checking, cleared on success
-      const device = await pairingFor(req).signIn(req.body?.token);
+      const device = await pairingFor(req).signIn(req.body?.token, req.body);
       const account = device && (await accessAccounts.loadAccounts()).find(a => a.id === device.accountId);
       if (!account) {
         return res.status(401).json({ success: false, error: 'This frame is no longer paired', code: 'DEVICE_UNKNOWN' });

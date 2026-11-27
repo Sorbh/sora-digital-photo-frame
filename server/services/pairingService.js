@@ -164,7 +164,8 @@ class PairingService {
     let published = false;
     try {
       if (pairing.expiresAt <= Date.now()) return null;
-      const { device, token } = await this.addDevice({ name, accountId, via: 'qr' });
+      const info = deviceInfo(pairing.device);
+      const { device, token } = await this.addDevice({ name, accountId, via: 'qr', info });
       try {
         const live = await this.find(pairing.code);
         if (live?.claimId === pairing.claimId && !live.approved) {
@@ -189,7 +190,7 @@ class PairingService {
 
   // Every way a screen joins (QR code or PIN) ends here, so the same screen
   // limit applies to all of them. Returns the device and its token.
-  async addDevice({ name, accountId, via }) {
+  async addDevice({ name, accountId, via, info }) {
     const id = `dev_${crypto.randomBytes(6).toString('hex')}`;
     const token = `${id}.${crypto.randomBytes(32).toString('base64url')}`;
     const device = {
@@ -199,7 +200,8 @@ class PairingService {
       via,
       tokenHash: hash(token),
       pairedAt: new Date().toISOString(),
-      lastSeen: null
+      lastSeen: null,
+      ...(info && Object.values(info).some(Boolean) && { info })
     };
     // MAX_SCREENS caps screens per library (0, the default, means no cap)
     const limit = parseInt(process.env.MAX_SCREENS, 10) || 0;
@@ -313,20 +315,27 @@ class PairingService {
   }
 
   // The paired device for a token, or null. Old tokens have no embedded id.
-  async signIn(token) {
+  async signIn(token, advertisement) {
     if (typeof token !== 'string' || !token) return null;
     const id = deviceIdFromToken(token);
     const tokenHash = hash(token);
+    const { id: tenantId } = currentTenant();
     let device;
     try {
       device = id
-        ? await this.deviceStore.findById(currentTenant().id, id)
-        : await this.deviceStore.findByTokenHash(currentTenant().id, tokenHash);
+        ? await this.deviceStore.findById(tenantId, id)
+        : await this.deviceStore.findByTokenHash(tenantId, tokenHash);
     } catch (error) {
       if (error.status >= 400 && error.status < 500) return null;
       throw error;
     }
     if (!device || !sameSecret(tokenHash, device.tokenHash)) return null;
+    const info = deviceInfo(advertisement);
+    if (Object.values(info).some(Boolean) &&
+        Object.entries(info).some(([key, value]) => value !== (device.info?.[key] ?? null))) {
+      device = await this.deviceStore.update(tenantId, device.id, { info });
+      if (!device) return null;
+    }
     this.seen(device.id);
     return device;
   }

@@ -80,7 +80,49 @@ describe('every page shares one header', () => {
     expect(res.text).toContain('<script src="/js/appHeader.js"></script>');
     // The phone tab bar follows the same rule
     const tabs = tabsOf(tabbarOf(res.text));
-    expect(tabs.filter(tab => tab !== 'fab')).toEqual(id === 'library' ? ['library', 'access', 'slideshow', 'settings'] : ['library', 'access', 'slideshow']);
+    // (Settings stays in the header, phones too)
+    expect(tabs.filter(tab => tab !== 'fab')).toEqual(['library', 'access', 'slideshow']);
+  });
+
+  test('the phone tab bar says Home, and Settings sits in the header beside the account menu', async () => {
+    const hosted = build({ accountUrl: '/account' });
+    const library = (await get(hosted, '/home').expect(200)).text;
+    const notes = (await get(hosted, '/notes').expect(200)).text;
+    app = build(); // the header's options are the last app's: back to self-hosted
+    const tabbar = tabbarOf(library);
+    // Hosted: Home, the round +, Slideshow and nothing else
+    expect(tabsOf(tabbar)).toEqual(['library', 'fab', 'slideshow']);
+    expect(tabbar).toMatch(/<a href="\/home" class="tab active" aria-current="page" data-tab="library"><span[^>]*>home<\/span><span data-i18n="admin.breadcrumbHome">Home<\/span><\/a>/);
+    expect(tabbar).not.toMatch(/Library|common\.library|settings|tune/);
+    // Settings: shown on phones too (no tb-desktop), the last tool before the account menu
+    const header = headerOf(library).html;
+    expect(header).toMatch(/<button type="button" id="settingsBtn" class="tb-btn icon" data-header-item="settings"/);
+    expect(header).toMatch(/id="settingsBtn"[^>]*>[^<]*<span[^>]*>tune<\/span><\/button>\s*<div class="account-menu">/);
+    // The other pages: the Home link in the header, no Settings
+    expect(headerOf(notes).html).toMatch(/data-header-item="library"[^>]*><span[^>]*>home<\/span><span class="tb-label" data-i18n="admin.breadcrumbHome">Home<\/span>/);
+    expect(headerOf(notes).html).not.toContain('settingsBtn');
+    expect(tabsOf(tabbarOf(notes))).toEqual(['library', 'fab', 'slideshow']);
+  });
+
+  test('every language has the Home label', () => {
+    for (const file of fs.readdirSync(path.join(publicDir, 'locales')).filter(name => name.endsWith('.json'))) {
+      const strings = JSON.parse(read(`locales/${file}`));
+      expect([file, typeof strings.admin.breadcrumbHome]).toEqual([file, 'string']);
+    }
+  });
+
+  test('the phone tab bar floats, rounded, with a round raised + in the middle', () => {
+    const css = read('css/sora.css');
+    const phone = css.slice(css.indexOf('@media (max-width: 640px)'));
+    const rule = selector => {
+      const at = phone.indexOf(`    ${selector} {`);
+      return phone.slice(at, phone.indexOf('}', at));
+    };
+    expect(rule('.tabbar')).toMatch(/bottom: calc\(12px \+ env\(safe-area-inset-bottom/);
+    expect(rule('.tabbar')).toMatch(/left: max\(12px/);
+    expect(rule('.tabbar')).toMatch(/border-radius: var\(--shape-lg\)/);
+    expect(rule('.tab-fab')).toMatch(/border-radius: 50%/);
+    expect(rule('.tab-fab')).toMatch(/margin-top: -\d+px/);
   });
 
   test('the page you are on is marked', async () => {

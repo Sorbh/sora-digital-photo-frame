@@ -81,6 +81,9 @@ const PAGES = {
   'owner-only.html': { id: 'owner-only', eyebrow: null }
 };
 
+// The library's name in the header and tab bar: the user calls it Home
+const HOME_LABEL = ['admin.breadcrumbHome', 'Home'];
+
 const icon = name => `<span class="material-symbols-outlined" aria-hidden="true">${name}</span>`;
 const i18nText = ([key, text]) => `<span data-i18n="${key}">${escapeHtml(text)}</span>`;
 
@@ -89,8 +92,8 @@ const i18nText = ([key, text]) => `<span data-i18n="${key}">${escapeHtml(text)}<
  * 'owner-only'). The host's slot ([data-host-slot]) holds the page's name until
  * the host puts something of its own there (a library switcher, say).
  *
- *   brand · slot        the places: Library (when not on it), Access, Slideshow
- *                       the tools: Settings (the library's), the account menu
+ *   brand · slot        the places: Home (when not on it), Access, Slideshow
+ *                       the tools: Settings (the library's, on phones too), the account menu
  *
  * The account menu (js/appHeader.js) holds Account (with accountUrl), the theme
  * and Log out, each keeping its id and data-header-item for scripts and tests.
@@ -100,7 +103,7 @@ function renderHeader(pageId, { eyebrow = null, settings: hasSettings = false } 
   const here = id => (pageId === id ? ' aria-current="page"' : '');
   const places = [];
   if (pageId !== 'library') {
-    places.push(`<a href="/home" class="tb-btn tb-desktop" data-header-item="library" title="Back to the library" data-i18n-attr="title:accessAccounts.static_017">${icon('photo_library')}<span class="tb-label" data-i18n="common.library">Library</span></a>`);
+    places.push(`<a href="/home" class="tb-btn tb-desktop" data-header-item="library" title="Back to the library" data-i18n-attr="title:accessAccounts.static_017">${icon('home')}<span class="tb-label" data-i18n="${HOME_LABEL[0]}">${HOME_LABEL[1]}</span></a>`);
   }
   if (!accountUrl) {
     places.push(`<a href="/access-accounts" class="tb-btn tb-desktop" data-header-item="access" data-owner-only${here('access')} title="Manage access accounts" data-i18n-attr="title:admin.static_033">${icon('key')}<span class="tb-label" data-i18n="common.access">Access</span></a>`);
@@ -109,7 +112,7 @@ function renderHeader(pageId, { eyebrow = null, settings: hasSettings = false } 
 
   const tools = [];
   if (hasSettings) {
-    tools.push(`<button type="button" id="settingsBtn" class="tb-btn icon tb-desktop" data-header-item="settings" title="Settings" aria-label="Settings" data-i18n-attr="title:admin.static_037; aria-label:admin.static_037">${icon('tune')}</button>`);
+    tools.push(`<button type="button" id="settingsBtn" class="tb-btn icon" data-header-item="settings" title="Settings" aria-label="Settings" data-i18n-attr="title:admin.static_037; aria-label:admin.static_037">${icon('tune')}</button>`);
   }
   // The account menu: Account, the theme, Log out
   const menu = [];
@@ -144,10 +147,14 @@ function renderHeader(pageId, { eyebrow = null, settings: hasSettings = false } 
         </header>`;
 }
 
-/** The phone tab bar: Library, Access (owner, without accountUrl), the page's own button, Slideshow, Settings (library). */
-function renderTabbar(pageId, { fab = null, settings: hasSettings = false } = {}, options = current()) {
+/**
+ * The phone tab bar, floating above the page: Home, Access (owner, without
+ * accountUrl), the page's own round button, Slideshow. The library's Settings
+ * stays in the header, phones too, just left of the account menu.
+ */
+function renderTabbar(pageId, { fab = null } = {}, options = current()) {
   const here = id => (pageId === id ? ' class="tab active" aria-current="page"' : ' class="tab"');
-  const tabs = [`<a href="/home"${here('library')} data-tab="library">${icon('photo_library')}${i18nText(['common.library', 'Library'])}</a>`];
+  const tabs = [`<a href="/home"${here('library')} data-tab="library">${icon('home')}${i18nText(HOME_LABEL)}</a>`];
   if (!options.accountUrl) {
     tabs.push(`<a href="/access-accounts"${here('access')} data-tab="access" data-owner-only>${icon('key')}${i18nText(['common.access', 'Access'])}</a>`);
   }
@@ -155,9 +162,6 @@ function renderTabbar(pageId, { fab = null, settings: hasSettings = false } = {}
     tabs.push(`<button type="button" class="tab-fab" ${fab.attrs} aria-label="${escapeHtml(fab.label[1])}" data-i18n-attr="aria-label:${fab.label[0]}">${icon(fab.icon)}</button>`);
   }
   tabs.push(`<a href="/slideshow" class="tab" data-tab="slideshow">${icon('slideshow')}${i18nText(['common.slideshow', 'Slideshow'])}</a>`);
-  if (hasSettings) {
-    tabs.push(`<button type="button" class="tab" data-tab="settings" data-proxy="settingsBtn">${icon('tune')}${i18nText(['common.settings', 'Settings'])}</button>`);
-  }
   return `<nav class="tabbar" aria-label="Sections" data-i18n-attr="aria-label:admin.static_054">
         ${tabs.join('\n        ')}
     </nav>`;

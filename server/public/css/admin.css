@@ -1585,7 +1585,7 @@ html.dark .app.file-dragging .drop-hint {
 /* Phones: above the tab bar, not under it */
 @media (max-width: 640px) {
     body:has(.tabbar) #toaster {
-        bottom: calc(78px + env(safe-area-inset-bottom));
+        bottom: calc(96px + env(safe-area-inset-bottom));
     }
 
     /* Full width here, so across the screen rather than pushed off its left edge */

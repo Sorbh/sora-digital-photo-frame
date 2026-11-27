@@ -135,7 +135,7 @@ describe('Toasts in front of dialogs (js/toastLayer.js)', () => {
 
   test('on phones the library toasts sit above the tab bar', () => {
     const css = read('css/admin.css');
-    expect(css).toMatch(/@media \(max-width: 640px\)\s*{\s*body:has\(\.tabbar\) #toaster\s*{\s*bottom: calc\(78px/);
+    expect(css).toMatch(/@media \(max-width: 640px\)\s*{\s*body:has\(\.tabbar\) #toaster\s*{\s*bottom: calc\(96px/);
   });
 });
 

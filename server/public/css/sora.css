@@ -1056,102 +1056,95 @@ html[dir="rtl"] .back-btn .material-symbols-outlined {
     }
 
     body:has(.tabbar) {
-        padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+        padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px));
     }
 
-    /* Docked at the bottom, like the header at the top: a hairline and a blur */
+    /* Floating above the page, rounded, with the page's main action raised in the middle */
     .tabbar {
         position: fixed;
-        inset-inline: 0;
-        bottom: 0;
+        left: max(12px, env(safe-area-inset-left, 0px));
+        right: max(12px, env(safe-area-inset-right, 0px));
+        bottom: calc(12px + env(safe-area-inset-bottom, 0px));
         z-index: 60;
         display: grid;
         /* One column per tab shown: a shared library hides some (js/scope.js) */
         grid-auto-flow: column;
         grid-auto-columns: 1fr;
         align-items: center;
-        height: calc(64px + env(safe-area-inset-bottom, 0px));
-        padding: 0 max(8px, env(safe-area-inset-right, 0px)) env(safe-area-inset-bottom, 0px) max(8px, env(safe-area-inset-left, 0px));
+        height: 66px;
+        padding: 0 6px;
         box-sizing: border-box;
-        border-top: 1px solid var(--rule);
+        border: 1px solid var(--rule);
+        border-radius: var(--shape-lg);
         /* Solid, so a bright photo scrolling underneath can't wash out the labels */
         background: var(--paper-raised);
+        box-shadow: 0 20px 40px -18px rgb(90 20 50 / 0.35);
     }
 
     .tab {
         display: grid;
         justify-items: center;
         gap: 2px;
-        padding: 4px 0;
+        padding: 6px 0;
         border: 0;
         background: none;
         color: var(--ink-soft);
         font: inherit;
         font-size: 0.6875rem;
-        font-weight: 600;
+        font-weight: 650;
         text-decoration: none;
         cursor: pointer;
         -webkit-tap-highlight-color: transparent;
     }
 
-    /* The icon sits in a pill that fills in on the page you're on */
     .tab .material-symbols-outlined {
-        display: grid;
-        place-items: center;
-        width: 52px;
-        height: 28px;
-        border-radius: 14px;
-        font-size: 22px;
-        transition: background-color 0.18s ease;
-    }
-
-    .tab:active .material-symbols-outlined {
-        background: var(--surface-press);
+        font-size: 24px;
     }
 
     .tab:focus-visible {
-        outline: none;
-    }
-
-    .tab:focus-visible .material-symbols-outlined {
         outline: 2px solid var(--ring);
-        outline-offset: 1px;
+        outline-offset: 2px;
+        border-radius: var(--shape-sm, 8px);
     }
 
     .tab.active {
-        color: var(--foreground);
+        color: var(--accent-ink);
         font-weight: 700;
     }
 
     .tab.active .material-symbols-outlined {
-        background: color-mix(in oklab, var(--berry) 16%, transparent);
-        color: var(--accent-ink);
         font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
     }
 
-    /* The page's main action (Add, New note): a berry key in the row, not a bubble over it */
+    /* The page's main action (Add, New note): a round berry button raised over the bar */
     .tab-fab {
         justify-self: center;
         display: grid;
         place-items: center;
-        width: 52px;
-        height: 40px;
-        border: 0;
-        border-radius: 14px;
+        width: 60px;
+        height: 60px;
+        margin-top: -34px;
+        border: 5px solid var(--paper);
+        border-radius: 50%;
         background: var(--berry-gradient);
         color: #fff;
-        box-shadow: var(--shadow-btn), 0 8px 18px -10px var(--berry);
+        box-shadow: 0 14px 28px -10px var(--berry);
         cursor: pointer;
         -webkit-tap-highlight-color: transparent;
         transition: transform 0.18s var(--ease-out);
     }
 
     .tab-fab:active {
-        transform: scale(0.95);
+        transform: scale(0.94);
+    }
+
+    .tab-fab:focus-visible {
+        outline: 2px solid var(--ring);
+        outline-offset: 2px;
     }
 
     .tab-fab .material-symbols-outlined {
-        font-size: 26px;
+        font-size: 28px;
         font-variation-settings: 'FILL' 0, 'wght' 500, 'GRAD' 0, 'opsz' 24;
     }
 }

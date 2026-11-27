@@ -20,6 +20,9 @@ const MAX_PER_ADDRESS = 10;
 const IN_USE_MS = 20 * 1000;
 const LOOKED_UP_MS = 5 * 60 * 1000;
 const SEEN_WRITE_GAP_MS = 60 * 60 * 1000;
+// A screen's own lastSeen is written more often than that (it says whether the
+// screen is on now); between writes, the exact time is kept in memory (see seen)
+const DEVICE_SEEN_WRITE_GAP_MS = 5 * 60 * 1000;
 // Removals the host's devicesRemoved hook missed, kept per library until it takes them
 const REMOVALS_OUTBOX = 'device-removals';
 // How long to wait before each try again; after the last, the next device change tries
@@ -51,6 +54,7 @@ const deviceIdFromToken = token => (typeof token === 'string' && TOKEN_PATTERN.e
  */
 class PairingService {
   constructor() {
+    this.seenAt = new Map(); // "tenant:device" -> when that screen last asked for anything (ms)
     this.pairings = new Map(); // code -> { code, secret, createdAt, lastSeen, expiresAt, address, device, claimed, approved }
     this.retries = new Map(); // tenant id -> { timer, attempt }, for reportRemovals
     this.reporting = new Map(); // tenant id -> { running, again }, so reports don't pile up
@@ -291,9 +295,10 @@ class PairingService {
   async noteUse({ account = null, device = null } = {}) {
     const now = Date.now();
     const at = new Date(now).toISOString();
-    const stale = when => !when || !(now - Date.parse(when) < SEEN_WRITE_GAP_MS);
+    const stale = (when, gap = SEEN_WRITE_GAP_MS) => !when || !(now - Date.parse(when) < gap);
     const writes = [];
-    if (device && stale(device.lastSeen)) {
+    if (device) this.seen(device.id, now);
+    if (device && stale(device.lastSeen, DEVICE_SEEN_WRITE_GAP_MS)) {
       writes.push(getDataStore().update('devices', [], devices => devices.map(d =>
         d.id === device.id ? { ...d, lastSeen: at } : d)));
     }
@@ -330,9 +335,25 @@ class PairingService {
     return device;
   }
 
+  // A signed-in screen asked for something (any /api or photo request, e.g. its
+  // next photo): noted in memory only, so it costs nothing per photo. listDevices
+  // shows it; noteUse writes it down now and then.
+  seen(deviceId, at = Date.now()) {
+    if (!deviceId) return;
+    const key = `${currentTenant()?.id || ''}:${deviceId}`;
+    if (!(this.seenAt.get(key) >= at)) this.seenAt.set(key, at);
+  }
+
+  // The later of the stored lastSeen and the one in memory
+  lastSeenOf(device) {
+    const remembered = this.seenAt.get(`${currentTenant()?.id || ''}:${device.id}`);
+    const stored = device.lastSeen ? Date.parse(device.lastSeen) : 0;
+    return remembered && remembered > stored ? new Date(remembered).toISOString() : device.lastSeen;
+  }
+
   async listDevices() {
     const devices = await this.loadDevices();
-    return devices.map(({ tokenHash, ...device }) => device);
+    return devices.map(({ tokenHash, ...device }) => ({ ...device, lastSeen: this.lastSeenOf(device) }));
   }
 
   async setLanguage(id, language) {
@@ -460,6 +481,7 @@ module.exports.deviceIdFromToken = deviceIdFromToken;
 module.exports.PAIRING_TTL_MS = PAIRING_TTL_MS;
 module.exports.MAX_PENDING = MAX_PENDING;
 module.exports.MAX_PER_ADDRESS = MAX_PER_ADDRESS;
+module.exports.DEVICE_SEEN_WRITE_GAP_MS = DEVICE_SEEN_WRITE_GAP_MS;
 module.exports.IN_USE_MS = IN_USE_MS;
 module.exports.NEARBY_MAX = NEARBY_MAX;
 module.exports.NEARBY_SEEN_MS = NEARBY_SEEN_MS;

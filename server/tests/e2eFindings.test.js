@@ -151,11 +151,28 @@ describe('"Last used" on Access for frames paired by code', () => {
     expect(Date.parse(await used(paired.accountId))).toBeGreaterThan(Date.parse(old));
     expect(Date.parse(await seen(paired.deviceId))).toBeGreaterThan(Date.parse(old));
 
-    // Used half an hour ago: the next recheck writes nothing
+    // Used half an hour ago: the next recheck leaves "last used" alone, but the
+    // screen's own "last seen" is written every few minutes
     const recent = await ageUse(paired, HOUR / 2);
     await later(2 * (RECHECK_MS + 1000), () => paired.frame.get('/api/folders').expect(200));
     expect(await used(paired.accountId)).toBe(recent);
-    expect(await seen(paired.deviceId)).toBe(recent);
+    expect(Date.parse(await seen(paired.deviceId))).toBeGreaterThan(Date.parse(recent));
+
+    // Seen a minute ago: nothing written
+    const justNow = await ageUse(paired, 60 * 1000);
+    await later(3 * (RECHECK_MS + 1000), () => paired.frame.get('/api/folders').expect(200));
+    expect(await seen(paired.deviceId)).toBe(justNow);
+  });
+
+  test("every request a screen makes, like its next photo, shows on Screens at once, without a write each time", async () => {
+    const paired = await pairFrame('Study TV');
+    await paired.frame.get('/api/folders').expect(200);
+    const written = await ageUse(paired, 60 * 1000); // stored a minute ago, so no write is due
+    const before = Date.now();
+    await paired.frame.get('/api/images/next').expect(res => expect(res.status).toBeLessThan(500));
+    const listed = (await admin.get('/api/admin/devices').expect(200)).body.devices.find(d => d.id === paired.deviceId);
+    expect(Date.parse(listed.lastSeen)).toBeGreaterThanOrEqual(before - 5);
+    expect((await stored()).devices.find(d => d.id === paired.deviceId).lastSeen).toBe(written);
   });
 
   test('Access shows the newest of the account and its screens', () => {

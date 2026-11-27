@@ -14,6 +14,9 @@ async function freshViewer(req, res, next) {
   const session = req.session;
   const signedIn = session?.accessAccount;
   if (!signedIn) return next();
+  // Every request a screen makes (its next photo, the photo itself, its session
+  // check) says it's on: "Last seen" on Screens. In memory, so free per request
+  if (session.deviceId) pairing.seen(session.deviceId);
   // The frame's own "am I still signed in?" (js/frameSession.js, every 15 seconds)
   // always looks again, so a removed screen hears it within that time
   const sessionCheck = req.method === 'GET' && req.originalUrl.split('?')[0] === '/api/auth/session';

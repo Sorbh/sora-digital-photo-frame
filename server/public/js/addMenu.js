@@ -1,11 +1,12 @@
 /**
- * The library's Upload button (and the phone tab bar's round + button): a small
- * menu with "From this device" and "From Google Photos".
+ * The library's Add button (and the phone tab bar's round + button): a small
+ * menu with "From this device" and "From Google Photos", then New folder, New
+ * snap and New note (items marked data-add-create; admin.js runs them).
  *
  * Google Photos follows the rules it always had: only the library's owner can
  * connect it, only someone who can edit can import, and only when the server
- * has it turned on (/api/features googlePhotosEnabled). When it isn't offered,
- * the button goes straight to the upload dialog, with no menu of one.
+ * has it turned on (/api/features googlePhotosEnabled). When the menu would
+ * hold one item only, the button goes straight to the upload dialog.
  *
  *   SoraAddMenu.choices({ features, canEdit, isOwner }) -> ['device', 'googlePhotos']
  *
@@ -45,7 +46,11 @@
   const phone = () => Boolean(root.matchMedia && root.matchMedia('(max-width: 640px)').matches);
 
   const menu = () => doc.getElementById('addMenu');
-  const items = () => [...menu().querySelectorAll('.menu-item')].filter(item => !item.hidden);
+  // Shown items: not hidden, and not hidden by a class either (.hidden, or js/scope.js's view-only)
+  const items = () => [...menu().querySelectorAll('.menu-item')].filter(item => !item.hidden && item.getClientRects().length > 0);
+  // New folder / snap / note that this folder offers (admin.js hides New folder at the deepest level)
+  const creates = () => [...menu().querySelectorAll('[data-add-create]')]
+    .filter(item => !item.hidden && !item.classList.contains('hidden') && !item.disabled);
   const isOpen = () => Boolean(menu()?.matches(':popover-open'));
 
   function setOffered(list) {
@@ -54,7 +59,9 @@
     if (google) google.hidden = !list.includes('googlePhotos');
   }
 
-  function close({ returnFocus = true } = {}) {
+  // leaving: the page is about to go elsewhere (New snap, New note), so the sheet's
+  // step stays in history rather than racing that navigation with a Back
+  function close({ returnFocus = true, leaving = false } = {}) {
     const popover = menu();
     if (!popover) return;
     const hadFocus = popover.contains(doc.activeElement);
@@ -62,7 +69,7 @@
     popover.classList.remove('is-sheet');
     if (inHistory) {
       inHistory = false;
-      root.history.back();
+      if (!leaving) root.history.back();
     }
     if (opener) {
       opener.setAttribute('aria-expanded', 'false');
@@ -122,7 +129,7 @@
   function trigger(event) {
     const button = event.currentTarget;
     if (isOpen() && opener === button) return close();
-    if (offered.length < 2) return fromDevice();
+    if (offered.length + creates().length < 2) return fromDevice();
     close({ returnFocus: false });
     open(button);
   }
@@ -138,6 +145,10 @@
     // "From Google Photos" is handled by js/googlePhotosSync.js, which listens to the same item
     doc.getElementById('addFromDeviceBtn').addEventListener('click', () => { close({ returnFocus: false }); fromDevice(); });
     doc.getElementById('googlePhotosBtn')?.addEventListener('click', () => close({ returnFocus: false }));
+    // New folder opens its dialog, New snap and New note open their editors
+    popover.querySelectorAll('[data-add-create]').forEach(item => {
+      item.addEventListener('click', () => close({ returnFocus: false, leaving: 'leaves' in item.dataset }));
+    });
     popover.addEventListener('keydown', event => {
       const list = items();
       const at = list.indexOf(doc.activeElement);

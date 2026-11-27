@@ -206,12 +206,23 @@ describe('accountUrl', () => {
 });
 
 describe('"New note" in the library', () => {
-  test('sits with New folder and New snap, for people who can edit', () => {
+  test('sits with New folder and New snap in the Add menu, for people who can edit', () => {
     const html = pages.renderPage('admin.html');
-    const actions = html.slice(html.indexOf('<div class="library-actions">'), html.indexOf('</section>', html.indexOf('<div class="library-actions">')));
-    const ids = [...actions.matchAll(/<button id="(\w+)"/g)].map(match => match[1]);
-    expect(ids).toEqual(['createFolderBtn', 'createSnapBtn', 'createNoteBtn', 'uploadBtn']);
-    expect(actions).toMatch(/<button id="createNoteBtn" class="btn-outline" data-edit-only /);
+    // The head: the play order and one main button, Add
+    const actions = html.slice(html.indexOf('<div class="library-actions">'), html.indexOf('<div popover="manual" id="addMenu"'));
+    expect([...actions.matchAll(/<button id="(\w+)"/g)].map(match => match[1])).toEqual(['uploadBtn']);
+    expect(actions).toMatch(/<button id="uploadBtn" class="btn add-btn mobile-hide" data-edit-only data-add-menu aria-haspopup="menu">/);
+    // The menu: the upload sources, then New folder, New snap and New note
+    const menu = html.slice(html.indexOf('<div popover="manual" id="addMenu"'), html.indexOf('</section>', html.indexOf('id="addMenu"')));
+    const ids = [...menu.matchAll(/<button type="button" role="menuitem"[^>]*id="(\w+)"/g)].map(match => match[1]);
+    expect(ids).toEqual(['addFromDeviceBtn', 'googlePhotosBtn', 'createFolderBtn', 'createSnapBtn', 'createNoteBtn']);
+    for (const id of ['createFolderBtn', 'createSnapBtn', 'createNoteBtn']) {
+      expect(menu).toMatch(new RegExp(`id="${id}" data-add-create[^>]*data-edit-only`));
+    }
+    // Snap and note open other pages; New folder opens a dialog here
+    expect(menu).toMatch(/id="createSnapBtn" data-add-create data-leaves /);
+    expect(menu).toMatch(/id="createNoteBtn" data-add-create data-leaves /);
+    expect(menu).not.toMatch(/id="createFolderBtn"[^>]*data-leaves/);
   });
 
   test('opens the note editor for the folder that is open', () => {
@@ -347,13 +358,20 @@ describe('Google Photos is in the Upload menu', () => {
   });
 
   // js/addMenu.js on a small stand-in for the library page
-  async function runMenu(features, scope, { phone = false } = {}) {
+  const CREATES = ['createFolderBtn', 'createSnapBtn', 'createNoteBtn'];
+  // creates: whether New folder, New snap and New note are offered (false: as if hidden)
+  async function runMenu(features, scope, { phone = false, creates = true } = {}) {
     const made = {};
     const node = (id) => {
       const listeners = {};
       const attrs = {};
+      const create = CREATES.includes(id);
       return made[id] = {
-        id, hidden: id === 'googlePhotosBtn', style: {}, popoverOpen: false,
+        id, hidden: id === 'googlePhotosBtn' || (create && !creates), style: {}, popoverOpen: false,
+        dataset: create ? (id === 'createFolderBtn' ? { addCreate: '' } : { addCreate: '', leaves: '' }) : {},
+        disabled: false,
+        classList: { contains: () => false },
+        getClientRects() { return this.hidden ? [] : [{}]; },
         addEventListener: (type, fn) => { (listeners[type] = listeners[type] || []).push(fn); },
         click() { (listeners.click || []).forEach(fn => fn({ currentTarget: this, target: this })); },
         emit: (type, event) => (listeners[type] || []).forEach(fn => fn(event)),
@@ -364,14 +382,16 @@ describe('Google Photos is in the Upload menu', () => {
         matches() { return this.popoverOpen; },
         showPopover() { this.popoverOpen = true; },
         hidePopover() { this.popoverOpen = false; },
-        querySelectorAll: () => [made.addFromDeviceBtn, made.googlePhotosBtn],
+        querySelectorAll: selector => (selector === '[data-add-create]'
+          ? CREATES.map(name => made[name])
+          : [made.addFromDeviceBtn, made.googlePhotosBtn, ...CREATES.map(name => made[name])]),
         getBoundingClientRect: () => ({ left: 0, top: 0, right: 40, bottom: 40 }),
         offsetWidth: 200,
         offsetHeight: 90,
         isConnected: true
       };
     };
-    ['addMenu', 'uploadBtn', 'addFromDeviceBtn', 'googlePhotosBtn'].forEach(node);
+    ['addMenu', 'uploadBtn', 'addFromDeviceBtn', 'googlePhotosBtn', ...CREATES].forEach(node);
     const classes = new Set();
     made.addMenu.classList = { toggle: (name, on) => (on ? classes.add(name) : classes.delete(name)), remove: name => classes.delete(name), contains: name => classes.has(name) };
     made.addMenu.classes = classes;
@@ -464,6 +484,17 @@ describe('Google Photos is in the Upload menu', () => {
     expect(made.addMenu.classes.has('is-sheet')).toBe(false);
     expect(history.backs).toBe(3);
     expect(uploads).toEqual(['dialog']);
+
+    // New folder opens its dialog on this page: the sheet's step comes back out of history
+    made.uploadBtn.click();
+    made.createFolderBtn.click();
+    expect(made.addMenu.popoverOpen).toBe(false);
+    expect(history.backs).toBe(4);
+    // New note goes to the Notes page: no Back racing that navigation
+    made.uploadBtn.click();
+    made.createNoteBtn.click();
+    expect(made.addMenu.popoverOpen).toBe(false);
+    expect(history.backs).toBe(4);
   });
 
   test('for the owner, Upload opens the menu with Google Photos in it', async () => {
@@ -478,18 +509,19 @@ describe('Google Photos is in the Upload menu', () => {
     expect(uploads).toEqual(['dialog']);
   });
 
-  test('for an editor who is not the owner, Upload goes straight to the device, no Google Photos', async () => {
+  test('for an editor who is not the owner, Add opens the menu without Google Photos', async () => {
     const { made, uploads } = await runMenu({ googlePhotosEnabled: true }, { canEdit: true, isOwner: false });
     expect(made.googlePhotosBtn.hidden).toBe(true);
     made.uploadBtn.click();
-    expect(made.addMenu.popoverOpen).toBe(false);
-    expect(uploads).toEqual(['dialog']);
+    expect(made.addMenu.popoverOpen).toBe(true);
+    expect(uploads).toEqual([]);
   });
 
-  test('self-hosted with Google Photos off: straight to the device too', async () => {
-    const { made, uploads } = await runMenu({ googlePhotosEnabled: false, scope: null }, null);
+  test('with only "From this device" to offer, Add goes straight to the device', async () => {
+    const { made, uploads } = await runMenu({ googlePhotosEnabled: false, scope: null }, null, { creates: false });
     expect(made.googlePhotosBtn.hidden).toBe(true);
     made.uploadBtn.click();
+    expect(made.addMenu.popoverOpen).toBe(false);
     expect(uploads).toEqual(['dialog']);
   });
 });

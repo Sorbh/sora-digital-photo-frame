@@ -74,6 +74,36 @@ html:root {
     /* Sora frame mark (icons/sora-mark.svg) used by the wordmark and hero watermarks */
     --sora-mark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Cg fill-rule='evenodd'%3E%3Cpath d='M19 2h90a17 17 0 0 1 17 17v90a17 17 0 0 1-17 17H19A17 17 0 0 1 2 109V19A17 17 0 0 1 19 2Z M18 11.5a6.5 6.5 0 0 0-6.5 6.5v92a6.5 6.5 0 0 0 6.5 6.5h92a6.5 6.5 0 0 0 6.5-6.5V44.5a5 5 0 0 0-1.5-3.6L90.6 13a5 5 0 0 0-3.6-1.5Z'/%3E%3Cpath d='M22.5 30.5A8 8 0 0 0 30.5 22.5H90a16 16 0 0 1 16 16V100a6 6 0 0 1-6 6H28.5a6 6 0 0 1-6-6Z M35 32a3 3 0 0 0-3 3v58.5a3 3 0 0 0 3 3h58.5a3 3 0 0 0 3-3V40a8 8 0 0 0-8-8Z'/%3E%3C/g%3E%3C/svg%3E");
 
+
+    /* ---- Calm system (2026-11): one scale for type, space and controls ----
+       Pink is for main buttons and highlights; the photos bring the colour. */
+    --accent-ink: #c2255c;      /* berry as text: 4.5:1 or more on every surface */
+    --surface-hover: color-mix(in oklab, var(--ink) 6%, transparent);
+    --surface-press: color-mix(in oklab, var(--ink) 10%, transparent);
+    --line-strong: color-mix(in oklab, var(--ink) 16%, var(--rule));
+
+    --text-xs: 0.75rem;     /* eyebrows, badges */
+    --text-sm: 0.875rem;    /* meta, menus, help */
+    --text-base: 1rem;      /* body */
+    --text-lg: 1.0625rem;   /* section headings */
+    --text-xl: 1.5rem;      /* dialog titles */
+    --text-display: clamp(2rem, 4vw, 2.75rem); /* page titles */
+
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 24px;
+    --space-6: 32px;
+    --space-7: 48px;
+    --page-gutter: clamp(1rem, 3vw, 2.5rem);
+    --page-max: 1440px;
+
+    --control-h: 40px;      /* buttons, inputs, selects */
+    --control-h-touch: 44px;
+    --shadow-menu: 0 1px 2px rgb(45 27 38 / 0.06), 0 12px 32px -12px rgb(45 27 38 / 0.22);
+    --shadow-btn: 0 1px 2px rgb(120 30 70 / 0.18);
+
     color-scheme: light;
 }
 
@@ -99,6 +129,13 @@ html.dark:root {
     --destructive-foreground: #1a0d0b;
     --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.4), 0 12px 30px -14px rgb(0 0 0 / 0.7);
     --shadow-lift: 0 2px 6px rgb(0 0 0 / 0.45), 0 28px 54px -20px rgb(0 0 0 / 0.85);
+
+
+    --accent-ink: var(--berry);
+    --surface-hover: color-mix(in oklab, var(--ink) 7%, transparent);
+    --surface-press: color-mix(in oklab, var(--ink) 12%, transparent);
+    --shadow-menu: 0 1px 2px rgb(0 0 0 / 0.4), 0 16px 40px -12px rgb(0 0 0 / 0.75);
+    --shadow-btn: 0 1px 2px rgb(0 0 0 / 0.35);
 
     color-scheme: dark;
 }
@@ -178,7 +215,7 @@ body {
     font-weight: 700;
     letter-spacing: 0.16em;
     text-transform: uppercase;
-    color: var(--berry);
+    color: var(--accent-ink);
 }
 
 .sora-mono {
@@ -254,65 +291,216 @@ body {
     100% { transform: translate(0, 0); }
 }
 
-/* ---------- Basecoat component polish -------------------------------- */
+/* ---------- Components: buttons, inputs, cards, menus, dialogs ---------
+   Calm, like the account page. Four buttons:
+     .btn (.btn-primary)          the one main action: berry, white text
+     .btn-outline (.btn-secondary) secondary: a quiet outline on the page
+     .btn-ghost                    quiet: no frame until hovered
+     .btn-destructive              danger: deletes for good
+   Basecoat draws the rest of them; these set the look. */
 
-.btn, .btn-outline, .btn-ghost, .btn-secondary, .btn-destructive,
+.btn, .btn-primary, .btn-outline, .btn-secondary, .btn-ghost, .btn-destructive,
 .btn-icon, .btn-sm-icon-ghost, .btn-link {
     font-family: var(--font-sans);
     font-weight: 650;
     letter-spacing: 0.005em;
-    transition: background-color 0.18s ease, color 0.18s ease, border-color 0.18s ease,
-        box-shadow 0.18s ease, transform 0.18s var(--ease-out);
+    transition: background-color 0.16s ease, color 0.16s ease, border-color 0.16s ease,
+        box-shadow 0.16s ease, transform 0.16s var(--ease-out);
 }
 
-.btn:active:not(:disabled), .btn-outline:active:not(:disabled),
-.btn-icon:active:not(:disabled), .btn-destructive:active:not(:disabled) {
-    transform: translateY(1px) scale(0.985);
-}
-
-.btn, .btn-primary {
+.btn, .btn-primary, .btn-outline, .btn-secondary, .btn-ghost, .btn-destructive {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    min-height: var(--control-h);
+    padding: 0 var(--space-4);
+    border: 1px solid transparent;
     border-radius: var(--shape-sm);
+    font-size: 0.9375rem;
+    line-height: 1.2;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.btn .material-symbols-outlined, .btn-primary .material-symbols-outlined,
+.btn-outline .material-symbols-outlined, .btn-secondary .material-symbols-outlined,
+.btn-ghost .material-symbols-outlined, .btn-destructive .material-symbols-outlined {
+    font-size: 20px;
+}
+
+.btn:active:not(:disabled), .btn-primary:active:not(:disabled), .btn-outline:active:not(:disabled),
+.btn-secondary:active:not(:disabled), .btn-ghost:active:not(:disabled), .btn-destructive:active:not(:disabled),
+.btn-icon:active:not(:disabled) {
+    transform: translateY(1px);
+}
+
+.btn:disabled, .btn-primary:disabled, .btn-outline:disabled, .btn-secondary:disabled,
+.btn-ghost:disabled, .btn-destructive:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+/* Primary */
+.btn, .btn-primary {
     background: var(--berry-gradient);
     color: #fff;
-    box-shadow: 0 1px 0 rgb(255 255 255 / 0.18) inset, 0 8px 20px -10px var(--berry);
+    box-shadow: var(--shadow-btn);
 }
 
 .btn:hover:not(:disabled), .btn-primary:hover:not(:disabled) {
-    filter: brightness(1.06) saturate(1.05);
+    background: var(--berry-gradient);
+    filter: brightness(1.05);
 }
 
-.btn-outline, .btn-secondary, .btn-ghost, .btn-destructive {
+/* Secondary */
+.btn-outline, .btn-secondary {
+    border-color: var(--line-strong);
+    background: transparent;
+    color: var(--foreground);
+    box-shadow: none;
+}
+
+.btn-outline:hover:not(:disabled), .btn-secondary:hover:not(:disabled) {
+    border-color: color-mix(in oklab, var(--ink) 28%, var(--rule));
+    background: var(--surface-hover);
+}
+
+/* Quiet */
+.btn-ghost {
+    background: transparent;
+    color: var(--ink-soft);
+}
+
+.btn-ghost:hover:not(:disabled) {
+    background: var(--surface-hover);
+    color: var(--foreground);
+}
+
+/* Danger */
+.btn-destructive {
+    background: var(--destructive);
+    color: var(--destructive-foreground);
+    box-shadow: var(--shadow-btn);
+}
+
+.btn-destructive:hover:not(:disabled) {
+    background: var(--destructive);
+    filter: brightness(1.06);
+}
+
+.btn-sm-icon-ghost {
+    border-radius: 50%;
+    color: var(--ink-soft);
+}
+
+.btn-sm-icon-ghost:hover {
+    background: var(--surface-hover);
+    color: var(--foreground);
+}
+
+/* Inputs (text fields; checkboxes and radios keep their own size) */
+.input:not([type="checkbox"]):not([type="radio"]), textarea.textarea, select.select {
+    min-height: var(--control-h);
+    border: 1px solid var(--input);
     border-radius: var(--shape-sm);
-}
-
-.btn-outline {
-    background: var(--paper-raised);
-    border-color: var(--rule);
-}
-
-.btn-outline:hover {
-    background: var(--paper-sunk);
-}
-
-.input, input.input, textarea.textarea, select.select {
     font-family: var(--font-sans);
-    background: var(--paper-raised);
-    transition: border-color 0.18s ease, box-shadow 0.18s ease;
+    font-size: var(--text-base);
+    background: var(--background);
+    color: var(--foreground);
+    transition: border-color 0.16s ease, box-shadow 0.16s ease;
 }
 
-.input:focus, .input:focus-visible {
-    border-color: var(--safelight);
+textarea.textarea { min-height: 0; }
+
+.input::placeholder, textarea.textarea::placeholder {
+    color: var(--muted-foreground);
+}
+
+.input:focus, .input:focus-visible, textarea.textarea:focus, select.select:focus {
+    border-color: var(--berry);
     box-shadow: 0 0 0 3px var(--safelight-soft);
     outline: none;
 }
 
-.card {
-    border-color: var(--rule);
-    border-radius: var(--shape-md);
-    box-shadow: var(--shadow-soft);
+.label {
+    font-size: var(--text-sm);
+    font-weight: 650;
 }
 
-/* Dialog titles get the display face */
+/* Cards: a frame on the page, no lift */
+.card {
+    border: 1px solid var(--rule);
+    border-radius: var(--shape-md);
+    background: var(--card);
+    box-shadow: none;
+}
+
+/* Menus: #contextMenuPopover, #addMenu and others mark their box .sora-menu */
+.sora-menu {
+    min-width: 13rem;
+    margin: 0;
+    padding: var(--space-1) !important;
+    border: 1px solid var(--rule) !important;
+    border-radius: var(--shape-md) !important;
+    background: var(--popover) !important;
+    color: var(--popover-foreground);
+    box-shadow: var(--shadow-menu) !important;
+}
+
+.menu-divider {
+    margin: var(--space-1) var(--space-2);
+    border: 0;
+    border-top: 1px solid var(--rule);
+}
+
+.menu-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    width: 100%;
+    min-height: 38px;
+    padding: 0 var(--space-3);
+    border: 0;
+    border-radius: var(--shape-sm);
+    background: transparent;
+    color: var(--foreground);
+    font: inherit;
+    font-size: var(--text-sm);
+    font-weight: 550;
+    text-align: start;
+    cursor: pointer;
+    transition: background-color 0.12s ease;
+}
+
+.menu-item:hover,
+.menu-item:focus-visible {
+    background-color: var(--surface-hover);
+}
+
+.menu-item:focus-visible {
+    outline: 2px solid var(--berry);
+    outline-offset: -2px;
+}
+
+.menu-item .material-symbols-outlined {
+    margin: 0 !important;
+    font-size: 20px;
+    color: var(--ink-soft);
+}
+
+.menu-item-destructive,
+.menu-item-destructive .material-symbols-outlined {
+    color: var(--destructive);
+}
+
+.menu-item-destructive:hover,
+.menu-item-destructive:focus-visible {
+    background-color: color-mix(in oklab, var(--destructive) 10%, transparent);
+}
+
+/* Dialogs */
 .dialog > article > header h2,
 dialog > article > header h2,
 .card > header h2,
@@ -320,20 +508,25 @@ dialog > article > header h2,
     font-family: var(--font-display);
     font-weight: 500;
     font-variation-settings: 'SOFT' 100;
-    font-size: 1.6rem;
+    font-size: var(--text-xl);
     letter-spacing: -0.02em;
-    line-height: 1.1;
+    line-height: 1.15;
 }
 
 dialog::backdrop {
-    background: rgb(45 15 32 / 0.5);
-    backdrop-filter: blur(6px);
+    background: rgb(26 17 23 / 0.45);
+    backdrop-filter: blur(2px);
 }
 
 .dialog > article, dialog.dialog > article {
-    border-color: var(--rule);
+    border: 1px solid var(--rule);
     border-radius: var(--shape-lg);
+    background: var(--paper-raised);
     box-shadow: var(--shadow-lift);
+}
+
+.dialog > article > footer, dialog.dialog > article > footer {
+    gap: var(--space-2);
 }
 
 /* ---------- App shell (admin pages) -------------------------------- */
@@ -427,70 +620,48 @@ dialog::backdrop {
     display: none;
 }
 
-/* ---------- Library heading: a berry hero card ------------------ */
+/* ---------- Page head: eyebrow, serif title, quiet meta, actions ---------
+   Shared by the library, Notes, Access, Snap and the folder picker. No banner:
+   the page itself, a small berry eyebrow (or the breadcrumb), the title in
+   Fraunces, the counts in muted ink and the actions on the right. */
 
 .library-head {
     position: relative;
     display: flex;
     align-items: flex-end;
     justify-content: space-between;
-    gap: 1.5rem;
     flex-wrap: wrap;
-    overflow: hidden;
-    margin: clamp(1rem, 2.5vw, 1.75rem) clamp(1rem, 3vw, 2.5rem) 1.75rem;
-    padding: clamp(1.5rem, 3.5vw, 2.75rem) clamp(1.5rem, 3.5vw, 2.75rem) clamp(2rem, 4vw, 3rem);
-    border-radius: var(--shape-lg);
-    background:
-        radial-gradient(45% 70% at 92% 0%, rgb(255 200 120 / 0.38), transparent 70%),
-        var(--berry-gradient);
-    color: #fff;
-    isolation: isolate;
-    box-shadow: 0 30px 60px -36px var(--berry-deep);
+    gap: var(--space-4) var(--space-5);
+    width: 100%;
+    max-width: var(--page-max);
+    margin: 0 auto;
+    padding: clamp(1.5rem, 3.5vw, 2.5rem) var(--page-gutter) var(--space-5);
+    box-sizing: border-box;
 }
 
-/* Blossom watermark */
-.library-head::before {
-    content: '';
-    position: absolute;
-    right: -3rem;
-    top: -4rem;
-    z-index: -1;
-    width: 16rem;
-    height: 16rem;
-    background: rgb(255 255 255 / 0.1);
-    -webkit-mask: var(--sora-mark) center / contain no-repeat;
-    mask: var(--sora-mark) center / contain no-repeat;
-    transform: rotate(20deg);
+.library-title {
+    flex: 1 1 18rem;
+    min-width: 0;
 }
 
-/* Soft clouds along the bottom edge */
-.library-head::after {
-    content: '';
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: -1px;
-    z-index: -1;
-    height: 34px;
-    opacity: 0.16;
-    background:
-        radial-gradient(circle at 8% 100%, #fff 26px, transparent 27px),
-        radial-gradient(circle at 22% 120%, #fff 34px, transparent 35px),
-        radial-gradient(circle at 40% 110%, #fff 24px, transparent 25px),
-        radial-gradient(circle at 62% 125%, #fff 38px, transparent 39px),
-        radial-gradient(circle at 84% 110%, #fff 28px, transparent 29px),
-        radial-gradient(circle at 97% 120%, #fff 30px, transparent 31px);
-}
-
-/* On the same dark chip as the breadcrumbs (below), for 4.5:1 or more */
 .library-head .sora-eyebrow {
-    padding: 4px 10px;
-    border-radius: var(--shape-sm);
-    background: rgb(61 10 38 / 0.45);
-    color: rgb(255 255 255 / 0.85);
+    display: inline-block;
+}
+
+/* Back button sits with the breadcrumb, so the title keeps a clean left edge */
+.crumb-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: 28px;
+    margin: 0 0 var(--space-2);
 }
 
 .breadcrumb {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px 6px;
     margin: 0;
     padding: 0;
     list-style: none;
@@ -499,48 +670,46 @@ dialog::backdrop {
     font-weight: 700;
     letter-spacing: 0.14em;
     text-transform: uppercase;
-    color: rgb(255 255 255 / 0.85);
+    color: var(--muted-foreground);
 }
 
-/* The light end of the berry banner, and the warm glow in its corner (where
-   the crumbs sit in RTL), are too bright for small white text: a dark chip
-   behind the crumbs keeps them at 4.5:1 or more, hover colour included */
-.library-head .breadcrumb {
-    padding: 4px 10px;
-    border-radius: var(--shape-sm);
-    background: rgb(61 10 38 / 0.45);
-}
-
-.library-head .breadcrumb .text-foreground,
-.library-head .breadcrumb .text-muted-foreground {
-    color: inherit !important;
-}
-
-.library-head .breadcrumb li:last-child .breadcrumb-item {
-    color: #fff;
+.breadcrumb li {
+    display: inline-flex;
+    align-items: center;
+    min-width: 0;
 }
 
 .breadcrumb .breadcrumb-item {
     font-weight: 700 !important;
+    color: var(--muted-foreground) !important;
+    overflow-wrap: anywhere;
+}
+
+/* Where you are reads as the eyebrow */
+.breadcrumb li:last-child .breadcrumb-item {
+    color: var(--accent-ink) !important;
+}
+
+.breadcrumb .breadcrumb-item.cursor-pointer {
+    border-radius: var(--shape-xs);
+    text-decoration: underline transparent;
+    text-underline-offset: 3px;
+    transition: color 0.16s ease, text-decoration-color 0.16s ease;
 }
 
 .breadcrumb .breadcrumb-item.cursor-pointer:hover {
-    color: #ffd98f !important;
+    color: var(--accent-ink) !important;
+    text-decoration-color: currentColor;
 }
 
 .breadcrumb svg {
     width: 12px;
     height: 12px;
-    opacity: 0.6;
+    opacity: 0.7;
 }
 
-/* Back button sits with the breadcrumb, so the title keeps a clean left edge */
-.crumb-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    min-height: 32px;
-    margin: 0 0 10px;
+html[dir="rtl"] .breadcrumb svg {
+    transform: scaleX(-1);
 }
 
 .back-btn {
@@ -549,49 +718,58 @@ dialog::backdrop {
     /* admin.js shows it as display:flex, so centre for flex as well */
     justify-content: center;
     align-items: center;
-    width: 32px;
-    height: 32px;
+    width: 28px;
+    height: 28px;
     padding: 0;
     flex-shrink: 0;
-    border: 1px solid rgb(255 255 255 / 0.35);
+    border: 1px solid var(--line-strong);
     border-radius: 50%;
-    background: rgb(255 255 255 / 0.14);
-    color: #fff;
+    background: transparent;
+    color: var(--ink-soft);
+    text-decoration: none;
     cursor: pointer;
-    transition: background-color 0.18s ease, transform 0.18s var(--ease-out);
+    transition: background-color 0.16s ease, color 0.16s ease, border-color 0.16s ease;
 }
 
 .back-btn .material-symbols-outlined {
-    font-size: 18px;
+    font-size: 16px;
     line-height: 1;
 }
 
+html[dir="rtl"] .back-btn .material-symbols-outlined {
+    transform: scaleX(-1);
+}
+
 .back-btn:hover {
-    background: rgb(255 255 255 / 0.26);
-    transform: translateX(-2px);
+    background: var(--surface-hover);
+    color: var(--foreground);
 }
 
 .page-title {
     margin: 0;
-    font-size: clamp(2.25rem, 5vw, 3.75rem);
+    font-size: var(--text-display);
+    font-variation-settings: 'SOFT' 100, 'opsz' 144;
+    letter-spacing: -0.03em;
+    line-height: 1.05;
     text-transform: capitalize;
     overflow-wrap: anywhere;
-    color: #fff;
+    color: var(--foreground);
 }
 
-/* Stats live in a white pill, like a counter badge */
+/* The counts and links under the title: plain muted text */
 .page-meta {
-    display: inline-flex;
+    display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 6px;
-    margin: 14px 0 0;
-    padding: 6px 14px;
-    border-radius: var(--shape-sm);
-    background: #fff;
-    color: #c42b6e;
-    font-size: 0.8125rem;
-    font-weight: 700;
-    box-shadow: 0 10px 24px -12px rgb(70 8 40 / 0.6);
+    gap: 2px var(--space-2);
+    margin: var(--space-2) 0 0;
+    color: var(--muted-foreground);
+    font-size: 0.9375rem;
+    font-weight: 500;
+}
+
+.page-meta .material-symbols-outlined {
+    color: var(--accent-ink);
 }
 
 .page-meta:empty,
@@ -601,34 +779,9 @@ dialog::backdrop {
 
 .library-actions {
     display: flex;
-    gap: 10px;
-}
-
-.library-actions .btn,
-.library-actions .btn-outline {
-    height: 44px;
-    padding: 0 20px;
-    border-radius: var(--shape-sm);
-}
-
-.library-head .btn-outline {
-    border: 1px solid rgb(255 255 255 / 0.45);
-    background: rgb(255 255 255 / 0.12);
-    color: #fff;
-}
-
-.library-head .btn-outline:hover {
-    background: rgb(255 255 255 / 0.24);
-}
-
-.library-head .btn {
-    background: #fff;
-    color: #c42b6e;
-    box-shadow: 0 14px 28px -14px rgb(70 8 40 / 0.7);
-}
-
-.library-head .btn:hover {
-    background: #fff4f7;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
 }
 
 /* ---------- Mobile tab bar ----------------------------------------- */
@@ -664,27 +817,23 @@ dialog::backdrop {
         font-size: 1.35rem;
     }
 
+    /* Phones: the head stays compact, the actions stay beside or under the title */
     .library-head {
-        margin: 0.75rem 0.75rem 1.25rem;
-        padding: 1.5rem 1.25rem 1.75rem;
-        border-radius: var(--shape-lg);
-        gap: 1.25rem;
+        padding: var(--space-4) var(--page-gutter) var(--space-4);
+        gap: var(--space-3);
     }
 
-    .library-head::before {
-        width: 11rem;
-        height: 11rem;
-        right: -3rem;
-        top: -3rem;
+    .library-title {
+        flex-basis: 12rem;
     }
 
-    .library-actions {
-        width: 100%;
+    .page-title {
+        font-size: 2rem;
     }
 
-    .library-actions > * {
-        flex: 1;
-        justify-content: center;
+    .page-meta {
+        margin-top: var(--space-1);
+        font-size: var(--text-sm);
     }
 
     /* Upload moves to the tab bar's centre button */

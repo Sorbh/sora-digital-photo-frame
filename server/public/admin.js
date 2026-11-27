@@ -738,7 +738,7 @@ class PhotoFrameAdmin {
             <div class="folder-cover">
                 <img class="folder-cover-img" alt="" loading="lazy" decoding="async">
                 <div class="folder-cover-empty">
-                    <span class="material-symbols-outlined">folder_open</span>
+                    <span class="material-symbols-outlined" aria-hidden="true">folder</span>
                 </div>
             </div>
             <div class="folder-meta">
@@ -746,7 +746,6 @@ class PhotoFrameAdmin {
                 <button type="button" class="folder-more" data-edit-only aria-label="${escapeHtml(t('admin.folderOptions'))}" aria-haspopup="menu" aria-expanded="false">
                     <span class="material-symbols-outlined">more_vert</span>
                 </button>
-                <span class="folder-kind material-symbols-outlined" aria-hidden="true">chevron_right</span>
             </div>
         `;
         div.querySelector('.folder-name').textContent = folder.name;

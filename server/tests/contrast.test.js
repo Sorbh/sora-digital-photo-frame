@@ -53,15 +53,6 @@ const soraDeclared = declaredIn(parseRules(sora));
 const browserJs = fs.readFileSync(path.join(__dirname, '..', 'public', 'js', 'folderBrowser.js'), 'utf8');
 const browserDeclared = declaredIn(parseRules(browserJs.slice(browserJs.indexOf('styles.textContent = `'), browserJs.indexOf('`;', browserJs.indexOf('styles.textContent = `')))));
 
-// rgb(255 255 255 / 0.85) or #ffd98f as { color, alpha }
-const plainColor = value => {
-  const m = /^rgba?\(\s*(\d+)[\s,]+(\d+)[\s,]+(\d+)\s*(?:[/,]\s*([\d.]+))?\s*\)$/.exec(value.trim());
-  if (m) return { color: [m[1], m[2], m[3]].map(Number), alpha: m[4] === undefined ? 1 : Number(m[4]) };
-  if (/^#[0-9a-f]{6}$/i.test(value.trim())) return { color: rgb(value.trim()), alpha: 1 };
-  if (value.trim() === '#fff') return { color: [255, 255, 255], alpha: 1 };
-  throw new Error(`Unhandled colour: ${value}`);
-};
-
 describe('muted text contrast', () => {
   test.each([['light', lightTokens], ['dark', darkTokens]])('%s mode: --ink-faint is at least 4.5:1 on every surface', (_, t) => {
     for (const surface of ['paper', 'paper-raised', 'paper-sunk', 'blush']) {
@@ -115,44 +106,32 @@ describe('muted text contrast', () => {
     });
   });
 
-  // The library banner's breadcrumbs and eyebrow: small white text on the berry gradient,
-  // over a dark chip. Checked over each gradient stop, with and without the
-  // warm glow in the banner's corner (the crumbs sit under it in RTL).
-  describe('library breadcrumbs', () => {
-    const gradientOf = block => /--berry-gradient:\s*([^;]+);/.exec(block)?.[1];
-    const gradients = [
-      ['light', gradientOf(sora.slice(sora.indexOf(':root'), sora.indexOf('html.dark:root')))],
-      ['dark', gradientOf(sora.slice(sora.indexOf('html.dark:root'), sora.indexOf('/* ---------- Base')))
-        || gradientOf(sora.slice(sora.indexOf(':root'), sora.indexOf('html.dark:root')))]
-    ];
-    const head = soraDeclared('.library-head', 'background');
-    const warm = /radial-gradient\([^,]+,\s*(rgb\([^)]+\))/.exec(head);
-    const chip = plainColor(soraDeclared('.library-head .breadcrumb', 'background'));
-    const eyebrowChip = plainColor(soraDeclared('.library-head .sora-eyebrow', 'background'));
+  // The page head (library, Notes, Access, Snap): no banner any more, so the
+  // breadcrumb, the eyebrow, the counts and "All notes" are small text on the page
+  describe('page head text', () => {
+    const colorOf = (t, value) => rgb(token(t, /var\(--([\w-]+)\)/.exec(value.replace(/\s*!important/, ''))[1]));
     const labels = [
-      ['parent crumb', soraDeclared('.breadcrumb', 'color')],
-      ['current crumb', soraDeclared('.library-head .breadcrumb li:last-child .breadcrumb-item', 'color')],
-      ['hovered crumb', soraDeclared('.breadcrumb .breadcrumb-item.cursor-pointer:hover', 'color').replace(/\s*!important/, '')],
-      // Pages without a trail show an eyebrow there instead, on its own chip
-      ['eyebrow', soraDeclared('.library-head .sora-eyebrow', 'color'), eyebrowChip]
+      ['eyebrow', () => soraDeclared('.sora-eyebrow', 'color')],
+      ['parent crumb', () => soraDeclared('.breadcrumb .breadcrumb-item', 'color')],
+      ['current crumb', () => soraDeclared('.breadcrumb li:last-child .breadcrumb-item', 'color')],
+      ['hovered crumb', () => soraDeclared('.breadcrumb .breadcrumb-item.cursor-pointer:hover', 'color')],
+      ['counts', () => soraDeclared('.page-meta', 'color')],
+      ['All notes', () => declared('.all-notes-link', 'color')]
     ];
-    const cases = gradients.flatMap(([mode, gradient]) => labels.map(([label, value, backing = chip]) => [`${label}, ${mode}`, gradient, value, backing]));
+    const cases = [['light', lightTokens], ['dark', darkTokens]].flatMap(([mode, t]) => labels.map(([label, value]) => [`${label}, ${mode}`, t, value]));
 
-    test('the banner, glow and chip are found', () => {
-      expect(warm).not.toBeNull();
-      expect(chip.alpha).toBeGreaterThan(0);
-      expect(eyebrowChip.alpha).toBeGreaterThan(0);
-      for (const [, gradient] of gradients) expect(gradient).toMatch(/#[0-9a-f]{6}/i);
+    test('the head no longer sits on the berry banner', () => {
+      expect(soraDeclared('.library-head', 'background')).toBeUndefined();
     });
 
-    test.each(cases)('%s is at least 4.5:1', (_, gradient, value, backing) => {
-      const glow = plainColor(warm[1]);
-      const { color, alpha } = plainColor(value);
-      for (const stop of gradient.match(/#[0-9a-f]{6}/gi).map(rgb)) {
-        for (const banner of [stop, blend(glow.color, stop, glow.alpha)]) {
-          const background = blend(backing.color, banner, backing.alpha);
-          expect(ratio(blend(color, background, alpha), background)).toBeGreaterThanOrEqual(4.5);
-        }
+    test.each(cases)('%s is at least 4.5:1 on the page', (_, t, value) => {
+      expect(value()).toBeDefined();
+      expect(ratio(colorOf(t, value()), rgb(token(t, 'paper')))).toBeGreaterThanOrEqual(4.5);
+    });
+
+    test.each([['light', lightTokens], ['dark', darkTokens]])('--accent-ink is at least 4.5:1 on every surface (%s)', (_, t) => {
+      for (const surface of ['paper', 'paper-raised', 'paper-sunk']) {
+        expect(ratio(rgb(token(t, 'accent-ink')), rgb(token(t, surface)))).toBeGreaterThanOrEqual(4.5);
       }
     });
   });

@@ -64,7 +64,7 @@ const PAGES = {
     id: 'library',
     eyebrow: ['common.library', 'Library'],
     settings: true,
-    fab: { icon: 'add', attrs: 'id="addTabBtn" data-add-menu data-edit-only aria-haspopup="menu"', label: ['admin.static_055', 'Upload photos'] }
+    fab: { icon: 'add', attrs: 'id="addTabBtn" data-add-menu data-edit-only aria-haspopup="menu"', label: ['admin.addButton', 'Add'] }
   },
   'access-accounts.html': {
     id: 'access',

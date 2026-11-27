@@ -13,7 +13,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/basecoat-css@0.3.1/dist/basecoat.cdn.min.css">
     <script src="https://cdn.jsdelivr.net/npm/basecoat-css@0.3.1/dist/js/basecoat.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/basecoat-css@0.3.1/dist/js/toast.min.js" defer></script>
-    <link rel="stylesheet" href="/css/sora.css">
+    <link rel="stylesheet" href="/css/sora.css?v=calm1">
     <link rel="stylesheet" href="/css/i18n.css">
     <link rel="stylesheet" href="/css/tailwind.css">
 
@@ -58,7 +58,7 @@
     </script>
 
     <link rel="stylesheet" href="/css/notePage.css">
-    <link rel="stylesheet" href="/css/admin.css">
+    <link rel="stylesheet" href="/css/admin.css?v=calm1">
 </head>
 
 <body>
@@ -72,7 +72,7 @@
                         <span class="material-symbols-outlined">arrow_back</span>
                     </button>
                     <nav aria-label="Breadcrumb" data-i18n-attr="aria-label:admin.static_042">
-                        <ol id="breadcrumbContainer" class="breadcrumb flex flex-wrap items-center gap-1.5">
+                        <ol id="breadcrumbContainer" class="breadcrumb">
                             <li>
                                 <span class="breadcrumb-item text-foreground" data-path="uploads" data-i18n="admin.breadcrumbHome">Home</span>
                             </li>
@@ -80,8 +80,9 @@
                     </nav>
                 </div>
                 <h1 id="folderTitle" class="page-title sora-display"></h1>
-                <p class="page-meta sora-mono"><span id="folderMeta">&nbsp;</span><a id="allNotesLink" class="all-notes-link hidden" href="/notes" data-i18n="admin.allNotes">All notes</a></p>
+                <p class="page-meta"><span id="folderMeta">&nbsp;</span><a id="allNotesLink" class="all-notes-link hidden" href="/notes" data-i18n="admin.allNotes">All notes</a></p>
             </div>
+            <!-- Calm: one main button (Add, a menu) and the folder's play order beside it -->
             <div class="library-actions">
                 <label class="play-order" data-edit-only title="How this folder plays on the frame" data-i18n-attr="title:admin.static_043">
                     <span class="material-symbols-outlined" id="playOrderIcon" aria-hidden="true">shuffle</span>
@@ -94,35 +95,37 @@
                     </select>
                     <span class="material-symbols-outlined play-order-caret" aria-hidden="true">expand_more</span>
                 </label>
-                <button id="createFolderBtn" class="btn-outline" data-edit-only title="Create folder" data-i18n-attr="title:admin.static_044">
-                    <span class="material-symbols-outlined">create_new_folder</span>
-                    <span data-i18n="admin.newFolder">New folder</span>
-                </button>
-                <button id="createSnapBtn" class="btn-outline" data-edit-only title="Make a memory-book page for this folder" data-i18n-attr="title:admin.static_045">
-                    <span class="material-symbols-outlined">auto_stories</span>
-                    <span data-i18n="admin.newSnap">New snap</span>
-                </button>
-                <button id="createNoteBtn" class="btn-outline" data-edit-only title="Write a note for this folder" data-i18n-attr="title:admin.newNoteTitle">
-                    <span class="material-symbols-outlined">sticky_note_2</span>
-                    <span data-i18n="notes.static_008">New note</span>
-                </button>
-                <button id="uploadBtn" class="btn mobile-hide" data-edit-only data-add-menu aria-haspopup="menu" title="Upload images" data-i18n-attr="title:admin.static_046">
-                    <span class="material-symbols-outlined">upload</span>
-                    <span data-i18n="admin.upload">Upload</span>
+                <button id="uploadBtn" class="btn add-btn mobile-hide" data-edit-only data-add-menu aria-haspopup="menu">
+                    <span class="material-symbols-outlined" aria-hidden="true">add</span>
+                    <span data-i18n="admin.addButton">Add</span>
+                    <span class="material-symbols-outlined add-btn-caret" aria-hidden="true">expand_more</span>
                 </button>
             </div>
-            <!-- Upload: from this device, or from Google Photos (js/addMenu.js). With only
-                 the first to offer, Upload goes straight to it. -->
-            <div popover="manual" id="addMenu" class="add-menu border rounded bg-background shadow-lg p-1">
-                <div role="menu" class="min-w-48" aria-label="Upload photos" data-i18n-attr="aria-label:admin.static_055">
+            <!-- Add (js/addMenu.js): photos from this device or Google Photos, then a new
+                 folder, snap or note here. The phone tab bar's + opens it as a sheet. -->
+            <div popover="manual" id="addMenu" class="add-menu sora-menu">
+                <div role="menu" aria-label="Add" data-i18n-attr="aria-label:admin.addButton">
                     <button type="button" role="menuitem" tabindex="-1" class="menu-item" id="addFromDeviceBtn" data-add="device">
-                        <span class="material-symbols-outlined mr-2" aria-hidden="true">upload</span>
+                        <span class="material-symbols-outlined" aria-hidden="true">upload</span>
                         <span data-i18n="admin.addFromDevice">From this device</span>
                     </button>
                     <!-- Connecting Google Photos is the owner's, importing is a change -->
                     <button type="button" role="menuitem" tabindex="-1" class="menu-item" id="googlePhotosBtn" data-add="googlePhotos" data-owner-only data-edit-only hidden>
-                        <span class="material-symbols-outlined mr-2" aria-hidden="true">add_photo_alternate</span>
+                        <span class="material-symbols-outlined" aria-hidden="true">add_photo_alternate</span>
                         <span class="add-menu-label" data-i18n="admin.addFromGooglePhotos">From Google Photos</span>
+                    </button>
+                    <hr class="menu-divider" aria-hidden="true">
+                    <button type="button" role="menuitem" tabindex="-1" class="menu-item" id="createFolderBtn" data-add-create data-edit-only title="Create folder" data-i18n-attr="title:admin.static_044">
+                        <span class="material-symbols-outlined" aria-hidden="true">create_new_folder</span>
+                        <span data-i18n="admin.newFolder">New folder</span>
+                    </button>
+                    <button type="button" role="menuitem" tabindex="-1" class="menu-item" id="createSnapBtn" data-add-create data-leaves data-edit-only title="Make a memory-book page for this folder" data-i18n-attr="title:admin.static_045">
+                        <span class="material-symbols-outlined" aria-hidden="true">auto_stories</span>
+                        <span data-i18n="admin.newSnap">New snap</span>
+                    </button>
+                    <button type="button" role="menuitem" tabindex="-1" class="menu-item" id="createNoteBtn" data-add-create data-leaves data-edit-only title="Write a note for this folder" data-i18n-attr="title:admin.newNoteTitle">
+                        <span class="material-symbols-outlined" aria-hidden="true">sticky_note_2</span>
+                        <span data-i18n="notes.static_008">New note</span>
                     </button>
                 </div>
             </div>
@@ -158,24 +161,21 @@
             </div>
 
             <div id="emptyState" class="empty-state hidden">
-                <div class="max-w-md mx-auto">
-                    <div class="text-center mb-6">
-                        <span class="material-symbols-outlined text-6xl text-muted-foreground">photo_library</span>
-                        <h3 class="text-xl font-semibold mt-4 mb-2" data-i18n="admin.static_006">No images yet</h3>
-                        <p class="text-muted-foreground" data-edit-only data-i18n="admin.static_007">Upload some images to get started</p>
-                    </div>
+                <div class="empty-state-inner">
+                    <span class="empty-state-art material-symbols-outlined" aria-hidden="true">photo_library</span>
+                    <h3 class="empty-state-title" data-i18n="admin.static_006">No images yet</h3>
+                    <p class="empty-state-text" data-edit-only data-i18n="admin.static_007">Upload some images to get started</p>
 
                     <!-- Uploading: not for people who can only view (js/scope.js) -->
-                    <div data-edit-only>
+                    <div class="empty-state-upload" data-edit-only>
                     <input type="file" id="emptyStateFileInput" multiple accept="image/*,.heic,.heif" hidden>
-                    <div class="upload-drop-zone border-2 border-dashed border-muted rounded-lg p-8 text-center cursor-pointer hover:bg-muted/50 transition-colors"
-                        id="emptyStateUploadZone">
-                        <span class="material-symbols-outlined text-4xl text-muted-foreground">cloud_upload</span>
-                        <p class="text-lg font-medium mt-2" data-i18n="admin.static_008">Click to select images or drag and drop</p>
-                        <p class="text-sm text-muted-foreground" data-i18n="admin.static_009">Supports JPEG, PNG, GIF, WebP (max 10MB each)</p>
+                    <div class="upload-drop-zone" id="emptyStateUploadZone">
+                        <span class="material-symbols-outlined" aria-hidden="true">cloud_upload</span>
+                        <p class="upload-drop-zone-title" data-i18n="admin.static_008">Click to select images or drag and drop</p>
+                        <p class="upload-drop-zone-hint" data-i18n="admin.static_009">Supports JPEG, PNG, GIF, WebP (max 10MB each)</p>
                     </div>
 
-                    <div id="emptyStateSelectedFiles" class="hidden mt-4">
+                    <div id="emptyStateSelectedFiles" class="hidden empty-state-files">
                         <div class="card">
                             <header>
                                 <h3 class="text-lg font-semibold" data-i18n="admin.static_010">Selected Files</h3>
@@ -188,7 +188,7 @@
                         </div>
                     </div>
 
-                    <div id="emptyStateUploadProgress" class="hidden mt-4">
+                    <div id="emptyStateUploadProgress" class="hidden empty-state-progress">
                         <div class="w-full bg-muted rounded-full h-2">
                             <div class="empty-state-progress-fill bg-primary h-2 rounded-full transition-all duration-300"
                                 style="width: 0%"></div>
@@ -197,7 +197,7 @@
                             class="empty-state-progress-text text-sm text-muted-foreground mt-2 block text-center" data-i18n="admin.static_011">Uploading...</span>
                     </div>
 
-                    <div class="flex gap-2 justify-center mt-4">
+                    <div class="empty-state-buttons">
                         <button id="emptyStateCancelBtn" class="btn-outline hidden" data-i18n="common.cancel">Cancel</button>
                         <button id="emptyStateUploadBtn" class="btn" disabled>
                             <span class="material-symbols-outlined">upload</span>
@@ -214,39 +214,39 @@
             <button type="button" id="contextMenuTrigger" aria-haspopup="menu" style="display: none;">
                 <!-- Hidden trigger button -->
             </button>
-            <div popover="manual" id="contextMenuPopover" class="border rounded bg-background shadow-lg p-1">
+            <div popover="manual" id="contextMenuPopover" class="sora-menu">
                 <div role="menu" class="min-w-48">
                     <button type="button" role="menuitem" tabindex="-1" class="menu-item" data-action="rotate-right" data-for="image">
-                        <span class="material-symbols-outlined mr-2">rotate_right</span>
+                        <span class="material-symbols-outlined" aria-hidden="true">rotate_right</span>
                         <span data-i18n="admin.menuRotateRight">Rotate Right</span>
                     </button>
                     <button type="button" role="menuitem" tabindex="-1" class="menu-item" data-action="rotate-left" data-for="image">
-                        <span class="material-symbols-outlined mr-2">rotate_left</span>
+                        <span class="material-symbols-outlined" aria-hidden="true">rotate_left</span>
                         <span data-i18n="admin.menuRotateLeft">Rotate Left</span>
                     </button>
                     <button type="button" role="menuitem" tabindex="-1" class="menu-item" data-action="create-snap" data-for="image">
-                        <span class="material-symbols-outlined mr-2">auto_stories</span>
+                        <span class="material-symbols-outlined" aria-hidden="true">auto_stories</span>
                         <span data-i18n="admin.menuCreateSnap">Create snap</span>
                     </button>
                     <button type="button" role="menuitem" tabindex="-1" class="menu-item" data-action="edit-snap" data-for="snap">
-                        <span class="material-symbols-outlined mr-2">edit</span>
+                        <span class="material-symbols-outlined" aria-hidden="true">edit</span>
                         <span data-i18n="admin.menuEditSnap">Edit snap</span>
                     </button>
                     <button type="button" role="menuitem" tabindex="-1" class="menu-item" data-action="edit-note" data-for="note">
-                        <span class="material-symbols-outlined mr-2">edit</span>
+                        <span class="material-symbols-outlined" aria-hidden="true">edit</span>
                         <span data-i18n="notes.editNote">Edit note</span>
                     </button>
                     <button type="button" role="menuitem" tabindex="-1" class="menu-item" data-action="move-earlier" data-for="image snap">
-                        <span class="material-symbols-outlined mr-2">arrow_back</span>
+                        <span class="material-symbols-outlined" aria-hidden="true">arrow_back</span>
                         <span data-i18n="admin.menuMoveEarlier">Move earlier</span>
                     </button>
                     <button type="button" role="menuitem" tabindex="-1" class="menu-item" data-action="move-later" data-for="image snap">
-                        <span class="material-symbols-outlined mr-2">arrow_forward</span>
+                        <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span>
                         <span data-i18n="admin.menuMoveLater">Move later</span>
                     </button>
                     <hr class="menu-divider" data-for="image snap">
                     <button type="button" role="menuitem" tabindex="-1" class="menu-item menu-item-destructive" data-action="delete">
-                        <span class="material-symbols-outlined mr-2">delete</span>
+                        <span class="material-symbols-outlined" aria-hidden="true">delete</span>
                         <span data-i18n="common.delete">Delete</span>
                     </button>
                 </div>

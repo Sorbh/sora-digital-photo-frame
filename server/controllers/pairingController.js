@@ -262,6 +262,7 @@ class PairingController {
   async show(req, res) {
     const found = pairing.find(req.params.code);
     if (!found) return res.status(404).json({ success: false, error: 'This code has expired', code: 'PAIRING_EXPIRED' });
+    found.lookedUpAt = Date.now(); // being approved, most likely: kept from being pushed out (see start)
     // name, kind, platform, app: what the screen said it is (a hint, e.g. to prefill its name)
     const { name, kind, platform, app } = found.device;
     res.json({ success: true, code: found.code, expiresAt: found.expiresAt, approved: !!found.approved, name, kind, platform, app });

@@ -31,6 +31,24 @@ describe('the pairing queue', () => {
     expect(pairing.find(codes[0])).toBeNull();
   });
 
+  test("a new code never pushes out one another screen is still showing, or one an owner looked up", () => {
+    const now = Date.now();
+    const home = '203.0.113.9';
+    const shown = pairing.start(home);
+    const lookedUp = pairing.start(home);
+    const abandoned = [];
+    for (let i = 2; i < pairing.MAX_PER_ADDRESS; i++) abandoned.push(pairing.start(home));
+    // Time passes: only the first screen still polls; the owner looked up the second
+    for (const p of [lookedUp, ...abandoned]) p.lastSeen = now - pairing.IN_USE_MS - 1000;
+    lookedUp.lookedUpAt = now;
+    for (let i = 0; i < abandoned.length + 2; i++) {
+      pairing.start(home).lastSeen = now - pairing.IN_USE_MS - 1000;
+    }
+    expect(pairing.find(shown.code)).not.toBeNull();
+    expect(pairing.find(lookedUp.code)).not.toBeNull();
+    expect(abandoned.every(p => !pairing.find(p.code))).toBe(true);
+  });
+
   test('a full queue still lets a new frame in, at the cost of the busiest address', () => {
     // Many addresses fill every slot
     for (let i = 0; pairing.pairings.size < pairing.MAX_PENDING; i++) {

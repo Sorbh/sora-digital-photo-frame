@@ -14,7 +14,11 @@ const NEARBY_MAX = 3;
 // MAX_PER_ADDRESS waiting codes, and when the queue is full the address holding
 // the most gives up its oldest, so floods from many addresses can't lock frames out.
 const MAX_PENDING = 2000;
-const MAX_PER_ADDRESS = 5;
+const MAX_PER_ADDRESS = 10;
+// A code still on a screen (polled this recently), or one an owner just looked up
+// (and may be approving), is the last one a new code pushes out (see start)
+const IN_USE_MS = 20 * 1000;
+const LOOKED_UP_MS = 5 * 60 * 1000;
 const SEEN_WRITE_GAP_MS = 60 * 60 * 1000;
 // Removals the host's devicesRemoved hook missed, kept per library until it takes them
 const REMOVALS_OUTBOX = 'device-removals';
@@ -74,6 +78,14 @@ class PairingService {
     return [...this.pairings.values()].filter(p => !p.approved && !p.claimed && p.address === address);
   }
 
+  // Of a network's waiting codes (oldest first), the one to drop: one no screen
+  // shows any more, else one nobody looked up, else the oldest
+  leastInUse(codes, now = Date.now()) {
+    const lookedUp = p => p.lookedUpAt && now - p.lookedUpAt <= LOOKED_UP_MS;
+    const shown = p => now - p.lastSeen <= IN_USE_MS;
+    return codes.find(p => !shown(p) && !lookedUp(p)) || codes.find(p => !lookedUp(p)) || codes[0];
+  }
+
   // The queue is full: the address with the most waiting codes, if it has more
   // than the one asking would, loses its oldest. False if nobody has more.
   makeRoom(address) {
@@ -99,8 +111,10 @@ class PairingService {
   start(address = 'unknown', browser = null, device = deviceInfo()) {
     this.dropExpired();
     const mine = this.waitingFrom(address);
-    // A frame that keeps asking keeps only its newest few codes
-    if (mine.length >= MAX_PER_ADDRESS) this.pairings.delete(mine[0].code);
+    // One network keeps only its newest few codes. A home shares one: its other
+    // screens, and the code its owner is typing in, go last, so a screen asking for
+    // a code never takes the one another screen is showing (oldest first otherwise)
+    if (mine.length >= MAX_PER_ADDRESS) this.pairings.delete(this.leastInUse(mine).code);
     if (this.pairings.size >= MAX_PENDING && !this.makeRoom(address)) return null;
     let code = this.newCode();
     while (this.pairings.has(code)) code = this.newCode();
@@ -446,5 +460,6 @@ module.exports.deviceIdFromToken = deviceIdFromToken;
 module.exports.PAIRING_TTL_MS = PAIRING_TTL_MS;
 module.exports.MAX_PENDING = MAX_PENDING;
 module.exports.MAX_PER_ADDRESS = MAX_PER_ADDRESS;
+module.exports.IN_USE_MS = IN_USE_MS;
 module.exports.NEARBY_MAX = NEARBY_MAX;
 module.exports.NEARBY_SEEN_MS = NEARBY_SEEN_MS;

@@ -72,11 +72,20 @@ POST /api/pair/status
 
 - `waiting`: the owner hasn't approved it yet. Keep polling.
 - `ready`: approved. Go to step 3.
-- `expired`: the code ran out, was pushed out, or the secret is wrong. Go back to step 1 for a new code.
+- `expired`: the code ran out, was cancelled or pushed out, or the secret is wrong. Go back to step 1 for a new code.
 
 Also start again by yourself once `expiresAt` has passed.
 
-Polling is also how **Sora Frame nearby** knows your screen is still showing its code: a code not polled for 60 seconds is no longer offered.
+Polling is also how **Sora Frame nearby** knows your screen is still showing its code. A code drops out of nearby after 10 seconds without a poll.
+
+When the app closes while waiting for approval, send a best-effort cancellation so the code disappears immediately. Keep polling if the display merely dims or the tab becomes hidden.
+
+```
+POST /api/pair/cancel
+{ "code": "K7P4QX", "secret": "9f2c…" }
+```
+
+**200:** `{ "success": true }` for all pairing states and credentials. The server removes an active waiting code only when its secret matches and approval has yet to start. An approval underway or ready for collection is preserved. In a browser, send the JSON body as an `application/json` blob using `navigator.sendBeacon` on `pagehide`. If a waiting page returns from the back-forward cache, start with a fresh code.
 
 ## 3. Collect the pairing
 

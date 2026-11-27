@@ -59,6 +59,7 @@ function nearbyPairingFromEnv(value = process.env.NEARBY_PAIRING) {
  *
  *   frame   POST /api/pair/start         a code, a secret and the QR code (body: what the screen is, optional)
  *   frame   POST /api/pair/status        waiting | ready | expired, changes nothing
+ *   frame   POST /api/pair/cancel        discard an unclaimed waiting code
  *   frame   POST /api/pair/collect       a ready pairing: the device token, and signs in
  *   admin   GET  /api/admin/pair/nearby  codes waiting on the admin's own network ("Sora Frame nearby")
  *   admin   GET  /api/admin/pair/:code   the code exists and is waiting
@@ -178,6 +179,16 @@ class PairingController {
       console.error('Error checking pairing:', errorSummary(error));
       res.status(500).json({ success: false, error: 'Could not check pairing' });
     }
+  }
+
+  async cancel(req, res) {
+    try {
+      const { code, secret } = req.body || {};
+      if (typeof code === 'string') await pairingFor(req).cancel(code, secret);
+    } catch (error) {
+      console.error('Error cancelling pairing:', errorSummary(error));
+    }
+    res.json({ success: true });
   }
 
   // A POST, so only this site's own pages can send it (middleware/sameOrigin), and

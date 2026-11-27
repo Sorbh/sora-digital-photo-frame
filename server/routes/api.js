@@ -117,6 +117,7 @@ router.get('/frame/keys', requireViewer, frameKeyController.get.bind(frameKeyCon
 router.post('/pair/start', pairingController.start.bind(pairingController));
 router.post('/pair/status', pairingController.status.bind(pairingController));
 router.get('/pair/status', pairingController.status.bind(pairingController)); // older frames, see status()
+router.post('/pair/cancel', pairingController.cancel.bind(pairingController));
 router.post('/pair/collect', pairingController.collect.bind(pairingController));
 router.post('/auth/device', pairingController.signIn.bind(pairingController));
 // Before /admin/pair/:code, which would take "nearby" for a code

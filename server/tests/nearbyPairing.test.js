@@ -95,15 +95,17 @@ describe('Sora Frame nearby (behind one trusted proxy)', () => {
     expect((await nearby(admin, HOME).expect(200)).body.nearby).toEqual([]);
   });
 
-  test('a code its TV stopped polling a minute ago is not listed, and is again once it polls', async () => {
+  test('a code is hidden after ten seconds without a poll and returns once it polls', async () => {
     const start = Date.now();
     const tv = await tvStarts(app, HOME);
-    at(start + pairing.NEARBY_SEEN_MS + 1);
+    at(start + 9_999);
+    expect((await nearby(admin, HOME)).body.nearby).toHaveLength(1);
+    at(start + 10_000);
     expect((await nearby(admin, HOME).expect(200)).body.nearby).toEqual([]);
     await tvPolls(app, tv, HOME);
     const listed = (await nearby(admin, HOME).expect(200)).body.nearby;
     expect(listed.map(n => n.code)).toEqual([shown(tv.code)]);
-    expect(listed[0].lastSeen).toBe(new Date(start + pairing.NEARBY_SEEN_MS + 1).toISOString());
+    expect(listed[0].lastSeen).toBe(new Date(start + 10_000).toISOString());
     expect(listed[0].createdAt).toBe(new Date(start).toISOString());
   });
 

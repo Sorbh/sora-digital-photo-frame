@@ -9,7 +9,7 @@ const PAIRING_TTL_MS = 10 * 60 * 1000;
 // "Sora Frame nearby" (see nearby): codes made this recently, whose screen asked for
 // their status this recently (it is still showing them), at most this many
 const NEARBY_MAX_AGE_MS = 10 * 60 * 1000;
-const NEARBY_SEEN_MS = 60 * 1000;
+const NEARBY_SEEN_MS = 10 * 1000;
 const NEARBY_MAX = 3;
 // Shared by every tenant on a hosted server. Each address keeps at most
 // MAX_PER_ADDRESS waiting codes, and when the queue is full the address holding
@@ -244,6 +244,11 @@ class PairingService {
     return pairing.approved ? 'ready' : 'waiting';
   }
 
+  async cancel(code, secret) {
+    const pairing = await this.withSecret(code, secret);
+    if (pairing) await this.store.cancel(pairing, Date.now());
+  }
+
   // Codes waiting on the same network, newest first.
   async nearby(address) {
     if (!address) return [];
@@ -251,7 +256,7 @@ class PairingService {
     const rows = await this.store.list(now, address);
     return rows
       .filter(p => p.address === address && !p.approved && !p.claimId && p.expiresAt > now &&
-        now - p.createdAt <= NEARBY_MAX_AGE_MS && now - p.lastSeen <= NEARBY_SEEN_MS)
+        now - p.createdAt <= NEARBY_MAX_AGE_MS && now - p.lastSeen < NEARBY_SEEN_MS)
       .sort((a, b) => b.createdAt - a.createdAt)
       .slice(0, NEARBY_MAX);
   }

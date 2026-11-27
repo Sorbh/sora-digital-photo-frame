@@ -302,6 +302,7 @@ const ROUTES = {
   'POST /pair/start': none('a frame asking to be paired'),
   'POST /pair/status': none('a frame asking to be paired'),
   'GET /pair/status': none('a frame from before #66 asking to be paired'),
+  'POST /pair/cancel': none('a frame cancelling its waiting code with its secret'),
   'POST /pair/collect': none('a frame asking to be paired'),
   'POST /auth/device': none('a paired frame signing in'),
   'PUT /device/language': none('a frame setting its own language'),

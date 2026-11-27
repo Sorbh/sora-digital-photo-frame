@@ -52,6 +52,11 @@ class MemoryPairingStore {
     if (pairing?.secretHash === secretHash) pairing[field] = Math.max(pairing[field] || 0, now);
   }
 
+  cancel({ code, secretHash }, now) {
+    const pairing = this.get(code, now);
+    if (pairing?.secretHash === secretHash && !pairing.claimId && !pairing.approved) this.rows.delete(code);
+  }
+
   take({ code, secretHash }, now) {
     const pairing = this.get(code, now);
     if (!pairing?.approved || pairing.secretHash !== secretHash) return null;

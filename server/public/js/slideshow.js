@@ -71,6 +71,23 @@ class AuthenticationManager {
 
     init() {
         this.bindEvents();
+        window.addEventListener('pagehide', () => {
+            const pairing = this.pairing;
+            if (!pairing || pairing.ready) return;
+            this.stopPairing();
+            this.restartPairingOnReturn = true;
+            if (pairing.code && navigator.sendBeacon) {
+                const { code, secret } = pairing;
+                navigator.sendBeacon('/api/pair/cancel', new Blob([JSON.stringify({ code, secret })], {
+                    type: 'application/json'
+                }));
+            }
+        });
+        window.addEventListener('pageshow', event => {
+            if (!event.persisted || !this.restartPairingOnReturn) return;
+            this.restartPairingOnReturn = false;
+            if (!this.isAuthenticated) this.startPairing();
+        });
         // Opening /frame#pin=... on this page again doesn't reload it: read it then too
         window.addEventListener('hashchange', () => {
             if (!/(?:^#|&)(?:pin|family)=/.test(location.hash)) return;
@@ -195,7 +212,8 @@ class AuthenticationManager {
     // Show a QR code an admin can scan to sign this frame in, and wait for them
     async startPairing() {
         if (!this.pairCard || this.pairing) return;
-        this.pairing = { starting: true };
+        const starting = { starting: true };
+        this.pairing = starting;
         this.pairCard.classList.remove('is-approved', 'is-error');
         this.setPairStatus(null);
         try {
@@ -205,16 +223,17 @@ class AuthenticationManager {
                 body: JSON.stringify(this.describeDevice())
             });
             const data = await response.json();
-            if (!this.pairing) return; // signed in meanwhile
+            if (this.pairing !== starting) return; // signed in or left meanwhile
             if (!data.success) throw new Error(data.error || 'Could not get a code');
 
-            this.pairing = { code: data.code, secret: data.secret, expiresAt: data.expiresAt };
             this.pairQr.innerHTML = data.qr; // an SVG drawn by our server
             this.pairCode.textContent = `${data.code.slice(0, 3)}-${data.code.slice(3)}`;
             this.pairUrlText = `${new URL(data.url).host}/pair`;
             this.renderPairHint();
+            this.pairing = { code: data.code, secret: data.secret, expiresAt: data.expiresAt };
             this.pairTimer = setTimeout(() => this.checkPairing(), 2000);
         } catch (error) {
+            if (this.pairing !== starting) return;
             console.error('Pairing could not start:', error);
             this.pairing = null;
             this.pairQr.innerHTML = '';
@@ -253,6 +272,7 @@ class AuthenticationManager {
             // Approved: collect the token, which also signs this browser in. A
             // sign-in from the address still under way would replace it: stop it first.
             if (data?.status === 'ready') {
+                pairing.ready = true;
                 this.outrankUrlSignIn();
                 data = await ask('/api/pair/collect');
             }

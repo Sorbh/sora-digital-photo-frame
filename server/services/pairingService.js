@@ -4,6 +4,7 @@ const { currentTenant, runWithTenant } = require('../context');
 const { emit } = require('../events');
 const quota = require('./quotaService');
 const MemoryPairingStore = require('./memoryPairingStore');
+const documentDeviceStore = require('./documentDeviceStore');
 const { deviceInfo } = require('../utils/deviceInfo');
 const PAIRING_TTL_MS = 10 * 60 * 1000;
 // "Sora Frame nearby" (see nearby): codes made this recently, whose screen asked for
@@ -21,9 +22,7 @@ const MAX_PER_ADDRESS = 10;
 const IN_USE_MS = 20 * 1000;
 const LOOKED_UP_MS = 5 * 60 * 1000;
 const SEEN_WRITE_GAP_MS = 60 * 60 * 1000;
-// A screen's own lastSeen is written more often than that (it says whether the
-// screen is on now); between writes, the exact time is kept in memory (see seen)
-const DEVICE_SEEN_WRITE_GAP_MS = 5 * 60 * 1000;
+const DEVICE_SEEN_FLUSH_MS = 60 * 1000;
 // Removals the host's devicesRemoved hook missed, kept per library until it takes them
 const REMOVALS_OUTBOX = 'device-removals';
 // How long to wait before each try again; after the last, the next device change tries
@@ -51,16 +50,19 @@ const deviceIdFromToken = token => (typeof token === 'string' && TOKEN_PATTERN.e
  * Pairing by QR code: the frame asks for a short code and shows it as
  * a QR code; an admin scans it, approves, and the frame collects a device
  * token it keeps for good. Pairings last ten minutes; paired
- * frames are kept in data/devices.json with only a hash of their token.
+ * frames are kept in a device store with only a hash of their token.
  */
 class PairingService {
-  constructor(store = null, resolveTenant = null, devices = null) {
+  constructor(store = null, resolveTenant = null, deviceStore = documentDeviceStore) {
     this.store = store || new MemoryPairingStore();
     this.resolveTenant = resolveTenant;
     this.pairings = this.store.rows;
-    this.seenAt = devices?.seenAt || new Map(); // "tenant:device" -> when that screen last asked for anything (ms)
-    this.retries = devices?.retries || new Map(); // tenant id -> { timer, attempt }, for reportRemovals
-    this.reporting = devices?.reporting || new Map(); // tenant id -> { running, again }, so reports don't pile up
+    this.deviceStore = deviceStore;
+    this.seenAt = new Map(); // tenant -> device -> dirty timestamp in ms
+    this.seenTimer = null;
+    this.flushingSeen = null;
+    this.retries = new Map(); // tenant id -> { timer, attempt }, for reportRemovals
+    this.reporting = new Map(); // tenant id -> { running, again }
     this.retryDelays = RETRY_DELAYS_MS;
   }
 
@@ -201,26 +203,25 @@ class PairingService {
     };
     // MAX_SCREENS caps screens per library (0, the default, means no cap)
     const limit = parseInt(process.env.MAX_SCREENS, 10) || 0;
-    await getDataStore().update('devices', [], async devices => {
-      if (limit && devices.length >= limit) {
+    await this.deviceStore.add(currentTenant().id, device, async screensInUse => {
+      if (limit && screensInUse >= limit) {
         throw Object.assign(new Error(`This family already has ${limit} screens. Remove one you no longer use to add this one.`),
           { status: 403, code: 'SCREEN_LIMIT', vars: { limit } });
       }
       // The quota hook's own limit, asked in the same turn so two new screens can't
       // both pass. Only here: a screen signing in again (by token or session) is
       // never a new one, so it is never asked about. The count is the exact one,
-      // under this lock: a host's own index only hears of a screen after it.
-      const answer = await quota.ask({ screens: 1 }, { screensInUse: devices.length });
+      // under this lock.
+      const answer = await quota.ask({ screens: 1 }, { screensInUse });
       if (!answer || !answer.ok) {
         throw Object.assign(new Error((answer && answer.message) || 'This family has no room for another screen.'),
           { status: 403, code: 'SCREEN_LIMIT' });
       }
-      return [...devices, device];
     });
     try {
       await emit('devicePaired', { deviceId: id, tenantId: currentTenant().id });
     } catch (error) {
-      await getDataStore().update('devices', [], devices => devices.filter(d => d.id !== id));
+      await this.deviceStore.remove(currentTenant().id, d => d.id === id);
       throw error;
     }
     // The host answered, so it can take any removals it missed. In the background:
@@ -281,84 +282,122 @@ class PairingService {
     };
   }
 
-  // A frame was just used, so Access can say when: its screen's lastSeen and its
-  // account's lastAccessed ("Last used"). Pass what was already read; each is
-  // written only when it is missing or older than SEEN_WRITE_GAP_MS, so a frame
-  // playing all day writes about once an hour.
+  // A frame was just used. The account's "Last used" is saved about once an
+  // hour. The screen's own "Last seen" joins the next batch.
   async noteUse({ account = null, device = null } = {}) {
     const now = Date.now();
-    const at = new Date(now).toISOString();
-    const stale = (when, gap = SEEN_WRITE_GAP_MS) => !when || !(now - Date.parse(when) < gap);
-    const writes = [];
     if (device) this.seen(device.id, now);
-    if (device && stale(device.lastSeen, DEVICE_SEEN_WRITE_GAP_MS)) {
-      writes.push(getDataStore().update('devices', [], devices => devices.map(d =>
-        d.id === device.id ? { ...d, lastSeen: at } : d)));
+    if (account && !(now - Date.parse(account.lastAccessed) < SEEN_WRITE_GAP_MS)) {
+      const at = new Date(now).toISOString();
+      await getDataStore().update('access-accounts', [], accounts => accounts.map(a =>
+        a.id === account.id ? { ...a, lastAccessed: at } : a));
     }
-    if (account && stale(account.lastAccessed)) {
-      writes.push(getDataStore().update('access-accounts', [], accounts => accounts.map(a =>
-        a.id === account.id ? { ...a, lastAccessed: at } : a)));
-    }
-    await Promise.all(writes);
   }
 
   async loadDevices() {
-    // A client error means there's no tenant to look in, so no such device.
-    // Anything else is an outage, and must not look like an unpaired frame.
-    return getDataStore().get('devices', []).catch((error) => {
+    try {
+      return await this.deviceStore.list(currentTenant().id);
+    } catch (error) {
       if (error.status >= 400 && error.status < 500) return [];
       throw error;
-    });
+    }
   }
 
-  async saveDevices(devices) {
-    await getDataStore().set('devices', devices);
+  async findDevice(id) {
+    try {
+      return await this.deviceStore.findById(currentTenant().id, id);
+    } catch (error) {
+      if (error.status >= 400 && error.status < 500) return null;
+      throw error;
+    }
   }
 
-  // The paired device for a token, or null
+  // The paired device for a token, or null. Old tokens have no embedded id.
   async signIn(token) {
     if (typeof token !== 'string' || !token) return null;
-    const devices = await this.loadDevices();
     const id = deviceIdFromToken(token);
-    const device = id
-      ? devices.find(d => d.id === id && crypto.timingSafeEqual(Buffer.from(d.tokenHash), Buffer.from(hash(token))))
-      : devices.find(d => d.tokenHash === hash(token));
-    if (!device) return null;
-    await this.noteUse({ device });
+    const tokenHash = hash(token);
+    let device;
+    try {
+      device = id
+        ? await this.deviceStore.findById(currentTenant().id, id)
+        : await this.deviceStore.findByTokenHash(currentTenant().id, tokenHash);
+    } catch (error) {
+      if (error.status >= 400 && error.status < 500) return null;
+      throw error;
+    }
+    if (!device || !sameSecret(tokenHash, device.tokenHash)) return null;
+    this.seen(device.id);
     return device;
   }
 
-  // A signed-in screen asked for something (any /api or photo request, e.g. its
-  // next photo): noted in memory only, so it costs nothing per photo. listDevices
-  // shows it; noteUse writes it down now and then.
+  // Every request updates memory. Persist the most recent time per screen in
+  // one batch, including requests that never recheck the screen's session.
   seen(deviceId, at = Date.now()) {
     if (!deviceId) return;
-    const key = `${currentTenant()?.id || ''}:${deviceId}`;
-    if (!(this.seenAt.get(key) >= at)) this.seenAt.set(key, at);
+    const { id: tenantId } = currentTenant();
+    if (!this.seenAt.has(tenantId)) this.seenAt.set(tenantId, new Map());
+    const times = this.seenAt.get(tenantId);
+    if (!(times.get(deviceId) >= at)) times.set(deviceId, at);
+    this.scheduleSeenFlush();
   }
 
-  // The later of the stored lastSeen and the one in memory
+  scheduleSeenFlush() {
+    if (this.seenTimer || this.flushingSeen || !this.seenAt.size) return;
+    this.seenTimer = setTimeout(() => {
+      this.flushSeen().catch(error => console.error('Could not save when screens were last seen:', error.message));
+    }, DEVICE_SEEN_FLUSH_MS);
+    this.seenTimer.unref?.();
+  }
+
+  async flushSeen() {
+    clearTimeout(this.seenTimer);
+    this.seenTimer = null;
+    if (this.flushingSeen) return this.flushingSeen;
+    const touches = [];
+    for (const [tenantId, times] of this.seenAt) {
+      for (const [deviceId, at] of times) touches.push({ tenantId, deviceId, at });
+    }
+    if (!touches.length) return;
+    this.flushingSeen = Promise.resolve().then(() => this.deviceStore.touchMany(touches)).then(() => {
+      for (const { tenantId, deviceId, at } of touches) {
+        const times = this.seenAt.get(tenantId);
+        if (times.get(deviceId) === at) times.delete(deviceId);
+        if (!times.size) this.seenAt.delete(tenantId);
+      }
+    }).finally(() => {
+      this.flushingSeen = null;
+      this.scheduleSeenFlush();
+    });
+    return this.flushingSeen;
+  }
+
+  // After HTTP drains, include any activity that came in during a previous batch.
+  async drainSeen() {
+    if (this.flushingSeen) await this.flushingSeen.catch(() => {});
+    try {
+      await this.flushSeen();
+    } finally {
+      clearTimeout(this.seenTimer);
+      this.seenTimer = null;
+    }
+  }
+
   lastSeenOf(device) {
-    const remembered = this.seenAt.get(`${currentTenant()?.id || ''}:${device.id}`);
-    const stored = device.lastSeen ? Date.parse(device.lastSeen) : 0;
-    return remembered && remembered > stored ? new Date(remembered).toISOString() : device.lastSeen;
+    const remembered = this.seenAt.get(currentTenant().id)?.get(device.id);
+    const stored = Date.parse(device.lastSeen);
+    return remembered !== undefined && !(stored >= remembered) ? new Date(remembered).toISOString() : device.lastSeen;
   }
 
   async listDevices() {
     const devices = await this.loadDevices();
-    return devices.map(({ tokenHash, ...device }) => ({ ...device, lastSeen: this.lastSeenOf(device) }));
+    return devices.map(({ tokenHash, pausedAt, ...device }) => ({ ...device, lastSeen: this.lastSeenOf(device) }));
   }
 
   async setLanguage(id, language) {
     const allowed = ['en', 'es', 'fr', 'de', 'pt-BR', 'it', 'nl', 'hi', 'ja', 'zh-CN', 'ar'];
     if (!allowed.includes(language)) return null;
-    let changed = null;
-    await getDataStore().update('devices', [], devices => devices.map(device => {
-      if (device.id !== id) return device;
-      changed = { ...device, language };
-      return changed;
-    }));
-    return changed;
+    return this.deviceStore.update(currentTenant().id, id, { language });
   }
 
   // Removes a device nobody ever got the token for. It goes even if the host's
@@ -373,7 +412,7 @@ class PairingService {
       // the two never disagree. If the host can't hear it either, the device stays.
       console.error('Could not keep a discarded device to report:', saveError);
       await emit('devicesRemoved', { deviceIds: [id], tenantId: currentTenant().id });
-      await getDataStore().update('devices', [], devices => devices.filter(d => d.id !== id));
+      await this.deviceStore.remove(currentTenant().id, d => d.id === id);
       return;
     }
     await this.reportRemovals();
@@ -413,7 +452,8 @@ class PairingService {
       if (!Array.isArray(pending) || !pending.length) return;
       // Gone here first (again, after a restart in between), so they never
       // count toward the screen limit while the host is away
-      await getDataStore().update('devices', [], devices => devices.filter(d => !pending.includes(d.id)));
+      const ids = new Set(pending);
+      await this.deviceStore.remove(tenant.id, d => ids.has(d.id));
       await emit('devicesRemoved', { deviceIds: pending, tenantId: tenant.id });
       await getDataStore().update(REMOVALS_OUTBOX, [], current => {
         left = current.filter(id => !pending.includes(id));
@@ -451,17 +491,14 @@ class PairingService {
   }
 
   async removeDevices(match) {
-    let removed = [];
-    await getDataStore().update('devices', [], devices => {
-      removed = devices.filter(d => match(d));
-      return devices.filter(d => !match(d));
-    });
+    const tenantId = currentTenant().id;
+    const removed = await this.deviceStore.remove(tenantId, match);
     if (!removed.length) return 0;
     try {
       await emit('devicesRemoved', { deviceIds: removed.map(d => d.id), tenantId: currentTenant().id });
     } catch (error) {
       // As in approve(): the action fails as a whole, so the host's index never misses it
-      await getDataStore().update('devices', [], devices => [...devices, ...removed]);
+      await this.deviceStore.restore(tenantId, removed);
       throw error;
     }
     this.reportRemovals(); // in the background, as in addDevice
@@ -470,12 +507,13 @@ class PairingService {
 }
 
 module.exports = new PairingService();
-module.exports.withStore = (store, resolveTenant) => new PairingService(store, resolveTenant, module.exports);
+module.exports.withStore = (store, resolveTenant, deviceStore) => new PairingService(store, resolveTenant, deviceStore);
+module.exports.forRequest = req => req?.app?.locals.pairingService || module.exports;
 module.exports.deviceIdFromToken = deviceIdFromToken;
 module.exports.PAIRING_TTL_MS = PAIRING_TTL_MS;
 module.exports.MAX_PENDING = MAX_PENDING;
 module.exports.MAX_PER_ADDRESS = MAX_PER_ADDRESS;
-module.exports.DEVICE_SEEN_WRITE_GAP_MS = DEVICE_SEEN_WRITE_GAP_MS;
+module.exports.DEVICE_SEEN_FLUSH_MS = DEVICE_SEEN_FLUSH_MS;
 module.exports.IN_USE_MS = IN_USE_MS;
 module.exports.NEARBY_MAX = NEARBY_MAX;
 module.exports.NEARBY_SEEN_MS = NEARBY_SEEN_MS;

@@ -8,6 +8,7 @@ These options are a public contract. Treat a change to a name, an argument or a 
 |---|---|---|---|
 | `library` | `PhotoLibrary` subclass. Its `photoUrl(adminPath)` must return a URL with each path segment percent-encoded, since folder and file names can hold `#`, `?` and `%` (`PhotoLibrary.uploadsUrl(adminPath)` builds one for the `/uploads` route). May also offer `rawUrl(adminPath)`, which lets frames fetch encrypted photos from remote storage and decrypt them in the browser. Only `createFolder` makes folders: `addPhoto`, `movePhoto` and `writeItem` into a missing folder (deleted meanwhile, even mid-write) must throw `PhotoLibrary.folderNotFoundError()` (404 `FOLDER_NOT_FOUND`) and leave it missing. Storage with symlinks should offer `realPath(adminPath)`: the admin path a path really leads to, or `null` when it leads out of the library; frames' folder limits and `MAX_FOLDER_DEPTH` are checked there. Notes are `*.note.json` files in folders, stored like snaps (`*.snap.json`): `listItems`, `readItem`, `writeItem`, `movePhoto` and `deletePhoto` must handle them, and so must moving, renaming and deleting a folder. `listFolder` should give them type `'note'`, and `allPhotos` must never return them: a note is not a photo (see [Notes](#notes)) | Local uploads folder | `server/library/PhotoLibrary.js` |
 | `dataStore` | `DataStore` subclass: `get`, `set`, `update`. `folder-settings:<folder>` documents (a folder's play order) belong to that photo folder: writing one must not create the folder, and throws 404 `FOLDER_NOT_FOUND` when it is gone. Notes are not kept here any more but in the library, as `*.note.json` files like `*.snap.json`; the old `notes` document is read once at start, then emptied, with a copy in `notes-before-folders` (see [Notes](#notes)) | Local data files | `server/store/DataStore.js` |
+| `deviceStore` | Async paired-screen storage. See [Device store](#device-store) | DataStore's `devices` document | `server/services/documentDeviceStore.js` |
 | `pairingStore` | Async pairing queue. See [Pairing store](#pairing-store) | In-memory | `server/services/memoryPairingStore.js` |
 | `resolvePairingTenant` | `async (id) => ({ id, plan })` or `null` when an approved code's tenant is gone | `{ id }` with a custom store | `server/services/pairingService.js` |
 | `resolveTenant` | `async (req) => ({ id, plan })` or `null` | One `default` tenant | `server/context.js` |
@@ -178,6 +179,27 @@ Each method may return a promise. Treat records returned by the store as snapsho
 | `restore(pairing, now)` | Put the original record back after a failed handover, only if it is still active and the code has not been reused. |
 
 Purge expired rows during normal operation. A server interrupted during an approval can leave a claim in the store until the code expires. Keep database locks short and release claims on handled approval failures.
+
+### Device store
+
+Pass `createApp({ deviceStore })` to store paired screens separately from the library's DataStore. The default uses the same `devices` document (`devices.json` with the local DataStore). This store holds paired screens and their token hashes. The pairing store holds short-lived codes and approvals.
+
+Device records have `id`, `accountId`, `name`, `via` (`qr` or `pin`), a SHA-256 hex `tokenHash`, ISO-8601 `pairedAt`, ISO-8601 or null `lastSeen`, and optional `language`. The core supplies the token hash and keeps it out of API responses. A store may return an optional `pausedAt` for its own pause state. The [auth hook](#paused-screens) supplies the API's `paused` flag.
+
+Each method may return a promise. Scope all reads and writes to the supplied tenant ID and return snapshots. Except for a batch of touches, calls run in that tenant's context.
+
+| Method | Contract |
+| --- | --- |
+| `list(tenantId)` | Return the tenant's devices. |
+| `add(tenantId, device, checkLimit)` | In one atomic operation, count the tenant's devices, including paused ones, await `checkLimit(count)`, then insert the device. Roll back if the callback throws. Serialize with concurrent adds, even when the tenant has no devices. The callback checks both `MAX_SCREENS` and the quota hook. |
+| `remove(tenantId, match)` | Atomically delete the devices that satisfy the synchronous `match(device)` predicate. Return their full records. |
+| `restore(tenantId, devices)` | Reinsert the full records after a removal hook fails, including any store-managed fields. |
+| `update(tenantId, id, changes)` | Apply a partial update (`name` or `language`) and return the updated device, or `null` if missing. |
+| `findById(tenantId, id)` | Return the device or `null`. |
+| `findByTokenHash(tenantId, tokenHash)` | Return the device or `null`. Used for tokens issued before tokens included a device ID. |
+| `touchMany([{ tenantId, deviceId, at }])` | Apply one batch spanning tenants. For each existing device, retain the later of the stored timestamp and `at` (epoch milliseconds). Ignore missing devices. |
+
+The process updates its in-memory timestamp on every screen request and overlays pending times in the Screens API. It batches dirty timestamps about once a minute and retries after a write failure. A different process sees the persisted times. The bundled servers drain HTTP and flush pending timestamps on SIGTERM and SIGINT. Hosts with their own server can await `app.locals.pairingService.drainSeen()` after draining requests and before closing their storage. The account's "Last used" follows its existing update schedule.
 
 ### Sora Frame nearby
 

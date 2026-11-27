@@ -25,7 +25,7 @@ const NEARBY_WINDOW_MS = 60 * 1000;
 // finished leaves nothing behind on the server.
 const BROWSER_COOKIE = 'photoframe.pairing.';
 const BROWSER_KEY = /^[A-Za-z0-9_-]{32}$/;
-const pairingFor = req => req.app.locals.pairingService || defaultPairing;
+const pairingFor = defaultPairing.forRequest;
 
 // One key per household: an IPv4 address, or the /64 an IPv6 address is in,
 // since one connection usually gets a whole /64 and could rotate through it.
@@ -368,14 +368,14 @@ class PairingController {
       if (!limit.allowed) return res.status(429).json({ success: false, error: limit.message, code: 'RATE_LIMITED' });
 
       accessAccounts.recordFailedAttempt(ip); // counted before checking, cleared on success
-      const device = await defaultPairing.signIn(req.body?.token);
+      const device = await pairingFor(req).signIn(req.body?.token);
       const account = device && (await accessAccounts.loadAccounts()).find(a => a.id === device.accountId);
       if (!account) {
         return res.status(401).json({ success: false, error: 'This frame is no longer paired', code: 'DEVICE_UNKNOWN' });
       }
       accessAccounts.recordSuccessfulAttempt(ip);
       // "Last used" on Access (the screen's own lastSeen was noted by signIn)
-      await defaultPairing.noteUse({ account });
+      await pairingFor(req).noteUse({ account });
       await rotateSession(req);
       req.session.accessAccount = this.sessionAccount(account);
       req.session.deviceId = device.id;
@@ -391,7 +391,7 @@ class PairingController {
 
   async listDevices(req, res) {
     try {
-      const [devices, accounts] = await Promise.all([defaultPairing.listDevices(), accessAccounts.loadAccounts()]);
+      const [devices, accounts] = await Promise.all([pairingFor(req).listDevices(), accessAccounts.loadAccounts()]);
       const names = new Map(accounts.map(a => [a.id, a.name]));
       // paused: true for a screen the host has paused (auth isScreenPaused), shown on Access
       const paused = await Promise.all(devices.map(d => screenPaused(d.id)));
@@ -408,7 +408,7 @@ class PairingController {
 
   async removeDevice(req, res) {
     try {
-      const removed = await defaultPairing.removeDevices(d => d.id === req.params.id);
+      const removed = await pairingFor(req).removeDevices(d => d.id === req.params.id);
       if (!removed) return res.status(404).json({ success: false, error: 'Frame not found' });
       res.json({ success: true });
     } catch (error) {
@@ -418,15 +418,19 @@ class PairingController {
     }
   }
 
-  async setDeviceLanguage(req, res) {
-    const device = await defaultPairing.setLanguage(req.params.id, req.body?.language);
+  setDeviceLanguage(req, res) {
+    return this.saveDeviceLanguage(req, res, req.params.id);
+  }
+
+  async saveDeviceLanguage(req, res, id) {
+    const device = await pairingFor(req).setLanguage(id, req.body?.language);
     if (!device) return res.status(400).json({ success: false, error: 'Choose a supported language', code: 'INVALID_LANGUAGE' });
     res.json({ success: true, device: { id: device.id, language: device.language } });
   }
 
   async setOwnLanguage(req, res) {
     if (!req.session?.deviceId) return res.status(403).json({ success: false, error: 'Only a paired frame can save this setting', code: 'DEVICE_REQUIRED' });
-    return this.setDeviceLanguage({ ...req, params: { id: req.session.deviceId } }, res);
+    return this.saveDeviceLanguage(req, res, req.session.deviceId);
   }
 }
 

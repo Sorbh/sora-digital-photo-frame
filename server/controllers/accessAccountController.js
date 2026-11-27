@@ -4,7 +4,7 @@ const { getDataStore } = require('../store');
 const { passClientError } = require('../utils/httpError');
 const { rotateSession } = require('../utils/session');
 const { currentTenant } = require('../context');
-const pairing = require('../services/pairingService');
+const { forRequest: pairingFor } = require('../services/pairingService');
 const familyCodes = require('../services/familyCodeService');
 const AttemptLimiter = require('../utils/attemptLimiter');
 
@@ -293,7 +293,7 @@ class AccessAccountController {
             }
 
             // Frames paired to this account stop working with it
-            await require('../services/pairingService').removeDevices(device => device.accountId === id);
+            await pairingFor(req).removeDevices(device => device.accountId === id);
             await getDataStore().update('access-accounts', [], accounts => accounts.filter(account => account.id !== id));
 
             res.json({
@@ -325,12 +325,13 @@ class AccessAccountController {
     // The screen for this sign-in: the one this browser already is (by its
     // token, or by its session for a page from before PIN screens that renews
     // with the PIN), or a new one
-    async screenFor(account, token, sessionDeviceId) {
+    async screenFor(req, account, token, sessionDeviceId) {
+        const pairing = pairingFor(req);
         const existing = token ? await pairing.signIn(token) : null;
         if (existing && existing.accountId === account.id) return { device: existing, token };
         if (sessionDeviceId) {
-            const current = (await pairing.listDevices()).find(d => d.id === sessionDeviceId && d.accountId === account.id);
-            if (current) return { device: current, token: undefined };
+            const current = await pairing.findDevice(sessionDeviceId);
+            if (current?.accountId === account.id) return { device: current, token: undefined };
         }
         return pairing.addDevice({ name: account.name, accountId: account.id, via: 'pin' });
     }
@@ -464,7 +465,7 @@ class AccessAccountController {
             // A PIN sign-in makes this browser a screen, as pairing by QR code does,
             // so it counts toward the same limit. A browser that already is one of
             // this account's screens (it sends its token) stays that screen.
-            const screen = await this.screenFor(account, token, req.session.deviceId);
+            const screen = await this.screenFor(req, account, token, req.session.deviceId);
             console.log(`✅ Successful PIN authentication from IP: ${clientIP} for account: ${account.name}`);
 
             // Update last accessed time
@@ -533,7 +534,7 @@ class AccessAccountController {
             if (req.session.deviceId) {
                 const deviceId = req.session.deviceId;
                 // Signing out still works if this fails; an admin can remove the screen in Access
-                await pairing.removeDevices(device => device.id === deviceId)
+                await pairingFor(req).removeDevices(device => device.id === deviceId)
                     .catch(error => console.error('Could not free the screen on sign-out:', error.message));
             }
 

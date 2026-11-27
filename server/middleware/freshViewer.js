@@ -1,5 +1,5 @@
 const accessAccounts = require('../controllers/accessAccountController');
-const pairing = require('../services/pairingService');
+const { forRequest: pairingFor } = require('../services/pairingService');
 
 // How often a signed-in frame's account and screen are looked up again
 const RECHECK_MS = 30 * 1000;
@@ -16,6 +16,7 @@ async function freshViewer(req, res, next) {
   if (!signedIn) return next();
   // Every request a screen makes (its next photo, the photo itself, its session
   // check) says it's on: "Last seen" on Screens. In memory, so free per request
+  const pairing = pairingFor(req);
   if (session.deviceId) pairing.seen(session.deviceId);
   // The frame's own "am I still signed in?" (js/frameSession.js, every 15 seconds)
   // always looks again, so a removed screen hears it within that time
@@ -23,13 +24,12 @@ async function freshViewer(req, res, next) {
   if (!sessionCheck && session.viewerCheckedAt && Date.now() - session.viewerCheckedAt < RECHECK_MS) return next();
 
   let account;
-  let screen = null;
   let screenKept = true;
   try {
     account = (await accessAccounts.loadAccounts()).find(a => a.id === signedIn.id);
     if (account && session.deviceId) {
-      screen = (await pairing.loadDevices()).find(d => d.id === session.deviceId && d.accountId === account.id) || null;
-      screenKept = Boolean(screen);
+      const screen = await pairing.findDevice(session.deviceId);
+      screenKept = screen?.accountId === account.id;
     }
   } catch (error) {
     // Storage is down: don't sign frames out over it, try again next time
@@ -50,7 +50,7 @@ async function freshViewer(req, res, next) {
   // A frame that stays signed in by its session still counts as used ("Last used"
   // on Access): at most about once an hour, and never in its way
   try {
-    await pairing.noteUse({ account, device: screen });
+    await pairing.noteUse({ account });
   } catch (error) {
     console.warn('Could not note when a frame was last used:', error.message);
   }

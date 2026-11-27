@@ -31,6 +31,8 @@ const app = createApp({
   beforeRoutes: (server) => server.get('/api/libraries', (req, res) => res.json({ libraries: ['own', 'shared'] }))
 });
 
+const flushSeen = () => app.locals.pairingService.flushSeen();
+
 const HOUR = 60 * 60 * 1000;
 const later = async (ms, call) => {
   const realNow = Date.now;
@@ -117,11 +119,14 @@ describe('API answers are never kept by the browser', () => {
 });
 
 describe('"Last used" on Access for frames paired by code', () => {
-  test('pairing counts as a use: the screen is seen and its account used', async () => {
+  test('pairing counts as a use: the account is used and the screen is seen in the next batch', async () => {
     const before = Date.now();
     const { accountId, deviceId } = await pairFrame('Kitchen TV');
-    const { accounts, devices } = await stored();
+    let { accounts, devices } = await stored();
     expect(Date.parse(accounts.find(a => a.id === accountId).lastAccessed)).toBeGreaterThanOrEqual(before - 1000);
+    expect(devices.find(d => d.id === deviceId).lastSeen).toBeNull();
+    await flushSeen();
+    ({ devices } = await stored());
     expect(Date.parse(devices.find(d => d.id === deviceId).lastSeen)).toBeGreaterThanOrEqual(before - 1000);
   });
 
@@ -129,39 +134,35 @@ describe('"Last used" on Access for frames paired by code', () => {
     const paired = await pairFrame('Hall TV');
     const old = await ageUse(paired, 3 * HOUR);
     await request(app).post('/api/auth/device').send({ token: paired.token }).expect(200);
+    await flushSeen();
     const { accounts, devices } = await stored();
-    expect(accounts.find(a => a.id === paired.accountId).lastAccessed).not.toBe(old);
     expect(Date.parse(accounts.find(a => a.id === paired.accountId).lastAccessed)).toBeGreaterThan(Date.parse(old));
     expect(Date.parse(devices.find(d => d.id === paired.deviceId).lastSeen)).toBeGreaterThan(Date.parse(old));
   });
 
   test('a frame playing on its session for days still counts as used, about once an hour', async () => {
     const paired = await pairFrame('Bedroom TV');
-    await paired.frame.get('/api/folders').expect(200); // its first look, just after pairing
+    await paired.frame.get('/api/folders').expect(200); // first session recheck
     const used = id => stored().then(({ accounts }) => accounts.find(a => a.id === id).lastAccessed);
     const seen = id => stored().then(({ devices }) => devices.find(d => d.id === id).lastSeen);
 
-    // Within the recheck time nothing is looked up or written
+    // A request within the recheck window still joins the next batch.
     const old = await ageUse(paired, 3 * HOUR);
     await paired.frame.get('/api/folders').expect(200);
     expect(await used(paired.accountId)).toBe(old);
-
-    // At the next recheck, both are noted
-    await later(RECHECK_MS + 1000, () => paired.frame.get('/api/folders').expect(200));
-    expect(Date.parse(await used(paired.accountId))).toBeGreaterThan(Date.parse(old));
+    expect(await seen(paired.deviceId)).toBe(old);
+    await flushSeen();
     expect(Date.parse(await seen(paired.deviceId))).toBeGreaterThan(Date.parse(old));
 
-    // Used half an hour ago: the next recheck leaves "last used" alone, but the
-    // screen's own "last seen" is written every few minutes
+    // The next recheck refreshes the account, independently of the device batch.
+    await later(RECHECK_MS + 1000, () => paired.frame.get('/api/folders').expect(200));
+    expect(Date.parse(await used(paired.accountId))).toBeGreaterThan(Date.parse(old));
     const recent = await ageUse(paired, HOUR / 2);
     await later(2 * (RECHECK_MS + 1000), () => paired.frame.get('/api/folders').expect(200));
     expect(await used(paired.accountId)).toBe(recent);
+    expect(await seen(paired.deviceId)).toBe(recent);
+    await flushSeen();
     expect(Date.parse(await seen(paired.deviceId))).toBeGreaterThan(Date.parse(recent));
-
-    // Seen a minute ago: nothing written
-    const justNow = await ageUse(paired, 60 * 1000);
-    await later(3 * (RECHECK_MS + 1000), () => paired.frame.get('/api/folders').expect(200));
-    expect(await seen(paired.deviceId)).toBe(justNow);
   });
 
   test("every request a screen makes, like its next photo, shows on Screens at once, without a write each time", async () => {

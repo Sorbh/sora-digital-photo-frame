@@ -133,7 +133,7 @@ function createApp({ sessionStore, beforeRoutes, library, dataStore, resolveTena
   // Changes only from this site's own pages (see middleware/sameOrigin)
   app.use(sameOrigin);
   app.use(tenantMiddleware(resolveTenant));
-  // Removed screens and accounts stop working, and folder changes arrive, within 30 seconds
+  // Check device revocation on every request and refresh account folders periodically.
   app.use(['/api', '/uploads'], freshViewer);
 
   // Static files

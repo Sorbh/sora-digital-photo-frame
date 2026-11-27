@@ -305,13 +305,8 @@ class PairingService {
     }
   }
 
-  async findDevice(id) {
-    try {
-      return await this.deviceStore.findById(currentTenant().id, id);
-    } catch (error) {
-      if (error.status >= 400 && error.status < 500) return null;
-      throw error;
-    }
+  findDevice(id) {
+    return this.deviceStore.findById(currentTenant().id, id);
   }
 
   // The paired device for a token, or null. Old tokens have no embedded id.

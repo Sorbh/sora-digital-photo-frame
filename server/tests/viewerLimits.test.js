@@ -40,8 +40,8 @@ let pinCount = 0;
 const frameFor = async (assignedFolders, frame = request.agent(app)) => {
   const pin = String(700000 + (++pinCount));
   const { body } = await admin.post('/api/access-accounts').send({ name: `Frame ${pin}`, pin, assignedFolders }).expect(201);
-  await frame.post('/api/auth/pin').send({ pin }).expect(200);
-  return { frame, accountId: (body.account || body.data || body).id };
+  const { body: signedIn } = await frame.post('/api/auth/pin').send({ pin }).expect(200);
+  return { frame, accountId: (body.account || body.data || body).id, token: signedIn.token };
 };
 
 test('the owner browser can open the frame with its own session and choose a folder', async () => {
@@ -139,20 +139,45 @@ describe('removing or changing a frame reaches it without waiting a day', () => 
     return Promise.resolve(agentCall()).finally(() => { Date.now = realNow; });
   };
 
-  test('a deleted account is signed out', async () => {
+  test('deleting an account refuses the very next request from its screen', async () => {
     const { frame, accountId } = await frameFor([]);
-    await frame.get('/api/images/random').expect(200);
+    await frame.get('/api/images/next').expect(200);
     await admin.delete(`/api/access-accounts/${accountId}`).expect(200);
-    await later(() => frame.get('/api/images/random').expect(401));
+    const { body } = await frame.get('/api/images/next').expect(401);
+    expect(body.code).toBe('DEVICE_REMOVED');
   });
 
-  test('a removed screen is signed out', async () => {
+  test.each([
+    ['/api/images/next', 'DEVICE_REMOVED'],
+    ['/uploads/family/beach.png', null],
+    ['/api/auth/device', 'DEVICE_UNKNOWN']
+  ])('disconnecting a device refuses its next %s request', async (url, code) => {
+    const { frame, token } = await frameFor([]);
+    const { body: { device } } = await frame.post('/api/auth/device').send({ token }).expect(200);
+    await frame.get('/api/images/next').expect(200);
+    await admin.delete(`/api/admin/devices/${device.id}`).expect(200);
+
+    const refused = url === '/api/auth/device' ? frame.post(url).send({ token }) : frame.get(url);
+    const { body } = await refused.expect(401);
+    if (code) expect(body.code).toBe(code);
+    const { body: next } = await frame.get('/api/images/next').expect(401);
+    expect(next.code).toBe('AUTH_REQUIRED');
+    expect((await frame.get('/api/auth/session').expect(200)).body.authenticated).toBe(false);
+  });
+
+  test.each([503, 404])('a device-store read error (%i) keeps the screen session', async (status) => {
     const { frame } = await frameFor([]);
-    const { body } = await admin.get('/api/admin/devices').expect(200);
-    const devices = body.devices || body;
-    const screen = devices[devices.length - 1];
-    await admin.delete(`/api/admin/devices/${screen.id}`).expect(200);
-    await later(() => frame.get('/api/images/random').expect(401));
+    await frame.get('/api/images/next').expect(200);
+    const store = app.locals.pairingService.deviceStore;
+    const unavailable = jest.spyOn(store, 'findById').mockRejectedValue(Object.assign(new Error('Device store unavailable'), { status }));
+    try {
+      await frame.get('/api/images/next').expect(200);
+      await frame.get('/uploads/family/beach.png').expect(200);
+      expect(unavailable).toHaveBeenCalledTimes(2);
+    } finally {
+      unavailable.mockRestore();
+    }
+    expect((await frame.get('/api/auth/session').expect(200)).body.authenticated).toBe(true);
   });
 
   test('new folder limits apply to a frame already signed in', async () => {

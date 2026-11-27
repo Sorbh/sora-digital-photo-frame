@@ -43,6 +43,7 @@ function fakeElement(id) {
       toggle: (name, on) => ((on === undefined ? !classes.has(name) : on) ? classes.add(name) : classes.delete(name))
     },
     addEventListener: (type, fn) => { (listeners[type] ||= []).push(fn); },
+    removeEventListener: (type, fn) => { listeners[type] = (listeners[type] || []).filter(listener => listener !== fn); },
     dispatchEvent: (event) => { (listeners[event.type] || []).forEach(fn => fn(event)); return true; },
     fire: type => (listeners[type] || []).forEach(fn => fn({ type, preventDefault() {}, currentTarget: element })),
     focus() {},
@@ -157,7 +158,9 @@ function openSlideshow(href, { pinSignIn = 'on', answer = () => new Promise(() =
   vm.runInContext(read('js/screenPause.js'), context);
   vm.runInContext(read('js/frameSession.js'), context);
   const source = read('js/slideshow.js');
-  vm.runInContext(`${source.slice(0, source.indexOf('class PhotoFrameSlideshow'))}\nthis.manager = this.authManager = new AuthenticationManager();`, context);
+  vm.runInContext(`${source.slice(0, source.indexOf('class WeatherWidget'))}
+    this.manager = this.authManager = new AuthenticationManager();
+    this.PhotoFrameSlideshow = PhotoFrameSlideshow;`, context);
   return { ...page, sandbox, requests, timers, manager: sandbox.manager };
 }
 
@@ -526,7 +529,12 @@ describe('A screen removed while it plays (js/frameSession.js)', () => {
         return server.other();
       }
     });
-    frame.sandbox.slideshow = { forgetScreen: jest.fn() };
+    frame.sandbox.slideshow = Object.assign(Object.create(frame.sandbox.PhotoFrameSlideshow.prototype), {
+      folderStorage: { getCurrentFolderPath: () => '' },
+      images: [frame.el('image1'), frame.el('image2')],
+      currentSlide: 0,
+      forgetScreen: jest.fn()
+    });
     await flush();
     expect(frame.manager.isAuthenticated).toBe(true);
     expect(frame.el('authOverlay').classList.contains('hidden')).toBe(true);
@@ -547,9 +555,64 @@ describe('A screen removed while it plays (js/frameSession.js)', () => {
     expect(frame.el('pausedScreen').classList.contains('hidden')).toBe(true);
   };
 
-  test('a 401 on its next request: asked once with its token, refused, and back to a fresh code and QR', async () => {
+  test.each(['DEVICE_REMOVED', 'DEVICE_UNKNOWN', 'AUTH_REQUIRED'])('a photo request with 401 %s goes straight back to pairing', async (code) => {
     const frame = await playingFrame();
-    frame.server.other = () => reply(401, { code: 'AUTH_REQUIRED' });
+    frame.server.other = () => reply(401, { code });
+    // Concurrent requests from the same playing screen must only transition once.
+    await Promise.all([
+      frame.sandbox.slideshow.fetchRandomImage(),
+      frame.sandbox.fetch('/api/notes/active')
+    ]);
+    await flush();
+    expectPairingScreen(frame);
+    expect(frame.requests.filter(r => r.url === '/api/auth/device')).toHaveLength(1); // startup only
+    expect(frame.sandbox.reloaded).toBe(0);
+  });
+
+  test('a failed uploads image checks the session immediately and returns to pairing on revocation', async () => {
+    const frame = await playingFrame();
+    frame.server.session = () => reply(401, { code: 'DEVICE_REMOVED' });
+    const loading = frame.sandbox.slideshow.loadImage({ url: 'https://frame.example/uploads/Goa/photo.png' });
+    await flush();
+    frame.el('image2').fire('error'); // an <img> error exposes no HTTP status
+    expect(await loading).toBe(false);
+    await flush();
+    expect(frame.requests.filter(r => r.url === '/api/auth/session')).toHaveLength(1);
+    expectPairingScreen(frame);
+  });
+
+  test('a token renewal refused during playback returns to pairing', async () => {
+    const frame = await playingFrame();
+    frame.server.device = () => unpaired;
+    await frame.manager.requestDevice('dev_tok');
+    await flush();
+    expectPairingScreen(frame);
+  });
+
+  test('a note still loading during revocation cannot restart playback', async () => {
+    const frame = await playingFrame();
+    const slideshow = frame.sandbox.slideshow;
+    slideshow.recovery = { generation: 1 };
+    slideshow.forgetScreen.mockImplementation(() => { slideshow.recovery.generation += 1; });
+    slideshow.resetProgress = jest.fn();
+    slideshow.isPlaying = true;
+    slideshow.noteScheduler = { nextDue: () => ({ showForSeconds: 10 }) };
+    slideshow.scheduleNext = jest.fn();
+    let finishNote;
+    slideshow.showNote = () => new Promise(resolve => { finishNote = resolve; });
+    const playing = slideshow.nextImage();
+    frame.server.other = () => reply(401, { code: 'DEVICE_REMOVED' });
+    await frame.sandbox.fetch('/api/notes/active');
+    finishNote(true);
+    await playing;
+    await flush();
+    expectPairingScreen(frame);
+    expect(slideshow.scheduleNext).not.toHaveBeenCalled();
+  });
+
+  test('a 401 without a sign-out code checks the token once and pairs again if it was removed', async () => {
+    const frame = await playingFrame();
+    frame.server.other = () => reply(401, {});
     frame.server.device = () => unpaired;
     const res = await frame.sandbox.fetch('/api/images/next');
     expect(res.status).toBe(401); // the caller still gets its answer
@@ -597,7 +660,7 @@ describe('A screen removed while it plays (js/frameSession.js)', () => {
     await frame.nextCheck().fn();
     frame.server.other = trouble;
     await frame.sandbox.fetch('/api/images/next').catch(() => {});
-    frame.server.other = () => reply(401, { code: 'AUTH_REQUIRED' });
+    frame.server.other = () => reply(401, {});
     frame.server.device = trouble;
     await frame.sandbox.fetch('/api/images/next');
     await flush();
@@ -648,7 +711,7 @@ describe('A removed screen hears it from the server at once', () => {
     await Promise.all([testUploadsDir, testCacheDir, testDataDir].map(dir => fs.remove(dir)));
   });
 
-  test('the session check says "not signed in" right after the account is deleted, and the token is refused', async () => {
+  test('the session check says the screen was removed right after account deletion, and the token is refused', async () => {
     const made = await admin.post('/api/access-accounts').send({ name: 'Porch', pin: '640219' }).expect(201);
     const frame = request.agent(app);
     const signedIn = await frame.post('/api/auth/pin').send({ pin: '640219' }).expect(200);
@@ -658,8 +721,8 @@ describe('A removed screen hears it from the server at once', () => {
     expect((await frame.get('/api/auth/session').expect(200)).body.authenticated).toBe(true);
 
     await admin.delete(`/api/access-accounts/${made.body.account.id}`).expect(200);
-    const session = await frame.get('/api/auth/session').expect(200);
-    expect(session.body.authenticated).toBe(false);
+    const session = await frame.get('/api/auth/session').expect(401);
+    expect(session.body.code).toBe('DEVICE_REMOVED');
     expect(session.headers['cache-control']).toMatch(/no-store/);
     const device = await request(app).post('/api/auth/device').send({ token: signedIn.body.token }).expect(401);
     expect(device.body.code).toBe('DEVICE_UNKNOWN');

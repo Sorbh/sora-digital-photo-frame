@@ -84,8 +84,9 @@ test.each(['default document', 'custom async'])('pairing, sign-in, language and 
   expect(listed.body.devices[0]).not.toHaveProperty('tokenHash');
   await app.locals.pairingService.flushSeen();
   await owner.delete(`/api/admin/devices/${id}`).expect(200);
-  await frame.get('/api/auth/session').expect(200).expect(res => expect(res.body.authenticated).toBe(false));
-  await request(app).post('/api/auth/device').send({ token }).expect(401);
+  await frame.get('/api/auth/session').expect(401).expect(res => expect(res.body.code).toBe('DEVICE_REMOVED'));
+  await request(app).post('/api/auth/device').send({ token }).expect(401)
+    .expect(res => expect(res.body.code).toBe('DEVICE_UNKNOWN'));
 
   if (deviceStore) {
     expect(deviceStore.update).toHaveBeenCalledTimes(2);

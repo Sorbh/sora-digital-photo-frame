@@ -7,10 +7,8 @@
  *   - a light check of its session (GET /api/auth/session) every 15 seconds,
  *     so a frame between two photos notices too.
  *
- * "Not signed in" alone is not proof the screen is gone: a session can also run
- * out by itself (a TV asleep for a day). So with a device token the frame asks
- * once with it: signed in again, it plays on; only a 401 to that (the server's
- * "this frame is no longer paired") forgets the token and calls signedOut().
+ * A coded sign-out from the API goes straight back to pairing. If the
+ * session simply expires, the frame can still try to renew it with its token.
  * A network error, a 5xx, a 429 or a paused screen (403 SCREEN_PAUSED, which
  * js/screenPause.js shows) never wipes the pairing: it is asked again later.
  *
@@ -21,8 +19,9 @@
 (function (root) {
   const TOKEN_KEY = 'photoframe_device_token';
   const CHECK_MS = 15 * 1000;
-  // Answers about a sign-in being tried, not about the frame being signed in
-  const SIGN_IN = /^\/api\/(auth\/(pin|device)|pair\/)/;
+  // Manual sign-in and pairing have their own error handling.
+  const SIGN_IN = /^\/api\/(auth\/pin|pair\/)/;
+  const SIGNED_OUT = new Set(['DEVICE_REMOVED', 'DEVICE_UNKNOWN', 'AUTH_REQUIRED']);
 
   const pathOf = (url) => {
     try {
@@ -41,16 +40,35 @@
       this.checkMs = checkMs;
       this.active = false;
       this.checkTimer = null;
+      this.checking = false;
       this.confirming = null;
       this.fetch = this.fetch.bind(this);
     }
 
     // fetch() for the page: the same answer, looked at on the way past
     fetch(url, options) {
-      return this.request(url, options).then((response) => {
-        if (this.active && response && response.status === 401 && !SIGN_IN.test(pathOf(url))) this.confirm();
+      return this.request(url, options).then(async (response) => {
+        if (this.active && response?.status === 401) {
+          const path = pathOf(url);
+          if (path.startsWith('/api/') && !SIGN_IN.test(path)) await this.handleUnauthorized(response);
+        }
         return response;
       });
+    }
+
+    async handleUnauthorized(response) {
+      let data;
+      try { data = await response.clone().json(); } catch (error) { /* the reply has no readable code */ }
+      if (!this.active) return;
+      if (SIGNED_OUT.has(data?.code)) this.endSession();
+      else this.confirm();
+    }
+
+    endSession() {
+      if (!this.active) return;
+      this.stop();
+      try { this.storage && this.storage.removeItem(TOKEN_KEY); } catch (error) { /* storage off */ }
+      this.signedOut();
     }
 
     start({ viewer = false } = {}) {
@@ -72,16 +90,20 @@
 
     // Is this browser still signed in? Cheap, and never answered from a cache
     async check() {
+      this.timers.clearTimeout(this.checkTimer);
       this.checkTimer = null;
-      if (!this.active || this.confirming) return;
+      if (!this.active || this.checking || this.confirming) return;
+      this.checking = true;
       let response;
       try {
         response = await this.request('/api/auth/session', { credentials: 'same-origin', cache: 'no-store' });
       } catch (error) {
         return this.schedule(); // offline for now
+      } finally {
+        this.checking = false;
       }
       if (!this.active) return;
-      if (response.status === 401) return this.confirm();
+      if (response.status === 401) return this.handleUnauthorized(response);
       if (!response.ok) return this.schedule(); // a 5xx, or paused (its card is up)
       let data = null;
       try { data = await response.json(); } catch (error) { /* not an answer */ }
@@ -102,9 +124,7 @@
       this.confirming = this.isGone()
         .then((gone) => {
           if (gone && this.active) {
-            try { this.storage && this.storage.removeItem(TOKEN_KEY); } catch (error) { /* storage off */ }
-            this.stop();
-            this.signedOut();
+            this.endSession();
             return true;
           }
           return false;

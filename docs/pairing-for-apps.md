@@ -134,13 +134,12 @@ Include the current advertisement fields alongside the token so a new name or ap
 | 429 | `{ "code": "RATE_LIMITED" }` | Too many failed sign-ins from this network. Wait, then try again; keep the token |
 | 5xx, no connection | | Keep the token, and try again shortly |
 
-Only a 401 to this request means the screen is gone. Never delete the token for anything else.
-
 ## 5. Playing
 
 Sessions last 24 hours, so a screen left on is signed out now and then. Every request below needs the session cookie.
 
-- **The session check:** `GET /api/auth/session` every **15 seconds**, as the web frame does. `{ "authenticated": true, "account": {…} }` means play on. On `"authenticated": false`, or a 401 to any request, sign in again with the token (step 4); only if that answers 401 is the screen removed. A 403 `SCREEN_PAUSED` can come from any request: show its message as in step 4.
+- **Disconnection:** A removed screen gets 401 `DEVICE_REMOVED` on its next API request, or HTTP 401 when it requests a photo under `/uploads`. On a 401 from any call, stop playback, delete the stored device token and return to pairing (step 1).
+- **The session check:** `GET /api/auth/session` every **15 seconds**, as the web frame does. `{ "authenticated": true, "account": {…} }` means play on. On a 200 with `"authenticated": false`, try signing in again with the token (step 4). A 403 `SCREEN_PAUSED` can come from any request: show its message as in step 4.
 - **The next photo:** `GET /api/images/next?folder=<folder>&after=<last id>` (both optional: no `folder` plays every folder the screen may see; `after` continues a folder's play order from the last photo shown). **200:** `{ "success": true, "image": { "id", "type", "url", "thumbnail", "folder", … } }`. `type` is `image` (load `url`, with the session cookie) or `snap` (a collage, described in `image.snap`). On a remote encrypted library the image also has `rawUrl` and `mimeType`, and the keys come from `GET /api/frame/keys?ids=<id>`; most apps can ignore that and load `url`. A 404 or 403 for a chosen folder means it is gone or no longer this screen's: drop the folder and play all.
 - **Folders** to choose from: `GET /api/folders` (the top level) and `GET /api/folders/<path>`, already limited to the screen's own folders.
 - **Notes** to show between photos: `GET /api/notes/active?folder=<folder>`.

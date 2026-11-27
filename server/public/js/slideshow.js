@@ -606,7 +606,6 @@ class AuthenticationManager {
         this.stopRateLimitWait();
         this.cancelUrlSignIn();
         clearInterval(this.renewTimer);
-        localStorage.removeItem(DEVICE_TOKEN_KEY);
         sessionStorage.removeItem('authenticated');
         sessionStorage.removeItem('accountName');
         // The last code shown, and "Paired as …", are not this screen's any more
@@ -790,6 +789,7 @@ class PhotoFrameSlideshow {
         this.logoutBtn.addEventListener('click', () => this.logout());
         this.playPauseBtn.addEventListener('click', () => this.togglePlayPause());
         this.nextBtn.addEventListener('click', () => this.nextImage());
+        this.noteLayer?.addEventListener('error', event => this.checkFailedPhoto(event.target.src), true);
         // The tap itself is what lets the browser keep the screen on
         this.keepAwakeBtn.addEventListener('click', () => this.wakeLock?.onGesture());
         // Retry, and back online: try again now, without waiting out the delay
@@ -968,6 +968,14 @@ class PhotoFrameSlideshow {
         return imageData.url;
     }
 
+    checkFailedPhoto(src) {
+        // Image load events hide the HTTP status. Check the session immediately
+        // when a protected photo fails to load.
+        if (src?.startsWith(new URL('/uploads/', location.href).href)) {
+            window.frameSession?.check();
+        }
+    }
+
     // Loads the photo into the hidden slide; false if it failed or `signal` gave up on it
     // Only the newest load owns the hidden slide: a Retry and a Next loading at
     // once must not both finish on one load event, and a load overtaken by a
@@ -1016,6 +1024,7 @@ class PhotoFrameSlideshow {
             const onError = () => {
                 stop();
                 if (isObjectUrl) URL.revokeObjectURL(src);
+                this.checkFailedPhoto(img.src);
                 console.error('Failed to load image:', imageData.url);
                 resolve(false);
             };
@@ -1104,17 +1113,22 @@ class PhotoFrameSlideshow {
     async nextImage() {
         this.resetProgress();
 
+        // A folder change or sign-out discards any photo or note still loading.
+        const generation = this.recovery.generation;
+        const isCurrent = () => this.recovery.generation === generation;
+
         // Every few minutes a note takes the place of the next photo
         const note = this.noteScheduler?.nextDue();
-        if (note && await this.showNote(note)) {
-            if (this.isPlaying) this.scheduleNext(note.showForSeconds * 1000);
-            return;
+        if (note) {
+            const shown = await this.showNote(note, { isCurrent });
+            if (!isCurrent()) return;
+            if (shown) {
+                if (this.isPlaying) this.scheduleNext(note.showForSeconds * 1000);
+                return;
+            }
         }
 
         // A photo that fails to come is skipped: the last good one stays on screen.
-        // Picking a folder (or signing out) meanwhile makes this one too late to show.
-        const generation = this.recovery.generation;
-        const isCurrent = () => this.recovery.generation === generation;
         const signal = timeoutSignal(REQUEST_TIMEOUT_MS);
         const next = await this.fetchRandomImage(signal);
         if (!isCurrent()) return;

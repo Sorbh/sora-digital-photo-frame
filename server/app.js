@@ -129,7 +129,14 @@ function createApp({ sessionStore, beforeRoutes, library, dataStore, resolveTena
     app.use('/uploads', requirePhotoViewer, requireVisiblePhoto, media());
   }
   app.use('/js', express.static(path.join(__dirname, 'public/js')));
-  app.use('/admin', express.static(path.join(__dirname, 'public')));
+  // The library moved from /admin to /home: old bookmarks, home-screen icons and links
+  // land there, with their ?path= and the like
+  app.get('/admin', (req, res) => {
+    const query = req.originalUrl.indexOf('?');
+    res.redirect(301, `/home${query === -1 ? '' : req.originalUrl.slice(query)}`);
+  });
+  // Pages cached from when the library was at /admin/ still find their scripts
+  app.use('/admin', express.static(path.join(__dirname, 'public'), { index: false, redirect: false }));
   // Serve CSS and JS files from root for access-accounts page
   app.use(express.static(path.join(__dirname, 'public'), {
     index: false // Prevent serving index.html from root

@@ -33,7 +33,7 @@ Set `ADMIN_PASSWORD` in `server/.env`, then open:
 | | |
 |---|---|
 | **Slideshow** | `http://localhost:3000` |
-| **Library** (admin) | `http://localhost:3000/admin` |
+| **Library** | `http://localhost:3000/home` |
 
 Prefer Docker? `ADMIN_PASSWORD=yourpassword docker compose up -d` — see [DOCKER.md](DOCKER.md).
 

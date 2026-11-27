@@ -35,7 +35,7 @@ const build = (options = {}) => createApp({
 const get = (app, url, person = 'admin') => request(app).get(url).set('x-person', person);
 
 // The pages with the shared header, and which one each is
-const HEADER_PAGES = { '/admin/': 'library', '/access-accounts': 'access', '/notes': 'notes', '/snap': 'snap', '/pair': 'pair' };
+const HEADER_PAGES = { '/home': 'library', '/access-accounts': 'access', '/notes': 'notes', '/snap': 'snap', '/pair': 'pair' };
 
 const headerOf = html => {
   const found = html.match(/<header class="topbar" data-sora-header="([\w-]+)">[\s\S]*?<\/header>/);
@@ -66,7 +66,7 @@ describe('every page shares one header', () => {
     const header = headerOf(res.text);
     expect(header.page).toBe(id);
     // The brand, linking home, and the host's slot beside it
-    expect(header.html).toMatch(/<a href="\/admin" class="sora-wordmark" data-brand [^>]*>Sora Frame<\/a>/);
+    expect(header.html).toMatch(/<a href="\/home" class="sora-wordmark" data-brand [^>]*>Sora Frame<\/a>/);
     expect(header.html).toContain('<div class="topbar-slot" data-host-slot>');
     // The same actions in the same order: Library (when not on it), Access (self-hosted),
     // Slideshow, settings (the library's own), then the account menu: theme, log out
@@ -86,8 +86,8 @@ describe('every page shares one header', () => {
   test('the page you are on is marked', async () => {
     const access = headerOf((await get(app, '/access-accounts').expect(200)).text).html;
     expect(access).toMatch(/<a href="\/access-accounts" [^>]*data-header-item="access" data-owner-only aria-current="page"/);
-    const library = (await get(app, '/admin/').expect(200)).text;
-    expect(tabbarOf(library)).toMatch(/<a href="\/admin" class="tab active" aria-current="page" data-tab="library">/);
+    const library = (await get(app, '/home').expect(200)).text;
+    expect(tabbarOf(library)).toMatch(/<a href="\/home" class="tab active" aria-current="page" data-tab="library">/);
     expect(headerOf(library).html).not.toContain('aria-current');
     // The page's name sits in the host's slot until the host fills it
     expect(headerOf(library).html).toMatch(/data-host-slot><span class="sora-eyebrow" data-i18n="common.library">Library<\/span><\/div>/);
@@ -125,10 +125,10 @@ describe('the brand option', () => {
       expect(html).not.toMatch(/data-brand>Sora Frame</);
       expect(html).not.toMatch(/<title[^>]*>[^<]*Sora Frame/);
     }
-    const header = headerOf((await get(app, '/admin/')).text).html;
+    const header = headerOf((await get(app, '/home')).text).html;
     expect(header).toContain(`data-brand aria-label="${escaped} library home"`);
     expect(header).toContain(`>${escaped}</a>`);
-    expect((await get(app, '/admin/')).text).toMatch(new RegExp(`<title data-i18n="admin.static_001">Library · ${escaped}</title>`));
+    expect((await get(app, '/home')).text).toMatch(new RegExp(`<title data-i18n="admin.static_001">Library · ${escaped}</title>`));
   });
 
   test('defaults to Sora Frame, and must be a name', () => {
@@ -328,7 +328,7 @@ describe('"New note" in the library', () => {
     expect(JSON.parse(await fs.readFile(path.join(testUploadsDir, 'Family', 'Beach', written[0]), 'utf8')).title).toBe('Lunch on Sunday');
     // Saved and closed: back to the library folder it came from
     expect(context.location.href).toBe(elements.backLink.href);
-    expect(elements.backLink.href).toBe('/admin?path=uploads%2FFamily%2FBeach');
+    expect(elements.backLink.href).toBe('/home?path=uploads%2FFamily%2FBeach');
   });
 });
 

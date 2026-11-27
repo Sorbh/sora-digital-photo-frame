@@ -3,7 +3,7 @@
   "name": "Sora Frame",
   "short_name": "Sora Frame",
   "description": "Add family photos to your Sora Frame screens",
-  "start_url": "/admin",
+  "start_url": "/home",
   "scope": "/",
   "display": "standalone",
   "background_color": "#fbf4e8",

@@ -54,7 +54,7 @@ function element() {
   };
 }
 
-function loadAdmin(start = 'https://frame.example/admin') {
+function loadAdmin(start = 'https://frame.example/home') {
   const browser = fakeBrowser(start);
   const elements = {};
   const get = id => (elements[id] = elements[id] || element());
@@ -104,7 +104,7 @@ describe('Back in the library', () => {
   });
 
   test('opening the folder already shown adds no entry', () => {
-    const { admin, browser } = loadAdmin('https://frame.example/admin?path=uploads%2FFamily');
+    const { admin, browser } = loadAdmin('https://frame.example/home?path=uploads%2FFamily');
     expect(admin.currentPath).toBe('uploads/Family');
     admin.navigateTo('uploads/Family');
     expect(browser.history.length).toBe(1);

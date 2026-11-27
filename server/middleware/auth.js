@@ -22,7 +22,7 @@ const announceAdminPassword = () => {
   const set = process.env.ADMIN_PASSWORD;
   if (set && !WEAK_PASSWORDS.has(set)) return;
   const why = set ? 'ADMIN_PASSWORD is the old default (admin123), which anyone could guess' : 'ADMIN_PASSWORD is not set';
-  console.warn(`⚠️  ${why}. Sign in to /admin with this password: ${generatedAdminPassword()}`);
+  console.warn(`⚠️  ${why}. Sign in to /home with this password: ${generatedAdminPassword()}`);
   console.warn(`   It is kept in ${storedSecret.file(GENERATED_NAME)}. Set ADMIN_PASSWORD to choose your own.`);
 };
 
@@ -101,7 +101,7 @@ const safeNext = (value) => (typeof value === 'string' && /^\/(?![\/\\])/.test(v
 // Check if user is NOT authenticated (for login page)
 const sessionRequireGuest = (req, res, next) => {
   if (req.session && req.session.authenticated) {
-    return res.redirect(safeNext(req.query.next) || '/admin');
+    return res.redirect(safeNext(req.query.next) || '/home');
   }
   next();
 };
@@ -140,11 +140,11 @@ const login = async (req, res) => {
 
     // If it's an API request, return JSON success
     if (req.is('application/json')) {
-      return res.json({ message: 'Login successful', redirect: '/admin' });
+      return res.json({ message: 'Login successful', redirect: '/home' });
     }
 
     // For form submissions, redirect to admin
-    return res.redirect('/admin');
+    return res.redirect('/home');
   }
 
   // Invalid password

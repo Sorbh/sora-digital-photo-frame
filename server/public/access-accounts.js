@@ -249,7 +249,7 @@ class AccessAccountsManager {
     bindEvents() {
         // Back button
         document.getElementById('backBtn').addEventListener('click', () => {
-            window.location.href = '/admin.html';
+            window.location.href = '/home';
         });
 
         document.getElementById('renewFamilyCodeBtn').addEventListener('click', () => this.renewFamilyCode());

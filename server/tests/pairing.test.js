@@ -515,7 +515,7 @@ describe('Pairing a frame by QR code', () => {
     const signedIn = await admin.get('/login').query({ next: '/pair?code=ABC234' }).expect(302);
     expect(signedIn.headers.location).toBe('/pair?code=ABC234');
     const offsite = await admin.get('/login').query({ next: '//evil.example' }).expect(302);
-    expect(offsite.headers.location).toBe('/admin');
+    expect(offsite.headers.location).toBe('/home');
   });
 
   test('MAX_SCREENS caps how many frames a library can pair', async () => {

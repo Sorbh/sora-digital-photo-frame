@@ -18,7 +18,7 @@ if (require.main === module) {
   app.listen(PORT, async () => {
     await initializeUploads();
     console.log(`Digital Photo Frame Server running on port ${PORT}`);
-    console.log(`Admin panel: http://localhost:${PORT}/admin`);
+    console.log(`Admin panel: http://localhost:${PORT}/home`);
     console.log(`Slideshow: http://localhost:${PORT}/slideshow`);
     console.log(`API endpoint: http://localhost:${PORT}/api/random-image`);
   });

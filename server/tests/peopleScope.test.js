@@ -344,7 +344,7 @@ const PAGES = {
   'GET /slideshow': none('a page; its photos come from the API'),
   'GET /folder-selection': none('a page; its folders come from the API'),
   'GET /login': none('the sign-in page'),
-  'GET /admin': none('a page; its folders come from the API'),
+  'GET /home': none('a page; its folders come from the API'),
   'GET /access-accounts': owner(p => as(p).get('/access-accounts')),
   'GET /notes': none('a page; its notes come from the API'),
   'GET /snap': none('a page; its snap comes from the API'),

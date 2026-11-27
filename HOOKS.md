@@ -173,13 +173,13 @@ It only changes what Access shows. Refusing the paused frame itself is still the
 
 ## Header
 
-Every page that looks after a library (`/admin`, `/access-accounts`, `/notes`, `/snap`, `/pair` and the "only for the owner" page) has the same top bar and phone tab bar. The page's HTML in `server/public` only marks where they go (`<!-- sora:header -->`, `<!-- sora:tabbar -->`); the server draws them when it sends the page (`server/views/pages.js`), so every page has the same brand, the same actions in the same order, and the page you're on marked (`aria-current="page"`). `js/appHeader.js` runs the theme and Log out buttons on every page.
+Every page that looks after a library (`/home`, `/access-accounts`, `/notes`, `/snap`, `/pair` and the "only for the owner" page) has the same top bar and phone tab bar. The page's HTML in `server/public` only marks where they go (`<!-- sora:header -->`, `<!-- sora:tabbar -->`); the server draws them when it sends the page (`server/views/pages.js`), so every page has the same brand, the same actions in the same order, and the page you're on marked (`aria-current="page"`). `js/appHeader.js` runs the theme and Log out buttons on every page.
 
 The top bar, in order:
 
 | Part | When |
 |---|---|
-| Brand (`.sora-wordmark[data-brand]`), linking to `/admin` | Always |
+| Brand (`.sora-wordmark[data-brand]`), linking to `/home` | Always |
 | Host slot: `<div class="topbar-slot" data-host-slot>` | Always. Holds the page's name (`.sora-eyebrow`) until the host replaces what's in it, e.g. with a library switcher |
 | Library | Not on the library |
 | Access (`data-owner-only`, hidden by `js/scope.js` for anyone but the owner) | Without `accountUrl` |

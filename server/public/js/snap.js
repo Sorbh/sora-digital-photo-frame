@@ -32,7 +32,7 @@ class SnapEditor extends PageEditor {
         });
 
         this.pickerPath = this.folder;
-        const back = `/admin?path=${encodeURIComponent(this.folder)}`;
+        const back = `/home?path=${encodeURIComponent(this.folder)}`;
         document.getElementById('backLink').href = back;
         document.getElementById('cancelSnapBtn').href = back;
         this.renderHeadings();
@@ -106,7 +106,7 @@ class SnapEditor extends PageEditor {
                 if (data.errors) this.showErrors(data.errors);
                 throw new Error(i18n.error(data, 'snap.saveFailed'));
             }
-            window.location.replace(`/admin?path=${encodeURIComponent(this.folder)}`);
+            window.location.replace(`/home?path=${encodeURIComponent(this.folder)}`);
         } catch (error) {
             btn.disabled = false;
             if (error.message !== 'Signed out') this.showToast(error.message, 'error');

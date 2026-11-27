@@ -111,7 +111,7 @@ const googlePhotosController = {
                   }, '*');
                   window.close();
                 } else {
-                  window.location.href = '/admin';
+                  window.location.href = '/home';
                 }
               </script>
             </body>
@@ -139,7 +139,7 @@ const googlePhotosController = {
                   }, '*');
                   window.close();
                 } else {
-                  window.location.href = '/admin';
+                  window.location.href = '/home';
                 }
               </script>
             </body>
@@ -167,7 +167,7 @@ const googlePhotosController = {
                 }, '*');
                 window.close();
               } else {
-                window.location.href = '/admin';
+                window.location.href = '/home';
               }
             </script>
           </body>
@@ -188,7 +188,7 @@ const googlePhotosController = {
                 }, '*');
                 window.close();
               } else {
-                window.location.href = '/admin';
+                window.location.href = '/home';
               }
             </script>
           </body>

@@ -63,7 +63,7 @@ class LoginManager {
                 this.showSuccess(t('login.success'), 'login.success');
                 // Back to the page that asked for sign-in (e.g. pairing a frame), else the library
                 const next = new URLSearchParams(window.location.search).get('next');
-                const target = next && /^\/(?![\/\\])/.test(next) ? next : '/admin';
+                const target = next && /^\/(?![\/\\])/.test(next) ? next : '/home';
                 // replace: Back from the library must not land on this form again
                 setTimeout(() => {
                     window.location.replace(target);

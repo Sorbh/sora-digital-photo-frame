@@ -28,6 +28,6 @@ self.addEventListener('fetch', event => {
     } catch (error) {
       // Nothing to keep: the library opens anyway and the person can pick the photos there
     }
-    return Response.redirect('/admin?shared=1', 303);
+    return Response.redirect('/home?shared=1', 303);
   })());
 });

@@ -11,7 +11,7 @@ router.get('/folder-selection', viewController.serveFolderSelection.bind(viewCon
 router.get('/login', requireGuest, viewController.serveLogin.bind(viewController));
 
 // Protected routes
-router.get('/admin', requireAuth, viewController.serveAdmin.bind(viewController));
+router.get('/home', requireAuth, viewController.serveAdmin.bind(viewController));
 // Access and pairing are the library owner's (see middleware/scope)
 router.get('/access-accounts', requireAuth, requireOwnerPage, viewController.serveAccessAccounts.bind(viewController));
 router.get('/notes', requireAuth, viewController.serveNotes.bind(viewController));

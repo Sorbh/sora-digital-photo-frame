@@ -100,7 +100,7 @@ function renderHeader(pageId, { eyebrow = null, settings: hasSettings = false } 
   const here = id => (pageId === id ? ' aria-current="page"' : '');
   const places = [];
   if (pageId !== 'library') {
-    places.push(`<a href="/admin" class="tb-btn tb-desktop" data-header-item="library" title="Back to the library" data-i18n-attr="title:accessAccounts.static_017">${icon('photo_library')}<span class="tb-label" data-i18n="common.library">Library</span></a>`);
+    places.push(`<a href="/home" class="tb-btn tb-desktop" data-header-item="library" title="Back to the library" data-i18n-attr="title:accessAccounts.static_017">${icon('photo_library')}<span class="tb-label" data-i18n="common.library">Library</span></a>`);
   }
   if (!accountUrl) {
     places.push(`<a href="/access-accounts" class="tb-btn tb-desktop" data-header-item="access" data-owner-only${here('access')} title="Manage access accounts" data-i18n-attr="title:admin.static_033">${icon('key')}<span class="tb-label" data-i18n="common.access">Access</span></a>`);
@@ -129,7 +129,7 @@ function renderHeader(pageId, { eyebrow = null, settings: hasSettings = false } 
   const slot = eyebrow ? `<span class="sora-eyebrow" data-i18n="${eyebrow[0]}">${escapeHtml(eyebrow[1])}</span>` : '';
   return `<header class="topbar" data-sora-header="${pageId}">
             <div class="topbar-brand">
-                <a href="/admin" class="sora-wordmark" data-brand aria-label="${escapeHtml(brand.name)} library home" data-i18n-attr="aria-label:admin.static_032">${escapeHtml(brand.name)}</a>
+                <a href="/home" class="sora-wordmark" data-brand aria-label="${escapeHtml(brand.name)} library home" data-i18n-attr="aria-label:admin.static_032">${escapeHtml(brand.name)}</a>
                 <span class="topbar-divider"></span>
                 <div class="topbar-slot" data-host-slot>${slot}</div>
             </div>
@@ -147,7 +147,7 @@ function renderHeader(pageId, { eyebrow = null, settings: hasSettings = false } 
 /** The phone tab bar: Library, Access (owner, without accountUrl), the page's own button, Slideshow, Settings (library). */
 function renderTabbar(pageId, { fab = null, settings: hasSettings = false } = {}, options = current()) {
   const here = id => (pageId === id ? ' class="tab active" aria-current="page"' : ' class="tab"');
-  const tabs = [`<a href="/admin"${here('library')} data-tab="library">${icon('photo_library')}${i18nText(['common.library', 'Library'])}</a>`];
+  const tabs = [`<a href="/home"${here('library')} data-tab="library">${icon('photo_library')}${i18nText(['common.library', 'Library'])}</a>`];
   if (!options.accountUrl) {
     tabs.push(`<a href="/access-accounts"${here('access')} data-tab="access" data-owner-only>${icon('key')}${i18nText(['common.access', 'Access'])}</a>`);
   }

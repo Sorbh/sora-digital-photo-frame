@@ -35,7 +35,7 @@ class NotesManager extends PageEditor {
         this.renderLayoutPicker();
         this.renderScheduleControls();
         this.bindEvents();
-        const back = this.cameFrom === TOP_FOLDER ? '/admin' : `/admin?${new URLSearchParams({ path: this.cameFrom })}`;
+        const back = this.cameFrom === TOP_FOLDER ? '/home' : `/home?${new URLSearchParams({ path: this.cameFrom })}`;
         document.getElementById('backLink').href = back;
         // Until the list arrives: the top folder and the one this page came from
         this.folders = [...new Set([TOP_FOLDER, this.cameFrom])];

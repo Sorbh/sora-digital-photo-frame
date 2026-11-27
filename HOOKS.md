@@ -42,7 +42,7 @@ The core asks `quota.canAdd(request, context)` before it adds anything to a libr
 
 | Field | Sent with | What it is |
 |---|---|---|
-| `screensInUse` | Screen requests only (`screens: 1`) | How many screens the library has now, without the new one. It is counted inside the same lock as the check, so it is always exact. An index the host keeps from `devicePaired` is only updated after the lock is released, so it can be one behind when two pairings run back to back |
+| `screensInUse` | Screen requests only (`screens: 1`) | How many slots are already in use under the same lock as the write. With PIN sign-in off, this includes every screen account, whether connected or paused, and reservations for in-progress approvals. With PIN sign-in on, this counts paired devices, including paused ones. |
 
 Other requests get no `context` (`undefined`). New fields may be added later, so read only the ones you need.
 
@@ -57,12 +57,13 @@ What each action asks for:
 | Create a note | 1 | its size | 0 |
 | Save a snap or note again | 0 | how much it grew | 0 |
 | Rotate a photo | 0 | how much it grew | 0 |
-| Pair a new screen (QR code or a new PIN sign-in) | 0 | 0 | 1 |
+| Create a screen account, from Access or with a new pairing (PIN sign-in off) | 0 | 0 | 1 |
+| Pair a device by QR code or a new PIN sign-in (PIN sign-in on) | 0 | 0 | 1 |
 | Rename, move or delete anything | not asked | | |
 
 - **"Is there any room at all?"** Before converting an upload, and before downloading each photo of an import, the core asks `{ items: 1, bytes: 1, screens: 0 }`, so a full library is refused before the work starts.
-- **Nothing added, nothing asked.** A save that adds no item, no bytes and no screen (a snap or rotated photo that got smaller, say) isn't asked about. Neither is a screen signing in again, by its token, by its PIN with its token, or by its session: it's the same screen.
-- **One at a time.** Uploads, imports, snaps, notes and rotations ask and save in turn for each tenant, so two can't both take the last place. A new screen is asked inside the same lock as the `MAX_SCREENS` check, so two new screens can't both take the last one. Count what is really stored when you answer, not what you were asked before.
+- **Nothing added, nothing asked.** A save that adds no item, no bytes and no screen (a snap or rotated photo that got smaller, say) isn't asked about. Neither is a screen signing in again, by its token, by its PIN with its token, or by its session. Connecting a device to an existing code-only screen account also takes no slot.
+- **One at a time.** Uploads, imports, snaps, notes and rotations ask and save in turn for each tenant, so two can't both take the last place. The screen hook and `MAX_SCREENS` use the same count and run inside the update taking the slot, so two additions cannot both take the last one. With PIN sign-in off, the slot is taken in the access-accounts DataStore update and released when the account is removed or its approval fails. With PIN sign-in on, the device-store add takes the slot. `MAX_SCREENS=0` disables the environment cap in either mode.
 - **Refusals.** For photos, snaps and notes, `{ ok: false, message }` is answered 413 `QUOTA_EXCEEDED` with your `message`. For a screen, it's 403 `SCREEN_LIMIT` with your `message` (and no `limit`, which only `MAX_SCREENS` sends); the frame shows your `message` as it is, so send it in the person's language. To send your own status and code instead, throw an error with `status` (4xx), `code` and optional `vars`: they reach the browser as they are.
 - **Notes** are files in folders like snaps (see [Notes](#notes)), and ask the same way: a new note `{ items: 1, bytes }`, saving one again only its growth. Moving a note, or the one-time move of old notes into the top folder, isn't asked about.
 
@@ -191,7 +192,7 @@ Each method may return a promise. Scope all reads and writes to the supplied ten
 | Method | Contract |
 | --- | --- |
 | `list(tenantId)` | Return the tenant's devices. |
-| `add(tenantId, device, checkLimit)` | In one atomic operation, count the tenant's devices, including paused ones, await `checkLimit(count)`, then insert the device. Roll back if the callback throws. Serialize with concurrent adds, even when the tenant has no devices. The callback checks both `MAX_SCREENS` and the quota hook. |
+| `add(tenantId, device, checkLimit)` | In one atomic operation, count the tenant's devices, including paused ones, await `checkLimit(count)`, then insert the device. Roll back if the callback throws. Serialize with concurrent adds, even when the tenant has no devices. The callback checks both `MAX_SCREENS` and the quota hook with PIN sign-in on. It is a no-op with PIN sign-in off, when the access-accounts update enforces both limits. |
 | `remove(tenantId, match)` | Atomically delete the devices that satisfy the synchronous `match(device)` predicate. Return their full records. |
 | `restore(tenantId, devices)` | Reinsert the full records after a removal hook fails, including any store-managed fields. |
 | `update(tenantId, id, changes)` | Apply a partial device update (`name`, `language` or `info`) and return the updated device, or `null` if missing. |

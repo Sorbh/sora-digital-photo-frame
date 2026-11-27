@@ -10,7 +10,7 @@
  *   screens  1 when a new screen (frame) joins the library, else 0
  * The core always passes all three, as numbers. context is optional extra
  * facts the core has in hand: { screensInUse } with screen requests, the
- * number of screens the library has now, read under the devices lock. Hooks written for the old
+ * number already in use under the account or device lock. Hooks written for the old
  * canAdd(bytes) must change (see HOOKS.md).
  */
 const unlimited = {
@@ -51,6 +51,21 @@ const addsAnything = ({ items, bytes, screens }) => items > 0 || bytes > 0 || sc
 async function ask(request, context) {
   const normalized = normalize(request);
   return context === undefined ? quota.canAdd(normalized) : quota.canAdd(normalized, context);
+}
+
+// Called inside the update that takes a slot, for code-only screen accounts
+// or for devices when PIN sign-in is enabled.
+async function assertCanAddScreen(screensInUse) {
+  const limit = parseInt(process.env.MAX_SCREENS, 10) || 0;
+  if (limit && screensInUse >= limit) {
+    throw Object.assign(new Error(`This family already has ${limit} screens. Remove one you no longer use to add this one.`),
+      { status: 403, code: 'SCREEN_LIMIT', vars: { limit } });
+  }
+  const answer = await ask({ screens: 1 }, { screensInUse });
+  if (!answer || !answer.ok) {
+    throw Object.assign(new Error(answer?.message || 'This family has no room for another screen.'),
+      { status: 403, code: 'SCREEN_LIMIT' });
+  }
 }
 
 /**
@@ -112,4 +127,4 @@ async function addWithinQuota(request, write, context) {
   }
 }
 
-module.exports = { ITEMS, setQuota, getQuota, ask, assertCanAdd, assertCanAddItems, addWithinQuota, photoItems };
+module.exports = { ITEMS, setQuota, getQuota, ask, assertCanAddScreen, assertCanAdd, assertCanAddItems, addWithinQuota, photoItems };

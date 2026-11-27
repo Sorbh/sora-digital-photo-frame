@@ -2,7 +2,7 @@ const crypto = require('crypto');
 const { getDataStore } = require('../store');
 const { currentTenant, runWithTenant } = require('../context');
 const { emit } = require('../events');
-const quota = require('./quotaService');
+const { assertCanAddScreen } = require('./quotaService');
 const MemoryPairingStore = require('./memoryPairingStore');
 const documentDeviceStore = require('./documentDeviceStore');
 const { deviceInfo } = require('../utils/deviceInfo');
@@ -157,7 +157,7 @@ class PairingService {
 
   // The admin said yes: make the device and hold its token for the frame to collect.
   // The caller owns the release when it supplies a claim. Otherwise release it here.
-  async approve(codeOrPairing, { name, accountId, beforeReady = null }) {
+  async approve(codeOrPairing, { name, accountId, beforeReady = null, countDevice = true }) {
     const ownClaim = typeof codeOrPairing !== 'object';
     const pairing = ownClaim ? await this.claim(codeOrPairing) : codeOrPairing;
     if (!pairing?.claimId) return null;
@@ -165,7 +165,7 @@ class PairingService {
     try {
       if (pairing.expiresAt <= Date.now()) return null;
       const info = deviceInfo(pairing.device);
-      const { device, token } = await this.addDevice({ name, accountId, via: 'qr', info });
+      const { device, token } = await this.addDevice({ name, accountId, via: 'qr', info, countDevice });
       try {
         const live = await this.find(pairing.code);
         if (live?.claimId === pairing.claimId && !live.approved) {
@@ -188,9 +188,9 @@ class PairingService {
     }
   }
 
-  // Every way a screen joins (QR code or PIN) ends here, so the same screen
-  // limit applies to all of them. Returns the device and its token.
-  async addDevice({ name, accountId, via, info }) {
+  // PIN-enabled libraries count devices. Code-only libraries reserve the slot
+  // when creating the screen account, so connecting a device takes no slot.
+  async addDevice({ name, accountId, via, info, countDevice = true }) {
     const id = `dev_${crypto.randomBytes(6).toString('hex')}`;
     const token = `${id}.${crypto.randomBytes(32).toString('base64url')}`;
     const device = {
@@ -203,23 +203,7 @@ class PairingService {
       lastSeen: null,
       ...(info && Object.values(info).some(Boolean) && { info })
     };
-    // MAX_SCREENS caps screens per library (0, the default, means no cap)
-    const limit = parseInt(process.env.MAX_SCREENS, 10) || 0;
-    await this.deviceStore.add(currentTenant().id, device, async screensInUse => {
-      if (limit && screensInUse >= limit) {
-        throw Object.assign(new Error(`This family already has ${limit} screens. Remove one you no longer use to add this one.`),
-          { status: 403, code: 'SCREEN_LIMIT', vars: { limit } });
-      }
-      // The quota hook's own limit, asked in the same turn so two new screens can't
-      // both pass. Only here: a screen signing in again (by token or session) is
-      // never a new one, so it is never asked about. The count is the exact one,
-      // under this lock.
-      const answer = await quota.ask({ screens: 1 }, { screensInUse });
-      if (!answer || !answer.ok) {
-        throw Object.assign(new Error((answer && answer.message) || 'This family has no room for another screen.'),
-          { status: 403, code: 'SCREEN_LIMIT' });
-      }
-    });
+    await this.deviceStore.add(currentTenant().id, device, countDevice ? assertCanAddScreen : () => {});
     try {
       await emit('devicePaired', { deviceId: id, tenantId: currentTenant().id });
     } catch (error) {

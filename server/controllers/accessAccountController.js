@@ -5,6 +5,7 @@ const { passClientError } = require('../utils/httpError');
 const { rotateSession } = require('../utils/session');
 const { currentTenant } = require('../context');
 const { forRequest: pairingFor } = require('../services/pairingService');
+const { assertCanAddScreen } = require('../services/quotaService');
 const familyCodes = require('../services/familyCodeService');
 const AttemptLimiter = require('../utils/attemptLimiter');
 
@@ -128,6 +129,8 @@ class AccessAccountController {
     async addAccountForFrame({ name, assignedFolders = [], pendingPairing = false }) {
         let account;
         await getDataStore().update('access-accounts', [], async accounts => {
+            // A pending approval reserves a slot until it succeeds or rolls back.
+            if (!this.pinSignIn) await assertCanAddScreen(accounts.length);
             let pinHash;
             if (this.pinSignIn) {
                 let pin;
@@ -186,6 +189,7 @@ class AccessAccountController {
             await getDataStore().update('access-accounts', [], async accounts => {
                 duplicate = Boolean(pin && await this.findByPin(accounts, pin));
                 if (duplicate) return accounts;
+                if (!this.pinSignIn) await assertCanAddScreen(accounts.length);
                 newAccount = {
                     id: this.generateAccountId(),
                     name,

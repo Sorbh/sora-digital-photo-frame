@@ -330,7 +330,10 @@ class PairingController {
         const { pendingPairing, ...paired } = a;
         return paired;
       }));
-      const device = await pairing.approve(claimed, { name, accountId: account.id, beforeReady: madeAccount ? finishAccount : null });
+      const device = await pairing.approve(claimed, {
+        name, accountId: account.id, countDevice: accessAccounts.pinSignIn,
+        beforeReady: madeAccount ? finishAccount : null
+      });
       if (!device) await undoAccount();
       return { device };
     };

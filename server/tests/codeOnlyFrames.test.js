@@ -224,6 +224,28 @@ describe('PIN sign-in off (PIN_SIGN_IN=off)', () => {
     expect(edited.body.account).toMatchObject({ name: 'Hallway', hasPin: false });
   });
 
+  test('MAX_SCREENS counts code-only accounts and permits connecting an existing account', async () => {
+    const { body: { account } } = await admin.post('/api/access-accounts').send({ name: 'For the limit test' }).expect(201);
+    const { body: { accounts } } = await admin.get('/api/access-accounts').expect(200);
+    const previous = process.env.MAX_SCREENS;
+    process.env.MAX_SCREENS = String(accounts.length);
+    try {
+      const refused = await admin.post('/api/access-accounts').send({ name: 'Over the cap' }).expect(403);
+      expect(refused.body).toMatchObject({ code: 'SCREEN_LIMIT', limit: accounts.length });
+      const { body: { code } } = await request(app).post('/api/pair/start').expect(200);
+      const approval = () => admin.post(`/api/admin/pair/${code}/approve`);
+      const newScreen = await approval().send({ name: 'Over the cap', newAccount: {} }).expect(403);
+      expect(newScreen.body).toEqual(refused.body);
+      const connection = await approval().send({ name: account.name, accountId: account.id }).expect(200);
+      await admin.delete(`/api/admin/devices/${connection.body.device.id}`).expect(200);
+      expect((await admin.get('/api/access-accounts').expect(200)).body.accounts).toEqual(accounts);
+    } finally {
+      if (previous === undefined) delete process.env.MAX_SCREENS;
+      else process.env.MAX_SCREENS = previous;
+      await admin.delete(`/api/access-accounts/${account.id}`).expect(200);
+    }
+  });
+
   describe('"Add a screen" on the Access page, against the real server', () => {
     // The phone's browser: the admin's signed-in session
     const phone = async (url, { method = 'GET', headers = {}, body } = {}) => {

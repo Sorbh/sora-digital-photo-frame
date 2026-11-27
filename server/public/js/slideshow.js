@@ -71,7 +71,7 @@ class AuthenticationManager {
 
     init() {
         this.bindEvents();
-        // Opening /slideshow#pin=... on this page again doesn't reload it: read it then too
+        // Opening /frame#pin=... on this page again doesn't reload it: read it then too
         window.addEventListener('hashchange', () => {
             if (!/(?:^#|&)(?:pin|family)=/.test(location.hash)) return;
             const pin = this.takeSignInFromUrl();
@@ -80,7 +80,7 @@ class AuthenticationManager {
             this.cancelUrlSignIn();
             this.signInFromUrl(pin);
         });
-        // Frames with no keyboard can open /slideshow#pin=123456 (hosted: &family=ABCD-EFGH)
+        // Frames with no keyboard can open /frame#pin=123456 (hosted: &family=ABCD-EFGH)
         // and sign in by themselves. A browser that already is a screen uses its token first.
         const urlPin = this.takeSignInFromUrl();
         const deviceToken = localStorage.getItem(DEVICE_TOKEN_KEY);

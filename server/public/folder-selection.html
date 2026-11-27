@@ -112,7 +112,7 @@
 <body>
     <header class="topbar">
         <div class="topbar-brand">
-            <a href="/slideshow" class="sora-wordmark" aria-label="Back to the slideshow" data-i18n-attr="aria-label:folders.static_008" data-brand>Sora Frame</a>
+            <a href="/frame" class="sora-wordmark" aria-label="Back to the slideshow" data-i18n-attr="aria-label:folders.static_008" data-brand>Sora Frame</a>
             <span class="topbar-divider"></span>
             <span class="sora-eyebrow" data-i18n="folders.static_002">Now playing</span>
         </div>
@@ -139,7 +139,7 @@
             </p>
         </div>
         <div class="library-actions">
-            <a href="/slideshow" class="btn mobile-hide">
+            <a href="/frame" class="btn mobile-hide">
                 <span class="material-symbols-outlined">play_arrow</span>
                 <span data-i18n="folders.static_013">Start slideshow</span>
             </a>
@@ -165,13 +165,13 @@
         <a href="/access-accounts" class="tab" data-owner-only>
             <span class="material-symbols-outlined">key</span><span data-i18n="common.access">Access</span>
         </a>
-        <a href="/slideshow" class="tab-fab" aria-label="Start slideshow" data-i18n-attr="aria-label:folders.static_013">
+        <a href="/frame" class="tab-fab" aria-label="Start slideshow" data-i18n-attr="aria-label:folders.static_013">
             <span class="material-symbols-outlined">play_arrow</span>
         </a>
         <a href="/folder-selection" class="tab active" aria-current="page">
             <span class="material-symbols-outlined">folder_special</span><span data-i18n="common.folders">Folders</span>
         </a>
-        <a href="/slideshow" class="tab">
+        <a href="/frame" class="tab">
             <span class="material-symbols-outlined">slideshow</span><span data-i18n="common.slideshow">Slideshow</span>
         </a>
     </nav>
@@ -235,7 +235,7 @@
             if (document.referrer && document.referrer !== window.location.href) {
                 window.history.back();
             } else {
-                window.location.href = '/slideshow';
+                window.location.href = '/frame';
             }
         }
 

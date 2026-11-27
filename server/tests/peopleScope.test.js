@@ -342,8 +342,9 @@ const ROUTES = {
 
 // Pages (routes/views.js): the data on them comes from the routes above
 const PAGES = {
-  'GET /': none('a redirect to the slideshow'),
-  'GET /slideshow': none('a page; its photos come from the API'),
+  'GET /': none('a redirect to the frame'),
+  'GET /frame': none('a page; its photos come from the API'),
+  'GET /slideshow': none('the old address of /frame: a redirect'),
   'GET /folder-selection': none('a page; its folders come from the API'),
   'GET /login': none('the sign-in page'),
   'GET /home': none('a page; its folders come from the API'),

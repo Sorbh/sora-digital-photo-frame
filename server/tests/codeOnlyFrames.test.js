@@ -186,7 +186,7 @@ describe('PIN sign-in off (PIN_SIGN_IN=off)', () => {
   });
 
   test('the slideshow page is told before anything loads', async () => {
-    const res = await request(app).get('/slideshow').expect(200);
+    const res = await request(app).get('/frame').expect(200);
     expect(/<html[^>]*>/.exec(res.text)[0]).toContain('data-pin-sign-in="off"');
   });
 
@@ -367,7 +367,7 @@ describe('PIN sign-in on (the self-hosted default) is unchanged', () => {
     const admin = request.agent(app);
     await admin.post('/api/auth/login').send({ password: 'test-admin-pass' }).expect(200);
     expect((await admin.get('/api/features').expect(200)).body.pinSignIn).toBe(true);
-    expect(/<html[^>]*>/.exec((await request(app).get('/slideshow').expect(200)).text)[0]).toContain('data-pin-sign-in="on"');
+    expect(/<html[^>]*>/.exec((await request(app).get('/frame').expect(200)).text)[0]).toContain('data-pin-sign-in="on"');
     await admin.post('/api/access-accounts').send({ name: 'Den' }).expect(400);
     await admin.post('/api/access-accounts').send({ name: 'Den', pin: '482913' }).expect(201);
     const signedIn = await request(app).post('/api/auth/pin').send({ pin: '482913' }).expect(200);
@@ -377,20 +377,20 @@ describe('PIN sign-in on (the self-hosted default) is unchanged', () => {
 
 describe('The frame with PIN sign-in off', () => {
   test('shows only the pairing code and QR: no PIN pad', () => {
-    const { el, manager } = openSlideshow('https://frame.example/slideshow', { pinSignIn: 'off' });
+    const { el, manager } = openSlideshow('https://frame.example/frame', { pinSignIn: 'off' });
     expect(manager.pinSignIn).toBe(false);
     expect(el('authOverlay').classList.contains('pin-off')).toBe(true);
     expect(el('pinForm').hidden).toBe(true);
   });
 
   test('ignores a #pin= link, and still takes it out of the address', () => {
-    const { requests, sandbox } = openSlideshow('https://frame.example/slideshow?lang=de#pin=123456&family=ABCD-EFGH', { pinSignIn: 'off' });
+    const { requests, sandbox } = openSlideshow('https://frame.example/frame?lang=de#pin=123456&family=ABCD-EFGH', { pinSignIn: 'off' });
     expect(requests.map(r => r.url)).not.toContain('/api/auth/pin');
-    expect(sandbox.location.href).toBe('https://frame.example/slideshow?lang=de');
+    expect(sandbox.location.href).toBe('https://frame.example/frame?lang=de');
   });
 
   test('a server that only says so in the session check still hides the PIN pad', async () => {
-    const { el, manager } = openSlideshow('https://frame.example/slideshow', {
+    const { el, manager } = openSlideshow('https://frame.example/frame', {
       pinSignIn: 'on',
       answer: url => (url === '/api/auth/session' ? reply(200, { authenticated: false, pinSignIn: false }) : new Promise(() => {}))
     });
@@ -400,7 +400,7 @@ describe('The frame with PIN sign-in off', () => {
   });
 
   test('with it on, the PIN pad shows and a #pin= link signs in, as before', () => {
-    const { el, requests, manager } = openSlideshow('https://frame.example/slideshow#pin=123456');
+    const { el, requests, manager } = openSlideshow('https://frame.example/frame#pin=123456');
     expect(manager.pinSignIn).toBe(true);
     expect(el('authOverlay').classList.contains('pin-off')).toBe(false);
     expect(requests.find(r => r.url === '/api/auth/pin').body).toMatchObject({ pin: '123456' });
@@ -463,7 +463,7 @@ describe('A paused screen (403 SCREEN_PAUSED)', () => {
   });
 
   test('at start-up, the session check gets it: the card shows, the token is kept, and no sign-in screen or new code', async () => {
-    const { el, requests, manager, sandbox, timers } = openSlideshow('https://frame.example/slideshow', {
+    const { el, requests, manager, sandbox, timers } = openSlideshow('https://frame.example/frame', {
       answer: () => paused
     });
     await flush();
@@ -477,7 +477,7 @@ describe('A paused screen (403 SCREEN_PAUSED)', () => {
   });
 
   test('at start-up with a token, the device sign-in gets it: the token is kept and nothing else is tried', async () => {
-    const { el, requests, sandbox } = openSlideshow('https://frame.example/slideshow', { token: 'dev_tok', answer: () => paused });
+    const { el, requests, sandbox } = openSlideshow('https://frame.example/frame', { token: 'dev_tok', answer: () => paused });
     await flush();
     expect(el('pausedScreen').classList.contains('hidden')).toBe(false);
     expect(requests.map(r => r.url)).toEqual(['/api/auth/device']);
@@ -495,7 +495,7 @@ describe('A screen removed while it plays (js/frameSession.js)', () => {
   // `server.other` answer from then on (a rejected promise is fetch offline)
   const playingFrame = async () => {
     const server = { device: () => welcome, session: () => reply(200, { authenticated: true }), other: () => reply(200, { success: true }) };
-    const frame = openSlideshow('https://frame.example/slideshow', {
+    const frame = openSlideshow('https://frame.example/frame', {
       token: 'dev_tok',
       answer: (url) => {
         if (url === '/api/auth/device') return server.device();

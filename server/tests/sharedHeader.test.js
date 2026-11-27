@@ -145,7 +145,7 @@ describe('every page shares one header', () => {
   });
 
   test('the brand is on the pages without the header too', async () => {
-    for (const url of ['/login', '/slideshow', '/folder-selection']) {
+    for (const url of ['/login', '/frame', '/folder-selection']) {
       const html = (await request(app).get(url)).text;
       expect(html).toMatch(/<html [^>]*data-brand="Sora Frame"/);
       expect(html).not.toMatch(/class="sora-wordmark"[^>]*>Sora</);
@@ -160,7 +160,7 @@ describe('the brand option', () => {
   test('names the product everywhere the pages say it', async () => {
     const app = build({ brand: { name: 'Nana <Frame> & Co' } });
     const escaped = 'Nana &lt;Frame&gt; &amp; Co';
-    for (const url of [...Object.keys(HEADER_PAGES), '/login', '/slideshow']) {
+    for (const url of [...Object.keys(HEADER_PAGES), '/login', '/frame']) {
       const html = (await get(app, url)).text;
       expect(html).toMatch(new RegExp(`<html [^>]*data-brand="${escaped}"`));
       expect(html).not.toContain('Nana <Frame>');

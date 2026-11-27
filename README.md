@@ -61,7 +61,7 @@ Prefer Docker? `ADMIN_PASSWORD=yourpassword docker compose up -d` — see [DOCKE
 - Give each frame or family member their own PIN.
 - Limit each PIN to the folders it may show.
 - Pair a frame by scanning the QR code on its screen with your phone, or type the code it shows under **Add a screen** on the Access page. On the same home connection, `/pair` offers the code of a screen showing one under **Sora Frame nearby**: one tap, then check it matches. Building an app that acts as a screen? See [Pairing for apps](docs/pairing-for-apps.md). Nothing needs typing on the frame, so a TV with only a remote works. It stays signed in, and you can unpair it from Access.
-- Frames with no keyboard can sign in from the address: `http://<server>:3000/slideshow#pin=123456`. After `#` the PIN never reaches the server or a proxy's logs.
+- Frames with no keyboard can sign in from the address: `http://<server>:3000/frame#pin=123456`. After `#` the PIN never reaches the server or a proxy's logs.
 
 ## A closer look
 

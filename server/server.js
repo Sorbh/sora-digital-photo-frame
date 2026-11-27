@@ -19,7 +19,7 @@ if (require.main === module) {
     await initializeUploads();
     console.log(`Digital Photo Frame Server running on port ${PORT}`);
     console.log(`Admin panel: http://localhost:${PORT}/home`);
-    console.log(`Slideshow: http://localhost:${PORT}/slideshow`);
+    console.log(`Frame: http://localhost:${PORT}/frame`);
     console.log(`API endpoint: http://localhost:${PORT}/api/random-image`);
   });
 }

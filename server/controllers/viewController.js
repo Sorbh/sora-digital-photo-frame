@@ -34,7 +34,7 @@ class ViewController {
     sendPage(res, 'snap.html');
   }
 
-  // Serve slideshow page
+  // Serve the frame's page (/frame)
   serveSlideshow(req, res) {
     const slideshowPath = path.join(__dirname, '..', 'public', 'slideshow.html');
     const defaultInterval = parseInt(process.env.DEFAULT_SLIDESHOW_INTERVAL, 10) || 15000;
@@ -70,9 +70,16 @@ class ViewController {
     sendPage(res, 'login.html');
   }
 
-  // Redirect root to slideshow
-  redirectToSlideshow(req, res) {
-    res.redirect('/slideshow');
+  // Redirect root to the frame
+  redirectToFrame(req, res) {
+    res.redirect('/frame');
+  }
+
+  // The frame's old address: /slideshow moved to /frame for good. The query
+  // string (?lang=, a legacy ?pin=) goes along; a #hash stays with the browser.
+  redirectSlideshow(req, res) {
+    const at = req.originalUrl.indexOf('?');
+    res.redirect(301, `/frame${at === -1 ? '' : req.originalUrl.slice(at)}`);
   }
 }
 

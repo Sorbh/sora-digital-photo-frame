@@ -115,35 +115,35 @@ describe('Slideshow sign-in from the address', () => {
     expect(head.indexOf('<meta name="referrer" content="no-referrer">')).toBeGreaterThan(-1);
     expect(head.indexOf('<meta name="referrer"')).toBeLessThan(head.indexOf('<link'));
 
-    const { addressAfterHead } = openSlideshow('https://frame.example/slideshow?lang=de#pin=123456&family=ABCD-EFGH&view=1');
-    expect(addressAfterHead).toBe('https://frame.example/slideshow?lang=de#view=1');
+    const { addressAfterHead } = openSlideshow('https://frame.example/frame?lang=de#pin=123456&family=ABCD-EFGH&view=1');
+    expect(addressAfterHead).toBe('https://frame.example/frame?lang=de#view=1');
   });
 
   test('signs in with the PIN and family code kept in memory', () => {
-    const { location, requests } = openSlideshow('https://frame.example/slideshow?lang=de#pin=123456&family=ABCD-EFGH&view=1');
+    const { location, requests } = openSlideshow('https://frame.example/frame?lang=de#pin=123456&family=ABCD-EFGH&view=1');
     expect(requests).toHaveLength(1);
     expect(requests[0].url).toBe('/api/auth/pin');
     expect(requests[0].body).toMatchObject({ pin: '123456', familyCode: 'ABCD-EFGH' });
-    expect(location.href).toBe('https://frame.example/slideshow?lang=de#view=1');
+    expect(location.href).toBe('https://frame.example/frame?lang=de#view=1');
   });
 
   test('keeps the family code for a later typed PIN', () => {
-    const { manager } = openSlideshow('https://frame.example/slideshow#family=ABCD-EFGH');
+    const { manager } = openSlideshow('https://frame.example/frame#family=ABCD-EFGH');
     expect(manager.familyCodeValue()).toBe('ABCD-EFGH');
   });
 
   test.each([true, false])('a ?pin= or ?family= in the query is taken out of the address and not used (head script runs: %s)', (headScriptRuns) => {
     const { location, requests, manager, localStorage } = openSlideshow(
-      'https://frame.example/slideshow?pin=123456&family=ABCD-EFGH&lang=de#x', { headScriptRuns });
-    expect(location.href).toBe('https://frame.example/slideshow?lang=de#x');
+      'https://frame.example/frame?pin=123456&family=ABCD-EFGH&lang=de#x', { headScriptRuns });
+    expect(location.href).toBe('https://frame.example/frame?lang=de#x');
     expect(requests).toHaveLength(0);
     expect(manager.familyCodeValue()).toBe('');
     expect(localStorage.getItem('photoframe_family_code')).toBeNull();
   });
 
   test('leaves an address without sign-in details as it is', () => {
-    const { location } = openSlideshow('https://frame.example/slideshow?lang=de');
-    expect(location.href).toBe('https://frame.example/slideshow?lang=de');
+    const { location } = openSlideshow('https://frame.example/frame?lang=de');
+    expect(location.href).toBe('https://frame.example/frame?lang=de');
   });
 
   test('tries again after a network or server failure, with the PIN from memory', async () => {
@@ -152,7 +152,7 @@ describe('Slideshow sign-in from the address', () => {
       () => answer(502, {}),
       () => answer(200, { success: true, account: { name: 'Grandma' } })
     ];
-    const { requests, timers, manager } = openSlideshow('https://frame.example/slideshow#pin=123456', { fetchPin: () => answers.shift()() });
+    const { requests, timers, manager } = openSlideshow('https://frame.example/frame#pin=123456', { fetchPin: () => answers.shift()() });
     for (let i = 0; i < 2; i += 1) {
       await flush();
       const retry = timers.filter(t => t.fn.toString().includes('signInFromUrl')).pop();
@@ -166,23 +166,23 @@ describe('Slideshow sign-in from the address', () => {
   });
 
   test('takes the PIN from the #fragment, which never reaches the server', () => {
-    const { addressAfterHead, requests } = openSlideshow('https://frame.example/slideshow?lang=de#pin=246810&family=QWER-TYUI');
-    expect(addressAfterHead).toBe('https://frame.example/slideshow?lang=de');
+    const { addressAfterHead, requests } = openSlideshow('https://frame.example/frame?lang=de#pin=246810&family=QWER-TYUI');
+    expect(addressAfterHead).toBe('https://frame.example/frame?lang=de');
     expect(requests[0].body).toMatchObject({ pin: '246810', familyCode: 'QWER-TYUI' });
   });
 
   test('reads #pin= itself when the head script was blocked', () => {
-    const { location, requests } = openSlideshow('https://frame.example/slideshow?lang=de#pin=246810&family=QWER-TYUI', { headScriptRuns: false });
+    const { location, requests } = openSlideshow('https://frame.example/frame?lang=de#pin=246810&family=QWER-TYUI', { headScriptRuns: false });
     expect(requests[0].body).toMatchObject({ pin: '246810', familyCode: 'QWER-TYUI' });
-    expect(location.href).toBe('https://frame.example/slideshow?lang=de');
+    expect(location.href).toBe('https://frame.example/frame?lang=de');
   });
 
   test('a #pin= opened on the page already showing reads it and clears it', async () => {
-    const { location, requests, navigate } = openSlideshow('https://frame.example/slideshow');
+    const { location, requests, navigate } = openSlideshow('https://frame.example/frame');
     expect(requests).toHaveLength(0);
-    navigate('https://frame.example/slideshow#pin=135791');
+    navigate('https://frame.example/frame#pin=135791');
     expect(requests.map(r => r.body.pin)).toEqual(['135791']);
-    expect(location.href).toBe('https://frame.example/slideshow');
+    expect(location.href).toBe('https://frame.example/frame');
   });
 
   test('a PIN typed by hand wins over a sign-in from the address still under way', async () => {
@@ -191,7 +191,7 @@ describe('Slideshow sign-in from the address', () => {
       () => new Promise(resolve => { answerUrl = resolve; }),
       () => answer(200, { success: true, token: 'typed-token', account: { name: 'Typed' } })
     ];
-    const { manager, localStorage } = openSlideshow('https://frame.example/slideshow#pin=123456', { fetchPin: () => answers.shift()() });
+    const { manager, localStorage } = openSlideshow('https://frame.example/frame#pin=123456', { fetchPin: () => answers.shift()() });
     manager.pinInput.value = '654321';
     await manager.authenticate();
     expect(manager.userAccount.name).toBe('Typed');
@@ -207,7 +207,7 @@ describe('Slideshow sign-in from the address', () => {
       () => new Promise(resolve => { answerUrl = resolve; }),
       () => answer(200, { success: true, token: 'typed-token', account: { name: 'Typed' } }).then(r => ({ ...r, cookie: 'typed-session' }))
     ];
-    const { manager, requests, cookies } = openSlideshow('https://frame.example/slideshow#pin=123456', { fetchPin: () => answers.shift()() });
+    const { manager, requests, cookies } = openSlideshow('https://frame.example/frame#pin=123456', { fetchPin: () => answers.shift()() });
     manager.pinInput.value = '654321';
     await manager.authenticate();
     // Typing the PIN stopped the request from the address before its reply came
@@ -228,7 +228,7 @@ describe('Slideshow sign-in from the address', () => {
     ['the family code field', ({ manager }) => { manager.familyInput.value = 'A'; manager.familyInput.dispatchEvent(new Event('input')); }]
   ])('starting to type on %s stops the sign-in from the address, so it cannot hide the form', async (_, type) => {
     let answerUrl;
-    const page = openSlideshow('https://frame.example/slideshow#pin=123456', { fetchPin: () => new Promise(resolve => { answerUrl = resolve; }) });
+    const page = openSlideshow('https://frame.example/frame#pin=123456', { fetchPin: () => new Promise(resolve => { answerUrl = resolve; }) });
     type(page);
     expect(page.requests[0].signal.aborted).toBe(true);
     answerUrl(lateUrlReply());
@@ -248,7 +248,7 @@ describe('Slideshow sign-in from the address', () => {
       }
       return new Promise(() => {});
     };
-    const { manager, requests, cookies, timers, localStorage } = openSlideshow('https://frame.example/slideshow#pin=123456', {
+    const { manager, requests, cookies, timers, localStorage } = openSlideshow('https://frame.example/frame#pin=123456', {
       fetchPin: () => new Promise(resolve => { answerUrl = resolve; }),
       fetchOther
     });
@@ -269,7 +269,7 @@ describe('Slideshow sign-in from the address', () => {
   });
 
   test('signing in another way meanwhile stops the request from the address too', async () => {
-    const { manager, requests, timers } = openSlideshow('https://frame.example/slideshow#pin=123456');
+    const { manager, requests, timers } = openSlideshow('https://frame.example/frame#pin=123456');
     manager.handleAuthSuccess({ name: 'Paired' });
     expect(requests[0].signal.aborted).toBe(true);
     await flush();
@@ -279,8 +279,8 @@ describe('Slideshow sign-in from the address', () => {
   });
 
   test('a new #pin= opened on the page replaces one still waiting for its reply', async () => {
-    const { requests, navigate } = openSlideshow('https://frame.example/slideshow#pin=111111');
-    navigate('https://frame.example/slideshow#pin=222222');
+    const { requests, navigate } = openSlideshow('https://frame.example/frame#pin=111111');
+    navigate('https://frame.example/frame#pin=222222');
     expect(requests.map(r => r.body.pin)).toEqual(['111111', '222222']);
     expect(requests[0].signal.aborted).toBe(true);
     expect(requests[1].signal.aborted).toBe(false);
@@ -291,7 +291,7 @@ describe('Slideshow sign-in from the address', () => {
       () => answer(429, { success: false, code: 'RATE_LIMITED', error: 'Too many', remainingTime: 15 }),
       () => answer(200, { success: true, account: { name: 'Grandma' } })
     ];
-    const { timers, manager } = openSlideshow('https://frame.example/slideshow#pin=123456', { fetchPin: () => answers.shift()() });
+    const { timers, manager } = openSlideshow('https://frame.example/frame#pin=123456', { fetchPin: () => answers.shift()() });
     await flush();
     // The form's own lockout wait tries the same PIN again when it ends
     const retry = timers.filter(t => t.ms >= 15 * 60000).pop();
@@ -302,7 +302,7 @@ describe('Slideshow sign-in from the address', () => {
   });
 
   test('does not try again when the PIN is refused', async () => {
-    const { requests, timers } = openSlideshow('https://frame.example/slideshow#pin=123456', {
+    const { requests, timers } = openSlideshow('https://frame.example/frame#pin=123456', {
       fetchPin: () => answer(401, { success: false, code: 'INVALID_PIN', error: 'Invalid PIN' })
     });
     await flush();
@@ -315,7 +315,7 @@ describe('The slideshow page', () => {
   test('tells the browser never to send its address on', async () => {
     process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'test-secret';
     const { createApp } = require('../app');
-    const res = await request(createApp()).get('/slideshow').expect(200);
+    const res = await request(createApp()).get('/frame').expect(200);
     expect(res.headers['referrer-policy']).toBe('no-referrer');
   });
 });

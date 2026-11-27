@@ -1,6 +1,6 @@
 # Pairing for apps
 
-How a native app (Android, Android TV, iOS, tvOS) acts as a Sora Frame screen: it asks for a pairing code, the owner approves it from their phone, and the app plays the library's photos from then on. Everything here is the same HTTP API the web slideshow (`/slideshow`) uses, so it works the same against the hosted service and a self-hosted server.
+How a native app (Android, Android TV, iOS, tvOS) acts as a Sora Frame screen: it asks for a pairing code, the owner approves it from their phone, and the app plays the library's photos from then on. Everything here is the same HTTP API the web slideshow (`/frame`) uses, so it works the same against the hosted service and a self-hosted server.
 
 An app that does this is also found by **Sora Frame nearby**: when the owner opens `/pair` (or the hosted screens page) on the same home internet connection, your screen's code is offered as one tap, with the name and kind you sent.
 

@@ -149,7 +149,7 @@ A note is a `<name>.note.json` file in a library folder, the same way a snap is 
 Many frames are TVs with only a remote, so a host may want nothing ever typed on a frame. `createApp({ pinSignIn: false })`, or `PIN_SIGN_IN=off`, does that:
 
 - The frame shows only its pairing code and QR code, never a PIN pad. The server tells the page before anything loads (`<html data-pin-sign-in="off">`), and `GET /api/auth/session` says `pinSignIn: false` too.
-- `POST /api/auth/pin` answers 404 with code `PIN_DISABLED`, and a `/slideshow#pin=` link is taken out of the address and not used.
+- `POST /api/auth/pin` answers 404 with code `PIN_DISABLED`, and a `/frame#pin=` link is taken out of the address and not used.
 - The Access page shows access accounts as **Screens**: a name and its folders, with no PIN field. `GET /api/access-accounts` and `GET /api/features` say `pinSignIn: false`. A screen made there or by pairing gets no PIN at all, and a PIN sent to `POST`/`PUT /api/access-accounts` is not kept.
 
 Whether PIN sign-in is on or off, the owner adds a frame by scanning its QR code (`/pair`) or with **Add a screen** on the Access page: type the code the frame shows (any case, with or without the dash or spaces), name the screen, pick an existing screen or a new one and its folders. Both use `GET /api/admin/pair/:code` and `POST /api/admin/pair/:code/approve`.

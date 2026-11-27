@@ -108,7 +108,7 @@ function renderHeader(pageId, { eyebrow = null, settings: hasSettings = false } 
   if (!accountUrl) {
     places.push(`<a href="/access-accounts" class="tb-btn tb-desktop" data-header-item="access" data-owner-only${here('access')} title="Manage access accounts" data-i18n-attr="title:admin.static_033">${icon('key')}<span class="tb-label" data-i18n="common.access">Access</span></a>`);
   }
-  places.push(`<a href="/slideshow" class="tb-btn tb-desktop" data-header-item="slideshow" title="Open the slideshow" data-i18n-attr="title:admin.static_036">${icon('play_circle')}<span class="tb-label" data-i18n="common.slideshow">Slideshow</span></a>`);
+  places.push(`<a href="/frame" class="tb-btn tb-desktop" data-header-item="slideshow" title="Open the slideshow" data-i18n-attr="title:admin.static_036">${icon('play_circle')}<span class="tb-label" data-i18n="common.slideshow">Slideshow</span></a>`);
 
   const tools = [];
   if (hasSettings) {
@@ -161,7 +161,7 @@ function renderTabbar(pageId, { fab = null } = {}, options = current()) {
   if (fab) {
     tabs.push(`<button type="button" class="tab-fab" ${fab.attrs} aria-label="${escapeHtml(fab.label[1])}" data-i18n-attr="aria-label:${fab.label[0]}">${icon(fab.icon)}</button>`);
   }
-  tabs.push(`<a href="/slideshow" class="tab" data-tab="slideshow">${icon('slideshow')}${i18nText(['common.slideshow', 'Slideshow'])}</a>`);
+  tabs.push(`<a href="/frame" class="tab" data-tab="slideshow">${icon('slideshow')}${i18nText(['common.slideshow', 'Slideshow'])}</a>`);
   return `<nav class="tabbar" aria-label="Sections" data-i18n-attr="aria-label:admin.static_054">
         ${tabs.join('\n        ')}
     </nav>`;

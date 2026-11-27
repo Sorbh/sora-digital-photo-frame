@@ -272,7 +272,9 @@
     <!-- Load folder selection scripts -->
     <script src="/js/i18n.js"></script>
     <!-- First, so it sees every request the frame makes -->
-    <script src="/js/screenPause.js"></script>
+    <script src="/js/screenPause.js?v=unpair1"></script>
+    <!-- Then this, so a removed screen goes back to its code (after the pause check) -->
+    <script src="/js/frameSession.js?v=unpair1"></script>
     <script src="/js/folderService.js"></script>
     <script src="/js/folderStorage.js"></script>
     <script src="/js/arrowFocus.js"></script>
@@ -286,7 +288,7 @@
     <script src="/js/photoCipher.js"></script>
     <script src="/js/retrySchedule.js"></script>
     <script src="/js/photoRecovery.js"></script>
-    <script src="/js/slideshow.js"></script>
+    <script src="/js/slideshow.js?v=unpair1"></script>
     <script>
       document.addEventListener('DOMContentLoaded', () => {
         const modal = document.getElementById('languageModal');

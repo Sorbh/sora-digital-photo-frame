@@ -503,6 +503,8 @@ class AuthenticationManager {
         sessionStorage.setItem('accountName', account.name);
 
         this.hideAuthOverlay();
+        // From now on, a screen removed meanwhile goes back to its code (js/frameSession.js)
+        window.frameSession?.start();
 
         document.dispatchEvent(new CustomEvent('authenticationComplete', {
             detail: { account }
@@ -539,6 +541,7 @@ class AuthenticationManager {
     }
 
     async logout() {
+        window.frameSession?.stop();
         try {
             await fetch('/api/auth/session', { method: 'DELETE' });
         } catch (error) {
@@ -558,6 +561,32 @@ class AuthenticationManager {
                 window.slideshow.cleanup();
             }
         }
+    }
+
+    // The screen was removed, or its account deleted, while it played (js/frameSession.js
+    // found out): straight from the photo to the sign-in screen with a fresh code and QR,
+    // nothing of the old screen left, and no error on the way. The token is gone already;
+    // the server dropped this screen from the session when it said "not signed in".
+    screenRemoved() {
+        if (!this.isAuthenticated) return;
+        window.frameSession?.stop();
+        this.isAuthenticated = false;
+        this.userAccount = null;
+        this.stopRateLimitWait();
+        this.cancelUrlSignIn();
+        clearInterval(this.renewTimer);
+        localStorage.removeItem(DEVICE_TOKEN_KEY);
+        sessionStorage.removeItem('authenticated');
+        sessionStorage.removeItem('accountName');
+        // The last code shown, and "Paired as …", are not this screen's any more
+        this.stopPairing();
+        if (this.pairQr) this.pairQr.innerHTML = '';
+        if (this.pairCode) this.pairCode.textContent = '······';
+        this.pairCard?.classList.remove('is-approved', 'is-error');
+        this.setPairStatus(null);
+        this.clearForm();
+        this.showAuthOverlay();
+        window.slideshow?.forgetScreen();
     }
 
     showAuthOverlay() {
@@ -1420,6 +1449,48 @@ class PhotoFrameSlideshow {
         clearTimeout(this.fullscreenCheck);
 
         this.noteScheduler?.stop();
+    }
+
+    // The screen was removed: its photo, notes, caption, timers and where it was in
+    // the folder go, so nothing of it shows again, here or after pairing anew
+    forgetScreen() {
+        this.cleanup();
+        this.resetProgress();
+        if (this.cancelLoad) this.cancelLoad();
+        this.currentLoad = null;
+        this.leavingTimers.forEach(timer => clearTimeout(timer));
+        this.slides.forEach(slide => slide.classList.remove('active', 'leaving'));
+        this.images.forEach(img => img.removeAttribute('src'));
+        this.ambients.forEach(ambient => { if (ambient) ambient.style.backgroundImage = ''; });
+        this.objectUrls.forEach((url, i) => {
+            if (url) URL.revokeObjectURL(url);
+            this.objectUrls[i] = null;
+        });
+        this.frameKeys.clear();
+        this.currentImageData = null;
+        this.hasShownPhoto = false;
+        clearTimeout(this.captionTimer);
+        this.caption?.classList.remove('is-visible');
+        clearTimeout(this.noteHideTimer);
+        if (this.noteLayer) {
+            this.noteLayer.classList.remove('is-visible');
+            this.noteLayer.replaceChildren();
+        }
+        document.body.classList.remove('note-showing');
+        if (this.noteScheduler) {
+            this.noteScheduler.notes = [];
+            this.noteScheduler.photosSinceNote = 0;
+        }
+        this.filename.textContent = '';
+        this.folder.textContent = '';
+        this.infoOverlay.classList.add('hidden');
+        this.hideError();
+        this.loadingState.classList.remove('hidden'); // what a newly paired screen shows first
+        this.requestWakeLock(); // the code stays on screen, as before the first pairing
+        try {
+            localStorage.removeItem(LAST_SHOWN_KEY);
+            this.folderStorage.clearSelectedFolder(); // the next screen may not have that folder
+        } catch (error) { /* storage off */ }
     }
 
     async startSlideshow() {

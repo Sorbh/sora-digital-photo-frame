@@ -151,8 +151,9 @@ function openSlideshow(href, { pinSignIn = 'on', answer = () => new Promise(() =
   const context = vm.createContext(sandbox);
   vm.runInContext(headScript, context);
   vm.runInContext(read('js/screenPause.js'), context);
+  vm.runInContext(read('js/frameSession.js'), context);
   const source = read('js/slideshow.js');
-  vm.runInContext(`${source.slice(0, source.indexOf('class PhotoFrameSlideshow'))}\nthis.manager = new AuthenticationManager();`, context);
+  vm.runInContext(`${source.slice(0, source.indexOf('class PhotoFrameSlideshow'))}\nthis.manager = this.authManager = new AuthenticationManager();`, context);
   return { ...page, sandbox, requests, timers, manager: sandbox.manager };
 }
 
@@ -481,5 +482,164 @@ describe('A paused screen (403 SCREEN_PAUSED)', () => {
     expect(el('pausedScreen').classList.contains('hidden')).toBe(false);
     expect(requests.map(r => r.url)).toEqual(['/api/auth/device']);
     expect(sandbox.localStorage.getItem('photoframe_device_token')).toBe('dev_tok');
+  });
+});
+
+describe('A screen removed while it plays (js/frameSession.js)', () => {
+  const fresh = { success: true, code: 'K7P4QX', secret: 'sec', expiresAt: Date.now() + 10 * 60 * 1000, qr: '<svg>new</svg>', url: 'https://frame.example/pair' };
+  const welcome = reply(200, { success: true, account: { id: 'acc_1', name: 'Living room' }, device: { id: 'dev_1', name: 'TV' } });
+  const unpaired = reply(401, { success: false, error: 'This frame is no longer paired', code: 'DEVICE_UNKNOWN' });
+  const paused = reply(403, { success: false, code: 'SCREEN_PAUSED', error: 'This screen is paused.' });
+
+  // A TV paired with a token and playing; `server.device`, `server.session` and
+  // `server.other` answer from then on (a rejected promise is fetch offline)
+  const playingFrame = async () => {
+    const server = { device: () => welcome, session: () => reply(200, { authenticated: true }), other: () => reply(200, { success: true }) };
+    const frame = openSlideshow('https://frame.example/slideshow', {
+      token: 'dev_tok',
+      answer: (url) => {
+        if (url === '/api/auth/device') return server.device();
+        if (url === '/api/auth/session') return server.session();
+        if (url === '/api/pair/start') return reply(200, fresh);
+        return server.other();
+      }
+    });
+    frame.sandbox.slideshow = { forgetScreen: jest.fn() };
+    await flush();
+    expect(frame.manager.isAuthenticated).toBe(true);
+    expect(frame.el('authOverlay').classList.contains('hidden')).toBe(true);
+    frame.el('pairCode').textContent = 'OLD-123'; // the code it was paired with
+    // The session check, every 15 seconds (the newest one set)
+    frame.nextCheck = () => frame.timers.filter(t => t.ms === 15 * 1000).at(-1);
+    return { ...frame, server };
+  };
+  const token = frame => frame.sandbox.localStorage.getItem('photoframe_device_token');
+  const expectPairingScreen = (frame) => {
+    expect(frame.manager.isAuthenticated).toBe(false);
+    expect(token(frame)).toBeNull();
+    expect(frame.sandbox.slideshow.forgetScreen).toHaveBeenCalledTimes(1); // photo, notes and timers gone
+    expect(frame.el('authOverlay').classList.contains('hidden')).toBe(false);
+    expect(frame.requests.filter(r => r.url === '/api/pair/start')).toHaveLength(1);
+    expect(frame.el('pairCode').textContent).toBe('K7P-4QX'); // a fresh code
+    expect(frame.el('pairQr').innerHTML).toBe('<svg>new</svg>');
+    expect(frame.el('pausedScreen').classList.contains('hidden')).toBe(true);
+  };
+
+  test('a 401 on its next request: asked once with its token, refused, and back to a fresh code and QR', async () => {
+    const frame = await playingFrame();
+    frame.server.other = () => reply(401, { code: 'AUTH_REQUIRED' });
+    frame.server.device = () => unpaired;
+    const res = await frame.sandbox.fetch('/api/images/next');
+    expect(res.status).toBe(401); // the caller still gets its answer
+    await flush();
+    expect(frame.requests.filter(r => r.url === '/api/auth/device').at(-1).body).toEqual({ token: 'dev_tok' });
+    expectPairingScreen(frame);
+    // Then quiet: no more session checks for the screen that is gone
+    const checks = frame.timers.filter(t => t.ms === 15 * 1000).length;
+    await frame.sandbox.fetch('/api/images/next');
+    await flush();
+    expect(frame.timers.filter(t => t.ms === 15 * 1000)).toHaveLength(checks);
+  });
+
+  test('between photos, the session check every 15 seconds finds it too', async () => {
+    const frame = await playingFrame();
+    const check = frame.nextCheck();
+    expect(check).toBeDefined();
+    frame.server.session = () => reply(200, { authenticated: false });
+    frame.server.device = () => unpaired;
+    await check.fn();
+    await flush();
+    expect(frame.requests.some(r => r.url === '/api/auth/session')).toBe(true);
+    expectPairingScreen(frame);
+  });
+
+  test('a session that only ran out signs in again with the token and plays on', async () => {
+    const frame = await playingFrame();
+    frame.server.session = () => reply(200, { authenticated: false });
+    await frame.nextCheck().fn();
+    await flush();
+    expect(token(frame)).toBe('dev_tok');
+    expect(frame.manager.isAuthenticated).toBe(true);
+    expect(frame.sandbox.slideshow.forgetScreen).not.toHaveBeenCalled();
+    expect(frame.nextCheck()).toBeDefined();
+  });
+
+  test.each([
+    ['offline (fetch fails)', () => Promise.reject(new TypeError('Failed to fetch'))],
+    ['a 503', () => reply(503, { error: 'Service unavailable' })]
+  ])('%s keeps the token and keeps playing', async (name, trouble) => {
+    const frame = await playingFrame();
+    const checksBefore = frame.timers.filter(t => t.ms === 15 * 1000).length;
+    // On the session check, on a photo request, and on the token check after a 401
+    frame.server.session = trouble;
+    await frame.nextCheck().fn();
+    frame.server.other = trouble;
+    await frame.sandbox.fetch('/api/images/next').catch(() => {});
+    frame.server.other = () => reply(401, { code: 'AUTH_REQUIRED' });
+    frame.server.device = trouble;
+    await frame.sandbox.fetch('/api/images/next');
+    await flush();
+    expect(token(frame)).toBe('dev_tok');
+    expect(frame.manager.isAuthenticated).toBe(true);
+    expect(frame.el('authOverlay').classList.contains('hidden')).toBe(true);
+    expect(frame.sandbox.slideshow.forgetScreen).not.toHaveBeenCalled();
+    expect(frame.requests.some(r => r.url === '/api/pair/start')).toBe(false);
+    // And it keeps checking
+    expect(frame.timers.filter(t => t.ms === 15 * 1000).length).toBeGreaterThan(checksBefore);
+  });
+
+  test('SCREEN_PAUSED still shows the paused card, and is not unpaired', async () => {
+    const frame = await playingFrame();
+    frame.server.session = () => paused;
+    frame.server.other = () => paused;
+    await frame.nextCheck().fn();
+    await frame.sandbox.fetch('/api/images/next');
+    await flush();
+    expect(frame.el('pausedScreen').classList.contains('hidden')).toBe(false);
+    expect(frame.el('pausedMessage').textContent).toBe('This screen is paused.');
+    expect(token(frame)).toBe('dev_tok');
+    expect(frame.manager.isAuthenticated).toBe(true);
+    expect(frame.sandbox.slideshow.forgetScreen).not.toHaveBeenCalled();
+    expect(frame.requests.some(r => r.url === '/api/pair/start')).toBe(false);
+  });
+
+  test('signing out by hand stops the checks', async () => {
+    const frame = await playingFrame();
+    frame.sandbox.slideshow.cleanup = () => {};
+    await frame.manager.logout();
+    expect(frame.sandbox.frameSession.active).toBe(false);
+  });
+});
+
+describe('A removed screen hears it from the server at once', () => {
+  let app;
+  let admin;
+
+  beforeAll(async () => {
+    app = createApp();
+    await fs.ensureDir(path.join(testUploadsDir, 'Goa'));
+    admin = request.agent(app);
+    await admin.post('/api/auth/login').send({ password: 'test-admin-pass' }).expect(200);
+  });
+
+  afterAll(async () => {
+    await Promise.all([testUploadsDir, testCacheDir, testDataDir].map(dir => fs.remove(dir)));
+  });
+
+  test('the session check says "not signed in" right after the account is deleted, and the token is refused', async () => {
+    const made = await admin.post('/api/access-accounts').send({ name: 'Porch', pin: '640219' }).expect(201);
+    const frame = request.agent(app);
+    const signedIn = await frame.post('/api/auth/pin').send({ pin: '640219' }).expect(200);
+    expect(signedIn.body.token).toBeTruthy();
+    // Playing: its account was just looked up, so the 30-second recheck is not due
+    await frame.get('/api/folders').expect(200);
+    expect((await frame.get('/api/auth/session').expect(200)).body.authenticated).toBe(true);
+
+    await admin.delete(`/api/access-accounts/${made.body.account.id}`).expect(200);
+    const session = await frame.get('/api/auth/session').expect(200);
+    expect(session.body.authenticated).toBe(false);
+    expect(session.headers['cache-control']).toMatch(/no-store/);
+    const device = await request(app).post('/api/auth/device').send({ token: signedIn.body.token }).expect(401);
+    expect(device.body.code).toBe('DEVICE_UNKNOWN');
   });
 });

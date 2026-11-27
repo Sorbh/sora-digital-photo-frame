@@ -5,6 +5,7 @@ const thumbnails = require('../services/thumbnailService');
 const snaps = require('../services/snapService');
 const notes = require('../services/noteService');
 const playOrder = require('../services/playOrderService');
+const photoInfo = require('../services/photoInfoService');
 const imageController = require('./imageController');
 const { resolveAdminPath, toAdminPath, uploadsUrl } = require('../utils/safePath');
 const { passClientError } = require('../utils/httpError');
@@ -59,6 +60,19 @@ class FolderController {
     } catch (error) {
       console.error('Error generating folder prints:', error);
       return [];
+    }
+  }
+
+  // What is directly inside a folder: { photos, folders } (one listing, no subfolders)
+  async folderCounts(dir) {
+    try {
+      const items = await this.entries(dir);
+      return {
+        photos: items.filter(item => item.isFile() && (thumbnails.IMAGE_PATTERN.test(item.name) || snaps.isSnap(item.name))).length,
+        folders: items.filter(item => item.isDirectory() && !item.name.startsWith('.')).length
+      };
+    } catch {
+      return null;
     }
   }
 
@@ -300,6 +314,8 @@ class FolderController {
       const items = await this.entries(fullPath);
       const folderJobs = [];
       const fileJobs = [];
+      // Photo sizes come from a cache: the grid keeps each photo's shape
+      await photoInfo.loadCache().catch(() => {});
 
       for (const item of items) {
         if (item.name.startsWith('.')) continue;
@@ -308,30 +324,45 @@ class FolderController {
           const folderRelative = path.relative(this.uploadsDir, path.join(fullPath, item.name));
           folderJobs.push((async () => {
             if (!await shows(folderRelative, canOpen)) return null;
-            const [thumbnail, prints] = limited ? await this.folderCover(req, folderRelative) : await Promise.all([
-              this.generateFolderThumbnail(folderRelative),
-              this.generateFolderPrints(folderRelative)
+            const [[thumbnail, prints], counts] = await Promise.all([
+              limited ? this.folderCover(req, folderRelative) : Promise.all([
+                this.generateFolderThumbnail(folderRelative),
+                this.generateFolderPrints(folderRelative)
+              ]),
+              // Counted only where this person sees all of it
+              !limited || canSee(req, folderRelative) ? this.folderCounts(path.join(fullPath, item.name)) : null
             ]);
             return {
               name: item.name,
               type: 'folder',
               path: path.join(folderPath, item.name),
               thumbnail, // null for empty folders, so the grid skips the request
-              prints
+              prints,
+              // { photos, folders } directly inside, for "12 photos" under the name (null: not shown)
+              counts
             };
           })());
         } else if (item.isFile() && thumbnails.IMAGE_PATTERN.test(item.name)) {
           const imageFullPath = path.join(fullPath, item.name);
           const relativePath = path.relative(this.uploadsDir, imageFullPath);
 
-          fileJobs.push(shows(relativePath).then(shown => shown && getLibrary().stat(toAdminPath(imageFullPath)).then(stat => ({
-            name: item.name,
-            type: 'image',
-            path: path.join(folderPath, item.name),
-            url: uploadsUrl(toAdminPath(imageFullPath)),
-            // Grid tiles use the small cached version; ?rev= changes after a rotate
-            thumbnail: `/api/images/${encodeURIComponent(relativePath)}/thumbnail?rev=${Math.round(stat.mtimeMs)}`
-          }))));
+          fileJobs.push(shows(relativePath).then(shown => shown && getLibrary().stat(toAdminPath(imageFullPath)).then(stat => {
+            const thumbnail = `/api/images/${encodeURIComponent(relativePath)}/thumbnail?rev=${Math.round(stat.mtimeMs)}`;
+            // Its upright shape, when known (else the grid measures it as it loads)
+            const size = photoInfo.sizeOf(relativePath, stat);
+            return {
+              name: item.name,
+              type: 'image',
+              path: path.join(folderPath, item.name),
+              url: uploadsUrl(toAdminPath(imageFullPath)),
+              // Square thumbnail (covers, pickers); ?rev= changes after a rotate
+              thumbnail,
+              // The grid's tile: the same photo in its own shape
+              preview: `${thumbnail}&fit=inside`,
+              width: size ? size.width : null,
+              height: size ? size.height : null
+            };
+          })));
         } else if (item.isFile() && snaps.isSnap(item.name)) {
           // Snaps carry their page, so the grid can draw them like the frame does
           // (with only the photos this person can see)
@@ -371,6 +402,8 @@ class FolderController {
         return { file, path: filePath, relativePath: path.relative(this.uploadsDir, filePath) };
       });
       const sorted = await playOrder.sort(fullPath, entries, order);
+      // Newest or oldest first: each says the date it was sorted by, and the grid groups by it
+      for (const entry of sorted) if (entry.date !== undefined) entry.file.date = entry.date;
       // Whether this person can change what's here: not in a folder that only
       // leads to theirs, and not if they can only view
       const canChange = (!limited || canSee(req, currentRelative)) && scopeFor(req)?.canEdit !== false;

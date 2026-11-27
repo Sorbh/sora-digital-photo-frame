@@ -33,12 +33,13 @@ class PhotoInfoService {
   // Each tenant has its own cache of photo info and place names
   state() {
     const { id } = currentTenant();
-    if (!this.states.has(id)) this.states.set(id, { info: null, places: null, saveTimer: null, save: null });
+    if (!this.states.has(id)) this.states.set(id, { info: null, places: null, sizes: null, saveTimer: null, save: null });
     return this.states.get(id);
   }
 
   get info() { return this.state().info; } // relative path -> { key, takenAt, lat, lon }
   get places() { return this.state().places; } // "lat,lon" -> name or ''
+  get sizes() { return this.state().sizes; } // relative path -> { key, w, h }: the upright shape, for the library grid
 
   async loadCache() {
     const state = this.state();
@@ -46,6 +47,8 @@ class PhotoInfoService {
       // A failed read stays an error: treating it as empty would save over real data
       const info = await getDataStore().get('photo-info', {});
       state.places = await getDataStore().get('places', {});
+      // Kept apart from info: a size known before the EXIF data is read must not stand in for it
+      state.sizes = await getDataStore().get('photo-sizes', {});
       state.info = info;
     }
   }
@@ -57,7 +60,11 @@ class PhotoInfoService {
     state.save = AsyncResource.bind(() => {
       state.saveTimer = null;
       state.save = null;
-      return Promise.all([getDataStore().set('photo-info', state.info), getDataStore().set('places', state.places)])
+      return Promise.all([
+        getDataStore().set('photo-info', state.info),
+        getDataStore().set('places', state.places),
+        getDataStore().set('photo-sizes', state.sizes)
+      ])
         .catch(error => console.error('Could not save photo info cache:', error.message));
     });
     state.saveTimer = setTimeout(state.save, 2000);
@@ -144,11 +151,43 @@ class PhotoInfoService {
     await this.loadCache();
     const from = path.relative(UPLOADS_DIR, fromPath);
     const to = path.relative(UPLOADS_DIR, toPath);
+    const size = this.sizes[from];
+    if (size) {
+      // A rotation (the same path) changed its shape: measured again with its next thumbnail
+      if (from === to) delete this.sizes[from];
+      else {
+        const moved = await getLibrary().stat(toAdminPath(toPath));
+        this.sizes[to] = { ...size, key: `${moved.size}:${Math.round(moved.mtimeMs)}` };
+        delete this.sizes[from];
+      }
+      this.scheduleSave();
+    }
     const remembered = this.info[from];
     if (!remembered) return;
     const stat = await getLibrary().stat(toAdminPath(toPath));
     this.info[to] = { ...remembered, key: `${stat.size}:${Math.round(stat.mtimeMs)}` };
     if (from !== to) delete this.info[from];
+    this.scheduleSave();
+  }
+
+  /**
+   * A photo's upright width and height, for the library grid's rows. Known once a
+   * thumbnail was made or it was uploaded; null until then (the grid measures it as
+   * it loads). stat: the photo's own, which the listing already has, so this reads nothing.
+   */
+  sizeOf(relativePath, stat) {
+    const known = this.sizes && this.sizes[relativePath];
+    if (!known || !stat || known.key !== `${stat.size}:${Math.round(stat.mtimeMs)}`) return null;
+    return { width: known.w, height: known.h };
+  }
+
+  async rememberSize(relativePath, stat, width, height) {
+    if (!stat || !(width > 0) || !(height > 0)) return;
+    await this.loadCache();
+    const key = `${stat.size}:${Math.round(stat.mtimeMs)}`;
+    const known = this.sizes[relativePath];
+    if (known && known.key === key && known.w === width && known.h === height) return;
+    this.sizes[relativePath] = { key, w: width, h: height };
     this.scheduleSave();
   }
 

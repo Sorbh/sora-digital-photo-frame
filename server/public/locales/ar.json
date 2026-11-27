@@ -499,7 +499,22 @@
     "newNoteTitle": "اكتب ملاحظة لهذا المجلد",
     "addFromDevice": "من هذا الجهاز",
     "addFromGooglePhotos": "من صور Google",
-    "allNotes": "كل الملاحظات"
+    "allNotes": "كل الملاحظات",
+    "menuView": "عرض",
+    "menuMove": "نقل إلى…",
+    "moveButton": "نقل",
+    "selectAll": "تحديد الكل",
+    "selectedCount_one": "تم تحديد {count}",
+    "selectedCount_other": "تم تحديد {count}",
+    "selectionBar": "الصور المحددة",
+    "moveTitle_one": "نقل صورة واحدة",
+    "moveTitle_other": "نقل {count} صورة",
+    "moveHere": "النقل إلى هنا",
+    "moveNoFolders": "لا توجد مجلدات هنا",
+    "accountMenu": "قائمة الحساب",
+    "moveTitle_two": "نقل صورتين",
+    "moveTitle_few": "نقل {count} صور",
+    "moveTitle_many": "نقل {count} صورة"
   },
   "notes": {
     "your_headline": "عنوانك",

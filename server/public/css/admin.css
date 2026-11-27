@@ -51,16 +51,14 @@ body {
     box-sizing: border-box;
 }
 
+/* The grid holds the folders (cards) and then the photos (justified rows) */
 .admin-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(176px, 1fr));
-    gap: clamp(0.75rem, 1.4vw, 1.125rem);
+    display: block;
 }
 
 /* "Folders" and "Photos": quiet section headings, like the account page's */
 .grid-label {
-    grid-column: 1 / -1;
-    margin: var(--space-6) 0 0;
+    margin: var(--space-6) 0 var(--space-3);
     font-family: var(--font-sans);
     font-size: var(--text-lg);
     font-weight: 700;
@@ -72,9 +70,19 @@ body {
     margin-top: var(--space-2);
 }
 
+.folder-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(188px, 1fr));
+    gap: var(--space-5) clamp(0.75rem, 1.4vw, 1.25rem);
+}
+
 .file-item {
     position: relative;
     cursor: pointer;
+}
+
+.file-item.folder,
+.file-item.google-photos-import {
     animation: tile-in 0.4s var(--ease-out) both;
 }
 
@@ -83,7 +91,7 @@ body {
     to { opacity: 1; transform: none; }
 }
 
-/* Folders: the cover photo with the next print peeking out behind it, and the name */
+/* Folders: the cover photo with the next print peeking out behind it, the name and the count */
 .file-item.folder {
     display: flex;
     flex-direction: column;
@@ -166,20 +174,38 @@ body {
 
 .folder-meta {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
     gap: var(--space-1);
     min-height: 32px;
     padding: 0 0 0 2px;
 }
 
+.folder-text {
+    display: grid;
+    gap: 1px;
+    min-width: 0;
+    padding-top: 2px;
+}
+
 .file-item.folder .folder-name {
     overflow: hidden;
     font-weight: 650;
     font-size: 0.9375rem;
+    line-height: 1.3;
     white-space: nowrap;
     text-overflow: ellipsis;
     text-transform: capitalize;
+}
+
+.folder-count {
+    overflow: hidden;
+    color: var(--muted-foreground);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    line-height: 1.3;
+    white-space: nowrap;
+    text-overflow: ellipsis;
 }
 
 .folder-more {
@@ -217,36 +243,240 @@ body {
     .folder-cover-empty { transition: none; }
 }
 
-/* Photos */
-.file-item.image {
-    aspect-ratio: 1;
-    overflow: hidden;
-    border-radius: var(--shape-md);
-    background: var(--paper-sunk);
-    transition: transform 0.3s var(--ease-out), box-shadow 0.3s ease;
+/* ---------- Photos: justified rows (js/justifiedLayout.js) ---------------
+   Each photo keeps its shape; a row is one height and fills the width. The
+   tiles are sized by admin.js (layoutPhotos); the gap is --grid-gap. */
+
+.photo-area {
+    --grid-gap: 4px;
+    --tile-radius: 4px;
 }
 
-.file-item.image:hover {
-    box-shadow: var(--shadow-soft);
+.photo-group + .photo-group {
+    margin-top: var(--space-5);
+}
+
+.photo-group-title {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-2);
+    margin: 0 0 var(--space-3);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    font-size: 0.9375rem;
+    font-weight: 650;
+    letter-spacing: 0;
+}
+
+.photo-group-count {
+    color: var(--muted-foreground);
+    font-size: var(--text-sm);
+    font-weight: 500;
+}
+
+.photo-row {
+    display: flex;
+    gap: var(--grid-gap);
+    margin-bottom: var(--grid-gap);
+}
+
+.file-item.image {
+    flex: none;
+    border-radius: var(--tile-radius);
+    -webkit-tap-highlight-color: transparent;
 }
 
 .admin-photo-image {
     position: absolute;
     inset: 0;
+    overflow: hidden;
+    border-radius: var(--tile-radius);
+    background: var(--paper-sunk);
+    transition: inset 0.18s var(--ease-out), border-radius 0.18s ease;
 }
 
 .admin-photo-image img {
+    display: block;
     width: 100%;
     height: 100%;
     object-fit: cover;
-    transition: transform 0.6s var(--ease-out);
 }
 
-.file-item.image:hover .admin-photo-image img {
-    transform: scale(1.03);
+/* The whole tile opens the photo (Enter too); the check and ⋮ sit above it */
+.tile-open {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    border-radius: var(--tile-radius);
+    background: transparent;
+    cursor: pointer;
 }
 
-/* Snaps: a live memory-book page in place of the thumbnail */
+.tile-open:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+}
+
+/* A soft shade at the top, so the white check and ⋮ read on any photo */
+.tile-shade {
+    position: absolute;
+    inset: 0 0 auto;
+    z-index: 3;
+    height: min(76px, 55%);
+    border-radius: var(--tile-radius) var(--tile-radius) 0 0;
+    background: linear-gradient(to bottom, rgb(0 0 0 / 0.42), rgb(0 0 0 / 0.14) 55%, transparent);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.18s ease;
+}
+
+/* The round check (top left) and the one menu (top right) */
+.photo-grid-checkbox {
+    position: absolute;
+    top: 0;
+    inset-inline-start: 0;
+    z-index: 4;
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    margin: 0;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.18s ease;
+}
+
+.tile-check-input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.tile-check {
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    box-sizing: border-box;
+    border: 2px solid rgb(255 255 255 / 0.92);
+    border-radius: 50%;
+    background: rgb(0 0 0 / 0.12) none center / 13px no-repeat;
+    box-shadow: 0 1px 3px rgb(0 0 0 / 0.35);
+    pointer-events: none;
+    transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+
+.photo-grid-checkbox:hover .tile-check {
+    background-color: rgb(255 255 255 / 0.25);
+}
+
+.tile-check-input:focus-visible + .tile-check {
+    outline: 2px solid #fff;
+    outline-offset: 2px;
+    box-shadow: 0 0 0 4px var(--ring);
+}
+
+.tile-check-input:checked + .tile-check {
+    border-color: #fff;
+    background-color: var(--berry);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E");
+}
+
+.photo-more.btn-icon {
+    position: absolute;
+    top: 6px;
+    inset-inline-end: 6px;
+    z-index: 4;
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: #fff;
+    cursor: pointer;
+    opacity: 0;
+    filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.45));
+    transition: opacity 0.18s ease, background-color 0.15s ease;
+}
+
+.photo-more.btn-icon .material-symbols-outlined {
+    font-size: 22px;
+    font-variation-settings: 'FILL' 1, 'wght' 500, 'GRAD' 0, 'opsz' 24;
+}
+
+.photo-more.btn-icon:hover,
+.photo-more.btn-icon[aria-expanded="true"] {
+    background: rgb(255 255 255 / 0.22);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+}
+
+.photo-more.btn-icon:focus-visible {
+    opacity: 1;
+    outline: 2px solid #fff;
+    outline-offset: 0;
+    box-shadow: 0 0 0 4px var(--ring);
+}
+
+/* Hovered or focused (a mouse, a keyboard): the shade, the check and ⋮ */
+@media (hover: hover) and (pointer: fine) {
+    .file-item.image:hover :is(.tile-shade, .photo-grid-checkbox, .photo-more),
+    .file-item.image:focus-within :is(.tile-shade, .photo-grid-checkbox, .photo-more) {
+        opacity: 1;
+    }
+}
+
+.photo-more[aria-expanded="true"],
+.file-item.image:has(.photo-more[aria-expanded="true"]) :is(.tile-shade, .photo-grid-checkbox) {
+    opacity: 1;
+}
+
+/* Selection mode: every tile shows its check; a tap ticks rather than opens.
+   No ⋮ on the tiles then: the selection bar has the actions. */
+.admin-grid.selecting .file-item.image :is(.photo-grid-checkbox, .tile-shade) {
+    opacity: 1;
+}
+
+.admin-grid.selecting .file-item.image .photo-more {
+    display: none;
+}
+
+.admin-grid.selecting .file-item.image:not(.selected) .tile-shade {
+    opacity: 0.55;
+}
+
+/* A selected photo draws in from the edges, on a soft berry wash */
+.file-item.image.selected {
+    background: color-mix(in oklab, var(--berry) 16%, var(--background));
+}
+
+.file-item.image.selected .admin-photo-image {
+    inset: 10%;
+    border-radius: 6px;
+}
+
+.file-item.image.selected .tile-shade {
+    opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .admin-photo-image,
+    .tile-check,
+    .tile-shade { transition: none; }
+}
+
+/* Snaps and notes: a live memory-book page in place of the thumbnail */
 .snap-tile-stage {
     width: 100%;
     height: 100%;
@@ -255,33 +485,30 @@ body {
 
 .snap-badge {
     position: absolute;
-    top: 13px;
-    inset-inline-start: 46px; /* beside the select circle; the options button has the other corner */
-    z-index: 6;
+    bottom: 8px;
+    inset-inline-start: 8px;
+    z-index: 3;
     display: inline-flex;
     align-items: center;
     gap: 4px;
+    max-width: calc(100% - 16px);
+    box-sizing: border-box;
     pointer-events: none;
-    padding: 3px 9px 3px 7px;
+    padding: 3px 8px 3px 6px;
     border-radius: 999px;
     background: rgb(20 12 17 / 0.72);
     color: #fff;
     font-size: 11px;
-    font-weight: 600;
+    font-weight: 650;
     letter-spacing: 0.04em;
     text-transform: uppercase;
+    -webkit-backdrop-filter: blur(6px);
     backdrop-filter: blur(6px);
 }
 
 .snap-badge .material-symbols-outlined {
     flex: none;
     font-size: 14px;
-}
-
-/* Long names ("Page souvenir") stop short of the options button: start 46px,
-   button and its margins about 56px */
-.snap-badge {
-    max-width: calc(100% - 104px);
 }
 
 .snap-badge-text {
@@ -296,9 +523,9 @@ body {
     container-type: inline-size;
 }
 
-@container (max-width: 180px) {
+@container (max-width: 150px) {
     .snap-badge {
-        padding-inline-end: 7px;
+        padding-inline-end: 6px;
     }
 
     .snap-badge-text {
@@ -306,187 +533,30 @@ body {
     }
 }
 
-.photo-grid-overlay {
-    position: absolute;
-    inset: 0;
-    z-index: 5;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    padding: 12px;
-    background: linear-gradient(to bottom, rgb(0 0 0 / 0.35), transparent 35%, transparent 55%, rgb(0 0 0 / 0.55));
-    opacity: 0;
-    transition: opacity 0.2s ease;
-}
-
-.file-item.image:hover .photo-grid-overlay,
-.file-item.image:focus-within .photo-grid-overlay,
-.file-item.image.selected .photo-grid-overlay {
-    opacity: 1;
-}
-
-.photo-grid-overlay-bottom {
-    display: flex;
-    justify-content: flex-end;
-}
-
-.photo-grid-actions {
-    display: flex;
-    gap: 6px;
-}
-
-.photo-grid-overlay .btn-icon {
-    display: inline-grid;
-    place-items: center;
-    width: 34px;
-    height: 34px;
-    padding: 0;
-    border: 0;
-    border-radius: 50%;
-    background: rgb(255 255 255 / 0.18);
-    color: #fff;
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    box-shadow: none;
-}
-
-.photo-grid-overlay .btn-icon:hover {
-    background: rgb(255 255 255 / 0.95);
-    color: #14120f;
-}
-
-.photo-grid-overlay .btn-icon[data-action="delete"]:hover {
-    background: var(--destructive);
-    color: #fff;
-}
-
-.photo-grid-overlay .btn-icon .material-symbols-outlined {
-    font-size: 18px;
-    line-height: 1;
-}
-
-.photo-grid-overlay-top {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-}
-
-.photo-grid-checkbox .label {
-    display: flex;
-    margin: 0;
-    cursor: pointer;
-}
-
-.photo-grid-checkbox input[type="checkbox"] {
-    appearance: none;
-    -webkit-appearance: none;
-    display: block;
-    flex: none;
-    width: 24px;
-    height: 24px;
-    margin: 0;
-    border: 1.5px solid rgb(255 255 255 / 0.9);
-    border-radius: 50%;
-    background: rgb(0 0 0 / 0.25) none center / 14px no-repeat;
-    box-shadow: none;
-    cursor: pointer;
-}
-
-.photo-grid-checkbox input[type="checkbox"]::before,
-.photo-grid-checkbox input[type="checkbox"]::after {
-    content: none;
-}
-
-.photo-grid-checkbox input[type="checkbox"]:checked {
-    border-color: #fff;
-    background-color: var(--safelight);
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E");
-}
-
-.photo-grid-info {
-    position: absolute;
-    left: 0;
-    right: 90px;
-    bottom: 0;
-    z-index: 6;
-    padding: 12px;
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.2s ease;
-}
-
-.file-item.image:hover .photo-grid-info {
-    opacity: 1;
-}
-
-.photo-grid-name {
-    overflow: hidden;
-    font-family: var(--font-sans);
-    font-weight: 600;
-    font-size: 0.6875rem;
-    color: rgb(255 255 255 / 0.9);
-    white-space: nowrap;
-    text-overflow: ellipsis;
-}
-
-.file-item.image.selected {
-    box-shadow: 0 0 0 3px var(--background), 0 0 0 5px var(--safelight);
-}
-
-/* Touch screens have no hover: the select circle, the options button and
-   the View and Delete buttons stay in view, at finger size, and holding a
-   photo selects it instead of opening the browser's image callout. Laptops
-   with a touch screen as well as a trackpad count too (any-pointer). */
-@media (hover: none), (pointer: coarse), (any-pointer: coarse) {
+/* Touch screens: nothing on the tiles at all. A tap opens, a hold selects (and
+   holding never brings up the browser's image callout). Laptops with a touch
+   screen as well as a trackpad keep the hover controls (any-pointer: fine). */
+@media (hover: none), (pointer: coarse) {
     .file-item.image {
         -webkit-touch-callout: none;
         -webkit-user-select: none;
         user-select: none;
     }
 
-    .photo-grid-overlay {
-        padding: 6px;
-        opacity: 1;
-    }
-
-    .photo-grid-overlay .btn-icon {
-        width: 44px;
-        height: 44px;
-        background: rgb(0 0 0 / 0.38);
-    }
-
-    .photo-grid-overlay .btn-icon .material-symbols-outlined {
-        font-size: 22px;
-    }
-
-    .photo-grid-checkbox .label {
-        padding: 10px;
-    }
-
-    .photo-grid-info {
-        right: 106px;
-    }
-
-    .snap-badge {
-        top: 17px;
-        inset-inline-start: 48px;
+    .file-item.image .photo-more {
+        display: none;
     }
 }
 
-.file-item.image.selected .admin-photo-image img {
-    transform: none;
-    filter: saturate(0.85) brightness(0.92);
-}
-
-/* Google Photos import tile */
+/* Google Photos import card, with the folders */
 .file-item.google-photos-import {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     gap: 10px;
-    min-height: 100%;
-    aspect-ratio: 1;
+    aspect-ratio: 4 / 3;
+    margin-top: 7px;
     padding: 1rem;
     border: 1.5px dashed color-mix(in oklab, var(--foreground) 22%, transparent);
     border-radius: var(--shape-md);
@@ -665,81 +735,298 @@ body {
     transform: translate(-50%, 0);
 }
 
-/* ---------- Selection FAB --------------------------------------- */
+/* ---------- Selection bar ----------------------------------------
+   While photos are selected: "3 selected", Select all, Move, Delete (and the
+   one photo's menu). A floating bar at the bottom on wider screens; on phones
+   it takes the tab bar's place. */
 
-.selection-fab {
+.selection-bar {
     position: fixed;
-    right: 1.5rem;
-    bottom: 1.5rem;
+    left: 50%;
+    bottom: calc(24px + env(safe-area-inset-bottom, 0px));
     z-index: 150;
-    opacity: 0;
-    transform: translateY(100px) scale(0.8);
-    transition: opacity 0.3s ease, transform 0.4s var(--ease-out);
-}
-
-.selection-fab:not(.hidden) {
-    opacity: 1;
-    transform: none;
-}
-
-.fab-button {
     display: flex;
     align-items: center;
-    justify-content: center;
-    width: 60px;
-    height: 60px;
-    border: 0;
-    border-radius: 50%;
-    background: var(--destructive);
-    color: #fff;
-    box-shadow: 0 16px 36px -14px var(--destructive);
-    cursor: pointer;
-    transition: transform 0.2s var(--ease-out);
-}
-
-.fab-button:hover { transform: scale(1.06); }
-.fab-button:active { transform: scale(0.95); }
-
-.fab-button .material-symbols-outlined {
-    font-size: 26px;
-}
-
-.fab-badge {
-    position: absolute;
-    top: -6px;
-    right: -6px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 26px;
-    height: 26px;
-    padding: 0 6px;
-    border: 3px solid var(--background);
-    border-radius: 999px;
+    gap: var(--space-1);
+    width: max-content;
+    max-width: calc(100vw - 32px);
+    box-sizing: border-box;
+    padding: 6px;
+    border: 1px solid color-mix(in oklab, var(--paper) 14%, transparent);
+    border-radius: 14px;
     background: var(--ink);
     color: var(--paper);
-    font-family: var(--font-sans);
+    box-shadow: 0 18px 40px -16px rgb(30 12 22 / 0.55), 0 2px 6px rgb(30 12 22 / 0.18);
+    transform: translateX(-50%);
+    animation: bar-in 0.22s var(--ease-out);
+}
+
+html[dir="rtl"] .selection-bar {
+    transform: translateX(50%);
+    left: auto;
+    right: 50%;
+}
+
+@keyframes bar-in {
+    from { opacity: 0; translate: 0 12px; }
+    to { opacity: 1; translate: 0 0; }
+}
+
+.sel-count {
+    padding: 0 var(--space-3) 0 var(--space-1);
+    font-size: var(--text-sm);
+    font-weight: 650;
+    white-space: nowrap;
+    font-feature-settings: 'tnum';
+}
+
+.sel-spacer {
+    width: 1px;
+    height: 22px;
+    margin: 0 var(--space-1);
+    background: color-mix(in oklab, var(--paper) 22%, transparent);
+}
+
+.sel-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 36px;
+    padding: 0 12px;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-size: var(--text-sm);
     font-weight: 600;
-    font-size: 0.75rem;
-    font-weight: 500;
-    animation: pulse-in 0.4s var(--ease-out);
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
 }
 
-.fab-badge.updated {
-    animation: bounce-badge 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+.sel-btn[hidden] {
+    display: none;
 }
 
-@keyframes pulse-in {
-    0% { transform: scale(0); opacity: 0; }
-    50% { transform: scale(1.2); }
-    100% { transform: scale(1); opacity: 1; }
+.sel-btn.icon {
+    width: 36px;
+    padding: 0;
+    justify-content: center;
 }
 
-@keyframes bounce-badge {
-    0%, 100% { transform: scale(1); }
-    25% { transform: scale(1.25); }
-    50% { transform: scale(0.9); }
-    75% { transform: scale(1.1); }
+.sel-btn .material-symbols-outlined {
+    font-size: 20px;
+}
+
+.sel-btn:hover {
+    background: color-mix(in oklab, var(--paper) 14%, transparent);
+}
+
+.sel-btn:focus-visible {
+    outline: 2px solid var(--paper);
+    outline-offset: -2px;
+}
+
+.sel-btn.danger:hover {
+    background: var(--destructive);
+    color: #fff;
+}
+
+/* Phones: docked where the tab bar was, icons over short words */
+@media (max-width: 640px) {
+    html.is-selecting .tabbar {
+        visibility: hidden;
+    }
+
+    .selection-bar {
+        left: 0;
+        right: 0;
+        bottom: 0;
+        width: auto;
+        max-width: none;
+        height: calc(64px + env(safe-area-inset-bottom, 0px));
+        padding: 0 8px env(safe-area-inset-bottom, 0px);
+        border: 0;
+        border-top: 1px solid var(--rule);
+        border-radius: 0;
+        background: var(--paper-raised);
+        color: var(--foreground);
+        box-shadow: 0 -8px 24px -18px rgb(45 27 38 / 0.4);
+        transform: none;
+    }
+
+    html[dir="rtl"] .selection-bar {
+        transform: none;
+        right: 0;
+    }
+
+    .sel-spacer {
+        flex: 1;
+        width: auto;
+        background: transparent;
+    }
+
+    .sel-btn {
+        flex-direction: column;
+        justify-content: center;
+        gap: 0;
+        height: 52px;
+        min-width: 56px;
+        padding: 0 6px;
+        font-size: 0.6875rem;
+    }
+
+    .sel-btn .material-symbols-outlined {
+        font-size: 22px;
+    }
+
+    .sel-btn.icon {
+        width: 44px;
+        min-width: 44px;
+    }
+
+    .sel-btn:hover {
+        background: var(--surface-hover);
+    }
+
+    .sel-btn:focus-visible {
+        outline-color: var(--ring);
+    }
+
+    .sel-btn.danger {
+        color: var(--destructive);
+    }
+}
+
+/* ---------- Move to… ---------------------------------------------- */
+
+.move-dialog > article {
+    width: min(28rem, calc(100vw - 32px));
+}
+
+.move-where {
+    text-transform: capitalize;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: 36px;
+    margin-top: var(--space-3);
+    color: var(--foreground);
+    font-weight: 650;
+}
+
+.move-where-icon {
+    color: var(--ink-soft);
+    font-size: 20px;
+}
+
+.move-up {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 1px solid var(--line-strong);
+    border-radius: 50%;
+    background: transparent;
+    color: var(--ink-soft);
+    cursor: pointer;
+}
+
+.move-up[hidden] {
+    display: none;
+}
+
+.move-up:hover {
+    background: var(--surface-hover);
+    color: var(--foreground);
+}
+
+html[dir="rtl"] .move-up .material-symbols-outlined,
+html[dir="rtl"] .move-folder-go {
+    transform: scaleX(-1);
+}
+
+.move-list {
+    display: grid;
+    gap: 2px;
+    max-height: min(22rem, 50vh);
+    margin: 0 calc(-1 * var(--space-2));
+    overflow-y: auto;
+}
+
+.move-list[aria-busy="true"] {
+    opacity: 0.55;
+}
+
+.move-folder {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    width: 100%;
+    min-height: 52px;
+    padding: 6px var(--space-2);
+    border: 0;
+    border-radius: var(--shape-sm);
+    background: transparent;
+    color: var(--foreground);
+    font: inherit;
+    font-weight: 600;
+    text-align: start;
+    cursor: pointer;
+}
+
+.move-folder:hover,
+.move-folder:focus-visible {
+    background: var(--surface-hover);
+}
+
+.move-folder:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: -2px;
+}
+
+.move-folder-cover {
+    position: relative;
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 40px;
+    height: 40px;
+    overflow: hidden;
+    border-radius: var(--shape-sm);
+    background: var(--paper-sunk);
+    color: var(--ink-soft);
+}
+
+.move-folder-cover img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.move-folder-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    text-transform: capitalize;
+}
+
+.move-folder-go {
+    color: var(--ink-soft);
+    font-size: 20px;
+}
+
+.move-empty {
+    margin: 0;
+    padding: var(--space-4) var(--space-2);
+    color: var(--muted-foreground);
+    font-size: var(--text-sm);
 }
 
 /* ---------- Google Photos modal (plain div, not <dialog>) -------- */
@@ -992,8 +1279,19 @@ html[dir="rtl"] .photo-modal-hints .keys {
 /* ---------- Small screens --------------------------------------- */
 
 @media (max-width: 640px) {
-    .admin-grid {
+    .folder-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: var(--space-4) var(--space-3);
+    }
+
+    /* Photos edge to edge, like a phone's own gallery */
+    .photo-area {
+        --tile-radius: 0px;
+        margin-inline: calc(-1 * var(--page-gutter));
+    }
+
+    .photo-group-title {
+        margin-inline: var(--page-gutter);
     }
 
     .photo-modal-content {
@@ -1023,17 +1321,8 @@ html[dir="rtl"] .photo-modal-hints .keys {
         display: none;
     }
 
-    .admin-grid {
-        gap: 0.75rem;
-    }
-
     .main-content {
         padding: 0 var(--page-gutter) 2rem;
-    }
-
-    .selection-fab {
-        right: 1rem;
-        bottom: calc(96px + env(safe-area-inset-bottom));
     }
 
     .file-item.folder .folder-name {
@@ -1265,12 +1554,12 @@ html.dark .app.file-dragging .drop-hint {
 }
 
 .file-item.image.drop-before::after {
-    left: calc(clamp(0.75rem, 1.6vw, 1.25rem) / -2 - 2px);
+    left: -4px;
     opacity: 1;
 }
 
 .file-item.image.drop-after::after {
-    right: calc(clamp(0.75rem, 1.6vw, 1.25rem) / -2 - 2px);
+    right: -4px;
     opacity: 1;
 }
 

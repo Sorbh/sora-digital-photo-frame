@@ -443,7 +443,19 @@
     "newNoteTitle": "为这个文件夹写一条备注",
     "addFromDevice": "从这台设备",
     "addFromGooglePhotos": "从 Google Photos",
-    "allNotes": "全部备注"
+    "allNotes": "全部备注",
+    "menuView": "查看",
+    "menuMove": "移动到…",
+    "moveButton": "移动",
+    "selectAll": "全选",
+    "selectedCount_one": "已选 {count} 项",
+    "selectedCount_other": "已选 {count} 项",
+    "selectionBar": "已选照片",
+    "moveTitle_one": "移动 {count} 张照片",
+    "moveTitle_other": "移动 {count} 张照片",
+    "moveHere": "移到这里",
+    "moveNoFolders": "这里没有文件夹",
+    "accountMenu": "账户菜单"
   },
   "notes": {
     "your_headline": "您的标题",

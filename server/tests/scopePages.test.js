@@ -79,12 +79,16 @@ describe('what each page hides', () => {
     // Connecting Google Photos is the owner's, importing is a change
     expect(tag(html, 'googlePhotosBtn')).toMatch(/data-owner-only data-edit-only/);
 
-    // Grid tiles: the options menu, selecting and deleting
+    // Grid tiles: the options menu and selecting (viewers click a photo to view it, nothing else)
     const admin = read('admin.js');
     expect(admin).toContain('class="folder-more" data-edit-only');
     expect(admin).toContain('class="photo-grid-checkbox" data-edit-only');
     expect(admin).toContain('class="btn-icon photo-more" data-edit-only');
-    expect(admin).toMatch(/class="btn-icon" data-edit-only data-tooltip="\$\{escapeHtml\(t\('admin.deletePhoto'\)\)\}"/);
+    // The selection bar's actions sit inside the edit-only bar
+    for (const id of ['bulkDeleteBtn', 'bulkMoveBtn', 'selectAllBtn']) {
+      expect(html.indexOf(`id="${id}"`)).toBeGreaterThan(html.indexOf('id="selectionFab"'));
+      expect(html.indexOf(`id="${id}"`)).toBeLessThan(html.indexOf('</div>', html.indexOf('id="selectionFab"')));
+    }
   });
 
   test('notes and snaps: no saving, adding or changing for viewers', () => {

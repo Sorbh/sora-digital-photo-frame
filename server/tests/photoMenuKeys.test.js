@@ -26,16 +26,16 @@ function loadMenu(page = {}) {
   };
   document.body = node();
 
-  // The menu's items, as in admin.html: [action, data-for]
-  const items = [
-    ['rotate-right', 'image'], ['rotate-left', 'image'], ['create-snap', 'image'], ['edit-snap', 'snap'],
-    ['move-earlier', 'image snap'], ['move-later', 'image snap'], ['delete', undefined]
-  ].map(([action, forTypes]) => {
-    const item = node();
-    item.dataset.action = action;
-    if (forTypes) item.dataset.for = forTypes;
-    return item;
-  });
+  // The menu's items, as in admin.html: [action, data-for, data-order]
+  const items = [...html.slice(html.indexOf('id="contextMenuPopover"'), html.indexOf('<!-- Modals -->'))
+    .matchAll(/<button type="button" role="menuitem"[^>]*data-action="([\w-]+)"(?: data-for="([\w ]+)")?(?: data-order="(\w+)")?/g)]
+    .map(([, action, forTypes, order]) => {
+      const item = node();
+      item.dataset.action = action;
+      if (forTypes) item.dataset.for = forTypes;
+      if (order) item.dataset.order = order;
+      return item;
+    });
   let open = false;
   const popover = node();
   Object.assign(popover, {
@@ -77,7 +77,21 @@ describe('the photo options menu with a keyboard', () => {
     const start = html.indexOf('<div role="menu"', html.indexOf('id="contextMenuPopover"'));
     const menu = html.slice(start, html.indexOf('</div>', start));
     expect(menu).not.toMatch(/<div role="menuitem"/);
-    expect(menu.match(/<button type="button" role="menuitem" tabindex="-1"/g)).toHaveLength(8);
+    expect(menu.match(/<button type="button" role="menuitem" tabindex="-1"/g)).toHaveLength(10);
+  });
+
+  test('a photo\'s menu: View, Rotate, Create snap, Move to… and Delete; Move earlier and later only in My order', () => {
+    const { admin, node, items } = loadMenu();
+    const shown = () => items.filter(item => item.style.display !== 'none').map(item => item.dataset.action);
+    admin.playOrder = 'newest';
+    admin.showContextMenu({ type: 'click', currentTarget: node({ 'aria-haspopup': 'menu' }), preventDefault() {} }, { name: 'a.jpg', type: 'image' });
+    expect(shown()).toEqual(['view', 'rotate-right', 'rotate-left', 'create-snap', 'move', 'delete']);
+    admin.playOrder = 'custom';
+    admin.showContextMenu({ type: 'click', currentTarget: node({ 'aria-haspopup': 'menu' }), preventDefault() {} }, { name: 'a.jpg', type: 'image' });
+    expect(shown()).toEqual(['view', 'rotate-right', 'rotate-left', 'create-snap', 'move', 'move-earlier', 'move-later', 'delete']);
+    // A folder's: Delete (a host adds Share… to it)
+    admin.showContextMenu({ type: 'click', currentTarget: node({ 'aria-haspopup': 'menu' }), preventDefault() {} }, { name: 'Family', type: 'folder' });
+    expect(shown()).toEqual(['delete']);
   });
 
   test('the options button opens it on the first item, and arrows move round it', () => {
@@ -88,18 +102,18 @@ describe('the photo options menu with a keyboard', () => {
 
     expect(isOpen()).toBe(true);
     expect(button.getAttribute('aria-expanded')).toBe('true');
-    expect(focused()).toBe('rotate-right');
+    expect(focused()).toBe('view');
     expect(key('ArrowDown').defaultPrevented).toBe(true);
-    expect(focused()).toBe('rotate-left');
+    expect(focused()).toBe('rotate-right');
     key('ArrowUp');
     key('ArrowUp'); // round the top to the bottom
     expect(focused()).toBe('delete');
     key('ArrowDown');
-    expect(focused()).toBe('rotate-right');
+    expect(focused()).toBe('view');
     key('End');
     expect(focused()).toBe('delete');
     key('Home');
-    expect(focused()).toBe('rotate-right');
+    expect(focused()).toBe('view');
   });
 
   test('items hidden for this kind of item are skipped', () => {
@@ -108,8 +122,7 @@ describe('the photo options menu with a keyboard', () => {
     admin.showContextMenu({ type: 'click', currentTarget: button, preventDefault() {} }, { name: 'page', type: 'snap' });
     expect(focused()).toBe('edit-snap');
     key('ArrowDown');
-    expect(focused()).toBe('move-earlier');
-    key('ArrowDown');
+    expect(focused()).toBe('move');
     key('ArrowDown');
     expect(focused()).toBe('delete');
     key('ArrowDown');
@@ -264,6 +277,8 @@ describe('a menu action that redraws the grid', () => {
       CSS: { escape: value => value },
       SoraPlaceMenu: require('../public/js/placeMenu'),
       SoraLongPress: { attach: () => ({ cancel() {} }) },
+      SoraJustified: require('../public/js/justifiedLayout'),
+      requestAnimationFrame: fn => fn(),
       navigator: {},
       innerWidth: 1280,
       innerHeight: 800,
@@ -276,7 +291,8 @@ describe('a menu action that redraws the grid', () => {
     vm.runInContext(`${fs.readFileSync(path.join(publicDir, 'admin.js'), 'utf8')}\n;this.PhotoFrameAdmin = PhotoFrameAdmin;`, context);
     const admin = Object.create(context.PhotoFrameAdmin.prototype);
     Object.assign(admin, {
-      currentPath: 'uploads/Goa', selectedItems: new Set(), availableImages: [], longPressDelay: 500,
+      currentPath: 'uploads/Goa', availableImages: [], longPressDelay: 500, measured: new Map(),
+      selection: require('../public/js/selectionMode').create({}),
       clearSelection() {}, updateBreadcrumb() {}, updateBackButton() {}, showToast() {}, updatePhotoModalNav() {}
     });
     const listing = { folders: [], files: [
@@ -296,7 +312,7 @@ describe('a menu action that redraws the grid', () => {
     const before = optionsFor('uploads/Goa/b.jpg');
     before.focus();
     before.fire('click'); // Enter on the options button
-    expect(document.activeElement.dataset.action).toBe('rotate-right');
+    expect(document.activeElement.dataset.action).toBe('view');
 
     await admin.handleContextMenuAction('rotate-right'); // Enter on Rotate Right
     await listed;
@@ -307,6 +323,101 @@ describe('a menu action that redraws the grid', () => {
     expect(before.isConnected).toBe(false);
     expect(document.activeElement).toBe(after);
     expect(after.isConnected).toBe(true);
+  });
+});
+
+describe('the photo grid', () => {
+  // The real admin.js drawing a listing on the small page above
+  function drawGrid(listing, { width = 1000, order = 'shuffle' } = {}) {
+    const { document } = miniPage();
+    const context = {
+      console: { log() {}, error() {}, warn() {} },
+      document, Element: Object, CSS: { escape: value => value },
+      SoraPlaceMenu: require('../public/js/placeMenu'),
+      SoraLongPress: { attach: () => ({ cancel() {} }) },
+      SoraJustified: require('../public/js/justifiedLayout'),
+      requestAnimationFrame: fn => fn(),
+      navigator: {}, t: (key, vars) => (vars && 'count' in vars ? `${key}:${vars.count}` : key), i18n: { error: (_, key) => key, locale: 'en' }
+    };
+    context.window = context;
+    vm.createContext(context);
+    vm.runInContext(`${fs.readFileSync(path.join(publicDir, 'admin.js'), 'utf8')}\n;this.PhotoFrameAdmin = PhotoFrameAdmin;`, context);
+    const admin = Object.create(context.PhotoFrameAdmin.prototype);
+    Object.assign(admin, {
+      currentPath: 'uploads/Goa', availableImages: [], longPressDelay: 500, measured: new Map(),
+      selection: require('../public/js/selectionMode').create({ onChange: () => admin.updateSelectionUI() }),
+      updateBreadcrumb() {}, updateBackButton() {}, showToast() {}, updatePhotoModalNav() {}
+    });
+    const grid = document.getElementById('fileGrid');
+    grid.getBoundingClientRect = () => ({ width });
+    admin.renderFolderContents({ order, folders: [], files: listing });
+    admin.photoArea.getBoundingClientRect = () => ({ width });
+    admin.layoutPhotos();
+    const all = [];
+    const walk = n => n.children.forEach(c => { all.push(c); walk(c); });
+    walk(grid);
+    return { admin, grid, all, tiles: grid.querySelectorAll('.file-item') };
+  }
+  const photo = (name, width, height, date) => ({
+    name, type: 'image', path: `uploads/Goa/${name}`, url: `/u/${name}`, thumbnail: `/t/${name}`, preview: `/t/${name}&fit=inside`, width, height, date
+  });
+
+  test('shows no file names: not as text, not in any attribute', () => {
+    const listing = [photo('images-1790007919.jpg', 1600, 1200), photo('IMG_2041.jpg', 1200, 1600)];
+    const { all } = drawGrid(listing);
+    for (const el of all) {
+      expect(el.textContent).not.toMatch(/images-1790007919|IMG_2041/);
+      for (const name of ['alt', 'title', 'aria-label', 'data-tooltip']) {
+        expect(String(el.getAttribute(name) || '')).not.toMatch(/images-1790007919|IMG_2041/);
+      }
+    }
+    expect(all.some(el => el.classList.contains('photo-grid-name'))).toBe(false);
+    // Each tile shows the photo in its own shape: the shaped thumbnail
+    expect(all.filter(el => el.tagName === 'IMG').map(img => img.src)).toEqual(['/t/images-1790007919.jpg&fit=inside', '/t/IMG_2041.jpg&fit=inside']);
+  });
+
+  test('lays photos in rows that keep their shape', () => {
+    const listing = [photo('a.jpg', 1600, 1200), photo('b.jpg', 1200, 1600), photo('c.jpg', 1400, 1400), photo('d.jpg', 3000, 1000)];
+    const { tiles } = drawGrid(listing, { width: 1000 });
+    const size = tile => [parseFloat(tile.style.width), parseFloat(tile.style.height)];
+    const [a, b, c] = tiles.map(size);
+    expect(a[1]).toBe(b[1]); // one height per row
+    expect(a[0] / a[1]).toBeCloseTo(4 / 3, 1);
+    expect(b[0] / b[1]).toBeCloseTo(3 / 4, 1);
+    expect(c[0] / c[1]).toBeCloseTo(1, 1);
+  });
+
+  test('newest first: grouped by month under quiet headings; shuffle keeps one list', () => {
+    const listing = [photo('a.jpg', 4, 3, '2026-10-05T10:00:00'), photo('b.jpg', 4, 3, '2026-10-01T10:00:00'), photo('c.jpg', 4, 3, '2026-08-12T10:00:00')];
+    const newest = drawGrid(listing, { order: 'newest' });
+    const headings = newest.all.filter(el => el.classList.contains('photo-group-title'));
+    expect(headings).toHaveLength(2);
+    expect(newest.all.filter(el => el.classList.contains('photo-group')).map(group => group.querySelectorAll('.file-item').length)).toEqual([2, 1]);
+    const shuffle = drawGrid(listing, { order: 'shuffle' });
+    expect(shuffle.all.filter(el => el.classList.contains('photo-group-title'))).toHaveLength(0);
+    expect(shuffle.tiles.map(tile => tile.dataset.path)).toEqual(listing.map(file => file.path));
+  });
+
+  test('ticking one starts selection: every tile shows its check, a click ticks instead of opening', () => {
+    const listing = [photo('a.jpg', 4, 3), photo('b.jpg', 4, 3), photo('c.jpg', 4, 3)];
+    const { admin, grid, tiles } = drawGrid(listing);
+    const opened = [];
+    admin.openTile = file => opened.push(file.name);
+    tiles[0].fire('click');
+    expect(opened).toEqual(['a.jpg']);
+
+    tiles[1].querySelector('input').fire('change');
+    expect(grid.classList.contains('selecting')).toBe(true);
+    tiles[2].fire('click');
+    expect(opened).toEqual(['a.jpg']);
+    expect(admin.selection.keys()).toEqual(['uploads/Goa/b.jpg', 'uploads/Goa/c.jpg']);
+    expect(tiles[2].classList.contains('selected')).toBe(true);
+
+    admin.selectAll();
+    expect(admin.selection.size).toBe(3);
+    admin.clearSelection();
+    expect(grid.classList.contains('selecting')).toBe(false);
+    expect(tiles.some(tile => tile.classList.contains('selected'))).toBe(false);
   });
 });
 
@@ -321,9 +432,12 @@ describe('for someone who can only view (js/scope.js)', () => {
 
   test('photos are not selected, moved or uploaded', () => {
     const { admin } = loadMenu(viewOnly);
-    admin.selectedItems = new Set();
+    admin.selection = require('../public/js/selectionMode').create({});
     admin.toggleSelection({ path: 'uploads/Family/a.jpg' });
-    expect(admin.selectedItems.size).toBe(0);
+    admin.selectAll();
+    expect(admin.selection.size).toBe(0);
+    admin.openMoveDialog(['uploads/Family/a.jpg']);
+    expect(admin.moving).toBeUndefined();
 
     const done = [];
     admin.movePhotos = () => done.push('move');

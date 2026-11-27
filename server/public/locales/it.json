@@ -457,7 +457,19 @@
     "newNoteTitle": "Scrivi una nota per questa cartella",
     "addFromDevice": "Da questo dispositivo",
     "addFromGooglePhotos": "Da Google Foto",
-    "allNotes": "Tutte le note"
+    "allNotes": "Tutte le note",
+    "menuView": "Visualizza",
+    "menuMove": "Sposta in…",
+    "moveButton": "Sposta",
+    "selectAll": "Seleziona tutto",
+    "selectedCount_one": "{count} selezionata",
+    "selectedCount_other": "{count} selezionate",
+    "selectionBar": "Foto selezionate",
+    "moveTitle_one": "Sposta {count} foto",
+    "moveTitle_other": "Sposta {count} foto",
+    "moveHere": "Sposta qui",
+    "moveNoFolders": "Nessuna cartella qui",
+    "accountMenu": "Menu account"
   },
   "notes": {
     "your_headline": "Il tuo titolo",

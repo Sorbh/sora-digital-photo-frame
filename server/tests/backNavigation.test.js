@@ -77,6 +77,8 @@ function loadAdmin(start = 'https://frame.example/admin') {
   admin.setupPhotoModalInteractions = () => {};
   admin.updatePhotoModalNav = () => {};
   admin.currentImagePosition = () => 0;
+  // Selection mode (js/selectionMode.js), on the same history
+  admin.selection = require('../public/js/selectionMode').create({ history: browser.history, onChange: () => {} });
   // The two listeners initializeEventListeners adds for this
   browser.addEventListener('popstate', () => admin.handleHistory());
   get('photoModal').addEventListener('close', () => { if (browser.history.state?.photo) browser.history.back(); });
@@ -141,6 +143,49 @@ describe('Back in the library', () => {
 
     browser.history.back(); // the next Back goes up a folder, not to a closed viewer
     expect(admin.currentPath).toBe('uploads');
+  });
+});
+
+describe('Back and selection', () => {
+  test('selecting adds an entry; Back ends selection and stays in the folder', () => {
+    const { admin, browser } = loadAdmin();
+    admin.navigateTo('uploads/Family');
+    admin.selection.toggle('uploads/Family/a.jpg');
+    admin.selection.toggle('uploads/Family/b.jpg');
+    expect(browser.history.length).toBe(3); // one entry for the selection, not one per photo
+    expect(browser.history.state.selecting).toBe(true);
+
+    browser.history.back();
+    expect(admin.selection.active).toBe(false);
+    expect(admin.currentPath).toBe('uploads/Family');
+    expect(admin.loaded).toEqual(['uploads/Family']); // not loaded again
+    browser.history.back(); // then up a folder, as before
+    expect(admin.currentPath).toBe('uploads');
+  });
+
+  test('Cancel (or unticking the last photo) takes its entry away', () => {
+    const { admin, browser } = loadAdmin();
+    admin.navigateTo('uploads/Family');
+    admin.selection.toggle('uploads/Family/a.jpg');
+    admin.clearSelection();
+    expect(browser.at()).toBe(1);
+    expect(browser.history.state?.selecting).toBeFalsy();
+
+    admin.selection.toggle('uploads/Family/a.jpg');
+    admin.selection.toggle('uploads/Family/a.jpg');
+    expect(browser.at()).toBe(1);
+  });
+
+  test('a folder opened while selecting takes the selection\'s entry, so Back returns to the folder before', () => {
+    const { admin, browser } = loadAdmin();
+    admin.navigateTo('uploads/Family');
+    admin.selection.toggle('uploads/Family/a.jpg');
+    admin.navigateTo('uploads/Family/Beach');
+    expect(admin.selection.active).toBe(false);
+    expect(browser.history.length).toBe(3);
+    expect(browser.history.state?.selecting).toBeFalsy();
+    browser.history.back();
+    expect(admin.currentPath).toBe('uploads/Family');
   });
 });
 

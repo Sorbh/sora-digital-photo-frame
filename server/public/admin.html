@@ -13,7 +13,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/basecoat-css@0.3.1/dist/basecoat.cdn.min.css">
     <script src="https://cdn.jsdelivr.net/npm/basecoat-css@0.3.1/dist/js/basecoat.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/basecoat-css@0.3.1/dist/js/toast.min.js" defer></script>
-    <link rel="stylesheet" href="/css/sora.css?v=calm1">
+    <link rel="stylesheet" href="/css/sora.css?v=calm2">
     <link rel="stylesheet" href="/css/i18n.css">
     <link rel="stylesheet" href="/css/tailwind.css">
 
@@ -58,7 +58,7 @@
     </script>
 
     <link rel="stylesheet" href="/css/notePage.css">
-    <link rel="stylesheet" href="/css/admin.css?v=calm1">
+    <link rel="stylesheet" href="/css/admin.css?v=calm2">
 </head>
 
 <body>
@@ -140,13 +140,28 @@
                 </div>
             </div>
 
-            <!-- Floating Action Button -->
-            <div id="selectionFab" class="selection-fab hidden" data-edit-only>
-                <button id="bulkDeleteBtn" class="fab-button" data-tooltip="Delete Selected Photos"
-                    aria-label="Delete Selected Photos" data-i18n-attr="aria-label:admin.static_047; data-tooltip:admin.static_047">
-                    <span class="material-symbols-outlined">delete</span>
+            <!-- Selection bar: shown while photos are selected (js/selectionMode.js) -->
+            <div id="selectionFab" class="selection-bar hidden" data-edit-only role="toolbar" aria-label="Selected photos" data-i18n-attr="aria-label:admin.selectionBar">
+                <button type="button" id="clearSelectionBtn" class="sel-btn icon" title="Cancel" aria-label="Cancel" data-i18n-attr="title:common.cancel; aria-label:common.cancel">
+                    <span class="material-symbols-outlined" aria-hidden="true">close</span>
                 </button>
-                <span class="fab-badge" id="fabBadge">0</span>
+                <span class="sel-count" id="fabBadge" aria-live="polite"></span>
+                <span class="sel-spacer"></span>
+                <button type="button" id="selectAllBtn" class="sel-btn">
+                    <span class="material-symbols-outlined" aria-hidden="true">select_all</span>
+                    <span class="sel-label" data-i18n="admin.selectAll">Select all</span>
+                </button>
+                <button type="button" id="bulkMoveBtn" class="sel-btn">
+                    <span class="material-symbols-outlined" aria-hidden="true">drive_file_move</span>
+                    <span class="sel-label" data-i18n="admin.moveButton">Move</span>
+                </button>
+                <button type="button" id="bulkDeleteBtn" class="sel-btn danger" title="Delete Selected Photos" data-i18n-attr="title:admin.static_047">
+                    <span class="material-symbols-outlined" aria-hidden="true">delete</span>
+                    <span class="sel-label" data-i18n="common.delete">Delete</span>
+                </button>
+                <button type="button" id="selectionMoreBtn" class="sel-btn icon" aria-haspopup="menu" aria-expanded="false" title="Photo options" aria-label="Photo options" data-i18n-attr="title:admin.photoOptions; aria-label:admin.photoOptions" hidden>
+                    <span class="material-symbols-outlined" aria-hidden="true">more_vert</span>
+                </button>
             </div>
 
             <div class="admin-grid" id="fileGrid">
@@ -216,6 +231,18 @@
             </button>
             <div popover="manual" id="contextMenuPopover" class="sora-menu">
                 <div role="menu" class="min-w-48">
+                    <button type="button" role="menuitem" tabindex="-1" class="menu-item" data-action="view" data-for="image">
+                        <span class="material-symbols-outlined" aria-hidden="true">open_in_full</span>
+                        <span data-i18n="admin.menuView">View</span>
+                    </button>
+                    <button type="button" role="menuitem" tabindex="-1" class="menu-item" data-action="edit-snap" data-for="snap">
+                        <span class="material-symbols-outlined" aria-hidden="true">edit</span>
+                        <span data-i18n="admin.menuEditSnap">Edit snap</span>
+                    </button>
+                    <button type="button" role="menuitem" tabindex="-1" class="menu-item" data-action="edit-note" data-for="note">
+                        <span class="material-symbols-outlined" aria-hidden="true">edit</span>
+                        <span data-i18n="notes.editNote">Edit note</span>
+                    </button>
                     <button type="button" role="menuitem" tabindex="-1" class="menu-item" data-action="rotate-right" data-for="image">
                         <span class="material-symbols-outlined" aria-hidden="true">rotate_right</span>
                         <span data-i18n="admin.menuRotateRight">Rotate Right</span>
@@ -228,23 +255,19 @@
                         <span class="material-symbols-outlined" aria-hidden="true">auto_stories</span>
                         <span data-i18n="admin.menuCreateSnap">Create snap</span>
                     </button>
-                    <button type="button" role="menuitem" tabindex="-1" class="menu-item" data-action="edit-snap" data-for="snap">
-                        <span class="material-symbols-outlined" aria-hidden="true">edit</span>
-                        <span data-i18n="admin.menuEditSnap">Edit snap</span>
+                    <button type="button" role="menuitem" tabindex="-1" class="menu-item" data-action="move" data-for="image snap note">
+                        <span class="material-symbols-outlined" aria-hidden="true">drive_file_move</span>
+                        <span data-i18n="admin.menuMove">Move to…</span>
                     </button>
-                    <button type="button" role="menuitem" tabindex="-1" class="menu-item" data-action="edit-note" data-for="note">
-                        <span class="material-symbols-outlined" aria-hidden="true">edit</span>
-                        <span data-i18n="notes.editNote">Edit note</span>
-                    </button>
-                    <button type="button" role="menuitem" tabindex="-1" class="menu-item" data-action="move-earlier" data-for="image snap">
+                    <button type="button" role="menuitem" tabindex="-1" class="menu-item" data-action="move-earlier" data-for="image snap" data-order="custom">
                         <span class="material-symbols-outlined" aria-hidden="true">arrow_back</span>
                         <span data-i18n="admin.menuMoveEarlier">Move earlier</span>
                     </button>
-                    <button type="button" role="menuitem" tabindex="-1" class="menu-item" data-action="move-later" data-for="image snap">
+                    <button type="button" role="menuitem" tabindex="-1" class="menu-item" data-action="move-later" data-for="image snap" data-order="custom">
                         <span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span>
                         <span data-i18n="admin.menuMoveLater">Move later</span>
                     </button>
-                    <hr class="menu-divider" data-for="image snap">
+                    <hr class="menu-divider" data-for="image snap note">
                     <button type="button" role="menuitem" tabindex="-1" class="menu-item menu-item-destructive" data-action="delete">
                         <span class="material-symbols-outlined" aria-hidden="true">delete</span>
                         <span data-i18n="common.delete">Delete</span>
@@ -367,6 +390,32 @@
             </div>
         </div>
 
+        <!-- Move to…: pick a folder for the photos (admin.js, openMoveDialog) -->
+        <dialog id="moveDialog" class="dialog move-dialog" aria-labelledby="moveTitle">
+            <article>
+                <header>
+                    <h2 id="moveTitle">Move photos</h2>
+                    <div class="move-where">
+                        <button type="button" id="moveUpBtn" class="move-up" title="Back" aria-label="Back" data-i18n-attr="title:common.back; aria-label:common.back">
+                            <span class="material-symbols-outlined" aria-hidden="true">arrow_back</span>
+                        </button>
+                        <span class="material-symbols-outlined move-where-icon" aria-hidden="true">folder_open</span>
+                        <span id="moveWhere"></span>
+                    </div>
+                </header>
+                <section>
+                    <div id="moveList" class="move-list"></div>
+                </section>
+                <footer>
+                    <button type="button" id="cancelMoveBtn" class="btn-outline" data-i18n="common.cancel">Cancel</button>
+                    <button type="button" id="moveHereBtn" class="btn" disabled>
+                        <span class="material-symbols-outlined" aria-hidden="true">drive_file_move</span>
+                        <span data-i18n="admin.moveHere">Move here</span>
+                    </button>
+                </footer>
+            </article>
+        </dialog>
+
         <!-- Bulk Delete Confirmation Modal -->
         <dialog id="bulkDeleteModal" class="dialog" aria-labelledby="bulk-delete-title"
             aria-describedby="bulk-delete-description">
@@ -433,9 +482,11 @@
     <script src="js/notePage.js"></script>
     <script src="/js/photoUpload.js"></script>
     <script src="/js/longPress.js"></script>
+    <script src="/js/justifiedLayout.js?v=calm2"></script>
+    <script src="/js/selectionMode.js?v=calm2"></script>
     <script src="/js/placeMenu.js"></script>
     <script src="/js/addMenu.js"></script>
-    <script src="admin.js"></script>
+    <script src="admin.js?v=calm2"></script>
     <script src="js/settings.js"></script>
     <script src="js/googlePhotosSync.js"></script>
 </body>

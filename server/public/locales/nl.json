@@ -443,7 +443,19 @@
     "newNoteTitle": "Schrijf een bericht voor deze map",
     "addFromDevice": "Van dit apparaat",
     "addFromGooglePhotos": "Uit Google Foto's",
-    "allNotes": "Alle berichten"
+    "allNotes": "Alle berichten",
+    "menuView": "Bekijken",
+    "menuMove": "Verplaatsen naar…",
+    "moveButton": "Verplaatsen",
+    "selectAll": "Alles selecteren",
+    "selectedCount_one": "{count} geselecteerd",
+    "selectedCount_other": "{count} geselecteerd",
+    "selectionBar": "Geselecteerde foto’s",
+    "moveTitle_one": "{count} foto verplaatsen",
+    "moveTitle_other": "{count} foto’s verplaatsen",
+    "moveHere": "Hierheen verplaatsen",
+    "moveNoFolders": "Hier staan geen mappen",
+    "accountMenu": "Accountmenu"
   },
   "notes": {
     "your_headline": "Je kop",

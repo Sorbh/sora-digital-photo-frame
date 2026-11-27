@@ -244,7 +244,9 @@ class ImageController {
         });
       }
 
-      thumbnails.send(res, await thumbnails.getThumbnail(imagePath));
+      // ?fit=inside: the photo's own shape, for the library grid; otherwise a square
+      const fit = req.query.fit === 'inside' ? 'inside' : 'cover';
+      thumbnails.send(res, await thumbnails.getThumbnail(imagePath, { fit }));
     } catch (error) {
       if (passClientError(res, error)) return;
       console.error('Error generating image thumbnail:', error);
@@ -253,6 +255,18 @@ class ImageController {
         error: 'Server error',
         code: 'SERVER_ERROR'
       });
+    }
+  }
+
+  // The library grid lays photos out by their shape before the thumbnails load
+  async rememberSize(fullPath, buffer) {
+    try {
+      const { width, height, pageHeight } = await sharp(buffer, { limitInputPixels: false }).metadata();
+      const stat = await getLibrary().stat(toAdminPath(fullPath));
+      // An animation's frames are stacked: one frame is pageHeight tall
+      await photoInfo.rememberSize(path.relative(this.uploadsDir, fullPath), stat, width, pageHeight || height);
+    } catch (error) {
+      console.warn('Could not read photo size:', error.message);
     }
   }
 
@@ -304,6 +318,8 @@ class ImageController {
         const storedPath = resolveAdminPath(added.path);
         await photoInfo.rememberUpload(storedPath, path.relative(this.uploadsDir, storedPath), file.buffer, sentInfo[index])
           .catch(error => console.warn('Could not read photo info:', error.message));
+        // Its shape, for the library grid (the display copy is already upright)
+        await this.rememberSize(storedPath, buffer);
         processedFiles.push({ filename, originalname: file.originalname, path: added.path, size: buffer.length });
       }
 
@@ -504,6 +520,7 @@ class ImageController {
       
       // Converted like an upload: in turn with the others, and only if not too large
       const release = await slots.acquire(currentTenant().id);
+      let rotated = null;
       try {
         // Rotating drops EXIF, so make sure it's been read before the file changes
         await photoInfo.get(fullPath, path.relative(this.uploadsDir, fullPath))
@@ -530,11 +547,14 @@ class ImageController {
           await sameFile();
           await getLibrary().writeItem(toAdminPath(fullPath), buffer);
         });
+        rotated = buffer;
       } finally {
         release();
       }
       await photoInfo.moveUpload(fullPath, fullPath)
         .catch(error => console.warn('Could not keep photo info:', error.message));
+      // Its new shape (a quarter turn swaps width and height)
+      if (rotated) await this.rememberSize(fullPath, rotated);
 
       // Clear cache after rotation to update available images
       this.clearImageCache();

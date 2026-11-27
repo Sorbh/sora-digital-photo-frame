@@ -143,6 +143,9 @@ html.dark:root {
 /* ---------- Base ------------------------------------------------------ */
 
 html {
+    /* A stable scrollbar: the header doesn't shift between pages, and the photo
+       rows don't lay out twice as a scrollbar comes and goes */
+    scrollbar-gutter: stable;
     font-family: var(--font-sans);
     font-feature-settings: 'ss01', 'cv11';
     text-rendering: optimizeLegibility;
@@ -529,50 +532,126 @@ dialog::backdrop {
     gap: var(--space-2);
 }
 
-/* ---------- App shell (admin pages) -------------------------------- */
+/* ---------- App shell: the shared header (views/pages.js) -------------
+   One calm bar on every page: the brand and the host's slot (the library's
+   name, or a library switcher) on the left; the places (Library, Access,
+   Slideshow) as quiet text links, then the tools (Settings, the account menu)
+   on the right. Its edges line up with the page's content. Once the page
+   scrolls under it, it turns translucent (js/appHeader.js: .is-scrolled). */
 
 .topbar {
+    --topbar-h: 60px;
     position: sticky;
     top: 0;
     z-index: 40;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 1rem;
+    gap: var(--space-4);
+    box-sizing: border-box;
     /* Notched phones (viewport-fit=cover): keep clear of the notch and rounded corners */
-    height: calc(64px + env(safe-area-inset-top, 0px));
-    padding: env(safe-area-inset-top, 0px) max(clamp(1rem, 3vw, 2.5rem), env(safe-area-inset-right, 0px)) 0 max(clamp(1rem, 3vw, 2.5rem), env(safe-area-inset-left, 0px));
+    height: calc(var(--topbar-h) + env(safe-area-inset-top, 0px));
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-inline: max(var(--page-gutter), calc((100% - var(--page-max)) / 2 + var(--page-gutter)), env(safe-area-inset-left, 0px));
     border-bottom: 1px solid var(--rule);
-    background: color-mix(in oklab, var(--background) 82%, transparent);
-    backdrop-filter: blur(16px) saturate(1.4);
-    -webkit-backdrop-filter: blur(16px) saturate(1.4);
+    background: var(--background);
+    transition: background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.topbar.is-scrolled {
+    background: color-mix(in oklab, var(--background) 80%, transparent);
+    box-shadow: 0 6px 20px -16px rgb(45 27 38 / 0.35);
+    backdrop-filter: blur(18px) saturate(1.5);
+    -webkit-backdrop-filter: blur(18px) saturate(1.5);
 }
 
 .topbar-brand {
     display: flex;
     align-items: center;
-    gap: 14px;
+    gap: var(--space-3);
+    min-width: 0;
 }
 
+/* The brand: the frame mark, white on a small berry tile, and the name */
 .topbar-brand .sora-wordmark {
-    font-size: 1.6rem;
+    position: relative;
+    flex: none;
+    gap: 10px;
+    font-size: 1.0625rem;
+    font-weight: 750;
+    letter-spacing: -0.02em;
+    border-radius: var(--shape-sm);
+}
+
+.topbar-brand .sora-wordmark::before {
+    width: 30px;
+    height: 30px;
+    border-radius: 9px;
+    background: var(--berry-gradient);
+    -webkit-mask: none;
+    mask: none;
+    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.14), 0 1px 2px rgb(120 30 70 / 0.28);
+    transition: box-shadow 0.2s ease;
+}
+
+.topbar-brand .sora-wordmark::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    inset-inline-start: 7px;
+    width: 16px;
+    height: 16px;
+    margin-top: -8px;
+    background: #fff;
+    -webkit-mask: var(--sora-mark) center / contain no-repeat;
+    mask: var(--sora-mark) center / contain no-repeat;
+    pointer-events: none;
+}
+
+.topbar-brand .sora-wordmark:hover::before {
+    transform: none;
+    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.2), 0 2px 8px -2px rgb(196 43 110 / 0.55);
 }
 
 .topbar-divider {
+    flex: none;
     width: 1px;
-    height: 20px;
-    background: var(--rule);
+    height: 22px;
+    background: var(--line-strong);
 }
 
 .topbar-actions {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: var(--space-2);
+    min-width: 0;
 }
 
+/* The places: quiet text links with their icon */
+.topbar-nav {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+/* The tools, set off from the places by a hairline */
+.topbar-tools {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+}
+
+.topbar-nav + .topbar-tools {
+    margin-inline-start: var(--space-2);
+    padding-inline-start: var(--space-3);
+    border-inline-start: 1px solid var(--rule);
+}
+
+/* Header buttons: one size, one hover, one focus ring (also used by Access's rows) */
 .tb-btn {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 8px;
     height: 36px;
     padding: 0 12px;
@@ -580,22 +659,32 @@ dialog::backdrop {
     border-radius: var(--shape-sm);
     background: transparent;
     color: var(--ink-soft);
-    font-size: 0.875rem;
-    font-weight: 550;
+    font: inherit;
+    font-size: var(--text-sm);
+    font-weight: 600;
+    white-space: nowrap;
     text-decoration: none;
     cursor: pointer;
-    transition: background-color 0.18s ease, color 0.18s ease;
+    transition: background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .tb-btn:hover {
-    background: var(--paper-sunk);
+    background: var(--surface-hover);
     color: var(--foreground);
+}
+
+.tb-btn:active {
+    background: var(--surface-press);
+}
+
+.tb-btn:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 1px;
 }
 
 .tb-btn.icon {
     width: 36px;
     padding: 0;
-    justify-content: center;
 }
 
 .tb-btn .material-symbols-outlined {
@@ -604,8 +693,106 @@ dialog::backdrop {
 
 /* The page you're on (Access, in the shared header) */
 .tb-btn[aria-current="page"] {
+    background: var(--surface-hover);
+    color: var(--accent-ink);
+}
+
+/* The account menu: a round person button, and Account, theme and Log out under it */
+.account-menu {
+    position: relative;
+    display: flex;
+}
+
+.tb-btn.account-trigger {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+}
+
+.tb-avatar {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
     background: var(--paper-sunk);
-    color: var(--berry);
+    color: var(--ink-soft);
+    box-shadow: inset 0 0 0 1px var(--rule);
+    transition: box-shadow 0.15s ease, color 0.15s ease;
+}
+
+.tb-avatar .material-symbols-outlined {
+    font-size: 20px;
+    font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+.tb-btn.account-trigger:hover {
+    background: transparent;
+}
+
+.tb-btn.account-trigger:hover .tb-avatar,
+.tb-btn.account-trigger[aria-expanded="true"] .tb-avatar {
+    color: var(--foreground);
+    box-shadow: inset 0 0 0 1px var(--line-strong), 0 0 0 3px var(--surface-hover);
+}
+
+/* On the account page itself */
+.account-menu:has([aria-current="page"]) .tb-avatar {
+    color: var(--accent-ink);
+    box-shadow: inset 0 0 0 1.5px var(--accent-ink);
+}
+
+.account-menu-list {
+    position: absolute;
+    top: calc(100% + 8px);
+    inset-inline-end: 0;
+    z-index: 70;
+    min-width: 15rem;
+    transform-origin: top right;
+    animation: menu-in 0.14s var(--ease-out);
+}
+
+html[dir="rtl"] .account-menu-list {
+    transform-origin: top left;
+}
+
+.account-menu-list[hidden] {
+    display: none !important;
+}
+
+@keyframes menu-in {
+    from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+    to { opacity: 1; transform: none; }
+}
+
+.account-menu-list .tb-btn {
+    display: flex;
+    justify-content: flex-start;
+    gap: var(--space-3);
+    width: 100%;
+    height: auto;
+    min-height: 40px;
+    padding: 0 var(--space-3);
+    color: var(--foreground);
+    font-weight: 550;
+    text-align: start;
+}
+
+.account-menu-list .tb-btn .material-symbols-outlined {
+    color: var(--ink-soft);
+}
+
+.account-menu-list .tb-btn:focus-visible {
+    outline-offset: -2px;
+    background: var(--surface-hover);
+}
+
+.account-menu-list .tb-btn[aria-current="page"] {
+    color: var(--accent-ink);
+}
+
+.account-menu-list .tb-btn[aria-current="page"] .material-symbols-outlined {
+    color: var(--accent-ink);
 }
 
 /* Beside the brand: the page's name, or what the host puts there (a library switcher) */
@@ -613,6 +800,14 @@ dialog::backdrop {
     display: flex;
     align-items: center;
     min-width: 0;
+}
+
+.topbar-slot .sora-eyebrow {
+    color: var(--foreground);
+    font-size: 0.9375rem;
+    font-weight: 650;
+    letter-spacing: 0;
+    text-transform: none;
 }
 
 .topbar-slot:empty,
@@ -784,7 +979,7 @@ html[dir="rtl"] .back-btn .material-symbols-outlined {
     gap: var(--space-2);
 }
 
-/* ---------- Mobile tab bar ----------------------------------------- */
+/* ---------- Phones: a compact header and the tab bar ------------------ */
 
 .tabbar {
     display: none;
@@ -798,23 +993,42 @@ html[dir="rtl"] .back-btn .material-symbols-outlined {
     .tb-btn:not(.icon) {
         width: 36px;
         padding: 0;
-        justify-content: center;
+    }
+
+    /* The account menu's items keep their words */
+    .account-menu-list .tb-btn:not(.icon),
+    .account-menu-list .tb-btn {
+        width: 100%;
+        padding: 0 var(--space-3);
     }
 }
 
 @media (max-width: 640px) {
+    /* The mark, the slot (the library's name or switcher) and the account menu */
     .topbar {
-        height: calc(58px + env(safe-area-inset-top, 0px));
+        --topbar-h: 56px;
+        gap: var(--space-2);
     }
 
     .topbar .tb-desktop,
-    .topbar-brand .sora-eyebrow,
     .topbar-brand .topbar-divider {
         display: none;
     }
 
+    .topbar-nav + .topbar-tools {
+        margin: 0;
+        padding: 0;
+        border: 0;
+    }
+
+    .topbar-brand {
+        gap: var(--space-2);
+    }
+
+    /* The mark alone: the slot says where you are */
     .topbar-brand .sora-wordmark {
-        font-size: 1.35rem;
+        gap: 0;
+        font-size: 0;
     }
 
     /* Phones: the head stays compact, the actions stay beside or under the title */
@@ -842,82 +1056,102 @@ html[dir="rtl"] .back-btn .material-symbols-outlined {
     }
 
     body:has(.tabbar) {
-        padding-bottom: calc(96px + env(safe-area-inset-bottom));
+        padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
     }
 
+    /* Docked at the bottom, like the header at the top: a hairline and a blur */
     .tabbar {
         position: fixed;
-        left: 12px;
-        right: 12px;
-        bottom: calc(12px + env(safe-area-inset-bottom));
+        inset-inline: 0;
+        bottom: 0;
         z-index: 60;
         display: grid;
         /* One column per tab shown: a shared library hides some (js/scope.js) */
         grid-auto-flow: column;
         grid-auto-columns: 1fr;
         align-items: center;
-        height: 66px;
-        padding: 0 6px;
-        border: 1px solid var(--rule);
-        border-radius: var(--shape-lg);
-        /* Solid, so a bright photo scrolling underneath can't wash out the muted labels */
+        height: calc(64px + env(safe-area-inset-bottom, 0px));
+        padding: 0 max(8px, env(safe-area-inset-right, 0px)) env(safe-area-inset-bottom, 0px) max(8px, env(safe-area-inset-left, 0px));
+        box-sizing: border-box;
+        border-top: 1px solid var(--rule);
+        /* Solid, so a bright photo scrolling underneath can't wash out the labels */
         background: var(--paper-raised);
-        backdrop-filter: blur(18px) saturate(1.4);
-        -webkit-backdrop-filter: blur(18px) saturate(1.4);
-        box-shadow: 0 20px 40px -18px rgb(90 20 50 / 0.35);
     }
 
     .tab {
         display: grid;
         justify-items: center;
         gap: 2px;
-        padding: 6px 0;
+        padding: 4px 0;
         border: 0;
         background: none;
-        color: var(--ink-faint);
+        color: var(--ink-soft);
         font: inherit;
         font-size: 0.6875rem;
-        font-weight: 650;
+        font-weight: 600;
         text-decoration: none;
         cursor: pointer;
         -webkit-tap-highlight-color: transparent;
     }
 
+    /* The icon sits in a pill that fills in on the page you're on */
     .tab .material-symbols-outlined {
-        font-size: 24px;
+        display: grid;
+        place-items: center;
+        width: 52px;
+        height: 28px;
+        border-radius: 14px;
+        font-size: 22px;
+        transition: background-color 0.18s ease;
+    }
+
+    .tab:active .material-symbols-outlined {
+        background: var(--surface-press);
+    }
+
+    .tab:focus-visible {
+        outline: none;
+    }
+
+    .tab:focus-visible .material-symbols-outlined {
+        outline: 2px solid var(--ring);
+        outline-offset: 1px;
     }
 
     .tab.active {
-        color: var(--berry);
+        color: var(--foreground);
+        font-weight: 700;
     }
 
     .tab.active .material-symbols-outlined {
+        background: color-mix(in oklab, var(--berry) 16%, transparent);
+        color: var(--accent-ink);
         font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
     }
 
+    /* The page's main action (Add, New note): a berry key in the row, not a bubble over it */
     .tab-fab {
         justify-self: center;
         display: grid;
         place-items: center;
-        width: 60px;
-        height: 60px;
-        margin-top: -34px;
-        border: 5px solid var(--paper);
-        border-radius: 50%;
+        width: 52px;
+        height: 40px;
+        border: 0;
+        border-radius: 14px;
         background: var(--berry-gradient);
         color: #fff;
-        box-shadow: 0 14px 28px -10px var(--berry);
+        box-shadow: var(--shadow-btn), 0 8px 18px -10px var(--berry);
         cursor: pointer;
         -webkit-tap-highlight-color: transparent;
         transition: transform 0.18s var(--ease-out);
     }
 
     .tab-fab:active {
-        transform: scale(0.94);
+        transform: scale(0.95);
     }
 
     .tab-fab .material-symbols-outlined {
-        font-size: 28px;
+        font-size: 26px;
         font-variation-settings: 'FILL' 0, 'wght' 500, 'GRAD' 0, 'opsz' 24;
     }
 }

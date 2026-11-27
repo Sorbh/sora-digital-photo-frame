@@ -7,8 +7,9 @@ const { folderNotFoundError } = require('../utils/httpError');
 
 const FOLDER_PREFIX = 'folder-settings:';
 
-// photo-info is real data: stored photos have no EXIF to read it back from
-const CACHE_NAMES = new Set(['places']);
+// photo-info is real data: stored photos have no EXIF to read it back from.
+// photo-sizes is measured again from the photos when it's gone.
+const CACHE_NAMES = new Set(['places', 'photo-sizes']);
 
 class LocalDataStore extends DataStore {
   constructor(root = DATA_DIR) {

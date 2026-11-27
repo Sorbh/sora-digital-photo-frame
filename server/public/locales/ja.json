@@ -443,7 +443,19 @@
     "newNoteTitle": "このフォルダにメモを書く",
     "addFromDevice": "この端末から",
     "addFromGooglePhotos": "Googleフォトから",
-    "allNotes": "すべてのメモ"
+    "allNotes": "すべてのメモ",
+    "menuView": "表示",
+    "menuMove": "移動先…",
+    "moveButton": "移動",
+    "selectAll": "すべて選択",
+    "selectedCount_one": "{count}件を選択",
+    "selectedCount_other": "{count}件を選択",
+    "selectionBar": "選択した写真",
+    "moveTitle_one": "{count}枚の写真を移動",
+    "moveTitle_other": "{count}枚の写真を移動",
+    "moveHere": "ここに移動",
+    "moveNoFolders": "ここにはフォルダがありません",
+    "accountMenu": "アカウントメニュー"
   },
   "notes": {
     "your_headline": "見出しを入力",

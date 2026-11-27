@@ -457,7 +457,19 @@
     "newNoteTitle": "Escreva um bilhete para esta pasta",
     "addFromDevice": "Deste aparelho",
     "addFromGooglePhotos": "Do Google Fotos",
-    "allNotes": "Todos os bilhetes"
+    "allNotes": "Todos os bilhetes",
+    "menuView": "Ver",
+    "menuMove": "Mover para…",
+    "moveButton": "Mover",
+    "selectAll": "Selecionar tudo",
+    "selectedCount_one": "{count} selecionada",
+    "selectedCount_other": "{count} selecionadas",
+    "selectionBar": "Fotos selecionadas",
+    "moveTitle_one": "Mover {count} foto",
+    "moveTitle_other": "Mover {count} fotos",
+    "moveHere": "Mover para cá",
+    "moveNoFolders": "Nenhuma pasta aqui",
+    "accountMenu": "Menu da conta"
   },
   "notes": {
     "your_headline": "Seu título",

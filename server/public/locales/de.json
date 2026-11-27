@@ -443,7 +443,19 @@
     "newNoteTitle": "Eine Notiz für diesen Ordner schreiben",
     "addFromDevice": "Von diesem Gerät",
     "addFromGooglePhotos": "Aus Google Fotos",
-    "allNotes": "Alle Notizen"
+    "allNotes": "Alle Notizen",
+    "menuView": "Ansehen",
+    "menuMove": "Verschieben nach…",
+    "moveButton": "Verschieben",
+    "selectAll": "Alle auswählen",
+    "selectedCount_one": "{count} ausgewählt",
+    "selectedCount_other": "{count} ausgewählt",
+    "selectionBar": "Ausgewählte Fotos",
+    "moveTitle_one": "{count} Foto verschieben",
+    "moveTitle_other": "{count} Fotos verschieben",
+    "moveHere": "Hierher verschieben",
+    "moveNoFolders": "Hier sind keine Ordner",
+    "accountMenu": "Kontomenü"
   },
   "notes": {
     "your_headline": "Ihre Überschrift",

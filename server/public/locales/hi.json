@@ -443,7 +443,19 @@
     "newNoteTitle": "इस फ़ोल्डर के लिए नोट लिखें",
     "addFromDevice": "इस डिवाइस से",
     "addFromGooglePhotos": "Google Photos से",
-    "allNotes": "सभी नोट"
+    "allNotes": "सभी नोट",
+    "menuView": "देखें",
+    "menuMove": "यहाँ ले जाएँ…",
+    "moveButton": "ले जाएँ",
+    "selectAll": "सभी चुनें",
+    "selectedCount_one": "{count} चुनी गई",
+    "selectedCount_other": "{count} चुनी गईं",
+    "selectionBar": "चुनी गई फ़ोटो",
+    "moveTitle_one": "{count} फ़ोटो ले जाएँ",
+    "moveTitle_other": "{count} फ़ोटो ले जाएँ",
+    "moveHere": "यहाँ ले जाएँ",
+    "moveNoFolders": "यहाँ कोई फ़ोल्डर नहीं है",
+    "accountMenu": "खाता मेनू"
   },
   "notes": {
     "your_headline": "आपकी हेडलाइन",

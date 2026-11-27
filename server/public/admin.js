@@ -51,7 +51,10 @@ class PhotoFrameAdmin {
         this.currentPath = this.getInitialPath();
         this.selectedFiles = [];
         this.emptyStateSelectedFiles = []; // For empty state upload
-        this.selectedItems = new Set(); // For multi-select
+        // Selection mode (js/selectionMode.js): a tick or a long press starts it, and
+        // Escape, Cancel or the phone's Back ends it
+        this.selection = SoraSelection.create({ history: window.history, onChange: () => this.updateSelectionUI() });
+        this.measured = new Map(); // path -> { width, height } of photos measured as they loaded
         this.contextMenuTarget = null;
         this.longPressDelay = 500; // 500ms for long press
         
@@ -160,12 +163,18 @@ class PhotoFrameAdmin {
         }
         if (url.href === location.href) return;
         if (push) window.history.pushState({}, '', url);
-        else window.history.replaceState(history.state, '', url);
+        else {
+            // Selection's own entry, taken over by the folder that opens from it
+            const { selecting, ...state } = history.state || {};
+            window.history.replaceState(state, '', url);
+        }
     }
 
     // Back and Forward: close the photo viewer first, then show the folder the
     // entry is for
     handleHistory() {
+        // Back while photos are selected ends selection first
+        this.selection.onPopState(history.state);
         const modal = document.getElementById('photoModal');
         if (modal.open && !history.state?.photo) this.hidePhotoModal();
         const path = this.getInitialPath();
@@ -227,12 +236,17 @@ class PhotoFrameAdmin {
         // Context menu. The popover is "manual" because the browser's light dismiss
         // closes it on the mouse-up of the same right-click that opened it.
         document.addEventListener('pointerdown', (e) => {
-            if (e.button === 0 && !e.target.closest('#contextMenuPopover, .folder-more, .photo-more')) {
+            if (e.button === 0 && !e.target.closest('#contextMenuPopover, .folder-more, .photo-more, #selectionMoreBtn')) {
                 this.hideContextMenu({ returnFocus: false }); // focus goes where the click was
             }
         });
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') this.hideContextMenu();
+            if (e.key !== 'Escape') return;
+            const menuOpen = document.getElementById('contextMenuPopover').matches(':popover-open')
+                || Boolean(document.getElementById('addMenu')?.matches(':popover-open'));
+            this.hideContextMenu();
+            // Escape closes what's on top first: a menu or a dialog, then selection
+            if (!menuOpen && !document.querySelector('dialog[open]')) this.selection.onKey(e);
         });
         document.getElementById('contextMenuPopover').addEventListener('keydown', (e) => this.contextMenuKey(e));
         window.addEventListener('resize', () => this.hideContextMenu());
@@ -302,8 +316,31 @@ class PhotoFrameAdmin {
             }
         });
 
-        // Selection controls
+        // Selection bar: Delete, Move, Select all, the one photo's menu, and Cancel
         document.getElementById('bulkDeleteBtn').addEventListener('click', () => this.showBulkDeleteModal());
+        document.getElementById('bulkMoveBtn').addEventListener('click', () => this.openMoveDialog(this.selection.keys()));
+        document.getElementById('selectAllBtn').addEventListener('click', () => this.selectAll());
+        document.getElementById('clearSelectionBtn').addEventListener('click', () => this.clearSelection());
+        document.getElementById('selectionMoreBtn').addEventListener('click', (e) => {
+            const [only] = this.selection.keys();
+            const file = this.folderData?.files.find(item => item.path === only);
+            if (file) this.showContextMenu(e, { ...file, type: this.tileType(file) });
+        });
+
+        // Move to…: a folder picker (see openMoveDialog)
+        document.getElementById('moveHereBtn').addEventListener('click', () => this.confirmMove());
+        document.getElementById('cancelMoveBtn').addEventListener('click', () => document.getElementById('moveDialog').close());
+        document.getElementById('moveUpBtn').addEventListener('click', () => this.showMoveFolder(this.moveParent()));
+        document.getElementById('moveDialog').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) e.currentTarget.close();
+            const folder = e.target.closest('.move-folder');
+            if (folder) this.showMoveFolder(folder.dataset.path);
+        });
+
+        // The photo grid lays itself out again when its width changes
+        if (window.ResizeObserver) {
+            new ResizeObserver(() => this.scheduleLayout()).observe(document.getElementById('fileGrid'));
+        }
         
         // Bulk delete modal
         document.getElementById('cancelBulkDeleteBtn').addEventListener('click', () => this.hideBulkDeleteModal());
@@ -599,11 +636,11 @@ class PhotoFrameAdmin {
         const focused = document.activeElement;
         const focusTile = focused && fileGrid.contains(focused) ? focused.closest('.file-item') : null;
         const focusPath = focusTile?.dataset.path;
-        const focusPart = focusTile && ['.photo-more', '.folder-more'].find(part => focused.matches(part));
-        
+        const focusPart = focusTile && ['.photo-more', '.folder-more', '.tile-open'].find(part => focused.matches(part));
+
         fileGrid.innerHTML = '';
         this.folderData = data; // kept to redraw the grid when the language changes
-        
+
         // Update available images for navigation
         // Snaps and notes open in their own editors, so the photo viewer steps over them
         this.availableImages = data.files.filter(file => file.type !== 'snap' && file.type !== 'note').map((file, index) => ({
@@ -619,45 +656,140 @@ class PhotoFrameAdmin {
         this.fileNames = data.files.map(file => file.name);
         this.showPlayOrder();
         // MAX_FOLDER_DEPTH: no "New folder" in a folder at the deepest level
-        
+
         // Background hint under the grid; the empty state has its own upload box
         const isEmpty = data.folders.length === 0 && data.files.length === 0;
         document.getElementById('dropHint').classList.toggle('hidden', isEmpty);
         this.renderDropTexts();
         document.getElementById('dropHintMove').classList.toggle('hidden', !(data.folders.length && data.files.length));
 
+        this.photoFiles = [];
+        this.tiles = new Map();
+        this.photoArea = null;
         if (isEmpty) {
             emptyState.classList.remove('hidden');
             return;
         }
-        
+
         emptyState.classList.add('hidden');
-        
-        // Add Google Photos import cell if user is authenticated
-        if (window.googlePhotosSync && window.googlePhotosSync.isAuthenticated) {
-            const importElement = this.createGooglePhotosImportElement();
-            fileGrid.appendChild(importElement);
+
+        // Folders first, as cards, with the Google Photos import card when it's connected
+        const importCard = window.googlePhotosSync && window.googlePhotosSync.isAuthenticated;
+        if (data.folders.length > 0 || importCard) {
+            if (data.folders.length > 0) fileGrid.appendChild(this.createGridLabel(t('admin.gridFolders')));
+            const folders = document.createElement('div');
+            folders.className = 'folder-grid';
+            if (importCard) folders.appendChild(this.createGooglePhotosImportElement());
+            data.folders.forEach(folder => folders.appendChild(this.createFolderElement(folder)));
+            fileGrid.appendChild(folders);
         }
-        
-        // Render folders
-        if (data.folders.length > 0) fileGrid.appendChild(this.createGridLabel(t('admin.gridFolders')));
-        data.folders.forEach(folder => {
-            const folderElement = this.createFolderElement(folder);
-            fileGrid.appendChild(folderElement);
-        });
-        
-        // Render files
-        if (data.files.length > 0) fileGrid.appendChild(this.createGridLabel(t('admin.gridPhotos')));
-        data.files.forEach(file => {
-            const fileElement = this.createFileElement(file);
-            fileGrid.appendChild(fileElement);
-        });
+
+        // Then the photos, in rows that keep each one's shape (layoutPhotos)
+        if (data.files.length > 0) {
+            this.photoFiles = data.files.slice();
+            data.files.forEach(file => this.tiles.set(file.path, this.createFileElement(file)));
+            const groups = this.photoGroups();
+            // "Photos" under the folders, unless dates head the photos
+            if (data.folders.length > 0 && !groups.some(group => group.label)) {
+                fileGrid.appendChild(this.createGridLabel(t('admin.gridPhotos')));
+            }
+            const area = document.createElement('div');
+            area.className = 'photo-area';
+            area.id = 'photoArea';
+            fileGrid.appendChild(area);
+            this.photoArea = area;
+            this.layoutPhotos();
+        }
+        this.updateSelectionUI();
 
         if (focusPath !== undefined) {
             const tile = [...fileGrid.querySelectorAll('.file-item')].find(item => item.dataset.path === focusPath);
             const target = tile && ((focusPart && tile.querySelector(focusPart)) || tile.querySelector('.photo-more, .folder-more'));
             target?.focus({ preventScroll: true });
         }
+    }
+
+    // ---------- The photo grid: justified rows, grouped by date -----------
+
+    // What a tile is: an image, or a snap or note (drawn pages)
+    tileType(file) {
+        return file.type === 'snap' || file.type === 'note' ? file.type : 'image';
+    }
+
+    // A photo's shape for the rows: from the listing, or measured as it loaded.
+    // Snaps and notes are pages in the frame's landscape shape.
+    shapeOf(file) {
+        if (file.type === 'snap' || file.type === 'note') return 4 / 3;
+        if (file.width > 0 && file.height > 0) return { width: file.width, height: file.height };
+        return this.measured.get(file.path) || null;
+    }
+
+    // Newest or oldest first: grouped by month (by day when they're all in one
+    // month). Shuffle and My order keep one list, in the order the folder has.
+    photoGroups() {
+        const files = this.photoFiles || [];
+        if (this.playOrder !== 'newest' && this.playOrder !== 'oldest') return [{ label: null, files }];
+        return SoraJustified.groupByDate(files, { locale: (window.i18n && window.i18n.locale) || 'en' });
+    }
+
+    // Lay the photos out in rows as wide as the grid (js/justifiedLayout.js). The
+    // tiles are made once per listing and moved into the new rows each time.
+    layoutPhotos() {
+        const area = this.photoArea;
+        if (!area || !this.tiles) return;
+        const width = Math.floor(area.getBoundingClientRect().width || area.clientWidth || 0) || 1200;
+        const gap = width < 640 ? 3 : 4;
+        const rowHeight = SoraJustified.rowHeightFor(width);
+        area.style.setProperty('--grid-gap', `${gap}px`);
+        const sections = this.photoGroups().map(group => {
+            const section = document.createElement('section');
+            section.className = 'photo-group';
+            if (group.label) {
+                const heading = document.createElement('h2');
+                heading.className = 'photo-group-title';
+                const label = document.createElement('span');
+                label.textContent = group.label;
+                const count = document.createElement('span');
+                count.className = 'photo-group-count';
+                count.textContent = t('admin.countPhotos', { count: group.files.length });
+                heading.appendChild(label);
+                heading.appendChild(count);
+                section.appendChild(heading);
+            }
+            const { rows } = SoraJustified.layout(group.files.map(file => this.shapeOf(file)), { width, rowHeight, gap });
+            rows.forEach(row => {
+                const line = document.createElement('div');
+                line.className = 'photo-row';
+                line.style.height = `${row.height}px`;
+                row.items.forEach(item => {
+                    const tile = this.tiles.get(group.files[item.index].path);
+                    if (!tile) return;
+                    tile.style.width = `${item.width}px`;
+                    tile.style.height = `${row.height}px`;
+                    line.appendChild(tile);
+                });
+                section.appendChild(line);
+            });
+            return section;
+        });
+        area.replaceChildren(...sections);
+        this.layoutWidth = width;
+    }
+
+    // Again on the next frame, once (a width change, a photo measured as it loaded)
+    scheduleLayout() {
+        if (this.layoutQueued) return;
+        this.layoutQueued = true;
+        requestAnimationFrame(() => {
+            this.layoutQueued = false;
+            const area = this.photoArea;
+            if (!area) return;
+            const width = Math.floor(area.getBoundingClientRect().width);
+            if (width !== this.layoutWidth || this.layoutStale) {
+                this.layoutStale = false;
+                this.layoutPhotos();
+            }
+        });
     }
 
     // The library root shows as "Library"; any other folder by its own name
@@ -679,17 +811,9 @@ class PhotoFrameAdmin {
         this.updateUploadButton();
         this.updateEmptyStateUploadButton();
         if (!this.folderData) return;
-        const selected = [...this.selectedItems];
+        // The tiles are drawn again; what was selected stays selected
         this.renderFolderContents(this.folderData);
         this.updateBreadcrumb();
-        selected.forEach(path => {
-            const tile = document.querySelector(`.file-item[data-path="${CSS.escape(path)}"]`);
-            if (!tile) return this.selectedItems.delete(path);
-            tile.classList.add('selected');
-            const checkbox = tile.querySelector('input[type="checkbox"]');
-            if (checkbox) checkbox.checked = true;
-        });
-        this.updateSelectionUI();
     }
 
     updateLibraryHeading(data) {
@@ -742,13 +866,27 @@ class PhotoFrameAdmin {
                 </div>
             </div>
             <div class="folder-meta">
-                <div class="folder-name"></div>
+                <div class="folder-text">
+                    <div class="folder-name"></div>
+                    <div class="folder-count"></div>
+                </div>
                 <button type="button" class="folder-more" data-edit-only aria-label="${escapeHtml(t('admin.folderOptions'))}" aria-haspopup="menu" aria-expanded="false">
                     <span class="material-symbols-outlined">more_vert</span>
                 </button>
             </div>
         `;
         div.querySelector('.folder-name').textContent = folder.name;
+        // "2 folders · 12 photos": what is directly inside, when the listing says
+        const counts = folder.counts;
+        const countLine = div.querySelector('.folder-count');
+        if (counts) {
+            const parts = [];
+            if (counts.folders) parts.push(t('admin.countFolders', { count: counts.folders }));
+            if (counts.photos || !counts.folders) parts.push(t('admin.countPhotos', { count: counts.photos }));
+            countLine.textContent = parts.join(' · ');
+        } else {
+            countLine.remove();
+        }
         const cover = div.querySelector('.folder-cover-img');
         if (folder.thumbnail) {
             cover.addEventListener('error', () => div.classList.add('no-cover'));
@@ -795,74 +933,60 @@ class PhotoFrameAdmin {
         else this.showPhotoModal(file.url, file.name);
     }
 
+    // A photo tile: the photo in its own shape and nothing else, until hovered (a
+    // round check to select, one ⋮ menu) or selection starts (every tile shows its
+    // check). No file names: they are the uploads' internal names.
     createFileElement(file) {
         const isSnap = file.type === 'snap';
         const isNote = file.type === 'note';
-        const type = isSnap || isNote ? file.type : 'image';
+        const type = this.tileType(file);
         const div = document.createElement('div');
         div.className = isSnap ? 'file-item image snap' : isNote ? 'file-item image snap note' : 'file-item image';
         div.dataset.path = file.path;
         div.dataset.type = type;
+        const openLabel = isSnap ? t('admin.editSnap') : isNote ? t('notes.editNote') : t('admin.viewPhoto');
         div.innerHTML = `
             <div class="admin-photo-image">
-                <img src="${file.thumbnail || file.url}" alt="" loading="lazy" decoding="async">
+                <img alt="" loading="lazy" decoding="async">
             </div>
-            <div class="photo-grid-overlay">
-                <div class="photo-grid-overlay-top">
-                    <div class="photo-grid-checkbox" data-edit-only>
-                        <label class="label">
-                            <input type="checkbox" class="input" aria-label="${escapeHtml(t('admin.selectPhoto'))}">
-                            <span class="sr-only">${escapeHtml(t('admin.selectPhoto'))}</span>
-                        </label>
-                    </div>
-                    <button type="button" class="btn-icon photo-more" data-edit-only data-action="more" aria-haspopup="menu" aria-expanded="false" aria-label="${escapeHtml(t('admin.photoOptions'))}">
-                        <span class="material-symbols-outlined">more_vert</span>
-                    </button>
-                </div>
-                <div class="photo-grid-overlay-bottom">
-                    <div class="photo-grid-actions">
-                        <button class="btn-icon" data-tooltip="${escapeHtml(t('admin.viewPhoto'))}" data-action="view" aria-label="${escapeHtml(t('admin.viewPhoto'))}">
-                            <span class="material-symbols-outlined">visibility</span>
-                        </button>
-                        <button class="btn-icon" data-edit-only data-tooltip="${escapeHtml(t('admin.deletePhoto'))}" data-action="delete" aria-label="${escapeHtml(t('admin.deletePhoto'))}">
-                            <span class="material-symbols-outlined">delete</span>
-                        </button>
-                    </div>
-                </div>
-            </div>
-            <div class="photo-grid-info">
-                <div class="photo-grid-name"></div>
-            </div>
+            <button type="button" class="tile-open" aria-label="${escapeHtml(openLabel)}"></button>
+            <span class="tile-shade" aria-hidden="true"></span>
+            <label class="photo-grid-checkbox" data-edit-only>
+                <input type="checkbox" class="tile-check-input" aria-label="${escapeHtml(t('admin.selectPhoto'))}">
+                <span class="tile-check" aria-hidden="true"></span>
+            </label>
+            <button type="button" class="btn-icon photo-more" data-edit-only data-action="more" aria-haspopup="menu" aria-expanded="false" aria-label="${escapeHtml(t('admin.photoOptions'))}" title="${escapeHtml(t('admin.photoOptions'))}">
+                <span class="material-symbols-outlined" aria-hidden="true">more_vert</span>
+            </button>
         `;
-        // File names come from uploads, so set them as text rather than HTML
-        div.querySelector('img').alt = file.name;
-        div.querySelector('.photo-grid-name').textContent = file.name;
+        const img = div.querySelector('img');
+        // The thumbnail in the photo's own shape (older listings: the square one)
+        img.src = file.preview || file.thumbnail || file.url;
+        // Not measured yet: measured as it loads, and the rows laid out again
+        if (type === 'image' && !(file.width > 0 && file.height > 0)) {
+            img.addEventListener('load', () => {
+                if (!img.naturalWidth || !img.naturalHeight || this.measured.has(file.path)) return;
+                this.measured.set(file.path, { width: img.naturalWidth, height: img.naturalHeight });
+                this.layoutStale = true;
+                this.scheduleLayout();
+            });
+        }
         if (isSnap) this.dressSnapTile(div, file);
         if (isNote) this.dressNoteTile(div, file);
-        div.querySelector('input[type="checkbox"]').dataset.path = file.path;
         
-        // Handle checkbox selection
+        // The check: starts selection, or ticks and unticks in it
         const checkbox = div.querySelector('input[type="checkbox"]');
+        checkbox.dataset.path = file.path;
         checkbox.addEventListener('change', (e) => {
             e.stopPropagation();
             this.toggleSelection(file);
         });
-        
-        // Handle action buttons
-        const actionButtons = div.querySelectorAll('.btn-icon');
-        actionButtons.forEach(button => {
-            button.addEventListener('click', (e) => {
-                e.stopPropagation(); // Prevent cell selection
-                const action = button.getAttribute('data-action');
-                if (action === 'view') {
-                    this.openTile(file);
-                } else if (action === 'delete') {
-                    this.deleteItem({...file, type});
-                } else if (action === 'more') {
-                    // Same menu as right-click (rotate, move earlier/later): the way in on touch screens
-                    this.showContextMenu(e, {...file, type});
-                }
-            });
+        checkbox.addEventListener('click', (e) => e.stopPropagation());
+
+        // ⋮: the same menu as right-click (View, Rotate, Move to…, Delete)
+        div.querySelector('.photo-more').addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.showContextMenu(e, {...file, type});
         });
         
         // Drag onto a folder to move it; a selected photo brings the whole selection along
@@ -875,7 +999,7 @@ class PhotoFrameAdmin {
                 e.preventDefault(); // nothing to move it with
                 return;
             }
-            const paths = this.selectedItems.has(file.path) ? [...this.selectedItems] : [file.path];
+            const paths = this.selection.has(file.path) ? this.selection.keys() : [file.path];
             e.dataTransfer.setData(PHOTO_DRAG_TYPE, JSON.stringify(paths));
             this.draggingPaths = paths;
             e.dataTransfer.effectAllowed = 'move';
@@ -895,7 +1019,7 @@ class PhotoFrameAdmin {
         // a finished hold is swallowed (js/longPress.js).
         const longPress = SoraLongPress.attach(div, {
             delay: this.longPressDelay,
-            ignore: '.photo-grid-checkbox, .btn-icon',
+            ignore: '.photo-grid-checkbox, .photo-more',
             onStart: (e) => {
                 // Fingers scroll and hold; only a mouse picks the tile up to drag it
                 div.draggable = e.pointerType === 'mouse';
@@ -903,20 +1027,21 @@ class PhotoFrameAdmin {
             },
             onLongPress: () => {
                 div.classList.remove('selecting');
+                if (!this.canEdit()) return;
                 this.toggleSelection(file);
-                if (navigator.vibrate) navigator.vibrate(50);
+                if (navigator.vibrate) navigator.vibrate(30);
             },
             onEnd: () => div.classList.remove('selecting')
         });
         div.addEventListener('dragstart', () => longPress.cancel());
         div.addEventListener('contextmenu', (e) => this.showContextMenu(e, {...file, type}));
         
-        // Regular click handler for photo modal
+        // A click opens it; while photos are selected it ticks it instead
         div.addEventListener('click', (e) => {
-            // Don't open modal if clicking on checkbox or action buttons
-            if (e.target.closest('.photo-grid-checkbox') || e.target.closest('.btn-icon')) return;
+            if (e.target.closest('.photo-grid-checkbox') || e.target.closest('.photo-more')) return;
             e.preventDefault();
-            this.openTile(file);
+            if (this.selection.active && this.canEdit()) this.toggleSelection(file);
+            else this.openTile(file);
         });
         
         return div;
@@ -939,14 +1064,8 @@ class PhotoFrameAdmin {
         badge.appendChild(label);
         div.appendChild(badge);
 
-        div.querySelector('.photo-grid-name').textContent = snap.title || file.name;
-        const view = div.querySelector('[data-action="view"]');
-        view.dataset.tooltip = t('admin.editSnap');
-        view.setAttribute('aria-label', t('admin.editSnap'));
-        view.querySelector('.material-symbols-outlined').textContent = 'edit';
-        const del = div.querySelector('[data-action="delete"]');
-        del.dataset.tooltip = t('admin.deleteSnap');
-        del.setAttribute('aria-label', t('admin.deleteSnap'));
+        // Its title says which page it is, to a screen reader
+        if (snap.title) div.querySelector('.tile-open').setAttribute('aria-label', `${t('admin.editSnap')}: ${snap.title}`);
     }
 
     // A note gets the same drawn page as a snap, with a note badge: it is not a
@@ -955,12 +1074,8 @@ class PhotoFrameAdmin {
         this.dressSnapTile(div, { ...file, snap: file.note });
         div.querySelector('.snap-badge .material-symbols-outlined').textContent = 'sticky_note_2';
         div.querySelector('.snap-badge-text').textContent = t('admin.noteBadge');
-        const view = div.querySelector('[data-action="view"]');
-        view.dataset.tooltip = t('notes.editNote');
-        view.setAttribute('aria-label', t('notes.editNote'));
-        const del = div.querySelector('[data-action="delete"]');
-        del.dataset.tooltip = t('notes.static_017');
-        del.setAttribute('aria-label', t('notes.static_017'));
+        const title = file.note && file.note.title;
+        div.querySelector('.tile-open').setAttribute('aria-label', title ? `${t('notes.editNote')}: ${title}` : t('notes.editNote'));
     }
 
     createGooglePhotosImportElement() {
@@ -991,7 +1106,11 @@ class PhotoFrameAdmin {
     navigateTo(path) {
         if (path === this.currentPath) return;
         this.currentPath = path;
-        this.updateURL(true);
+        // Opened from selection: the folder takes selection's history entry, so
+        // Back still goes to the folder before
+        const fromSelection = this.selection.ownsEntry;
+        this.selection.forget();
+        this.updateURL(!fromSelection);
         this.loadFolderContents();
     }
 
@@ -1297,9 +1416,6 @@ class PhotoFrameAdmin {
     showContextMenu(event, item) {
         event.preventDefault();
         if (!this.canEdit()) return; // every item in it changes something
-        console.log('Context menu triggered for:', item);
-        console.log('Item type:', typeof item, 'Has name:', item?.name);
-        
         this.contextMenuTarget = item;
         const popover = document.getElementById('contextMenuPopover');
         // Focus comes back here when the menu closes: the options button, or what had
@@ -1311,9 +1427,12 @@ class PhotoFrameAdmin {
         }
         this.markMenuOpen(this.contextMenuOpener, true);
         
-        // Show/hide menu items based on item type (data-for lists the types)
+        // Show/hide menu items based on item type (data-for lists the types); Move
+        // earlier and later only in "My order" (data-order)
         popover.querySelectorAll('[data-for]').forEach(menuItem => {
-            menuItem.style.display = menuItem.dataset.for.split(' ').includes(item.type) ? '' : 'none';
+            const forType = menuItem.dataset.for.split(' ').includes(item.type);
+            const forOrder = !menuItem.dataset.order || menuItem.dataset.order === this.playOrder;
+            menuItem.style.display = forType && forOrder ? '' : 'none';
         });
         
         // Under the options button, or at the right-click, kept on screen (js/placeMenu.js)
@@ -1389,7 +1508,6 @@ class PhotoFrameAdmin {
     }
 
     async handleContextMenuAction(action) {
-        console.log('Context menu action:', action, 'Target:', this.contextMenuTarget);
         if (!this.contextMenuTarget) return;
         
         // Store the target before hiding the menu
@@ -1397,6 +1515,12 @@ class PhotoFrameAdmin {
         this.hideContextMenu();
         
         switch (action) {
+            case 'view':
+                this.openTile(targetItem);
+                break;
+            case 'move':
+                this.openMoveDialog([targetItem.path]);
+                break;
             case 'delete':
                 await this.deleteItem(targetItem);
                 break;
@@ -1533,9 +1657,10 @@ class PhotoFrameAdmin {
     }
 
     arrangeTiles() {
-        const grid = document.getElementById('fileGrid');
-        const tiles = new Map([...grid.querySelectorAll('.file-item.image')].map(el => [el.dataset.path.split('/').pop(), el]));
-        this.fileNames.forEach(name => tiles.get(name) && grid.appendChild(tiles.get(name)));
+        // The rows follow the new order
+        const rank = new Map(this.fileNames.map((name, i) => [name, i]));
+        this.photoFiles = (this.photoFiles || []).slice().sort((a, b) => (rank.get(a.name) ?? Infinity) - (rank.get(b.name) ?? Infinity));
+        this.layoutPhotos();
         this.availableImages = this.availableImages
             .slice()
             .sort((a, b) => this.fileNames.indexOf(a.name) - this.fileNames.indexOf(b.name))
@@ -1799,77 +1924,133 @@ class PhotoFrameAdmin {
         }
     }
 
-    // Selection Management Methods
+    // ---------- Selection ------------------------------------------------
+
     toggleSelection(file) {
         if (!this.canEdit()) return; // selecting is for deleting and moving
-        const filePath = file.path;
-        const fileElement = document.querySelector(`[data-path="${filePath}"]`);
-        const checkbox = fileElement.querySelector('input[type="checkbox"]');
-        
-        if (this.selectedItems.has(filePath)) {
-            this.selectedItems.delete(filePath);
-            fileElement.classList.remove('selected');
-            checkbox.checked = false;
-        } else {
-            this.selectedItems.add(filePath);
-            fileElement.classList.add('selected');
-            checkbox.checked = true;
-        }
-        
-        this.updateSelectionUI();
+        this.selection.toggle(file.path);
+    }
+
+    // Every photo, snap and note in this folder
+    selectAll() {
+        if (!this.canEdit()) return;
+        this.selection.selectAll((this.photoFiles || []).map(file => file.path));
     }
 
     clearSelection() {
-        this.selectedItems.forEach(filePath => {
-            const fileElement = document.querySelector(`[data-path="${filePath}"]`);
-            if (fileElement) {
-                const checkbox = fileElement.querySelector('input[type="checkbox"]');
-                fileElement.classList.remove('selected');
-                if (checkbox) {
-                    checkbox.checked = false;
-                }
-            }
-        });
-        
-        this.selectedItems.clear();
-        this.updateSelectionUI();
+        this.selection.clear();
     }
 
+    // The tiles' checks, the grid's selecting look and the selection bar
     updateSelectionUI() {
-        const selectionCount = this.selectedItems.size;
-        const fabBadge = document.getElementById('fabBadge');
-        const selectionFab = document.getElementById('selectionFab');
-        const currentCount = parseInt(fabBadge.textContent) || 0;
-        
-        // Update badge text
-        fabBadge.textContent = selectionCount;
-        
-        // Add bounce animation if count changed
-        if (selectionCount !== currentCount && selectionCount > 0) {
-            fabBadge.classList.remove('updated');
-            // Force reflow to restart animation
-            fabBadge.offsetHeight;
-            fabBadge.classList.add('updated');
-            
-            // Remove animation class after animation completes
-            setTimeout(() => {
-                fabBadge.classList.remove('updated');
-            }, 600);
+        const selection = this.selection;
+        const count = selection.size;
+        (this.tiles || new Map()).forEach((tile, path) => {
+            const on = selection.has(path);
+            tile.classList.toggle('selected', on);
+            const checkbox = tile.querySelector('input[type="checkbox"]');
+            if (checkbox) checkbox.checked = on;
+        });
+        document.getElementById('fileGrid')?.classList.toggle('selecting', count > 0);
+        document.documentElement?.classList.toggle('is-selecting', count > 0);
+
+        const bar = document.getElementById('selectionFab');
+        if (!bar) return;
+        bar.classList.toggle('hidden', count === 0);
+        document.getElementById('fabBadge').textContent = t('admin.selectedCount', { count });
+        const all = (this.photoFiles || []).length;
+        document.getElementById('selectAllBtn').hidden = count >= all;
+        // One photo: its own menu (Rotate, Create snap…) is a tap away on phones too
+        document.getElementById('selectionMoreBtn').hidden = count !== 1;
+    }
+
+    // ---------- Move to… ------------------------------------------------
+    // A small folder picker: it opens on this folder, goes into a folder with a
+    // click and up with the back arrow, and "Move here" moves the photos there.
+
+    openMoveDialog(paths) {
+        if (!this.canEdit() || !paths || !paths.length) return;
+        this.moving = { paths: [...paths], from: this.currentPath, at: this.currentPath };
+        const dialog = document.getElementById('moveDialog');
+        document.getElementById('moveTitle').textContent = t('admin.moveTitle', { count: paths.length });
+        if (!dialog.open) dialog.showModal();
+        // Opens on this folder, or beside it when it has no folders inside
+        this.showMoveFolder(this.currentPath, { orParent: true });
+    }
+
+    moveParent() {
+        const parts = (this.moving?.at || 'uploads').split('/');
+        parts.pop();
+        return parts.join('/') || 'uploads';
+    }
+
+    async showMoveFolder(path, { orParent = false } = {}) {
+        if (!this.moving) return;
+        this.moving.at = path;
+        const request = this.moveRequest = (this.moveRequest || 0) + 1;
+        const list = document.getElementById('moveList');
+        const here = document.getElementById('moveHereBtn');
+        document.getElementById('moveWhere').textContent = this.folderDisplayName(path);
+        document.getElementById('moveUpBtn').hidden = path === 'uploads';
+        here.disabled = true;
+        list.setAttribute('aria-busy', 'true');
+        try {
+            const response = await this.authenticatedFetch(`/api/admin/folders?path=${encodeURIComponent(path)}`);
+            if (!response || request !== this.moveRequest) return;
+            const data = await response.json();
+            if (!response.ok) throw new Error(i18n.error(data, 'admin.loadFolderFailed'));
+            if (orParent && !data.folders.length && path !== 'uploads') return this.showMoveFolder(this.moveParent());
+            list.replaceChildren(...data.folders.map(folder => {
+                const row = document.createElement('button');
+                row.type = 'button';
+                row.className = 'move-folder';
+                row.dataset.path = folder.path;
+                row.innerHTML = `
+                    <span class="move-folder-cover"><span class="material-symbols-outlined" aria-hidden="true">folder</span></span>
+                    <span class="move-folder-name"></span>
+                    <span class="material-symbols-outlined move-folder-go" aria-hidden="true">chevron_right</span>`;
+                row.querySelector('.move-folder-name').textContent = folder.name;
+                if (folder.thumbnail) {
+                    const img = document.createElement('img');
+                    img.alt = '';
+                    img.loading = 'lazy';
+                    img.src = folder.thumbnail;
+                    img.addEventListener('error', () => img.remove());
+                    row.querySelector('.move-folder-cover').appendChild(img);
+                }
+                return row;
+            }));
+            if (!data.folders.length) {
+                const empty = document.createElement('p');
+                empty.className = 'move-empty';
+                empty.textContent = t('admin.moveNoFolders');
+                list.appendChild(empty);
+            }
+            // Not where they already are, nor a folder this person can't change
+            here.disabled = path === this.moving.from || data.canChange === false;
+        } catch (error) {
+            if (request !== this.moveRequest) return;
+            list.replaceChildren();
+            this.showToast(error.message || t('admin.loadFolderFailed'), 'error');
+        } finally {
+            if (request === this.moveRequest) list.removeAttribute('aria-busy');
         }
-        
-        // Show/hide FAB with smooth animation
-        if (selectionCount > 0) {
-            selectionFab.classList.remove('hidden');
-        } else {
-            selectionFab.classList.add('hidden');
-        }
+    }
+
+    async confirmMove() {
+        if (!this.moving || document.getElementById('moveHereBtn').disabled) return;
+        const { paths, at } = this.moving;
+        this.moving = null;
+        document.getElementById('moveDialog').close();
+        this.clearSelection();
+        await this.movePhotos(paths, at);
     }
 
     showBulkDeleteModal() {
-        if (this.selectedItems.size === 0) return;
+        if (this.selection.size === 0) return;
         
         const modal = document.getElementById('bulkDeleteModal');
-        document.getElementById('bulk-delete-description').textContent = t('admin.bulkDeleteConfirm', { count: this.selectedItems.size });
+        document.getElementById('bulk-delete-description').textContent = t('admin.bulkDeleteConfirm', { count: this.selection.size });
         modal.showModal();
     }
 
@@ -1879,7 +2060,7 @@ class PhotoFrameAdmin {
     }
 
     async confirmBulkDelete() {
-        const selectedPaths = Array.from(this.selectedItems);
+        const selectedPaths = this.selection.keys();
         
         if (selectedPaths.length === 0) {
             this.hideBulkDeleteModal();

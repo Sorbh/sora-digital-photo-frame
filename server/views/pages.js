@@ -15,7 +15,7 @@
  *   brand       { name }: the name in the wordmark, page titles and labels
  *               (default "Sora Frame")
  *   accountUrl  a page of the host's about the person's account. When set, the
- *               header links to it (a person icon), and Access leaves the header
+ *               header's account menu links to it, and Access leaves the header
  *               and the tab bar: the host shows it from its account page.
  */
 const fs = require('fs');
@@ -88,27 +88,43 @@ const i18nText = ([key, text]) => `<span data-i18n="${key}">${escapeHtml(text)}<
  * The top bar for a page ('library', 'access', 'notes', 'snap', 'pair' or
  * 'owner-only'). The host's slot ([data-host-slot]) holds the page's name until
  * the host puts something of its own there (a library switcher, say).
+ *
+ *   brand · slot        the places: Library (when not on it), Access, Slideshow
+ *                       the tools: Settings (the library's), the account menu
+ *
+ * The account menu (js/appHeader.js) holds Account (with accountUrl), the theme
+ * and Log out, each keeping its id and data-header-item for scripts and tests.
  */
 function renderHeader(pageId, { eyebrow = null, settings: hasSettings = false } = {}, options = current()) {
   const { brand, accountUrl } = options;
   const here = id => (pageId === id ? ' aria-current="page"' : '');
-  const actions = [];
+  const places = [];
   if (pageId !== 'library') {
-    actions.push(`<a href="/admin" class="tb-btn tb-desktop" data-header-item="library" title="Back to the library" data-i18n-attr="title:accessAccounts.static_017">${icon('photo_library')}<span class="tb-label" data-i18n="common.library">Library</span></a>`);
+    places.push(`<a href="/admin" class="tb-btn tb-desktop" data-header-item="library" title="Back to the library" data-i18n-attr="title:accessAccounts.static_017">${icon('photo_library')}<span class="tb-label" data-i18n="common.library">Library</span></a>`);
   }
   if (!accountUrl) {
-    actions.push(`<a href="/access-accounts" class="tb-btn tb-desktop" data-header-item="access" data-owner-only${here('access')} title="Manage access accounts" data-i18n-attr="title:admin.static_033">${icon('key')}<span class="tb-label" data-i18n="common.access">Access</span></a>`);
+    places.push(`<a href="/access-accounts" class="tb-btn tb-desktop" data-header-item="access" data-owner-only${here('access')} title="Manage access accounts" data-i18n-attr="title:admin.static_033">${icon('key')}<span class="tb-label" data-i18n="common.access">Access</span></a>`);
   }
-  actions.push(`<a href="/slideshow" class="tb-btn tb-desktop" data-header-item="slideshow" title="Open the slideshow" data-i18n-attr="title:admin.static_036">${icon('slideshow')}<span class="tb-label" data-i18n="common.slideshow">Slideshow</span></a>`);
-  actions.push('<span class="topbar-divider tb-desktop" aria-hidden="true"></span>');
+  places.push(`<a href="/slideshow" class="tb-btn tb-desktop" data-header-item="slideshow" title="Open the slideshow" data-i18n-attr="title:admin.static_036">${icon('play_circle')}<span class="tb-label" data-i18n="common.slideshow">Slideshow</span></a>`);
+
+  const tools = [];
   if (hasSettings) {
-    actions.push(`<button type="button" id="settingsBtn" class="tb-btn icon tb-desktop" data-header-item="settings" title="Settings" aria-label="Settings" data-i18n-attr="title:admin.static_037; aria-label:admin.static_037">${icon('tune')}</button>`);
+    tools.push(`<button type="button" id="settingsBtn" class="tb-btn icon tb-desktop" data-header-item="settings" title="Settings" aria-label="Settings" data-i18n-attr="title:admin.static_037; aria-label:admin.static_037">${icon('tune')}</button>`);
   }
-  actions.push(`<button type="button" id="themeToggle" class="tb-btn icon" data-header-item="theme" title="Switch to dark mode" aria-label="Switch to dark mode" data-i18n-attr="title:admin.static_038; aria-label:admin.static_038"><span class="material-symbols-outlined" id="themeIcon" aria-hidden="true">brightness_auto</span></button>`);
+  // The account menu: Account, the theme, Log out
+  const menu = [];
   if (accountUrl) {
-    actions.push(`<a href="${escapeHtml(accountUrl)}" class="tb-btn icon" data-header-item="account" title="Account" aria-label="Account" data-i18n-attr="title:common.account; aria-label:common.account">${icon('account_circle')}</a>`);
+    menu.push(`<a href="${escapeHtml(accountUrl)}" class="tb-btn icon" data-header-item="account" role="menuitem" tabindex="-1">${icon('manage_accounts')}<span class="tb-menu-label" data-i18n="common.account">Account</span></a>`);
   }
-  actions.push(`<button type="button" id="logoutBtn" class="tb-btn icon" data-header-item="logout" title="Log out" aria-label="Log out" data-i18n-attr="title:admin.static_039; aria-label:admin.static_039">${icon('logout')}</button>`);
+  menu.push(`<button type="button" id="themeToggle" class="tb-btn icon" data-header-item="theme" role="menuitem" tabindex="-1"><span class="material-symbols-outlined" id="themeIcon" aria-hidden="true">dark_mode</span><span class="tb-menu-label" id="themeLabel" data-i18n="admin.static_038">Switch to dark mode</span></button>`);
+  menu.push('<hr class="menu-divider" aria-hidden="true">');
+  menu.push(`<button type="button" id="logoutBtn" class="tb-btn icon" data-header-item="logout" role="menuitem" tabindex="-1">${icon('logout')}<span class="tb-menu-label" data-i18n="admin.static_039">Log out</span></button>`);
+  tools.push(`<div class="account-menu">
+                    <button type="button" id="accountMenuBtn" class="tb-btn icon account-trigger" data-header-item="menu" aria-haspopup="menu" aria-expanded="false" aria-controls="accountMenu" title="Account menu" aria-label="Account menu" data-i18n-attr="title:admin.accountMenu; aria-label:admin.accountMenu"><span class="tb-avatar">${icon('person')}</span></button>
+                    <div id="accountMenu" class="sora-menu account-menu-list" role="menu" aria-labelledby="accountMenuBtn" hidden>
+                        ${menu.join('\n                        ')}
+                    </div>
+                </div>`);
 
   const slot = eyebrow ? `<span class="sora-eyebrow" data-i18n="${eyebrow[0]}">${escapeHtml(eyebrow[1])}</span>` : '';
   return `<header class="topbar" data-sora-header="${pageId}">
@@ -118,7 +134,12 @@ function renderHeader(pageId, { eyebrow = null, settings: hasSettings = false } 
                 <div class="topbar-slot" data-host-slot>${slot}</div>
             </div>
             <div class="topbar-actions">
-                ${actions.join('\n                ')}
+                <nav class="topbar-nav tb-desktop" aria-label="Sections" data-i18n-attr="aria-label:admin.static_054">
+                ${places.join('\n                ')}
+                </nav>
+                <div class="topbar-tools">
+                ${tools.join('\n                ')}
+                </div>
             </div>
         </header>`;
 }

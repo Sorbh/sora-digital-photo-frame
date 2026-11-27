@@ -46,7 +46,8 @@ class PlayOrderService {
   async sort(baseDir, items, order) {
     if (order === 'newest' || order === 'oldest') {
       const infos = await photoInfo.getMany(items);
-      const dated = items.map((item, i) => ({ item, at: photoInfo.sortDate(infos[i]) }));
+      // The date each was sorted by goes along (the library groups its grid by it)
+      const dated = items.map((item, i) => ({ item: { ...item, date: infos[i]?.takenAt || infos[i]?.modifiedAt || null }, at: photoInfo.sortDate(infos[i]) }));
       const sign = order === 'newest' ? -1 : 1;
       dated.sort((a, b) => sign * (a.at - b.at) || a.item.path.localeCompare(b.item.path));
       return dated.map(d => d.item);

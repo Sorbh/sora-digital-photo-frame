@@ -69,10 +69,10 @@ describe('every page shares one header', () => {
     expect(header.html).toMatch(/<a href="\/admin" class="sora-wordmark" data-brand [^>]*>Sora Frame<\/a>/);
     expect(header.html).toContain('<div class="topbar-slot" data-host-slot>');
     // The same actions in the same order: Library (when not on it), Access (self-hosted),
-    // Slideshow, settings (the library's own), theme, log out
+    // Slideshow, settings (the library's own), then the account menu: theme, log out
     const expected = id === 'library'
-      ? ['access', 'slideshow', 'settings', 'theme', 'logout']
-      : ['library', 'access', 'slideshow', 'theme', 'logout'];
+      ? ['access', 'slideshow', 'settings', 'menu', 'theme', 'logout']
+      : ['library', 'access', 'slideshow', 'menu', 'theme', 'logout'];
     expect(itemsOf(header.html)).toEqual(expected);
     // No Notes or Google Photos in it any more
     expect(header.html).not.toMatch(/href="\/notes"|googlePhotosBtn|sticky_note_2/);
@@ -186,9 +186,10 @@ describe('accountUrl', () => {
     for (const url of Object.keys(HEADER_PAGES)) {
       const html = (await get(app, url)).text;
       const header = headerOf(html).html;
-      expect(itemsOf(header).slice(-2)).toEqual(['account', 'logout']);
+      expect(itemsOf(header).slice(-4)).toEqual(['menu', 'account', 'theme', 'logout']);
       expect(itemsOf(header)).not.toContain('access');
-      expect(header).toMatch(/<a href="\/account" class="tb-btn icon" data-header-item="account" [^>]*data-i18n-attr="title:common.account; aria-label:common.account">/);
+      // A labelled item in the account menu (a host marks it aria-current on its own page)
+      expect(header).toMatch(/<a href="\/account" class="tb-btn icon" data-header-item="account" role="menuitem" tabindex="-1">[\s\S]*?<span class="tb-menu-label" data-i18n="common.account">Account<\/span><\/a>/);
       expect(header).not.toContain('href="/access-accounts"');
       expect(tabsOf(tabbarOf(html))).not.toContain('access');
       expect(tabbarOf(html)).not.toContain('href="/access-accounts"');
@@ -523,5 +524,148 @@ describe('Google Photos is in the Upload menu', () => {
     made.uploadBtn.click();
     expect(made.addMenu.popoverOpen).toBe(false);
     expect(uploads).toEqual(['dialog']);
+  });
+});
+
+describe('the account menu (js/appHeader.js)', () => {
+  // The header's menu as pages.js draws it, on a small stand-in page
+  function loadMenu() {
+    const listeners = new Map();
+    let active = null;
+    const make = (id, extra = {}) => {
+      const own = {};
+      const el = {
+        id, hidden: false, attrs: {}, children: [], textContent: '', parent: null,
+        setAttribute(name, value) { this.attrs[name] = String(value); },
+        getAttribute(name) { return this.attrs[name] ?? null; },
+        removeAttribute(name) { delete this.attrs[name]; },
+        addEventListener(type, fn) { (own[type] = own[type] || []).push(fn); },
+        fire(type, props = {}) {
+          const event = { type, target: el, defaultPrevented: false, stopped: false, preventDefault() { this.defaultPrevented = true; }, stopPropagation() { this.stopped = true; }, ...props };
+          for (let node = el; node && !event.stopped; node = node.parent) (node.own[type] || []).forEach(fn => fn(event));
+          if (!event.stopped) (listeners.get(type) || []).forEach(fn => fn(event));
+          return event;
+        },
+        focus() { active = el; },
+        contains(other) { for (let node = other; node; node = node.parent) if (node === el) return true; return false; },
+        closest(selector) { for (let node = el; node; node = node.parent) if (selector === '[role="menuitem"]' && node.attrs.role === 'menuitem') return node; return null; },
+        querySelectorAll() { return el.children.filter(child => child.attrs.role === 'menuitem'); },
+        getClientRects: () => [1],
+        classList: { toggle() {} },
+        own,
+        ...extra
+      };
+      return el;
+    };
+    const button = make('accountMenuBtn');
+    button.setAttribute('aria-expanded', 'false');
+    const list = make('accountMenu');
+    list.hidden = true;
+    const items = ['accountLink', 'themeToggle', 'logoutBtn'].map(id => {
+      const item = make(id);
+      item.setAttribute('role', 'menuitem');
+      item.parent = list;
+      list.children.push(item);
+      return item;
+    });
+    const byId = { accountMenuBtn: button, accountMenu: list, themeToggle: items[1], logoutBtn: items[2], themeLabel: make('themeLabel'), themeIcon: make('themeIcon') };
+    const document = {
+      readyState: 'complete',
+      documentElement: { classList: { toggle() {} } },
+      get activeElement() { return active; },
+      getElementById: id => byId[id] || null,
+      querySelector: () => null,
+      querySelectorAll: () => [],
+      addEventListener: (type, fn) => listeners.set(type, [...(listeners.get(type) || []), fn]),
+      dispatchEvent() {}
+    };
+    const context = { document, localStorage: { getItem: () => null, setItem() {} }, CustomEvent: function () {}, addEventListener() {}, matchMedia: () => ({ matches: false }), fetch: async () => ({ ok: true }), location: {} };
+    context.window = context;
+    vm.createContext(context);
+    vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'public', 'js', 'appHeader.js'), 'utf8'), context);
+    const outside = make('page');
+    return { button, list, items, outside, focused: () => active && active.id, open: () => !list.hidden };
+  }
+
+  test('Enter, Space or Down opens it on the first item; Up on the last; a click opens it without moving focus', () => {
+    for (const key of ['Enter', ' ', 'ArrowDown']) {
+      const menu = loadMenu();
+      menu.button.focus();
+      expect(menu.button.fire('keydown', { key }).defaultPrevented).toBe(true);
+      expect(menu.open()).toBe(true);
+      expect(menu.button.getAttribute('aria-expanded')).toBe('true');
+      expect(menu.focused()).toBe('accountLink');
+    }
+    const up = loadMenu();
+    up.button.fire('keydown', { key: 'ArrowUp' });
+    expect(up.focused()).toBe('logoutBtn');
+    const click = loadMenu();
+    click.button.focus();
+    click.button.fire('click');
+    expect(click.open()).toBe(true);
+    expect(click.focused()).toBe('accountMenuBtn');
+    click.button.fire('click');
+    expect(click.open()).toBe(false);
+  });
+
+  test('arrows go round it, Home and End jump to the ends', () => {
+    const menu = loadMenu();
+    menu.button.fire('keydown', { key: 'Enter' });
+    const key = k => menu.focused() && menu.items.find(item => item.id === menu.focused()).fire('keydown', { key: k });
+    key('ArrowDown');
+    expect(menu.focused()).toBe('themeToggle');
+    key('ArrowDown');
+    key('ArrowDown'); // round the bottom to the top
+    expect(menu.focused()).toBe('accountLink');
+    key('ArrowUp');
+    expect(menu.focused()).toBe('logoutBtn');
+    key('Home');
+    expect(menu.focused()).toBe('accountLink');
+    key('End');
+    expect(menu.focused()).toBe('logoutBtn');
+  });
+
+  test('Escape closes it, back on the button, and goes no further; Tab closes it and moves on', () => {
+    const menu = loadMenu();
+    let pageEscape = 0;
+    menu.button.parent = null;
+    menu.button.fire('keydown', { key: 'Enter' });
+    const escape = menu.items[1].fire('keydown', { key: 'Escape' });
+    expect(escape.stopped).toBe(true);
+    expect(pageEscape).toBe(0);
+    expect(menu.open()).toBe(false);
+    expect(menu.button.getAttribute('aria-expanded')).toBe('false');
+    expect(menu.focused()).toBe('accountMenuBtn');
+
+    menu.button.fire('keydown', { key: 'Enter' });
+    menu.items[0].fire('keydown', { key: 'Tab' });
+    expect(menu.open()).toBe(false);
+    expect(menu.focused()).toBe('accountLink'); // the browser moves focus on from here
+  });
+
+  test('a click elsewhere closes it; the theme item keeps it open, Log out closes it', () => {
+    const menu = loadMenu();
+    menu.button.fire('click');
+    menu.outside.fire('pointerdown');
+    expect(menu.open()).toBe(false);
+    menu.button.fire('click');
+    menu.items[1].fire('click');
+    expect(menu.open()).toBe(true);
+    menu.items[2].fire('click');
+    expect(menu.open()).toBe(false);
+  });
+});
+
+describe('the header markup', () => {
+  test('the account menu: a labelled button that owns a menu of items', () => {
+    const html = pages.renderHeader('library', { settings: true }, { brand: 'Sora Frame', accountUrl: '/account' });
+    expect(html).toMatch(/<button[^>]*id="accountMenuBtn"[^>]*aria-haspopup="menu" aria-expanded="false" aria-controls="accountMenu"/);
+    expect(html).toMatch(/id="accountMenuBtn"[^>]*aria-label="[^"]+"/);
+    expect(html).toMatch(/<div id="accountMenu" class="[^"]*" role="menu" aria-labelledby="accountMenuBtn" hidden>/);
+    // Its items: Account, the theme and Log out, out of the Tab order (the arrows walk them)
+    const list = html.slice(html.indexOf('id="accountMenu"'));
+    for (const id of ['data-header-item="account"', 'id="themeToggle"', 'id="logoutBtn"']) {
+      expect(list).toMatch(new RegExp(`${id}[^>]*role="menuitem" tabindex="-1"`));
+    }
   });
 });

@@ -8,14 +8,20 @@ const { toAdminPath } = require('../utils/safePath');
 const { getLibrary } = require('../library');
 const { jpegCopy, acceptsWebp } = require('../middleware/webpFallback');
 const { currentTenant, DEFAULT_TENANT } = require('../context');
+const photoInfo = require('./photoInfoService');
 
 // v2: keys that always name the family (see cachePathFor). Files from before sit one
 // folder up and are never looked at, so an old key that two families shared can't be served.
 const CACHE_DIR = path.join(CACHE_ROOT, 'thumbs', 'v2');
 const IMAGE_PATTERN = /\.(jpg|jpeg|png|gif|webp)$/i;
 
-// Square cover crop, big enough for a 2x-density grid tile
+// Square cover crop, big enough for a 2x-density grid tile (folder covers, pickers, snaps)
 const THUMB_SIZE = 480;
+// The library grid keeps each photo's shape: rows about 240px tall at 2x density,
+// a panorama at most this wide
+const SHAPED_HEIGHT = 540;
+const SHAPED_MAX_WIDTH = 1280;
+const FITS = ['cover', 'inside'];
 
 /**
  * Generates thumbnails once and keeps them on disk, so the admin grid,
@@ -40,49 +46,73 @@ class ThumbnailService {
     return resolved;
   }
 
-  cachePathFor(sourcePath) {
+  cachePathFor(sourcePath, fit = 'cover') {
     // Tenants share admin paths ("uploads/Family/..."), so their thumbnails must not
     // (the default one included: its "family/a.jpg" must never be tenant "family"'s "a.jpg")
     const { id } = currentTenant();
     const scope = id === DEFAULT_TENANT.id ? '__default__/' : `t/${encodeURIComponent(id)}/`;
     const key = crypto.createHash('sha1')
-      .update(`${scope}${path.relative(UPLOADS_DIR, sourcePath)}:${THUMB_SIZE}`)
+      .update(`${scope}${path.relative(UPLOADS_DIR, sourcePath)}:${fit === 'inside' ? `inside${SHAPED_HEIGHT}` : THUMB_SIZE}`)
       .digest('hex');
     return path.join(CACHE_DIR, `${key}.webp`);
   }
 
   /**
    * Absolute path of a ready thumbnail for an image inside uploads/.
+   * fit: 'cover' (square) or 'inside' (the photo's own shape, for the library grid).
    */
-  async getThumbnail(sourcePath) {
-    const cachePath = this.cachePathFor(sourcePath);
+  async getThumbnail(sourcePath, { fit = 'cover' } = {}) {
+    if (!FITS.includes(fit)) fit = 'cover';
+    const cachePath = this.cachePathFor(sourcePath, fit);
 
     const [source, cached] = await Promise.all([
       getLibrary().stat(toAdminPath(sourcePath)),
       fs.stat(cachePath).catch(() => null)
     ]);
     if (cached && cached.mtimeMs >= source.mtimeMs) {
+      if (fit === 'inside') await this.measureCached(sourcePath, cachePath, source);
       return cachePath;
     }
 
     // Concurrent requests for the same image share one sharp job
     if (!this.inFlight.has(cachePath)) {
-      const job = this.generate(sourcePath, cachePath)
+      const job = this.generate(sourcePath, cachePath, fit, source)
         .finally(() => this.inFlight.delete(cachePath));
       this.inFlight.set(cachePath, job);
     }
     return this.inFlight.get(cachePath);
   }
 
-  async generate(sourcePath, cachePath) {
+  async generate(sourcePath, cachePath, fit = 'cover', sourceStat = null) {
     const tmpPath = `${cachePath}.${process.pid}.tmp`;
-    await sharp(await getLibrary().readPhoto(toAdminPath(sourcePath)))
-      .rotate() // honour EXIF orientation from phone cameras
-      .resize(THUMB_SIZE, THUMB_SIZE, { fit: 'cover' })
-      .webp({ quality: 78 })
-      .toFile(tmpPath);
+    const image = sharp(await getLibrary().readPhoto(toAdminPath(sourcePath)))
+      .rotate(); // honour EXIF orientation from phone cameras
+    if (fit === 'inside') {
+      image.resize(SHAPED_MAX_WIDTH, SHAPED_HEIGHT, { fit: 'inside', withoutEnlargement: true });
+    } else {
+      image.resize(THUMB_SIZE, THUMB_SIZE, { fit: 'cover' });
+    }
+    const made = await image.webp({ quality: 78 }).toFile(tmpPath);
     await fs.move(tmpPath, cachePath, { overwrite: true });
+    // Its shape, so the next listing can lay the grid out before any thumbnail loads
+    if (fit === 'inside' && sourceStat) {
+      await photoInfo.rememberSize(path.relative(UPLOADS_DIR, sourcePath), sourceStat, made.width, made.height)
+        .catch(() => {});
+    }
     return cachePath;
+  }
+
+  // A shaped thumbnail made before its size was kept (or the size cache was cleared): measure it
+  async measureCached(sourcePath, cachePath, sourceStat) {
+    try {
+      const relative = path.relative(UPLOADS_DIR, sourcePath);
+      await photoInfo.loadCache();
+      if (photoInfo.sizeOf(relative, sourceStat)) return;
+      const { width, height } = await sharp(cachePath).metadata();
+      await photoInfo.rememberSize(relative, sourceStat, width, height);
+    } catch {
+      // the grid measures it as it loads
+    }
   }
 
   /**
@@ -124,7 +154,7 @@ class ThumbnailService {
   }
 
   async remove(sourcePath) {
-    await fs.remove(this.cachePathFor(sourcePath)).catch(() => {});
+    await Promise.all(FITS.map(fit => fs.remove(this.cachePathFor(sourcePath, fit)).catch(() => {})));
   }
 
   /**
